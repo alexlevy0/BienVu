@@ -1,6 +1,6 @@
 # Sprint 02 — Comptes, agence et identité visuelle
 
-**Dépendance : sprint 01. Statut initial : à faire.**
+**Dépendance : sprint 01. Code livré et recette locale réussie le 27/09/2026. Validation complète en attente de Google OAuth réel et du staging.**
 
 ## Objectif
 
@@ -11,11 +11,11 @@ Références : [CADRAGE.md](../CADRAGE.md), [CONTRATS.md](../CONTRATS.md), [ARCH
 ## Travail à réaliser
 
 - [ ] **02.1 — Intégrer la connexion.** Configurer le flux OAuth, les sessions et la déconnexion avec les versions compatibles. Vérifier cookies sécurisés, origines autorisées, URL de retour et protections intégrées du fournisseur d'authentification. Aucun jeton de fournisseur ne doit finir dans les journaux ou dans un objet de session envoyé inutilement au navigateur.
-- [ ] **02.2 — Créer l'agence une seule fois.** Rendre la création idempotente, y compris lors de connexions simultanées. Déduire systématiquement l'agence de la session sur les routes serveur. Préparer l'identité d'éligibilité à l'essai sans accorder encore de génération publique.
-- [ ] **02.3 — Enregistrer la marque.** Formulaire simple pour nom, logo, couleurs et coordonnées facultatives. Proposer des valeurs visuelles par défaut. Valider les couleurs et coordonnées, expliquer les champs requis, gérer sauvegarde et erreur. L'identité d'agence est un réglage permanent ; elle n'introduit pas un éditeur d'annonce.
-- [ ] **02.4 — Sécuriser le logo.** Accepter uniquement des formats raster contrôlés avec limites de poids et dimensions. Vérifier le contenu réel du fichier, le décoder et le normaliser si nécessaire. Stocker dans R2 privé. Écarter SVG actif, HTML déguisé et fichier corrompu.
-- [ ] **02.5 — Gérer les versions d'assets.** Une modification de logo s'applique aux futures générations. Une vidéo déjà produite conserve son apparence ; un job en cours utilise la copie de marque de son manifeste. Ne pas supprimer un asset encore référencé par un travail actif.
-- [ ] **02.6 — Tester l'isolation.** Préparer deux agences distinctes et vérifier lectures, écritures, fichiers et URL signées éventuelles. L'identifiant d'agence transmis par le client ne permet jamais de changer de propriétaire.
+- [x] **02.2 — Créer l'agence une seule fois.** Rendre la création idempotente, y compris lors de connexions simultanées. Déduire systématiquement l'agence de la session sur les routes serveur. Préparer l'identité d'éligibilité à l'essai sans accorder encore de génération publique.
+- [x] **02.3 — Enregistrer la marque.** Formulaire simple pour nom, logo, couleurs et coordonnées facultatives. Proposer des valeurs visuelles par défaut. Valider les couleurs et coordonnées, expliquer les champs requis, gérer sauvegarde et erreur. L'identité d'agence est un réglage permanent ; elle n'introduit pas un éditeur d'annonce.
+- [x] **02.4 — Sécuriser le logo.** Accepter uniquement des formats raster contrôlés avec limites de poids et dimensions. Vérifier le contenu réel du fichier, le décoder et le normaliser si nécessaire. Stocker dans R2 privé. Écarter SVG actif, HTML déguisé et fichier corrompu.
+- [x] **02.5 — Gérer les versions d'assets.** Une modification de logo s'applique aux futures générations. Une vidéo déjà produite conserve son apparence ; un job en cours utilise la copie de marque de son manifeste. Ne pas supprimer un asset encore référencé par un travail actif.
+- [x] **02.6 — Tester l'isolation.** Préparer deux agences distinctes et vérifier lectures, écritures, fichiers et URL signées éventuelles. L'identifiant d'agence transmis par le client ne permet jamais de changer de propriétaire.
 
 ## Critères d'acceptation
 
@@ -30,4 +30,10 @@ Références : [CADRAGE.md](../CADRAGE.md), [CONTRATS.md](../CONTRATS.md), [ARCH
 
 Authentification, routes de marque, formulaire, gestion privée des logos et tests ciblés d'isolation. Documenter la configuration OAuth nécessaire sans secrets et mettre à jour [SUIVI.md](../SUIVI.md).
 
-Les abonnements, invitations, rôles d'équipe, connexion par mot de passe et récupération de mot de passe ne sont pas attendus dans ce sprint. Si un autre mode de connexion est retenu, consigner la raison et sa charge d'exploitation avant de l'intégrer.
+Les abonnements, invitations et rôles d’équipe restent hors périmètre. **Extension demandée par Alex le 28/09/2026 : connexion e-mail/mot de passe en plus de Google**, avec confirmation et récupération. Elle remplace l’exclusion initiale des mots de passe. Cloudflare Email Service est préparé ; les essais utilisent son simulateur local. L’envoi réel exige Workers Paid et un domaine vérifié, sans nouveau fournisseur d’hébergement. Voir [AUTHENTIFICATION.md](../AUTHENTIFICATION.md).
+
+## Résultat du 27 septembre 2026
+
+02.1 est implémenté (Better Auth 1.7.6, Google, sessions et déconnexion) mais reste non coché : les identifiants Google ne sont pas configurés et aucun consentement/callback réel n’a été exercé. Les points cochés sont validés **en local** ; 02.5 prouve la conservation des versions et de la copie de marque, pas encore un rendu produit utilisant un logo. Les fixtures d’identité ne simulent pas un succès OAuth réel.
+
+43 tests, types et build OpenNext réussis ; sonde HTTP D1/R2 sous workerd, marque persistante, isolation de deux propriétaires, normalisation des logos, inspection mobile/ordinateur et nettoyage. [Rapport et limites](../preuves/sprint-02/RAPPORT.md) · [Configuration OAuth et reproduction](../AUTHENTIFICATION.md).

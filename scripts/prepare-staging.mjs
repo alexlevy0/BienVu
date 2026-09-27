@@ -9,6 +9,20 @@ for(const [file,target,name] of [
   ['apps/pipeline/wrangler.render.jsonc','apps/pipeline/wrangler.staging.render.jsonc','bienvu-render-probe-staging'],
 ]) {
   const c=JSON.parse(await readFile(file,'utf8'));c.name=name;c.vars.PROBE_MODE='remote';
+  if (name === 'bienvu-web-probe-staging') {
+    const origin = process.env.BIENVU_WEB_ORIGIN ?? '';
+    if (origin && (new URL(origin).origin !== origin || !origin.startsWith('https://'))) throw new Error('BIENVU_WEB_ORIGIN doit être une origine HTTPS exacte.');
+    c.vars.BETTER_AUTH_URL = origin;
+    c.vars.GOOGLE_CLIENT_ID = process.env.BIENVU_GOOGLE_CLIENT_ID ?? '';
+    c.vars.AUTH_EMAIL_VERIFICATION_BYPASS = 'false';
+    const sender = process.env.BIENVU_AUTH_EMAIL_FROM ?? '';
+    if (sender && (plan !== 'paid' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sender) || /\.(example|invalid|test)$/.test(sender)))
+      throw new Error('Un expéditeur réel vérifié et BIENVU_WORKERS_PLAN=paid sont requis pour les e-mails.');
+    c.vars.AUTH_EMAIL_MODE = sender ? 'cloudflare' : 'disabled';
+    c.vars.AUTH_EMAIL_FROM = sender;
+    if (sender) c.send_email = [{name: 'AUTH_EMAIL', allowed_sender_addresses: [sender]}];
+    else delete c.send_email;
+  }
   // La limite CPU personnalisée nécessite Workers Paid. Le plan Free applique sa propre limite.
   if(name==='bienvu-browser-probe-staging'&&plan==='free')delete c.limits;
   c.r2_buckets[0].bucket_name='bienvu-s00-private';

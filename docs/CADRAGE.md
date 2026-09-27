@@ -29,7 +29,7 @@ La préférence de développement est Next.js et TypeScript. Remotion est le mot
 - Voix française synthétique standard, testée à l'écoute ; aucune imitation ou création de voix personnelle.
 - Pas de musique au premier lancement. Pas d'avatar ni de modification générative des pièces.
 - Un utilisateur propriétaire pour une agence ; pas encore d'invitations d'équipe ou de gestion de plusieurs agences.
-- Connexion Google OAuth via Better Auth, proposée pour éviter de maintenir des mots de passe et un service de mails dans le premier lot. Ce n'est pas un choix déjà exprimé par Alex. Le code d'authentification doit permettre d'ajouter ultérieurement un autre fournisseur.
+- Connexion **e-mail/mot de passe en plus de Google**, demandée par Alex le 28/09/2026. Confirmation d’adresse obligatoire et récupération de mot de passe. Better Auth/D1 reste le choix technique d’implémentation ; les e-mails transactionnels sont préparés sur Cloudflare Email Service, avec essais locaux en attendant Workers Paid et un domaine expéditeur vérifié.
 - Essai téléchargeable avec filigrane permanent dans les pixels ; abonnements donnant des vidéos sans filigrane BienVu.
 - Prix proposés uniquement dans BUDGET-ET-OFFRES.md. Ils ne sont ni validés commercialement ni publiés.
 

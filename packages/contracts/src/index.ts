@@ -2,6 +2,7 @@ import {z} from 'zod';
 
 export * from './product';
 export * from './errors';
+export * from './agency';
 
 export const ProbeRender = z.object({
   id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
@@ -39,3 +40,4 @@ export const VideoFixture = z.object({
   scenes: z.array(z.object({image: z.enum(['room-1.png','room-2.png','room-3.png']), caption: z.string().max(160)})).length(3),
 });
 export type VideoFixture = z.infer<typeof VideoFixture>;
+export * from './auth';

@@ -1,1 +1,11 @@
 PROBE_TOKEN=
+BETTER_AUTH_SECRET=
+GOOGLE_CLIENT_SECRET=
+# Facultatif pour une connexion Google réelle. Ne pas remplacer le secret aléatoire.
+GOOGLE_CLIENT_ID=
+# Doit correspondre exactement à l'origine et au callback déclarés chez Google.
+BETTER_AUTH_URL=http://localhost:8787
+# true : e-mail vérifié et session automatique, uniquement en local loopback.
+AUTH_EMAIL_VERIFICATION_BYPASS=false
+# E-mails : valeurs locales dans wrangler.jsonc (AUTH_EMAIL_MODE=local, simulateur).
+# Ne pas y copier un expéditeur réel ; voir docs/AUTHENTIFICATION.md pour le staging.

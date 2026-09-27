@@ -1,0 +1,9 @@
+
+> bienvu@0.0.0 probe:auth-email /Users/alexlevy0/Dev/BienVu
+> node scripts/probe-auth-email.mjs
+
+✓ Inscription HTTP, hash persisté, mail simulé ; aucune session/agence avant confirmation
+✓ Confirmation puis connexion et rechargement : une seule agence, aucun crédit public
+✓ Réinitialisation : secret dans le fragment, usage unique, anciennes sessions/mot de passe invalidés
+✓ CSRF refusé, déconnexion et essai unique conservés, zéro allocation
+Identité synthétique, sessions et agence supprimées.

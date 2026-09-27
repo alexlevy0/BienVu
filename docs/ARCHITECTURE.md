@@ -12,7 +12,8 @@ Statut : proposition à démontrer au sprint 00. Références officielles dans [
 | Données | Cloudflare D1 | Agences, annonces, jobs, abonnements, écritures de quota et coûts |
 | Fichiers | R2 privé | Photos validées, narration, manifeste et MP4 |
 | Rendu | Remotion dans Cloudflare Containers | Chromium et encodage vidéo dans un environnement Linux/Node |
-| Authentification | Better Auth + D1 ; Google OAuth proposé | Sessions et identité vérifiée |
+| Authentification | Better Auth + D1 ; e-mail/mot de passe et Google | Sessions et identité vérifiée ; deux modes demandés par Alex |
+| E-mails de compte | Binding Cloudflare Email Service | Confirmation et récupération ; simulateur local, domaine et Workers Paid requis pour le réel |
 | Texte et voix | API OpenAI, modèles configurables | Script factuel et synthèse vocale |
 | Abonnements | Stripe Checkout + Billing + Customer Portal | Paiement récurrent et gestion client |
 

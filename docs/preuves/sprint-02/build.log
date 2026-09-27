@@ -1,0 +1,93 @@
+
+> bienvu@0.0.0 build:web /Users/alexlevy0/Dev/BienVu
+> pnpm --filter @bienvu/web build:worker
+
+
+> @bienvu/web@0.0.0 build:worker /Users/alexlevy0/Dev/BienVu/apps/web
+> opennextjs-cloudflare build
+
+
+┌─────────────────────────────┐
+│ OpenNext — Cloudflare build │
+└─────────────────────────────┘
+
+Monorepo detected at /Users/alexlevy0/Dev/BienVu
+App directory: /Users/alexlevy0/Dev/BienVu/apps/web
+Next.js version : 16.3.6
+@opennextjs/cloudflare version: 1.20.6
+@opennextjs/aws version: 4.1.4
+workerd compatibility_date: 2026-09-27
+
+┌─────────────────────────────────┐
+│ OpenNext — Building Next.js app │
+└─────────────────────────────────┘
+
+
+> @bienvu/web@0.0.0 build /Users/alexlevy0/Dev/BienVu/apps/web
+> next build --webpack
+
+▲ Next.js 16.3.6 (webpack)
+✓ Running next.config.ts took 167ms
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 9.6s
+  Running TypeScript ...
+  Finished TypeScript in 9.6s ...
+  Collecting page data using 5 workers ...
+  Generating static pages using 5 workers (0/9) ...
+  Generating static pages using 5 workers (2/9)
+  Generating static pages using 5 workers (4/9)
+  Generating static pages using 5 workers (6/9)
+✓ Generating static pages using 5 workers (9/9) in 1861ms
+  Finalizing page optimization ...
+  Collecting build traces ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /abonnement
+├ ○ /agence
+├ ƒ /api/agency
+├ ƒ /api/agency/logo
+├ ƒ /api/agency/logo/[id]
+├ ƒ /api/auth/[...all]
+├ ƒ /api/generations
+├ ƒ /api/me
+├ ƒ /api/probe
+├ ○ /connexion
+├ ○ /generer
+├ ○ /historique
+└ ○ /laboratoire
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+
+┌──────────────────────────────┐
+│ OpenNext — Generating bundle │
+└──────────────────────────────┘
+
+Bundling middleware function...
+Bundling static assets...
+Bundling cache assets...
+Building server function: default...
+Applying code patches: 11.708s
+# copyPackageTemplateFiles
+[35m⚙️ Bundling the OpenNext server...
+[0m
+▲ [WARNING] The "??" operator here will always return the left operand [suspicious-nullish-coalescing]
+
+    .open-next/server-functions/default/apps/web/.next/server/app/api/agency/logo/route.js:1:43178:
+      1 │ ...hod=(1*("Adam7"===b.interlace))??0,this.setBigEndian()}encode(){...
+        ╵                                   ~~
+
+  The left operand of the "??" operator here will never be null or undefined, so it will always be returned. This usually indicates a bug in your code:
+
+    .open-next/server-functions/default/apps/web/.next/server/app/api/agency/logo/route.js:1:43152:
+      1 │ ...._interlaceMethod=(1*("Adam7"===b.interlace))??0,this.setBigEndi...
+        ╵                       ~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+[35mWorker saved in `.open-next/worker.js` 🚀
+[0m
+OpenNext build complete.

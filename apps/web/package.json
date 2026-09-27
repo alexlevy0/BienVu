@@ -1,5 +1,25 @@
 {
-  "name":"@bienvu/web","version":"0.0.0","private":true,
-  "scripts":{"dev":"next dev","build":"next build --webpack","build:worker":"opennextjs-cloudflare build","preview":"wrangler dev --port 8787 --local","typegen":"wrangler types --strict-vars false --env-interface CloudflareEnv cloudflare-env.d.ts","typecheck":"tsc --noEmit"},
-  "dependencies":{"next":"16.3.6","react":"19.3.0","react-dom":"19.3.0","@opennextjs/cloudflare":"1.20.6","@bienvu/contracts":"workspace:*","@bienvu/db":"workspace:*","@bienvu/observability":"workspace:*"}
+  "name": "@bienvu/web",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build --webpack",
+    "build:worker": "opennextjs-cloudflare build",
+    "preview": "wrangler dev --port 8787 --local",
+    "typegen": "wrangler types --strict-vars false --env-interface CloudflareEnv cloudflare-env.d.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@bienvu/contracts": "workspace:*",
+    "@bienvu/db": "workspace:*",
+    "@bienvu/observability": "workspace:*",
+    "@opennextjs/cloudflare": "1.20.6",
+    "better-auth": "1.7.6",
+    "fast-png": "8.0.0",
+    "jpeg-js": "0.4.4",
+    "next": "16.3.6",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  }
 }

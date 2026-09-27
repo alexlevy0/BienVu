@@ -2,7 +2,7 @@
 
 SaaS immobilier en construction : un lien d'annonce → une vidéo verticale avec voix off, aperçu et téléchargement, sans éditeur. Les décisions produit restent dans [docs/CADRAGE.md](docs/CADRAGE.md).
 
-**Sprint 01 : fondations et interface en développement, disponibles en local.** Le tableau de bord, l'identité d'agence, la création, l'historique, l'abonnement et la connexion sont préparés. Aucun paiement, compte client, essai public ou quota commercial n'est activé. Le sprint 00 reste partiellement validé jusqu'à la recette Cloudflare Containers.
+**Sprint 02 : comptes et identité d’agence implémentés en local.** Connexion e-mail/mot de passe en plus de Google, confirmation et récupération, sessions Better Auth, marque persistante et logos privés. Google réel et livraison réelle des e-mails attendent configuration et recette ; l’envoi local est simulé. Aucun paiement ni essai public activé. Le sprint 00 reste partiellement validé jusqu’à la recette Cloudflare Containers. [Configuration et tests des comptes](docs/AUTHENTIFICATION.md).
 
 ## Démarrer localement
 
@@ -20,7 +20,7 @@ pnpm build:web
 pnpm preview
 ```
 
-Dans un second terminal : `pnpm probe:foundations`, puis `pnpm probe:web`. L'interface est sur `http://localhost:8787`. Le build est exécuté par **workerd**. Les sondes vérifient les pages, le refus des générations, puis D1/R2 et le cookie opérateur, et nettoient leurs objets. Les tests D1 locaux couvrent aussi les clés d'agence, les contraintes et le rollback ; ils ne valident pas encore l'authentification client ni le pipeline métier complet.
+Dans un second terminal : `pnpm probe:foundations`, puis `pnpm probe:web` et `pnpm probe:accounts`. L'interface est sur `http://localhost:8787`. Le build est exécuté par **workerd**. Les sondes vérifient les pages, le refus des générations, puis D1/R2 et le cookie opérateur, et nettoient leurs objets. Les tests D1 locaux couvrent aussi les clés d'agence, les contraintes et le rollback ; la sonde comptes vérifie sessions et isolation avec des identités synthétiques, sans valider Google OAuth réel ni le pipeline métier complet.
 
 Pour travailler seulement sur l'interface : `pnpm dev` (`http://localhost:3000`). Ne pas exécuter le build et TypeScript simultanément : Next régénère ses types. Guide détaillé, bindings, arrêt des générations et reproduction depuis une copie propre : [DEVELOPPEMENT.md](docs/DEVELOPPEMENT.md).
 
@@ -70,6 +70,7 @@ Le service Node accepte aussi des jobs via `POST /jobs`, renvoie `202`, puis exp
 | `scripts`, `tests`, `fixtures` | Commandes reproductibles et tests sans API payante |
 | `docs/preuves/sprint-00` | Rapport, procédure distante et preuves synthétiques versionnées |
 | `docs/preuves/sprint-01` | Contrôles locaux, limites et inspection de l'interface |
+| `docs/preuves/sprint-02` | Sessions, marque, logos et isolation locales ; OAuth réel à vérifier |
 | `evidence/local`, `evidence/remote` | Sorties datées, ignorées par Git |
 
 Les documents initiaux restent dans `docs/` pour conserver leurs liens. Les versions directes sont exactes et les dépendances transitives figurent dans `pnpm-lock.yaml`.

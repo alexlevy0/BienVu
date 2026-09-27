@@ -45,3 +45,16 @@ Dans l'échange, son contenu a été consulté via un outil de recherche web, pa
 ## Hors vérification documentaire actuelle
 
 Les CGU particulières de tous les portails, les droits sur chaque photo, les mentions légales immobilières applicables au format vidéo, le statut fiscal d'Alex et la disponibilité de la marque/domaines ne sont pas établis par ces sources techniques. Les étapes produit correspondantes ne doivent pas déclarer automatiquement ces sujets validés.
+
+## Sources du sprint 02 — consultées le 27/09/2026
+
+- [Better Auth : Google](https://better-auth.com/docs/authentication/google), [options](https://better-auth.com/docs/reference/options), [base de données](https://better-auth.com/docs/concepts/database) et [sessions](https://better-auth.com/docs/concepts/session-management). Version retenue 1.7.6, types et adaptateur D1 installés inspectés.
+- [Google : OAuth serveur](https://developers.google.com/identity/protocols/oauth2/web-server), client Web et URI de retour.
+- [Cloudflare : zlib dans Workers](https://developers.cloudflare.com/workers/runtime-apis/nodejs/zlib/). Compatibilité de la décompression bornée effectivement testée sous workerd local.
+- [fast-png](https://github.com/image-js/fast-png), version 8.0.0 ; [jpeg-js](https://github.com/jpeg-js/jpeg-js), version 0.4.4. Bornes et comportement contrôlés dans les sources installées et par les fixtures raster.
+
+## Ajout e-mail/mot de passe — sources consultées le 28/09/2026
+
+- [Better Auth : e-mail/mot de passe](https://better-auth.com/docs/authentication/email-password) : vérification obligatoire, réponses génériques, reset et révocation. Types et code 1.7.6 inspectés pour la liaison entre comptes vérifiés, la consommation du jeton, le hachage et les tâches d’arrière-plan.
+- [Cloudflare Email Service : binding Workers](https://developers.cloudflare.com/email-service/api/send-emails/workers-api/) et [développement local](https://developers.cloudflare.com/email-service/local-development/sending/) : messages structurés, simulation native, contenu dans des fichiers locaux. API et types testés avec Wrangler 4.142.0.
+- [Cloudflare Email Service : tarifs](https://developers.cloudflare.com/email-service/platform/pricing/) : envoi aux destinataires arbitraires réservé à Workers Paid ; 3 000 messages/mois inclus, puis 0,35 USD/1 000. Aucun abonnement activé ici. Les destinations pré-vérifiées du compte relèvent d’un régime distinct et ne suffisent pas pour l’inscription publique d’un SaaS.

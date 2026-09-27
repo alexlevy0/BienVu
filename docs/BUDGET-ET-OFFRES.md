@@ -27,6 +27,8 @@ Commencer sur les domaines de développement fournis. Aucun achat de domaine, ab
 
 Le plan gratuit Browser Run aide à tester le scraping. Le rendu sur Cloudflare Containers nécessite le plan Workers Paid : le produit complet n'est donc pas un hébergement intégralement gratuit.
 
+**Ajout confirmé le 28/09/2026 : e-mail/mot de passe en plus de Google.** [Cloudflare Email Service](https://developers.cloudflare.com/email-service/platform/pricing/) exige Workers Paid pour envoyer aux adresses des utilisateurs : 3 000 e-mails/mois inclus par compte, puis 0,35 USD/1 000 (tarif consulté le 28/09/2026). La préparation utilise cet hébergement déjà prévu, avec un plafond applicatif de 50 messages/jour et 3 par adresse/10 minutes. Les essais locaux coûtent 0 € et n’envoient rien. L’expéditeur exige un domaine vérifié : domaine existant à confirmer ou achat à compter dans les 30 €, sans achat autorisé par cette tranche. Le coût CPU du hachage des mots de passe reste à mesurer sur le Worker distant. Les limites applicatives ne couvrent pas d’autres applications utilisant les allocations du compte Cloudflare.
+
 ### Calcul du rendu, à remplacer par des mesures
 
 Après allocations incluses, les tarifs consultés pour Containers sont : 0,000020 USD par vCPU-seconde utilisée, 0,0000025 USD par GiB-seconde de RAM provisionnée, 0,00000007 USD par GB-seconde de disque provisionné. Les allocations sont notamment 375 vCPU-minutes, 25 GiB-heures et 200 GB-heures par mois. RAM et disque sont facturés selon le type d'instance et son temps actif, pas seulement selon les octets occupés [S07].

@@ -1,0 +1,119 @@
+
+> bienvu@0.0.0 check /Users/alexlevy0/Dev/BienVu
+> pnpm check:boundaries && pnpm test && pnpm typecheck
+
+
+> bienvu@0.0.0 check:boundaries /Users/alexlevy0/Dev/BienVu
+> node scripts/check-boundaries.mjs
+
+Frontières vérifiées : 46 fichiers, renderer et composition isolés des Workers, contrats sans API Node.
+
+> bienvu@0.0.0 test /Users/alexlevy0/Dev/BienVu
+> tsx --test tests/*.test.ts
+
+▶ comptes : Better Auth avec D1 local, identités synthétiques sans Google
+  ✔ cookie signé, session persistée et relue après nouvelle instance, expiration et falsification (339.166834ms)
+  ✔ deux retours concurrents : une agence, une identité essai et zéro crédit accordé (468.645792ms)
+  ✔ marque persistante et propriétaire déduit côté serveur (70.250625ms)
+  ✔ limite d’upload atomique sous concurrence (116.42625ms)
+  ✔ logo étranger refusé en base, ancienne version immuable et plafond de stockage (157.816166ms)
+  ✔ identité Google non vérifiée rejetée ; jetons fournisseur effacés (30.517542ms)
+  ✔ OAuth : état, PKCE, origine/callback étrangers refusés sans contacter Google (182.1145ms)
+  ✔ déconnexion invalide immédiatement le cookie en base (133.102875ms)
+  ✔ CSRF et HTTP non local refusés ; corps borné même sans Content-Length (1.054125ms)
+✔ comptes : Better Auth avec D1 local, identités synthétiques sans Google (2245.316333ms)
+✔ la préparation staging désactive le bypass même si la configuration locale l’active (114.767084ms)
+▶ e-mail/mot de passe : routes réelles et D1, envoi capturé en mémoire
+  ✔ inscription sans session/agence ; hash distinct du mot de passe ; réponse minimale (761.868292ms)
+{"requestId":"c11a6274-69d2-4d35-8533-3f8cbf49ba87","event":"request_completed","status":403,"durationMs":148,"code":"EMAIL_NOT_VERIFIED"}
+{"requestId":"14d6985b-6e9d-4476-b5b9-34ceb7c92e1c","event":"request_completed","status":422,"durationMs":1,"code":"VALIDATION_ERROR"}
+{"requestId":"e37d17bc-efe1-4be1-aad1-6e46a87a9ead","event":"request_completed","status":422,"durationMs":27,"code":"VALIDATION_ERROR"}
+{"requestId":"2aa47e4a-db4e-4df6-9715-86b1b6b2fbe0","event":"request_completed","status":403,"durationMs":1,"code":"FORBIDDEN"}
+{"requestId":"a5c913ce-a1f6-41da-802f-e34473c0a2b4","event":"request_completed","status":422,"durationMs":25,"code":"VALIDATION_ERROR"}
+{"requestId":"5cabc5d7-2843-444b-9f50-9539add1d519","event":"request_completed","status":503,"durationMs":65,"code":"EMAIL_UNAVAILABLE"}
+  ✔ refus avant confirmation ; tentative avec e-mail existant indistinguable ; champs supplémentaires refusés (429.259333ms)
+  ✔ confirmation avec retour fixé ; répétition sans session ; connexion crée une seule agence (549.424708ms)
+{"requestId":"a2cb0331-82c0-487d-86a7-b3ade96a0088","event":"request_completed","status":400,"durationMs":152,"code":"AUTH_CREDENTIALS"}
+{"requestId":"2b5d0299-e57f-4c58-b5f5-840d79649eca","event":"request_completed","status":400,"durationMs":123,"code":"AUTH_CREDENTIALS"}
+  ✔ identifiants incorrects uniformes ; renvoi de confirmation inconnu/vérifié uniforme (1565.134375ms)
+{"requestId":"aa2bda31-6f46-43a5-9be9-ff0412367524","event":"request_completed","status":400,"durationMs":73,"code":"AUTH_LINK_INVALID"}
+{"requestId":"c3d287d7-5050-4483-b4e4-d939e9d0f560","event":"request_completed","status":400,"durationMs":131,"code":"AUTH_CREDENTIALS"}
+  ✔ réinitialisation : message générique, jeton unique, ancien mot de passe/session invalidés (1158.208167ms)
+{"requestId":"6ee27af6-fcd8-4ad5-819c-7afe52a898ea","event":"request_completed","status":400,"durationMs":99,"code":"AUTH_LINK_INVALID"}
+  ✔ expiration du reset et renvoi de confirmation après perte du premier message (1311.792583ms)
+  ✔ compte Google existant : ajout du mot de passe par e-mail, même propriétaire (728.100334ms)
+{"requestId":"297ad740-87cf-4e3b-9dd2-030334288f28","event":"request_completed","status":400,"durationMs":113,"code":"AUTH_FAILED"}
+{"requestId":"1955d1be-aa85-4868-93d4-4c4cadb87ea3","event":"request_completed","status":400,"durationMs":139,"code":"AUTH_CREDENTIALS"}
+  ✔ bypass local : inscription vérifiée, cookie signé et agence sans fournisseur e-mail (824.545042ms)
+{"requestId":"c0f35ffb-47dd-4d89-be2d-8ebb92d0a45d","event":"request_completed","status":400,"durationMs":122,"code":"AUTH_CREDENTIALS"}
+{"requestId":"bd5a56d2-d830-4e6c-b093-fbd12e1ade53","event":"request_completed","status":403,"durationMs":0,"code":"FORBIDDEN"}
+{"requestId":"0f506367-93fc-43a7-b5e1-8e32048228f6","event":"request_completed","status":422,"durationMs":1,"code":"VALIDATION_ERROR"}
+{"requestId":"8c9a167a-d0ef-4d30-afc0-a212f0474140","event":"request_completed","status":403,"durationMs":0,"code":"FORBIDDEN"}
+  ✔ compte local en attente : bypass seulement après vérification du bon mot de passe (652.466417ms)
+  ✔ bypass fermé par défaut, valeurs strictes, refus sur origine publique et contrôle Google maintenu (53.294375ms)
+{"requestId":"84971acb-db7c-440a-867f-323f45771c59","event":"request_completed","status":429,"durationMs":117,"code":"RATE_LIMITED"}
+  ✔ limites HTTP et budget d’envoi atomique ; mode local impossible sur une origine publique (1189.908375ms)
+✔ e-mail/mot de passe : routes réelles et D1, envoi capturé en mémoire (9606.170917ms)
+✔ 5 tentatives maximum ; les échecs ne réinitialisent pas le budget (27.538917ms)
+✔ frais déjà engagés + réservation respectent la pause à 25 € (0.0945ms)
+✔ coupe-circuit et changement de mois exigent action opérateur (0.086167ms)
+✔ coût brut inclut RAM/disque provisionnés pendant tout le temps actif (0.091958ms)
+✔ contrats : vente, location et valeurs facultatives absentes sont distinctes (46.310042ms)
+✔ contradictions traçables mais non générables, photos et provenance contrôlées (1.49725ms)
+✔ URL produit : destinations dangereuses et droits transmis par le client refusés (1.148375ms)
+✔ manifeste : filigrane, isolation des fichiers, références et audio complet obligatoires (2.886584ms)
+✔ état terminal de job : pas de bail actif ni succès avec erreur (1.656208ms)
+▶ D1 local réel : migrations, isolation, contraintes et rollback du batch
+  ✔ liens inter-agences rejetés sans écriture partielle (75.93825ms)
+  ✔ préfixe média exact, même avec underscore dans l’agence (19.096ms)
+  ✔ lecture toujours limitée à l’agence du contexte serveur (57.353166ms)
+  ✔ idempotence et unicité du traitement actif survivent à deux requêtes (85.776833ms)
+  ✔ rollback complet si une réservation dépasse la capacité (52.613542ms)
+  ✔ coûts dédupliqués sans écrasement, arrêt par défaut (184.159417ms)
+✔ D1 local réel : migrations, isolation, contraintes et rollback du batch (1717.619542ms)
+✔ faits sourcés et unités explicites sur fixture (9.184667ms)
+✔ biens voisins et plusieurs annonces ne sont pas mélangés (0.349333ms)
+✔ prix contradictoires bloquent le résultat (0.112667ms)
+✔ loyer jamais présenté comme prix de vente (5.878ms)
+✔ prix et surface non vérifiables sont omis, pas remplacés par zéro (0.380417ms)
+✔ page agence seule ou identité incomplète ne compte pas comme annonce (1.477375ms)
+✔ adaptateur agence : galerie limitée à la référence, contradiction bloquante (1.210875ms)
+✔ logos synthétiques : vrais PNG/JPEG décodés, réencodés, sans métadonnées (46.724792ms)
+✔ PNG à palette et entrelacé conservés après normalisation (16.869167ms)
+✔ logos malveillants/corrompus : SVG, HTML déguisé, mauvais MIME, troncature, CRC, bombe de dimensions (5.290542ms)
+✔ journaux sur liste blanche : aucun cookie, clé, URL signée, corps ou stack (11.991916ms)
+✔ fixture HTTP : un rendu échoué conserve le reçu et la dépense réservée dans les preuves (359.447417ms)
+✔ URL dangereuses et domaines trompeurs refusés (24.564709ms)
+✔ IPv4/IPv6 privés, link-local, multicast et adresses mappées refusés (11.778167ms)
+✔ DNS mixte privé/public et DNS vide échouent fermés (42.318416ms)
+✔ taille limitée même sans Content-Length (3.94175ms)
+✔ renderer refuse traversée de chemin, URL, durée et droits arbitraires (3.912667ms)
+ℹ tests 56
+ℹ suites 0
+ℹ pass 56
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12282.601542
+
+> bienvu@0.0.0 typecheck /Users/alexlevy0/Dev/BienVu
+> pnpm -r typecheck && tsc -p tsconfig.tests.json
+
+Scope: 8 of 9 workspace projects
+packages/contracts typecheck$ tsc -p tsconfig.json
+packages/contracts typecheck: Done
+packages/db typecheck$ tsc -p tsconfig.json
+packages/observability typecheck$ tsc -p tsconfig.json
+packages/importers typecheck$ tsc -p tsconfig.json
+packages/video typecheck$ tsc -p tsconfig.json
+packages/importers typecheck: Done
+packages/observability typecheck: Done
+packages/db typecheck: Done
+packages/video typecheck: Done
+apps/renderer typecheck$ tsc -p tsconfig.json
+apps/pipeline typecheck$ tsc -p tsconfig.json
+apps/web typecheck$ tsc --noEmit
+apps/pipeline typecheck: Done
+apps/renderer typecheck: Done
+apps/web typecheck: Done

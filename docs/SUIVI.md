@@ -1,8 +1,12 @@
 # BienVu — suivi des sprints
 
-Dernière mise à jour : 27 septembre 2026.
+Dernière mise à jour : 28 septembre 2026.
 
 ## État actuel
+
+**Ajout du 28/09 : bypass local de vérification e-mail.** `AUTH_EMAIL_VERIFICATION_BYPASS=true` est activé dans `apps/web/.dev.vars` sur le poste ; les configurations versionnées restent à `false`. Une inscription marque l’adresse vérifiée et ouvre directement l’agence avec une vraie session, sans mail. Un compte local en attente passe vérifié seulement après saisie du bon mot de passe. Mode réservé à localhost/127.0.0.1, interdit sur origine publique, staging forcé à `false`. [Configuration](AUTHENTIFICATION.md#bypass-de-vérification-pour-le-développement) · [preuve spécifique](preuves/sprint-02/BYPASS-LOCAL.md). Cela ne valide pas une adresse réelle et ne clôt pas la recette distante du sprint 02.
+
+**Sprint 02 : code livré et vérifié en local, validation complète en attente.** Better Auth 1.7.6/D1, agence unique par propriétaire, formulaire persistant, logos PNG/JPEG privés et versionnés. **56 tests**, TypeScript, build OpenNext et sondes workerd D1/R2 réussis ; inspection desktop/mobile. L’extension e-mail/mot de passe demandée le 28/09 est implémentée : inscription avec confirmation, connexion, récupération et révocation. Le hachage est exercé dans workerd ; les messages sont simulés, aucune livraison réelle validée. [Rapport de cette extension](preuves/sprint-02/EMAIL-MOT-DE-PASSE.md). La connexion Google réelle n’a pas été testée : `GOOGLE_CLIENT_ID` et `GOOGLE_CLIENT_SECRET` sont absents. [Rapport et preuves](preuves/sprint-02/RAPPORT.md) · [configuration OAuth et recette restante](AUTHENTIFICATION.md). Aucun quota public ni paiement activé.
 
 **Sprint 01 : fondations livrées et vérifiées en local**, à la demande d'Alex de poursuivre sans attendre Workers Paid. Interface française, contrats métier, migrations D1, CI préparée et observabilité disponibles. Installation depuis une copie propre, 30 tests, TypeScript et build OpenNext réussis. Aucun déploiement de cette tranche ; [rapport du sprint 01](preuves/sprint-01/RAPPORT.md) et [guide local](DEVELOPPEMENT.md).
 
@@ -17,8 +21,8 @@ Après reconnexion Wrangler par Alex, puis activation de R2 par Alex, deux Worke
 | Sprint | Statut | Preuves | Reste |
 |---|---|---|---|
 | 00 | Code livré, validation partielle | Workers/D1/R2/cookie distants ; import agence avec trois photos ; MP4 natifs 6/30 s ; image Linux et rendu 6 s réussis ; son local entendu par Alex | Durée cible Linux, Containers/R2/sommeil, recette du MP4 distant et facture |
-| 01 | Livré et vérifié en local | Copie propre, 30 tests, types, migrations, build OpenNext, sondes workerd et inspection mobile/ordinateur | Déploiement/migrations de staging et exécution GitHub CI non faits ; validation Containers du sprint 00 distincte |
-| 02 | À faire | — | Compte et marque |
+| 01 | Livré et vérifié en local | Copie propre, 30 tests, types, migrations, build OpenNext, sondes workerd et inspection mobile/ordinateur | Déploiement/migrations de staging non faits ; résultat GitHub CI non contrôlé ici ; validation Containers du sprint 00 distincte |
+| 02 | Code livré ; local validé ; OAuth et mails réels restants | 56 tests, build, e-mail/mot de passe avec mails simulés, sessions Better Auth/D1, marque, logos R2 privés, isolation, UI mobile/desktop | Client Google, domaine expéditeur vérifié + Workers Paid, réception réelle, staging, mesure CPU logos/scrypt |
 | 03 | À faire | — | Import agences et sécurité d'URL client |
 | 04 | À faire | — | Portails et couverture générique |
 | 05 | À faire | — | Script et voix |
@@ -35,7 +39,7 @@ Après reconnexion Wrangler par Alex, puis activation de R2 par Alex, deux Worke
 | Adaptation Next.js | Next 16.3.6, React 19.3.0, OpenNext 1.20.6, Wrangler 4.142.0 | Build, workerd local et Worker distant réussis ; pas de migration silencieuse |
 | Rendu | Remotion 4.0.529, Node 24.17.0, Linux amd64 prévu pour Containers | Rendus natifs 6/30 s et Linux 6 s réussis ; hébergement Containers non validé |
 | Taille / concurrence | standard-2 proposé, un rendu simultané | Mesure distante à faire |
-| Auth client | Better Auth + Google OAuth | Proposition, pas une décision confirmée |
+| Auth client | E-mail/mot de passe **en plus de Google**, demandé par Alex le 28/09 ; Better Auth 1.7.6 + D1 retenu techniquement | Sessions, confirmation et reset locaux prouvés ; mails simulés, Google réel non testé. Cloudflare Email Service préparé sans activation distante |
 | Texte / voix | API OpenAI, modèles et voix configurables | Aucun appel ; qualité française et coût non mesurés |
 | Prix et quotas | 29/59/99 € HT pour 10/30/60 vidéos | Hypothèses commerciales non validées |
 | Format | 1080×1920, environ 30 s, un modèle | Valeurs proposées, éprouvées sur médias synthétiques |
@@ -78,6 +82,35 @@ Après reconnexion Wrangler par Alex, puis activation de R2 par Alex, deux Worke
 - **Inspection :** tableau de bord et agence vus sur ordinateur, plusieurs pages vues à 390 px ; champs désactivés et refus d'une URL locale vérifiés dans le navigateur. Aucun débordement horizontal sur les pages mesurées. [Compte rendu](preuves/sprint-01/inspection-ui.json).
 - **Limites / coût :** authentification, enregistrement de marque, génération et facturation non intégrés. CI non exécutée sur GitHub ; staging inchangé. Aucun nouveau conteneur Docker, appel payant ou déploiement. Coût fournisseur supplémentaire attendu : 0 € ; facture non relue. [Rapport complet](preuves/sprint-01/RAPPORT.md).
 
+## Sprint 02 — comptes et marque en local
+
+- **Contexte Git :** Alex confirme avoir défini `main` par défaut sur GitHub et effectué le checkout local. Travail poursuivi sur `main` depuis le commit `3d41aaa`. Aucun commit/push de cette tranche effectué.
+- **Livré :** authentification Better Auth/Google prête à configurer, sessions et déconnexion, agence idempotente, trace d’éligibilité sans allocation, marque persistante, logos privés/versionnés, isolation serveur et limite des uploads. Le formulaire conserve les champs non enregistrés lors d’un remplacement de logo.
+- **Fichiers :** `apps/web/lib`, routes `api/auth`, `api/me`, `api/agency`, composants compte/agence, contrat `agency.ts`, accès D1 et migration `0004_accounts_brand.sql`, tests comptes/logos, sondes/opérateur local, setup, Wrangler/types, CI, manifests, lockfile et [documentation OAuth](AUTHENTIFICATION.md).
+- **Commandes exécutées :** installation des dépendances exactes ; `pnpm setup:local`, `pnpm --filter @bienvu/web typegen`, tests ciblés puis `pnpm check`, `pnpm db:migrate` et réapplication, `pnpm build:web`, `pnpm preview`, `pnpm probe:accounts` (avec conservation temporaire pour UI puis nettoyage), `pnpm probe:foundations`, `pnpm probe:web`, contrôle des secrets candidats Git et des liens documentaires.
+- **Résultats locaux :** 43 tests réussis, types et frontières vérifiés, migration sur base vide/locale existante, build final réussi. Neuf groupes HTTP passent dans workerd : sessions, concurrence, validation, CSRF, logos PNG/JPEG réellement décodés/réencodés, refus inter-agences et visiteur, conservation des anciennes versions, déconnexion et absence de crédit/job/coût. [Journal](preuves/sprint-02/check.log), [preuve HTTP](preuves/sprint-02/accounts-workerd.json).
+- **Interface :** formulaire vu en 1280×720 et 390×844 ; erreurs de nom/couleur, sauvegarde, rechargement et déconnexion exercés. Connexion non configurée clairement indiquée. Aucun débordement horizontal mesuré à 390 px ; sélecteur de fichier natif non exercé, upload vérifié par API. [Inspection](preuves/sprint-02/inspection-ui.json).
+- **Réel vs fixtures :** D1/R2/workerd et la bibliothèque d’authentification s’exécutent réellement en local ; utilisateurs et logos sont synthétiques. Les contrôles OAuth couvrent URL d’autorisation, PKCE, origine et état invalide, sans consentement ni callback Google réussi. Ne pas cocher 02.1 ni déclarer le sprint entièrement validé sur cette base.
+- **Limites :** configuration et recette Google, staging, mesures CPU distantes à faire. Anciens logos conservés sous plafond 64 versions/32 Mio ; rapprochement des uploads interrompus/purge respectant les manifestes à préparer avant exploitation durable. Aucun rendu produit avec marque ni pipeline public ouvert.
+- **Coût / arrêt :** aucun appel applicatif distant, abonnement, paiement, API IA, Browser Run ou Docker. 0 € fournisseur supplémentaire attendu, facture non relue. Comptes et logos de recette supprimés ; preview workerd conservé au port 8787. [Rapport complet](preuves/sprint-02/RAPPORT.md).
+
+## Extension du sprint 02 — e-mail/mot de passe, 28 septembre 2026
+
+- **Décision d’Alex :** conserver Google et proposer aussi e-mail/mot de passe. L’exclusion initiale des mots de passe est remplacée dans le cadrage et le sprint.
+- **Livré :** formulaire d’inscription/connexion, confirmation d’adresse et renvoi, récupération avec lien unique et révocation des sessions, même agence pour un compte Google récupéré par e-mail. Binding Cloudflare Email Service préparé, fermé par défaut en staging ; plafonds atomiques d’envoi 50/jour et 3/adresse/10 minutes.
+- **Fichiers :** `components/login.tsx`, `lib/auth.ts`, `auth-handler.ts`, `auth-email.ts`, route `api/auth`, contrats `auth.ts`, migration `0005_auth_mail_limits.sql`, tests `auth-email.test.ts`, sonde `probe-auth-email.mjs`, Wrangler/types, CI et préparation staging ; documents produit, budget et configuration actualisés.
+- **Commandes exécutées :** `pnpm --filter @bienvu/web typegen`, `pnpm db:migrate` puis réapplication, tests ciblés, `pnpm check`, `pnpm build:web`, `pnpm preview`, `BIENVU_PREVIEW_LOG=… pnpm probe:auth-email`, `pnpm probe:accounts`, `pnpm probe:foundations`, `pnpm probe:web`, inspection navigateur et contrôle des secrets candidats Git.
+- **Résultats :** 52 tests réussis, TypeScript et build ; parcours HTTP d’inscription sans insertion de compte préalable, confirmation, connexion/rechargement, reset et déconnexion sous workerd. Scrypt et D1 s’exécutent réellement en local. Les nouveaux tests protègent aussi erreur/expiration/rejeu, CSRF, révocation, réponse générique, plafonds, configuration fermée et conservation de l’essai.
+- **Réel vs fixtures :** identités synthétiques, mails capturés en mémoire dans les tests et par le simulateur Wrangler dans la sonde ; **aucun mail reçu réellement**, aucun échange Google réussi. Le test de récupération Google utilise une identité fournisseur synthétique en D1. Les comptes de recette sont nettoyés.
+- **Restant / coûts :** domaine expéditeur vérifié, Workers Paid, client Google et recette distante (livraison/spam, parcours entre modes, HTTPS, CPU scrypt et facture). 0 € d’appel applicatif externe, aucun achat, Docker ou déploiement. Aucun commit/push. [Rapport et preuves](preuves/sprint-02/EMAIL-MOT-DE-PASSE.md).
+
+## Vérification du bypass local
+
+- **Fichiers :** `lib/auth.ts` (drapeau, hooks limités aux parcours e-mail), `auth-handler.ts` (origine locale, inscription sans transport, réponse sans jeton), `components/login.tsx` (redirection automatique), Wrangler/types, `.dev.vars.example`, préparation staging, tests et variante `probe:auth-email --bypass`.
+- **Configuration :** variable serveur exacte `true`, `false` par défaut. Activation seulement dans le fichier local ignoré ; aucun secret affiché, aucun changement de configuration distante ni migration de données utilisateur.
+- **Vérifications :** `typegen`, `pnpm check` (56 tests dont défaut/activation, session immédiate, adresse persistée, ancien compte en attente, mauvais mot de passe, réinscription, CSRF, origine publique et génération de configuration staging), build OpenNext, sonde HTTP workerd puis inscription navigateur sur compte synthétique. Rapports séparés de la recette normale par e-mail.
+- **Coût / limites :** aucun appel externe, e-mail réel, Docker, abonnement ou déploiement. Les adresses ainsi marquées sont des fixtures locales ; les contrôles Google réels et livraison réelle restent à faire.
+
 ## Couverture des sources
 
 | Source | Mode effectivement testé | Liens uniques | Tentatives Cloudflare | Succès | Limite / résultat |
@@ -97,8 +130,10 @@ Après reconnexion Wrangler par Alex, puis activation de R2 par Alex, deux Worke
 | 27/09/2026 | Browser Run | 5 sessions, 63,301 s mesurées, échecs compris ; 536,699 s de quota quotidien restantes | 0 € après quota ; brut théorique 0,001582525 USD | Non consultée | 30 € |
 | 27/09/2026 | Texte/TTS, Remotion | 0 appel API ; licence gratuite pour 1–3 personnes | 0 € | Aucun achat | 30 € |
 | 27/09/2026 | Sprint 01 local | Tests de contrats, D1/workerd local, builds et inspection UI ; aucun appel fournisseur payant | 0 € fournisseur attendu | Aucun achat ; facture non relue | 30 € estimés |
+| 27–28/09/2026 | Sprint 02 local | Sessions et identités synthétiques, D1/R2 locaux, images, builds et UI ; aucun appel applicatif distant | 0 € fournisseur attendu | Aucun achat ; facture non relue | 30 € estimés |
+| 28/09/2026 | Extension e-mail/mot de passe | Hachage réel et mails simulés en local, contrôles D1/workerd et UI | 0 € fournisseur | Aucun achat ni envoi réel | 30 € estimés |
 | À venir, non engagé | Workers Paid + Containers | Provision indicative 8 € fixes et 0,50 €/tentative, 3 essais initiaux / 5 max | À recalculer avec change/taxes et facture | Aucun achat | Non engagé |
 
 ## Prochaine vérification
 
-Les fondations du sprint 01 sont disponibles en local (`pnpm preview`, port 8787). Attendre l'activation de Workers Paid annoncée par Alex pour le 28/09/2026 avant les essais Containers du sprint 00 : courte vidéo puis 30 s, MP4 récupéré depuis R2 privé, lecture/écoute, concurrence, fin effective, sommeil et consommation facturable, dans les limites déjà préparées. L'audibilité locale est confirmée ; le rendu hébergé reste à démontrer. La future mise à jour du staging avec le sprint 01 nécessitera ses migrations et une nouvelle sonde web distante ; aucun de ces actes n'a été effectué pendant la phase locale.
+Les sprints 01–02 sont disponibles en local (`pnpm preview`, port 8787). Configurer le client Google puis réaliser la recette décrite dans [AUTHENTIFICATION.md](AUTHENTIFICATION.md) ; un abonnement Workers Paid ne fournit pas ces identifiants OAuth. Attendre l'activation de Workers Paid annoncée par Alex pour le 28/09/2026 avant les essais Containers du sprint 00 : courte vidéo puis 30 s, MP4 récupéré depuis R2 privé, lecture/écoute, concurrence, fin effective, sommeil et consommation facturable, dans les limites déjà préparées. L'audibilité locale est confirmée ; le rendu hébergé reste à démontrer. La future mise à jour du staging avec les sprints 01–02 nécessitera leurs migrations et une nouvelle sonde web distante ; aucun de ces actes n'a été effectué pendant la phase locale.

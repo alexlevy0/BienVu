@@ -1,0 +1,7 @@
+
+> bienvu@0.0.0 probe:auth-email /Users/alexlevy0/Dev/BienVu
+> node scripts/probe-auth-email.mjs --bypass
+
+✓ Inscription : adresse vérifiée en D1, session immédiate, agence unique, aucun mail
+✓ Session persistante, mauvais mot de passe et réinscription refusés, zéro allocation, déconnexion
+Identité synthétique, sessions et agence supprimées.

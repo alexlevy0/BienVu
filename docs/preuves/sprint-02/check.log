@@ -1,0 +1,87 @@
+
+> bienvu@0.0.0 check /Users/alexlevy0/Dev/BienVu
+> pnpm check:boundaries && pnpm test && pnpm typecheck
+
+
+> bienvu@0.0.0 check:boundaries /Users/alexlevy0/Dev/BienVu
+> node scripts/check-boundaries.mjs
+
+Frontières vérifiées : 42 fichiers, renderer et composition isolés des Workers, contrats sans API Node.
+
+> bienvu@0.0.0 test /Users/alexlevy0/Dev/BienVu
+> tsx --test tests/*.test.ts
+
+▶ comptes : Better Auth avec D1 local, identités synthétiques sans Google
+  ✔ cookie signé, session persistée et relue après nouvelle instance, expiration et falsification (214.7555ms)
+  ✔ deux retours concurrents : une agence, une identité essai et zéro crédit accordé (619.584083ms)
+  ✔ marque persistante et propriétaire déduit côté serveur (80.8585ms)
+  ✔ limite d’upload atomique sous concurrence (115.776834ms)
+  ✔ logo étranger refusé en base, ancienne version immuable et plafond de stockage (220.767084ms)
+  ✔ identité Google non vérifiée rejetée ; jetons fournisseur effacés (45.199292ms)
+  ✔ OAuth : état, PKCE, origine/callback étrangers refusés sans contacter Google (246.43225ms)
+  ✔ déconnexion invalide immédiatement le cookie en base (198.494125ms)
+  ✔ CSRF et HTTP non local refusés ; corps borné même sans Content-Length (1.554209ms)
+✔ comptes : Better Auth avec D1 local, identités synthétiques sans Google (2680.523083ms)
+✔ 5 tentatives maximum ; les échecs ne réinitialisent pas le budget (9.42425ms)
+✔ frais déjà engagés + réservation respectent la pause à 25 € (0.279959ms)
+✔ coupe-circuit et changement de mois exigent action opérateur (0.230458ms)
+✔ coût brut inclut RAM/disque provisionnés pendant tout le temps actif (0.234375ms)
+✔ contrats : vente, location et valeurs facultatives absentes sont distinctes (37.529041ms)
+✔ contradictions traçables mais non générables, photos et provenance contrôlées (12.882083ms)
+✔ URL produit : destinations dangereuses et droits transmis par le client refusés (1.5145ms)
+✔ manifeste : filigrane, isolation des fichiers, références et audio complet obligatoires (6.019875ms)
+✔ état terminal de job : pas de bail actif ni succès avec erreur (1.683917ms)
+▶ D1 local réel : migrations, isolation, contraintes et rollback du batch
+  ✔ liens inter-agences rejetés sans écriture partielle (92.453625ms)
+  ✔ préfixe média exact, même avec underscore dans l’agence (27.626792ms)
+  ✔ lecture toujours limitée à l’agence du contexte serveur (135.912ms)
+  ✔ idempotence et unicité du traitement actif survivent à deux requêtes (148.700292ms)
+  ✔ rollback complet si une réservation dépasse la capacité (65.807459ms)
+  ✔ coûts dédupliqués sans écrasement, arrêt par défaut (192.488459ms)
+✔ D1 local réel : migrations, isolation, contraintes et rollback du batch (2059.256916ms)
+✔ faits sourcés et unités explicites sur fixture (15.696167ms)
+✔ biens voisins et plusieurs annonces ne sont pas mélangés (1.5185ms)
+✔ prix contradictoires bloquent le résultat (0.586083ms)
+✔ loyer jamais présenté comme prix de vente (1.6955ms)
+✔ prix et surface non vérifiables sont omis, pas remplacés par zéro (0.443208ms)
+✔ page agence seule ou identité incomplète ne compte pas comme annonce (1.098125ms)
+✔ adaptateur agence : galerie limitée à la référence, contradiction bloquante (10.957875ms)
+✔ logos synthétiques : vrais PNG/JPEG décodés, réencodés, sans métadonnées (72.689583ms)
+✔ PNG à palette et entrelacé conservés après normalisation (19.113959ms)
+✔ logos malveillants/corrompus : SVG, HTML déguisé, mauvais MIME, troncature, CRC, bombe de dimensions (5.275916ms)
+✔ journaux sur liste blanche : aucun cookie, clé, URL signée, corps ou stack (2.934875ms)
+✔ fixture HTTP : un rendu échoué conserve le reçu et la dépense réservée dans les preuves (649.56ms)
+✔ URL dangereuses et domaines trompeurs refusés (4.096042ms)
+✔ IPv4/IPv6 privés, link-local, multicast et adresses mappées refusés (6.523458ms)
+✔ DNS mixte privé/public et DNS vide échouent fermés (48.033791ms)
+✔ taille limitée même sans Content-Length (10.825958ms)
+✔ renderer refuse traversée de chemin, URL, durée et droits arbitraires (8.968542ms)
+ℹ tests 43
+ℹ suites 0
+ℹ pass 43
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7082.747667
+
+> bienvu@0.0.0 typecheck /Users/alexlevy0/Dev/BienVu
+> pnpm -r typecheck && tsc -p tsconfig.tests.json
+
+Scope: 8 of 9 workspace projects
+packages/contracts typecheck$ tsc -p tsconfig.json
+packages/contracts typecheck: Done
+packages/db typecheck$ tsc -p tsconfig.json
+packages/observability typecheck$ tsc -p tsconfig.json
+packages/importers typecheck$ tsc -p tsconfig.json
+packages/video typecheck$ tsc -p tsconfig.json
+packages/db typecheck: Done
+packages/observability typecheck: Done
+packages/importers typecheck: Done
+packages/video typecheck: Done
+apps/pipeline typecheck$ tsc -p tsconfig.json
+apps/web typecheck$ tsc --noEmit
+apps/renderer typecheck$ tsc -p tsconfig.json
+apps/pipeline typecheck: Done
+apps/renderer typecheck: Done
+apps/web typecheck: Done

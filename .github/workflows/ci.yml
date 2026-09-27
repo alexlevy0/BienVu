@@ -39,8 +39,13 @@ jobs:
           done
           pnpm probe:foundations
           pnpm probe:web
+          pnpm probe:accounts
+          BIENVU_PREVIEW_LOG=/tmp/bienvu-preview.log pnpm probe:auth-email
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: preuves-locales
-          path: evidence/local/sprint-01/
+          path: |
+            evidence/local/sprint-01/
+            evidence/local/sprint-02/accounts-workerd.json
+            evidence/local/sprint-02/email-workerd.json
