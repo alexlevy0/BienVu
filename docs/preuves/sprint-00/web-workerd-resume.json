@@ -1,0 +1,14 @@
+{
+  "at": "2026-09-27T18:39:35.433Z",
+  "target": "http://localhost:8787",
+  "environment": "workerd-local",
+  "checks": [
+    "sans secret : 401",
+    "sans cookie : 401",
+    "D1/R2 écrits, cookie HttpOnly Secure Strict",
+    "cookie relu, D1/R2 concordants",
+    "cookie inconnu : 404",
+    "artefacts de sonde nettoyés"
+  ],
+  "pass": true
+}

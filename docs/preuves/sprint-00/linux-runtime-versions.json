@@ -1,0 +1,9 @@
+{
+  "node": "v24.17.0",
+  "platform": "linux",
+  "arch": "x64",
+  "totalMemoryBytes": 4109111296,
+  "cgroupMemoryMax": "6442450944",
+  "cgroupCpuMax": "100000 100000",
+  "ffmpeg": "ffmpeg version 5.1.9-0+deb12u1 Copyright (c) 2000-2026 the FFmpeg developers"
+}

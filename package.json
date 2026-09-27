@@ -1,0 +1,31 @@
+{
+  "name": "bienvu", "version": "0.0.0", "private": true, "type": "module",
+  "packageManager": "pnpm@10.33.2",
+  "engines": {"node": ">=24.17.0 <25"},
+  "scripts": {
+    "dev": "pnpm --filter @bienvu/web dev",
+    "preview": "pnpm --filter @bienvu/web preview",
+    "db:migrate": "pnpm --filter @bienvu/web exec wrangler d1 migrations apply DB --local",
+    "check:boundaries": "node scripts/check-boundaries.mjs",
+    "check": "pnpm check:boundaries && pnpm test && pnpm typecheck",
+    "probe:foundations": "node scripts/probe-foundations.mjs",
+    "setup:local": "node scripts/setup-local.mjs",
+    "fixtures": "tsx scripts/generate-fixtures.ts",
+    "test": "tsx --test tests/*.test.ts",
+    "typecheck": "pnpm -r typecheck && tsc -p tsconfig.tests.json",
+    "generations:pause": "node scripts/pause-generations.mjs",
+    "build:web": "pnpm --filter @bienvu/web build:worker",
+    "probe:web": "node scripts/probe-web.mjs",
+    "probe:browser": "node scripts/probe-browser.mjs",
+    "probe:renderer": "node scripts/probe-renderer.mjs",
+    "render:local": "node scripts/renderer-native.mjs render",
+    "serve:renderer": "node scripts/renderer-native.mjs serve",
+    "budget": "tsx scripts/budget.ts",
+    "versions": "node scripts/versions.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1", "@types/react": "19.3.0", "@types/react-dom": "19.2.3",
+    "sharp": "0.35.5", "tsx": "4.23.15", "typescript": "5.9.3", "wrangler": "4.142.0",
+    "miniflare": "5.20260926.0-alpha"
+  }
+}

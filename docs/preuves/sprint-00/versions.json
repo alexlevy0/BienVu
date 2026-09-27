@@ -1,0 +1,462 @@
+{
+  "at": "2026-09-27T17:04:10.855Z",
+  "node": "v24.17.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "pnpm": "10.33.2",
+  "packages": [
+    {
+      "name": "bienvu",
+      "version": "0.0.0",
+      "path": "/Users/alexlevy0/Dev/BienVu",
+      "private": true,
+      "devDependencies": {
+        "@types/node": {
+          "from": "@types/node",
+          "version": "24.10.1",
+          "resolved": "https://registry.npmjs.org/@types/node/-/node-24.10.1.tgz",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/@types+node@24.10.1/node_modules/@types/node"
+        },
+        "@types/react": {
+          "from": "@types/react",
+          "version": "19.3.0",
+          "resolved": "https://registry.npmjs.org/@types/react/-/react-19.3.0.tgz",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/@types+react@19.3.0/node_modules/@types/react"
+        },
+        "@types/react-dom": {
+          "from": "@types/react-dom",
+          "version": "19.2.3",
+          "resolved": "https://registry.npmjs.org/@types/react-dom/-/react-dom-19.2.3.tgz",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/@types+react-dom@19.2.3_@types+react@19.3.0/node_modules/@types/react-dom"
+        },
+        "sharp": {
+          "from": "sharp",
+          "version": "0.35.5",
+          "resolved": "https://registry.npmjs.org/sharp/-/sharp-0.35.5.tgz",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/sharp@0.35.5_@types+node@24.10.1/node_modules/sharp"
+        },
+        "tsx": {
+          "from": "tsx",
+          "version": "4.23.15",
+          "resolved": "https://registry.npmjs.org/tsx/-/tsx-4.23.15.tgz",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/tsx@4.23.15/node_modules/tsx"
+        },
+        "typescript": {
+          "from": "typescript",
+          "version": "5.9.3",
+          "resolved": "https://registry.npmjs.org/typescript/-/typescript-5.9.3.tgz",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/typescript@5.9.3/node_modules/typescript"
+        },
+        "wrangler": {
+          "from": "wrangler",
+          "version": "4.142.0",
+          "resolved": "https://registry.npmjs.org/wrangler/-/wrangler-4.142.0.tgz",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/wrangler@4.142.0_@types+node@24.10.1/node_modules/wrangler"
+        }
+      }
+    },
+    {
+      "name": "@bienvu/pipeline",
+      "version": "0.0.0",
+      "path": "/Users/alexlevy0/Dev/BienVu/apps/pipeline",
+      "private": true,
+      "dependencies": {
+        "@bienvu/contracts": {
+          "from": "@bienvu/contracts",
+          "version": "link:../../packages/contracts",
+          "path": "/Users/alexlevy0/Dev/BienVu/packages/contracts"
+        },
+        "@bienvu/importers": {
+          "from": "@bienvu/importers",
+          "version": "link:../../packages/importers",
+          "path": "/Users/alexlevy0/Dev/BienVu/packages/importers"
+        },
+        "@cloudflare/containers": {
+          "from": "@cloudflare/containers",
+          "version": "0.3.7",
+          "resolved": "https://registry.npmjs.org/@cloudflare/containers/-/containers-0.3.7.tgz",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/@cloudflare+containers@0.3.7/node_modules/@cloudflare/containers"
+        },
+        "@cloudflare/playwright": {
+          "from": "@cloudflare/playwright",
+          "version": "1.3.6",
+          "resolved": "https://registry.npmjs.org/@cloudflare/playwright/-/playwright-1.3.6.tgz",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/@cloudflare+playwright@1.3.6/node_modules/@cloudflare/playwright"
+        },
+        "image-size": {
+          "from": "image-size",
+          "version": "2.0.2",
+          "resolved": "https://registry.npmjs.org/image-size/-/image-size-2.0.2.tgz",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/image-size@2.0.2/node_modules/image-size"
+        }
+      },
+      "unsavedDependencies": {
+        "sharp": {
+          "from": "sharp",
+          "version": "link:../../node_modules/.pnpm/sharp@0.35.5_@types+node@24.10.1/node_modules/sharp",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/sharp@0.35.5_@types+node@24.10.1/node_modules/sharp"
+        },
+        "tsx": {
+          "from": "tsx",
+          "version": "link:../../node_modules/.pnpm/tsx@4.23.15/node_modules/tsx",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/tsx@4.23.15/node_modules/tsx"
+        },
+        "typescript": {
+          "from": "typescript",
+          "version": "link:../../node_modules/.pnpm/typescript@5.9.3/node_modules/typescript",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/typescript@5.9.3/node_modules/typescript"
+        },
+        "wrangler": {
+          "from": "wrangler",
+          "version": "link:../../node_modules/.pnpm/wrangler@4.142.0_@types+node@24.10.1/node_modules/wrangler",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/wrangler@4.142.0_@types+node@24.10.1/node_modules/wrangler"
+        },
+        "@types/node": {
+          "from": "@types/node",
+          "version": "link:../../node_modules/.pnpm/@types+node@24.10.1/node_modules/@types/node",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/@types+node@24.10.1/node_modules/@types/node"
+        },
+        "@types/react": {
+          "from": "@types/react",
+          "version": "link:../../node_modules/.pnpm/@types+react@19.3.0/node_modules/@types/react",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/@types+react@19.3.0/node_modules/@types/react"
+        },
+        "@types/react-dom": {
+          "from": "@types/react-dom",
+          "version": "link:../../node_modules/.pnpm/@types+react-dom@19.2.3_@types+react@19.3.0/node_modules/@types/react-dom",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/@types+react-dom@19.2.3_@types+react@19.3.0/node_modules/@types/react-dom"
+        }
+      }
+    },
+    {
+      "name": "@bienvu/renderer",
+      "version": "0.0.0",
+      "path": "/Users/alexlevy0/Dev/BienVu/apps/renderer",
+      "private": true,
+      "dependencies": {
+        "@bienvu/contracts": {
+          "from": "@bienvu/contracts",
+          "version": "link:../../packages/contracts",
+          "path": "/Users/alexlevy0/Dev/BienVu/packages/contracts"
+        },
+        "@bienvu/video": {
+          "from": "@bienvu/video",
+          "version": "link:../../packages/video",
+          "path": "/Users/alexlevy0/Dev/BienVu/packages/video"
+        },
+        "@remotion/bundler": {
+          "from": "@remotion/bundler",
+          "version": "4.0.529",
+          "resolved": "https://registry.npmjs.org/@remotion/bundler/-/bundler-4.0.529.tgz",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/@remotion+bundler@4.0.529_@swc+helpers@0.5.23_postcss@8.5.23_react-dom@19.3.0_react@19.3.0__react@19.3.0/node_modules/@remotion/bundler"
+        },
+        "@remotion/renderer": {
+          "from": "@remotion/renderer",
+          "version": "4.0.529",
+          "resolved": "https://registry.npmjs.org/@remotion/renderer/-/renderer-4.0.529.tgz",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/@remotion+renderer@4.0.529_react-dom@19.3.0_react@19.3.0__react@19.3.0/node_modules/@remotion/renderer"
+        },
+        "react": {
+          "from": "react",
+          "version": "19.3.0",
+          "resolved": "https://registry.npmjs.org/react/-/react-19.3.0.tgz",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/react@19.3.0/node_modules/react"
+        },
+        "react-dom": {
+          "from": "react-dom",
+          "version": "19.3.0",
+          "resolved": "https://registry.npmjs.org/react-dom/-/react-dom-19.3.0.tgz",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/react-dom@19.3.0_react@19.3.0/node_modules/react-dom"
+        },
+        "remotion": {
+          "from": "remotion",
+          "version": "4.0.529",
+          "resolved": "https://registry.npmjs.org/remotion/-/remotion-4.0.529.tgz",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/remotion@4.0.529_react-dom@19.3.0_react@19.3.0__react@19.3.0/node_modules/remotion"
+        },
+        "tsx": {
+          "from": "tsx",
+          "version": "4.23.15",
+          "resolved": "https://registry.npmjs.org/tsx/-/tsx-4.23.15.tgz",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/tsx@4.23.15/node_modules/tsx"
+        }
+      },
+      "unsavedDependencies": {
+        "sharp": {
+          "from": "sharp",
+          "version": "link:../../node_modules/.pnpm/sharp@0.35.5_@types+node@24.10.1/node_modules/sharp",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/sharp@0.35.5_@types+node@24.10.1/node_modules/sharp"
+        },
+        "typescript": {
+          "from": "typescript",
+          "version": "link:../../node_modules/.pnpm/typescript@5.9.3/node_modules/typescript",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/typescript@5.9.3/node_modules/typescript"
+        },
+        "wrangler": {
+          "from": "wrangler",
+          "version": "link:../../node_modules/.pnpm/wrangler@4.142.0_@types+node@24.10.1/node_modules/wrangler",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/wrangler@4.142.0_@types+node@24.10.1/node_modules/wrangler"
+        },
+        "@types/node": {
+          "from": "@types/node",
+          "version": "link:../../node_modules/.pnpm/@types+node@24.10.1/node_modules/@types/node",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/@types+node@24.10.1/node_modules/@types/node"
+        },
+        "@types/react-dom": {
+          "from": "@types/react-dom",
+          "version": "link:../../node_modules/.pnpm/@types+react-dom@19.2.3_@types+react@19.3.0/node_modules/@types/react-dom",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/@types+react-dom@19.2.3_@types+react@19.3.0/node_modules/@types/react-dom"
+        },
+        "@types/react": {
+          "from": "@types/react",
+          "version": "link:../../node_modules/.pnpm/@types+react@19.3.0/node_modules/@types/react",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/@types+react@19.3.0/node_modules/@types/react"
+        }
+      }
+    },
+    {
+      "name": "@bienvu/web",
+      "version": "0.0.0",
+      "path": "/Users/alexlevy0/Dev/BienVu/apps/web",
+      "private": true,
+      "dependencies": {
+        "@opennextjs/cloudflare": {
+          "from": "@opennextjs/cloudflare",
+          "version": "1.20.6",
+          "resolved": "https://registry.npmjs.org/@opennextjs/cloudflare/-/cloudflare-1.20.6.tgz",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/@opennextjs+cloudflare@1.20.6_next@16.3.6_@types+node@24.10.1_react-dom@19.3.0_react@19_52f2827bbc6e69d2aaac7e2bcf34a11d/node_modules/@opennextjs/cloudflare"
+        },
+        "next": {
+          "from": "next",
+          "version": "16.3.6",
+          "resolved": "https://registry.npmjs.org/next/-/next-16.3.6.tgz",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/next@16.3.6_@types+node@24.10.1_react-dom@19.3.0_react@19.3.0__react@19.3.0/node_modules/next"
+        },
+        "react": {
+          "from": "react",
+          "version": "19.3.0",
+          "resolved": "https://registry.npmjs.org/react/-/react-19.3.0.tgz",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/react@19.3.0/node_modules/react"
+        },
+        "react-dom": {
+          "from": "react-dom",
+          "version": "19.3.0",
+          "resolved": "https://registry.npmjs.org/react-dom/-/react-dom-19.3.0.tgz",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/react-dom@19.3.0_react@19.3.0/node_modules/react-dom"
+        }
+      },
+      "unsavedDependencies": {
+        "sharp": {
+          "from": "sharp",
+          "version": "link:../../node_modules/.pnpm/sharp@0.35.5_@types+node@24.10.1/node_modules/sharp",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/sharp@0.35.5_@types+node@24.10.1/node_modules/sharp"
+        },
+        "tsx": {
+          "from": "tsx",
+          "version": "link:../../node_modules/.pnpm/tsx@4.23.15/node_modules/tsx",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/tsx@4.23.15/node_modules/tsx"
+        },
+        "typescript": {
+          "from": "typescript",
+          "version": "link:../../node_modules/.pnpm/typescript@5.9.3/node_modules/typescript",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/typescript@5.9.3/node_modules/typescript"
+        },
+        "wrangler": {
+          "from": "wrangler",
+          "version": "link:../../node_modules/.pnpm/wrangler@4.142.0_@types+node@24.10.1/node_modules/wrangler",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/wrangler@4.142.0_@types+node@24.10.1/node_modules/wrangler"
+        },
+        "@types/node": {
+          "from": "@types/node",
+          "version": "link:../../node_modules/.pnpm/@types+node@24.10.1/node_modules/@types/node",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/@types+node@24.10.1/node_modules/@types/node"
+        },
+        "@types/react": {
+          "from": "@types/react",
+          "version": "link:../../node_modules/.pnpm/@types+react@19.3.0/node_modules/@types/react",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/@types+react@19.3.0/node_modules/@types/react"
+        },
+        "@types/react-dom": {
+          "from": "@types/react-dom",
+          "version": "link:../../node_modules/.pnpm/@types+react-dom@19.2.3_@types+react@19.3.0/node_modules/@types/react-dom",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/@types+react-dom@19.2.3_@types+react@19.3.0/node_modules/@types/react-dom"
+        }
+      }
+    },
+    {
+      "name": "@bienvu/contracts",
+      "version": "0.0.0",
+      "path": "/Users/alexlevy0/Dev/BienVu/packages/contracts",
+      "private": true,
+      "dependencies": {
+        "zod": {
+          "from": "zod",
+          "version": "4.6.5",
+          "resolved": "https://registry.npmjs.org/zod/-/zod-4.6.5.tgz",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/zod@4.6.5/node_modules/zod"
+        }
+      },
+      "unsavedDependencies": {
+        "sharp": {
+          "from": "sharp",
+          "version": "link:../../node_modules/.pnpm/sharp@0.35.5_@types+node@24.10.1/node_modules/sharp",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/sharp@0.35.5_@types+node@24.10.1/node_modules/sharp"
+        },
+        "tsx": {
+          "from": "tsx",
+          "version": "link:../../node_modules/.pnpm/tsx@4.23.15/node_modules/tsx",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/tsx@4.23.15/node_modules/tsx"
+        },
+        "typescript": {
+          "from": "typescript",
+          "version": "link:../../node_modules/.pnpm/typescript@5.9.3/node_modules/typescript",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/typescript@5.9.3/node_modules/typescript"
+        },
+        "wrangler": {
+          "from": "wrangler",
+          "version": "link:../../node_modules/.pnpm/wrangler@4.142.0_@types+node@24.10.1/node_modules/wrangler",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/wrangler@4.142.0_@types+node@24.10.1/node_modules/wrangler"
+        },
+        "@types/node": {
+          "from": "@types/node",
+          "version": "link:../../node_modules/.pnpm/@types+node@24.10.1/node_modules/@types/node",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/@types+node@24.10.1/node_modules/@types/node"
+        },
+        "@types/react": {
+          "from": "@types/react",
+          "version": "link:../../node_modules/.pnpm/@types+react@19.3.0/node_modules/@types/react",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/@types+react@19.3.0/node_modules/@types/react"
+        },
+        "@types/react-dom": {
+          "from": "@types/react-dom",
+          "version": "link:../../node_modules/.pnpm/@types+react-dom@19.2.3_@types+react@19.3.0/node_modules/@types/react-dom",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/@types+react-dom@19.2.3_@types+react@19.3.0/node_modules/@types/react-dom"
+        }
+      }
+    },
+    {
+      "name": "@bienvu/importers",
+      "version": "0.0.0",
+      "path": "/Users/alexlevy0/Dev/BienVu/packages/importers",
+      "private": true,
+      "dependencies": {
+        "@bienvu/contracts": {
+          "from": "@bienvu/contracts",
+          "version": "link:../contracts",
+          "path": "/Users/alexlevy0/Dev/BienVu/packages/contracts"
+        },
+        "ipaddr.js": {
+          "from": "ipaddr.js",
+          "version": "2.5.0",
+          "resolved": "https://registry.npmjs.org/ipaddr.js/-/ipaddr.js-2.5.0.tgz",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/ipaddr.js@2.5.0/node_modules/ipaddr.js"
+        }
+      },
+      "unsavedDependencies": {
+        "sharp": {
+          "from": "sharp",
+          "version": "link:../../node_modules/.pnpm/sharp@0.35.5_@types+node@24.10.1/node_modules/sharp",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/sharp@0.35.5_@types+node@24.10.1/node_modules/sharp"
+        },
+        "tsx": {
+          "from": "tsx",
+          "version": "link:../../node_modules/.pnpm/tsx@4.23.15/node_modules/tsx",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/tsx@4.23.15/node_modules/tsx"
+        },
+        "typescript": {
+          "from": "typescript",
+          "version": "link:../../node_modules/.pnpm/typescript@5.9.3/node_modules/typescript",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/typescript@5.9.3/node_modules/typescript"
+        },
+        "wrangler": {
+          "from": "wrangler",
+          "version": "link:../../node_modules/.pnpm/wrangler@4.142.0_@types+node@24.10.1/node_modules/wrangler",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/wrangler@4.142.0_@types+node@24.10.1/node_modules/wrangler"
+        },
+        "@types/node": {
+          "from": "@types/node",
+          "version": "link:../../node_modules/.pnpm/@types+node@24.10.1/node_modules/@types/node",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/@types+node@24.10.1/node_modules/@types/node"
+        },
+        "@types/react": {
+          "from": "@types/react",
+          "version": "link:../../node_modules/.pnpm/@types+react@19.3.0/node_modules/@types/react",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/@types+react@19.3.0/node_modules/@types/react"
+        },
+        "@types/react-dom": {
+          "from": "@types/react-dom",
+          "version": "link:../../node_modules/.pnpm/@types+react-dom@19.2.3_@types+react@19.3.0/node_modules/@types/react-dom",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/@types+react-dom@19.2.3_@types+react@19.3.0/node_modules/@types/react-dom"
+        }
+      }
+    },
+    {
+      "name": "@bienvu/video",
+      "version": "0.0.0",
+      "path": "/Users/alexlevy0/Dev/BienVu/packages/video",
+      "private": true,
+      "dependencies": {
+        "@bienvu/contracts": {
+          "from": "@bienvu/contracts",
+          "version": "link:../contracts",
+          "path": "/Users/alexlevy0/Dev/BienVu/packages/contracts"
+        },
+        "react": {
+          "from": "react",
+          "version": "19.3.0",
+          "resolved": "https://registry.npmjs.org/react/-/react-19.3.0.tgz",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/react@19.3.0/node_modules/react"
+        },
+        "react-dom": {
+          "from": "react-dom",
+          "version": "19.3.0",
+          "resolved": "https://registry.npmjs.org/react-dom/-/react-dom-19.3.0.tgz",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/react-dom@19.3.0_react@19.3.0/node_modules/react-dom"
+        },
+        "remotion": {
+          "from": "remotion",
+          "version": "4.0.529",
+          "resolved": "https://registry.npmjs.org/remotion/-/remotion-4.0.529.tgz",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/remotion@4.0.529_react-dom@19.3.0_react@19.3.0__react@19.3.0/node_modules/remotion"
+        }
+      },
+      "unsavedDependencies": {
+        "sharp": {
+          "from": "sharp",
+          "version": "link:../../node_modules/.pnpm/sharp@0.35.5_@types+node@24.10.1/node_modules/sharp",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/sharp@0.35.5_@types+node@24.10.1/node_modules/sharp"
+        },
+        "tsx": {
+          "from": "tsx",
+          "version": "link:../../node_modules/.pnpm/tsx@4.23.15/node_modules/tsx",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/tsx@4.23.15/node_modules/tsx"
+        },
+        "typescript": {
+          "from": "typescript",
+          "version": "link:../../node_modules/.pnpm/typescript@5.9.3/node_modules/typescript",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/typescript@5.9.3/node_modules/typescript"
+        },
+        "wrangler": {
+          "from": "wrangler",
+          "version": "link:../../node_modules/.pnpm/wrangler@4.142.0_@types+node@24.10.1/node_modules/wrangler",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/wrangler@4.142.0_@types+node@24.10.1/node_modules/wrangler"
+        },
+        "@types/react": {
+          "from": "@types/react",
+          "version": "link:../../node_modules/.pnpm/@types+react@19.3.0/node_modules/@types/react",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/@types+react@19.3.0/node_modules/@types/react"
+        },
+        "@types/react-dom": {
+          "from": "@types/react-dom",
+          "version": "link:../../node_modules/.pnpm/@types+react-dom@19.2.3_@types+react@19.3.0/node_modules/@types/react-dom",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/@types+react-dom@19.2.3_@types+react@19.3.0/node_modules/@types/react-dom"
+        },
+        "@types/node": {
+          "from": "@types/node",
+          "version": "link:../../node_modules/.pnpm/@types+node@24.10.1/node_modules/@types/node",
+          "path": "/Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/@types+node@24.10.1/node_modules/@types/node"
+        }
+      }
+    }
+  ]
+}

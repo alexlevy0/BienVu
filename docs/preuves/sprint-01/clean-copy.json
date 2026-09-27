@@ -1,0 +1,44 @@
+{
+  "at": "2026-09-27T21:15:50.508Z",
+  "source": "/Users/alexlevy0/Dev/BienVu",
+  "cleanDirectory": "/var/folders/s2/6pf34p856hggr7bz4lf30rhh0000gn/T/bienvu-s01-clean-DcAFOK",
+  "mode": "local-offline",
+  "steps": [
+    {
+      "command": "pnpm install --offline --frozen-lockfile",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm setup:local",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm fixtures",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm --filter @bienvu/web typegen",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm --filter @bienvu/pipeline typegen",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm check",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm db:migrate",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm db:migrate",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm build:web",
+      "exitCode": 0
+    }
+  ]
+}

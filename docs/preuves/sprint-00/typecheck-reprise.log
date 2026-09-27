@@ -1,0 +1,17 @@
+
+> bienvu@0.0.0 typecheck /Users/alexlevy0/Dev/BienVu
+> pnpm -r typecheck
+
+Scope: 6 of 7 workspace projects
+apps/web typecheck$ tsc --noEmit
+packages/contracts typecheck$ tsc -p tsconfig.json
+packages/contracts typecheck: Done
+apps/web typecheck: Done
+packages/importers typecheck$ tsc -p tsconfig.json
+packages/video typecheck$ tsc -p tsconfig.json
+packages/importers typecheck: Done
+packages/video typecheck: Done
+apps/pipeline typecheck$ tsc -p tsconfig.json
+apps/renderer typecheck$ tsc -p tsconfig.json
+apps/pipeline typecheck: Done
+apps/renderer typecheck: Done

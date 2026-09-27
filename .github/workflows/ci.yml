@@ -1,0 +1,46 @@
+name: Vérifications locales
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  foundations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: 'true'
+      NEXT_TELEMETRY_DISABLED: '1'
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm setup:local
+      - run: pnpm fixtures
+      - run: pnpm --filter @bienvu/web typegen
+      - run: pnpm --filter @bienvu/pipeline typegen
+      - run: pnpm check
+      - run: pnpm db:migrate
+      - run: pnpm db:migrate
+      - run: pnpm build:web
+      - name: Vérifier le Worker local
+        run: |
+          pnpm preview > /tmp/bienvu-preview.log 2>&1 &
+          preview_pid=$!
+          trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 40); do
+            if curl -fsS http://localhost:8787/ >/dev/null; then break; fi
+            sleep 1
+          done
+          pnpm probe:foundations
+          pnpm probe:web
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: preuves-locales
+          path: evidence/local/sprint-01/

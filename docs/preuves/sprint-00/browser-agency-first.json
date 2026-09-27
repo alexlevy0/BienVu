@@ -1,0 +1,31 @@
+{
+  "at": "2026-09-27T19:10:49.943Z",
+  "target": "https://bienvu-browser-probe-staging.alexlevy0.workers.dev",
+  "httpStatus": 422,
+  "result": {
+    "ok": false,
+    "error": "INSUFFICIENT_PHOTOS",
+    "errorName": "Error",
+    "message": "Galerie du bien insuffisante.",
+    "case": "agency",
+    "sourceUrl": "https://www.espaces-atypiques.com/ventes/75015-paris-appartement-bourgeois-avec-vue-panoramique-16624/",
+    "runId": "00968cfb-092f-4d7f-8094-f6714f2c6d60",
+    "at": "2026-09-27T19:10:48.994Z",
+    "mode": "remote",
+    "browserLocation": "cloudflare",
+    "durationMs": 26697,
+    "diagnostics": {
+      "blockedRequests": 75,
+      "requests": 104,
+      "downloadBytes": 788371,
+      "browserClosed": true,
+      "sessionId": "6b5465a1-1c30-4cf0-8cbc-ecf3bd8c7a51",
+      "stage": "extraction"
+    },
+    "attempts": 1,
+    "textTokens": 0,
+    "ttsCalls": 0,
+    "estimatedBrowserUsd": 0.0006674249999999999,
+    "actualBilledEur": null
+  }
+}

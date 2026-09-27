@@ -1,0 +1,10 @@
+{
+  "$schema":"../../node_modules/wrangler/config-schema.json",
+  "name":"bienvu-browser-probe-local", "main":"src/browser-worker.ts",
+  "compatibility_date":"2026-09-27", "compatibility_flags":["nodejs_compat"],
+  "browser":{"binding":"BROWSER"},
+  "vars":{"PROBE_MODE":"local","ALLOW_REAL_BROWSER":"false"},
+  "r2_buckets":[{"binding":"MEDIA","bucket_name":"bienvu-probes-local"}],
+  "observability":{"enabled":true,"head_sampling_rate":1},
+  "limits":{"cpu_ms":30000}
+}

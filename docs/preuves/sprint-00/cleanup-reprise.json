@@ -1,0 +1,16 @@
+{
+  "at": "2026-09-27T19:39:23.477Z",
+  "dockerContext": "desktop-linux",
+  "dockerContainersRemaining": 0,
+  "temporaryRenderContainerRemoved": true,
+  "portsChecked": [
+    8080,
+    8787,
+    8788
+  ],
+  "listenersRemaining": 0,
+  "cloudBrowserActiveSessions": 0,
+  "cloudImportsEnabled": false,
+  "oldProjectsRestarted": false,
+  "volumesOrImagesDeletedDuringReprise": false
+}

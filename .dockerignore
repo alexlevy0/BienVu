@@ -1,0 +1,10 @@
+**/node_modules
+**/.next
+**/.open-next
+**/.wrangler
+**/.env*
+**/.dev.vars*
+.git
+evidence
+docs
+out

@@ -1,0 +1,73 @@
+
+> bienvu@0.0.0 check /Users/alexlevy0/Dev/BienVu
+> pnpm check:boundaries && pnpm test && pnpm typecheck
+
+
+> bienvu@0.0.0 check:boundaries /Users/alexlevy0/Dev/BienVu
+> node scripts/check-boundaries.mjs
+
+Frontières vérifiées : 29 fichiers, renderer et composition isolés des Workers, contrats sans API Node.
+
+> bienvu@0.0.0 test /Users/alexlevy0/Dev/BienVu
+> tsx --test tests/*.test.ts
+
+✔ 5 tentatives maximum ; les échecs ne réinitialisent pas le budget (44.37925ms)
+✔ frais déjà engagés + réservation respectent la pause à 25 € (0.304291ms)
+✔ coupe-circuit et changement de mois exigent action opérateur (0.279917ms)
+✔ coût brut inclut RAM/disque provisionnés pendant tout le temps actif (0.208416ms)
+✔ contrats : vente, location et valeurs facultatives absentes sont distinctes (88.400625ms)
+✔ contradictions traçables mais non générables, photos et provenance contrôlées (8.951375ms)
+✔ URL produit : destinations dangereuses et droits transmis par le client refusés (1.793375ms)
+✔ manifeste : filigrane, isolation des fichiers, références et audio complet obligatoires (8.781125ms)
+✔ état terminal de job : pas de bail actif ni succès avec erreur (5.213375ms)
+▶ D1 local réel : migrations, isolation, contraintes et rollback du batch
+  ✔ liens inter-agences rejetés sans écriture partielle (37.528834ms)
+  ✔ préfixe média exact, même avec underscore dans l’agence (9.85275ms)
+  ✔ lecture toujours limitée à l’agence du contexte serveur (24.414708ms)
+  ✔ idempotence et unicité du traitement actif survivent à deux requêtes (51.514ms)
+  ✔ rollback complet si une réservation dépasse la capacité (32.43225ms)
+  ✔ coûts dédupliqués sans écrasement, arrêt par défaut (126.158166ms)
+✔ D1 local réel : migrations, isolation, contraintes et rollback du batch (1010.521834ms)
+✔ faits sourcés et unités explicites sur fixture (11.085ms)
+✔ biens voisins et plusieurs annonces ne sont pas mélangés (1.371833ms)
+✔ prix contradictoires bloquent le résultat (0.233875ms)
+✔ loyer jamais présenté comme prix de vente (2.657542ms)
+✔ prix et surface non vérifiables sont omis, pas remplacés par zéro (0.2155ms)
+✔ page agence seule ou identité incomplète ne compte pas comme annonce (0.7035ms)
+✔ adaptateur agence : galerie limitée à la référence, contradiction bloquante (0.771792ms)
+✔ journaux sur liste blanche : aucun cookie, clé, URL signée, corps ou stack (1.768709ms)
+✔ fixture HTTP : un rendu échoué conserve le reçu et la dépense réservée dans les preuves (380.584833ms)
+✔ URL dangereuses et domaines trompeurs refusés (2.021917ms)
+✔ IPv4/IPv6 privés, link-local, multicast et adresses mappées refusés (1.259417ms)
+✔ DNS mixte privé/public et DNS vide échouent fermés (32.294ms)
+✔ taille limitée même sans Content-Length (5.071375ms)
+✔ renderer refuse traversée de chemin, URL, durée et droits arbitraires (4.715708ms)
+ℹ tests 30
+ℹ suites 0
+ℹ pass 30
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2666.063
+
+> bienvu@0.0.0 typecheck /Users/alexlevy0/Dev/BienVu
+> pnpm -r typecheck && tsc -p tsconfig.tests.json
+
+Scope: 8 of 9 workspace projects
+packages/contracts typecheck$ tsc -p tsconfig.json
+packages/contracts typecheck: Done
+packages/importers typecheck$ tsc -p tsconfig.json
+packages/db typecheck$ tsc -p tsconfig.json
+packages/video typecheck$ tsc -p tsconfig.json
+packages/observability typecheck$ tsc -p tsconfig.json
+packages/db typecheck: Done
+packages/observability typecheck: Done
+packages/importers typecheck: Done
+packages/video typecheck: Done
+apps/pipeline typecheck$ tsc -p tsconfig.json
+apps/renderer typecheck$ tsc -p tsconfig.json
+apps/web typecheck$ tsc --noEmit
+apps/pipeline typecheck: Done
+apps/renderer typecheck: Done
+apps/web typecheck: Done

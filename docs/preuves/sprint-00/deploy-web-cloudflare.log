@@ -1,0 +1,40 @@
+
+ ⛅️ wrangler 4.142.0
+────────────────────
+🌀 Building list of assets...
+✨ Read 36 files from the assets directory /Users/alexlevy0/Dev/BienVu/apps/web/.open-next/assets
+🌀 Starting asset upload...
+🌀 Found 15 new or modified static assets to upload. Proceeding with upload...
++ /BUILD_ID
++ /_next/static/chunks/next/dist/client/components/builtin/global-error-550805de3aa6a87c.js
++ /_next/static/chunks/main-app-57a2776244fd1d04.js
++ /_next/static/chunks/webpack-bdffd8a2bf819b14.js
++ /_next/static/chunks/744ac648-c2f9f78cad3b5b2a.js
++ /_next/static/W4cNGMZJJ_H5LCuhZChiP/_ssgManifest.js
++ /_next/static/chunks/app/layout-e316d9883c4585b8.js
++ /_next/static/css/88cb032f6114c86a.css
++ /_next/static/chunks/polyfills-42372ed130431b0a.js
++ /_next/static/chunks/framework-e66a83ec9680e59f.js
++ /_next/static/chunks/next/dist/client/components/builtin/app-error-e967c0d2e2e69021.js
++ /_next/static/W4cNGMZJJ_H5LCuhZChiP/_buildManifest.js
++ /_next/static/chunks/app/_not-found/page-482557906374e526.js
++ /_next/static/chunks/main-59e1045fd0604e78.js
++ /_next/static/chunks/458-19e7e5d2b0fc4c65.js
+Uploaded 5 of 15 assets
+Uploaded 10 of 15 assets
+Uploaded 15 of 15 assets
+✨ Success! Uploaded 15 files (6 already uploaded) (2.19 sec)
+
+Total Upload: 4771.66 KiB / gzip: 978.63 KiB
+Worker Startup Time: 19 ms
+Your Worker has access to the following bindings:
+Binding                                  Resource                  
+env.DB (bienvu-s00-staging)              D1 Database               
+env.MEDIA (bienvu-s00-private)           R2 Bucket                 
+env.ASSETS                               Assets                    
+env.PROBE_MODE ("remote")                Environment Variable      
+
+Uploaded bienvu-web-probe-staging (11.48 sec)
+Deployed bienvu-web-probe-staging triggers (2.02 sec)
+  https://bienvu-web-probe-staging.alexlevy0.workers.dev
+Current Version ID: 44b0fe96-7415-4b14-8122-5a1aa4cdc8c6

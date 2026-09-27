@@ -1,0 +1,14 @@
+{
+  "at": "2026-09-27T17:20:28.119Z",
+  "provider": "cloudflare",
+  "command": "pnpm exec wrangler whoami",
+  "status": "blocked",
+  "reason": "OAuth token expired and refresh failed in non-interactive environment",
+  "remoteDeployments": 0,
+  "remoteBrowserAttempts": 0,
+  "remoteContainerRenders": 0,
+  "apiCallsOpenAI": 0,
+  "providerChargesIncurredEur": 0,
+  "userConfirmedPriorMonthlySpendEur": 0,
+  "remainingEnvelopeEur": 30
+}

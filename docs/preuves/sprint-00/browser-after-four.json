@@ -1,0 +1,48 @@
+{
+  "at": "2026-09-27T19:20:29.875Z",
+  "target": "https://bienvu-browser-probe-staging.alexlevy0.workers.dev",
+  "httpStatus": 200,
+  "result": {
+    "at": "2026-09-27T19:20:29.668Z",
+    "mode": "remote",
+    "enabled": true,
+    "limits": {
+      "activeSessions": [],
+      "maxConcurrentSessions": 4,
+      "allowedBrowserAcquisitions": 1,
+      "timeUntilNextAllowedBrowserAcquisition": 0,
+      "usedBrowserTimeSeconds": 56.834
+    },
+    "activeSessions": [],
+    "recentSessions": [
+      {
+        "sessionId": "e7ed2105-df3e-4347-bf79-6a49ece68d04",
+        "startTime": 1790536778466,
+        "endTime": 1790536803206,
+        "closeReason": 2,
+        "closeReasonText": "BrowserIdle"
+      },
+      {
+        "sessionId": "27879071-0df0-4600-ad6f-b2af5a6f09f1",
+        "startTime": 1790536419425,
+        "endTime": 1790536424741,
+        "closeReason": 1,
+        "closeReasonText": "NormalClosure"
+      },
+      {
+        "sessionId": "654dbb3e-47f7-43c6-b063-25c168ff6aae",
+        "startTime": 1790536309901,
+        "endTime": 1790536311488,
+        "closeReason": 1,
+        "closeReasonText": "NormalClosure"
+      },
+      {
+        "sessionId": "6b5465a1-1c30-4cf0-8cbc-ecf3bd8c7a51",
+        "startTime": 1790536223840,
+        "endTime": 1790536249031,
+        "closeReason": 1,
+        "closeReasonText": "NormalClosure"
+      }
+    ]
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "at": "2026-09-27T21:22:47.470Z",
+  "mode": "navigateur local sur build OpenNext/workerd",
+  "desktop": {
+    "width": 1280,
+    "height": 720,
+    "pages": [
+      "/",
+      "/agence"
+    ],
+    "visuallyInspected": true
+  },
+  "mobile": {
+    "width": 390,
+    "height": 844,
+    "pages": [
+      "/",
+      "/agence",
+      "/abonnement",
+      "/historique",
+      "/connexion"
+    ],
+    "visuallyInspected": true,
+    "measuredNoHorizontalOverflow": [
+      "/agence",
+      "/historique",
+      "/connexion"
+    ]
+  },
+  "interaction": {
+    "unsafeUrlRejectedInFrench": true,
+    "validUrlOnlyChecksSyntax": true,
+    "generationButtonDisabled": true,
+    "agencyFieldsDisabled": true,
+    "loginDisabled": true,
+    "noConsoleErrorObservedOnAgency": true
+  },
+  "limits": [
+    "Aucun import ni rendu déclenché",
+    "Pas de session client réelle",
+    "Pas de recette exhaustive sur tous les appareils"
+  ],
+  "viewportOverrideReset": true
+}

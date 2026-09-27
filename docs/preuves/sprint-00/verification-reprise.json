@@ -1,0 +1,17 @@
+{
+  "at": "2026-09-27T19:32:57.227Z",
+  "fixtureTests": 17,
+  "fixtureFailures": 0,
+  "typescriptFullPassed": true,
+  "typescriptPipelineAfterFinalCorrectionPassed": true,
+  "localRendererWrapperHealthPassed": true,
+  "secretScan": {
+    "candidateFiles": 143,
+    "localSecretsChecked": 5,
+    "leaks": 0
+  },
+  "documentationLinks": {
+    "checkedDocuments": 5,
+    "missing": []
+  }
+}

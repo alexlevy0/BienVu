@@ -1,0 +1,408 @@
+
+pnpm install --offline --frozen-lockfile
+Scope: all 9 workspace projects
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +475
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 475, reused 351, downloaded 0, added 0
+Progress: resolved 475, reused 473, downloaded 0, added 19
+Progress: resolved 475, reused 475, downloaded 0, added 90
+Progress: resolved 475, reused 475, downloaded 0, added 194
+Progress: resolved 475, reused 475, downloaded 0, added 249
+Progress: resolved 475, reused 475, downloaded 0, added 280
+Progress: resolved 475, reused 475, downloaded 0, added 392
+Progress: resolved 475, reused 475, downloaded 0, added 442
+Progress: resolved 475, reused 475, downloaded 0, added 472
+Progress: resolved 475, reused 475, downloaded 0, added 473
+Progress: resolved 475, reused 475, downloaded 0, added 474
+Progress: resolved 475, reused 475, downloaded 0, added 475, done
+.../esbuild@0.25.4/node_modules/esbuild postinstall$ node install.js
+.../esbuild@0.28.2/node_modules/esbuild postinstall$ node install.js
+.../esbuild@0.28.1/node_modules/esbuild postinstall$ node install.js
+.../node_modules/workerd postinstall$ node install.js
+.../esbuild@0.28.2/node_modules/esbuild postinstall: Done
+.../esbuild@0.25.4/node_modules/esbuild postinstall: Done
+.../esbuild@0.28.1/node_modules/esbuild postinstall: Done
+.../node_modules/workerd postinstall: Done
+
+devDependencies:
++ @types/node 24.10.1
++ @types/react 19.3.0
++ @types/react-dom 19.2.3
++ miniflare 5.20260926.0-alpha
++ sharp 0.35.5
++ tsx 4.23.15
++ typescript 5.9.3
++ wrangler 4.142.0
+
+Done in 29.3s using pnpm v10.33.2
+
+pnpm setup:local
+
+> bienvu@0.0.0 setup:local /private/var/folders/s2/6pf34p856hggr7bz4lf30rhh0000gn/T/bienvu-s01-clean-DcAFOK
+> node scripts/setup-local.mjs
+
+apps/web/.dev.vars créé, secret non affiché.
+apps/pipeline/.dev.vars créé, secret non affiché.
+
+pnpm fixtures
+
+> bienvu@0.0.0 fixtures /private/var/folders/s2/6pf34p856hggr7bz4lf30rhh0000gn/T/bienvu-s01-clean-DcAFOK
+> tsx scripts/generate-fixtures.ts
+
+Fixtures créées : 3 PNG, 1 WAV de synthèse, manifestes 6 s et 30 s. Aucun appel API.
+
+pnpm --filter @bienvu/web typegen
+
+> @bienvu/web@0.0.0 typegen /private/var/folders/s2/6pf34p856hggr7bz4lf30rhh0000gn/T/bienvu-s01-clean-DcAFOK/apps/web
+> wrangler types --strict-vars false --env-interface CloudflareEnv cloudflare-env.d.ts
+
+
+ ⛅️ wrangler 4.142.0
+────────────────────
+Generating project types...
+
+interface __BaseEnv_CloudflareEnv {
+	MEDIA: R2Bucket;
+	DB: D1Database;
+	ASSETS: Fetcher;
+	PROBE_MODE: string;
+	GENERATIONS_ENABLED: string;
+	PROBE_TOKEN: string;
+}
+declare namespace Cloudflare {
+	interface Env extends __BaseEnv_CloudflareEnv {}
+}
+interface CloudflareEnv extends __BaseEnv_CloudflareEnv {}
+type StringifyValues<EnvType extends Record<string, unknown>> = {
+	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
+};
+declare namespace NodeJS {
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "PROBE_MODE" | "GENERATIONS_ENABLED" | "PROBE_TOKEN">> {}
+}
+
+Generating runtime types...
+
+Runtime types generated.
+
+
+✨ Types written to cloudflare-env.d.ts
+
+📖 Read about runtime types
+https://developers.cloudflare.com/workers/languages/typescript/#generate-types
+📣 Remember to rerun 'wrangler types' after you change your wrangler.jsonc file.
+
+
+pnpm --filter @bienvu/pipeline typegen
+
+> @bienvu/pipeline@0.0.0 typegen /private/var/folders/s2/6pf34p856hggr7bz4lf30rhh0000gn/T/bienvu-s01-clean-DcAFOK/apps/pipeline
+> wrangler types --strict-vars false --env-interface BrowserEnv browser-env.d.ts && wrangler types --strict-vars false --config wrangler.render.jsonc --env-interface RendererEnv renderer-env.d.ts
+
+
+ ⛅️ wrangler 4.142.0
+────────────────────
+Generating project types...
+
+interface __BaseEnv_BrowserEnv {
+	MEDIA: R2Bucket;
+	BROWSER: BrowserRun;
+	PROBE_MODE: string;
+	ALLOW_REAL_BROWSER: string;
+	PROBE_TOKEN: string;
+	RENDER_TOKEN: string;
+}
+declare namespace Cloudflare {
+	interface GlobalProps {
+		mainModule: typeof import("./src/browser-worker");
+	}
+	interface Env extends __BaseEnv_BrowserEnv {}
+}
+interface BrowserEnv extends __BaseEnv_BrowserEnv {}
+type StringifyValues<EnvType extends Record<string, unknown>> = {
+	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
+};
+declare namespace NodeJS {
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "PROBE_MODE" | "ALLOW_REAL_BROWSER" | "PROBE_TOKEN" | "RENDER_TOKEN">> {}
+}
+
+Generating runtime types...
+
+Runtime types generated.
+
+
+✨ Types written to browser-env.d.ts
+
+📖 Read about runtime types
+https://developers.cloudflare.com/workers/languages/typescript/#generate-types
+📣 Remember to rerun 'wrangler types' after you change your wrangler.jsonc file.
+
+
+ ⛅️ wrangler 4.142.0
+────────────────────
+Generating project types...
+
+interface __BaseEnv_RendererEnv {
+	MEDIA: R2Bucket;
+	PROBE_MODE: string;
+	ALLOW_PAID_PROBES: string;
+	PROBE_TOKEN: string;
+	RENDER_TOKEN: string;
+	RENDERER: DurableObjectNamespace<import("./src/render-worker").Renderer>;
+}
+declare namespace Cloudflare {
+	interface GlobalProps {
+		mainModule: typeof import("./src/render-worker");
+		durableNamespaces: "Renderer";
+	}
+	interface Env extends __BaseEnv_RendererEnv {}
+}
+interface RendererEnv extends __BaseEnv_RendererEnv {}
+type StringifyValues<EnvType extends Record<string, unknown>> = {
+	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
+};
+declare namespace NodeJS {
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "PROBE_MODE" | "ALLOW_PAID_PROBES" | "PROBE_TOKEN" | "RENDER_TOKEN">> {}
+}
+
+Generating runtime types...
+
+Runtime types generated.
+
+
+✨ Types written to renderer-env.d.ts
+
+📖 Read about runtime types
+https://developers.cloudflare.com/workers/languages/typescript/#generate-types
+📣 Remember to rerun 'wrangler types' after you change your wrangler.jsonc file.
+
+
+pnpm check
+
+> bienvu@0.0.0 check /private/var/folders/s2/6pf34p856hggr7bz4lf30rhh0000gn/T/bienvu-s01-clean-DcAFOK
+> pnpm check:boundaries && pnpm test && pnpm typecheck
+
+
+> bienvu@0.0.0 check:boundaries /private/var/folders/s2/6pf34p856hggr7bz4lf30rhh0000gn/T/bienvu-s01-clean-DcAFOK
+> node scripts/check-boundaries.mjs
+
+Frontières vérifiées : 29 fichiers, renderer et composition isolés des Workers, contrats sans API Node.
+
+> bienvu@0.0.0 test /private/var/folders/s2/6pf34p856hggr7bz4lf30rhh0000gn/T/bienvu-s01-clean-DcAFOK
+> tsx --test tests/*.test.ts
+
+✔ 5 tentatives maximum ; les échecs ne réinitialisent pas le budget (27.952542ms)
+✔ frais déjà engagés + réservation respectent la pause à 25 € (0.197625ms)
+✔ coupe-circuit et changement de mois exigent action opérateur (0.157292ms)
+✔ coût brut inclut RAM/disque provisionnés pendant tout le temps actif (0.183583ms)
+✔ contrats : vente, location et valeurs facultatives absentes sont distinctes (16.373167ms)
+✔ contradictions traçables mais non générables, photos et provenance contrôlées (7.069583ms)
+✔ URL produit : destinations dangereuses et droits transmis par le client refusés (3.610959ms)
+✔ manifeste : filigrane, isolation des fichiers, références et audio complet obligatoires (8.570416ms)
+✔ état terminal de job : pas de bail actif ni succès avec erreur (1.765125ms)
+▶ D1 local réel : migrations, isolation, contraintes et rollback du batch
+  ✔ liens inter-agences rejetés sans écriture partielle (43.244458ms)
+  ✔ préfixe média exact, même avec underscore dans l’agence (12.390542ms)
+  ✔ lecture toujours limitée à l’agence du contexte serveur (30.81575ms)
+  ✔ idempotence et unicité du traitement actif survivent à deux requêtes (66.237791ms)
+  ✔ rollback complet si une réservation dépasse la capacité (71.516666ms)
+  ✔ coûts dédupliqués sans écrasement, arrêt par défaut (244.499583ms)
+✔ D1 local réel : migrations, isolation, contraintes et rollback du batch (1522.953041ms)
+✔ faits sourcés et unités explicites sur fixture (49.533875ms)
+✔ biens voisins et plusieurs annonces ne sont pas mélangés (0.583875ms)
+✔ prix contradictoires bloquent le résultat (0.183583ms)
+✔ loyer jamais présenté comme prix de vente (0.613209ms)
+✔ prix et surface non vérifiables sont omis, pas remplacés par zéro (0.332ms)
+✔ page agence seule ou identité incomplète ne compte pas comme annonce (1.05175ms)
+✔ adaptateur agence : galerie limitée à la référence, contradiction bloquante (1.272791ms)
+✔ journaux sur liste blanche : aucun cookie, clé, URL signée, corps ou stack (2.36325ms)
+✔ fixture HTTP : un rendu échoué conserve le reçu et la dépense réservée dans les preuves (284.654958ms)
+✔ URL dangereuses et domaines trompeurs refusés (3.272459ms)
+✔ IPv4/IPv6 privés, link-local, multicast et adresses mappées refusés (1.670584ms)
+✔ DNS mixte privé/public et DNS vide échouent fermés (24.014916ms)
+✔ taille limitée même sans Content-Length (2.77475ms)
+✔ renderer refuse traversée de chemin, URL, durée et droits arbitraires (3.006833ms)
+ℹ tests 30
+ℹ suites 0
+ℹ pass 30
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2963.674708
+
+> bienvu@0.0.0 typecheck /private/var/folders/s2/6pf34p856hggr7bz4lf30rhh0000gn/T/bienvu-s01-clean-DcAFOK
+> pnpm -r typecheck && tsc -p tsconfig.tests.json
+
+Scope: 8 of 9 workspace projects
+packages/contracts typecheck$ tsc -p tsconfig.json
+packages/contracts typecheck: Done
+packages/importers typecheck$ tsc -p tsconfig.json
+packages/db typecheck$ tsc -p tsconfig.json
+packages/video typecheck$ tsc -p tsconfig.json
+packages/observability typecheck$ tsc -p tsconfig.json
+packages/observability typecheck: Done
+packages/importers typecheck: Done
+packages/db typecheck: Done
+packages/video typecheck: Done
+apps/pipeline typecheck$ tsc -p tsconfig.json
+apps/renderer typecheck$ tsc -p tsconfig.json
+apps/web typecheck$ tsc --noEmit
+apps/pipeline typecheck: Done
+apps/renderer typecheck: Done
+apps/web typecheck: Done
+
+pnpm db:migrate
+
+> bienvu@0.0.0 db:migrate /private/var/folders/s2/6pf34p856hggr7bz4lf30rhh0000gn/T/bienvu-s01-clean-DcAFOK
+> pnpm --filter @bienvu/web exec wrangler d1 migrations apply DB --local
+
+
+ ⛅️ wrangler 4.142.0
+────────────────────
+Resource location: local 
+
+Use --remote if you want to access the remote instance.
+
+Migrations to be applied:
+┌────────────────────────────┐
+│ name                       │
+├────────────────────────────┤
+│ 0001_probes.sql            │
+├────────────────────────────┤
+│ 0002_foundations.sql       │
+├────────────────────────────┤
+│ 0003_exact_media_scope.sql │
+└────────────────────────────┘
+? About to apply 3 migration(s)
+Your database may not be available to serve requests during the migration, continue?
+🤖 Using fallback value in non-interactive context: yes
+🌀 Executing on local database DB (00000000-0000-0000-0000-000000000000) from .wrangler/state/v3/d1:
+🌀 To execute on your remote database, add a --remote flag to your wrangler command.
+🚣 2 commands executed successfully.
+┌────────────────────────────┬────────┐
+│ name                       │ status │
+├────────────────────────────┼────────┤
+│ 0001_probes.sql            │ ✅     │
+├────────────────────────────┼────────┤
+│ 0002_foundations.sql       │ 🕒️    │
+├────────────────────────────┼────────┤
+│ 0003_exact_media_scope.sql │ 🕒️    │
+└────────────────────────────┴────────┘
+🌀 Executing on local database DB (00000000-0000-0000-0000-000000000000) from .wrangler/state/v3/d1:
+🌀 To execute on your remote database, add a --remote flag to your wrangler command.
+🚣 24 commands executed successfully.
+┌────────────────────────────┬────────┐
+│ name                       │ status │
+├────────────────────────────┼────────┤
+│ 0001_probes.sql            │ ✅     │
+├────────────────────────────┼────────┤
+│ 0002_foundations.sql       │ ✅     │
+├────────────────────────────┼────────┤
+│ 0003_exact_media_scope.sql │ 🕒️    │
+└────────────────────────────┴────────┘
+🌀 Executing on local database DB (00000000-0000-0000-0000-000000000000) from .wrangler/state/v3/d1:
+🌀 To execute on your remote database, add a --remote flag to your wrangler command.
+🚣 3 commands executed successfully.
+┌────────────────────────────┬────────┐
+│ name                       │ status │
+├────────────────────────────┼────────┤
+│ 0001_probes.sql            │ ✅     │
+├────────────────────────────┼────────┤
+│ 0002_foundations.sql       │ ✅     │
+├────────────────────────────┼────────┤
+│ 0003_exact_media_scope.sql │ ✅     │
+└────────────────────────────┴────────┘
+
+pnpm db:migrate
+
+> bienvu@0.0.0 db:migrate /private/var/folders/s2/6pf34p856hggr7bz4lf30rhh0000gn/T/bienvu-s01-clean-DcAFOK
+> pnpm --filter @bienvu/web exec wrangler d1 migrations apply DB --local
+
+
+ ⛅️ wrangler 4.142.0
+────────────────────
+Resource location: local 
+
+Use --remote if you want to access the remote instance.
+
+✅ No migrations to apply!
+
+pnpm build:web
+
+> bienvu@0.0.0 build:web /private/var/folders/s2/6pf34p856hggr7bz4lf30rhh0000gn/T/bienvu-s01-clean-DcAFOK
+> pnpm --filter @bienvu/web build:worker
+
+
+> @bienvu/web@0.0.0 build:worker /private/var/folders/s2/6pf34p856hggr7bz4lf30rhh0000gn/T/bienvu-s01-clean-DcAFOK/apps/web
+> opennextjs-cloudflare build
+
+
+┌─────────────────────────────┐
+│ OpenNext — Cloudflare build │
+└─────────────────────────────┘
+
+Monorepo detected at /private/var/folders/s2/6pf34p856hggr7bz4lf30rhh0000gn/T/bienvu-s01-clean-DcAFOK
+App directory: /private/var/folders/s2/6pf34p856hggr7bz4lf30rhh0000gn/T/bienvu-s01-clean-DcAFOK/apps/web
+Next.js version : 16.3.6
+@opennextjs/cloudflare version: 1.20.6
+@opennextjs/aws version: 4.1.4
+workerd compatibility_date: 2026-09-27
+
+┌─────────────────────────────────┐
+│ OpenNext — Building Next.js app │
+└─────────────────────────────────┘
+
+
+> @bienvu/web@0.0.0 build /private/var/folders/s2/6pf34p856hggr7bz4lf30rhh0000gn/T/bienvu-s01-clean-DcAFOK/apps/web
+> next build --webpack
+
+▲ Next.js 16.3.6 (webpack)
+✓ Running next.config.ts took 1782ms
+⚠ No build cache found. Please configure build caching for faster rebuilds. Read more: https://nextjs.org/docs/messages/no-cache
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 13.0s
+  Running TypeScript ...
+  Finished TypeScript in 25.6s ...
+  Collecting page data using 5 workers ...
+  Generating static pages using 5 workers (0/9) ...
+  Generating static pages using 5 workers (2/9) 
+  Generating static pages using 5 workers (4/9) 
+  Generating static pages using 5 workers (6/9) 
+✓ Generating static pages using 5 workers (9/9) in 4.9s
+  Finalizing page optimization ...
+  Collecting build traces ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /abonnement
+├ ○ /agence
+├ ƒ /api/generations
+├ ƒ /api/probe
+├ ○ /connexion
+├ ○ /generer
+├ ○ /historique
+└ ○ /laboratoire
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+
+┌──────────────────────────────┐
+│ OpenNext — Generating bundle │
+└──────────────────────────────┘
+
+Bundling middleware function...
+Bundling static assets...
+Bundling cache assets...
+Building server function: default...
+Applying code patches: 18.216s
+# copyPackageTemplateFiles
+[35m⚙️ Bundling the OpenNext server...
+[0m
+[35mWorker saved in `.open-next/worker.js` 🚀
+[0m
+OpenNext build complete.

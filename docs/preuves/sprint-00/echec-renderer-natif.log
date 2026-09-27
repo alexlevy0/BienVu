@@ -1,0 +1,22 @@
+
+> bienvu@0.0.0 render:local /Users/alexlevy0/Dev/BienVu
+> pnpm --filter @bienvu/renderer render native-short short
+
+
+> @bienvu/renderer@0.0.0 render /Users/alexlevy0/Dev/BienVu/apps/renderer
+> tsx src/cli.ts native-short short
+
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+TimeoutError: Timed out after 25000 ms while trying to connect to the browser! Chrome logged the following: 
+    at Timeout.onTimeout (file:///Users/alexlevy0/Dev/BienVu/node_modules/.pnpm/@remotion+renderer@4.0.529_react-dom@19.3.0_react@19.3.0__react@19.3.0/node_modules/@remotion/renderer/dist/esm/index.mjs:4167:14)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+Node.js v24.17.0
+/Users/alexlevy0/Dev/BienVu/apps/renderer:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @bienvu/renderer@0.0.0 render: `tsx src/cli.ts native-short short`
+Exit status 1
+ ELIFECYCLE  Command failed with exit code 1.

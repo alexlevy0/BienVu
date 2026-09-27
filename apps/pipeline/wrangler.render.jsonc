@@ -1,0 +1,12 @@
+{
+  "$schema":"../../node_modules/wrangler/config-schema.json",
+  "name":"bienvu-render-probe-local", "main":"src/render-worker.ts",
+  "compatibility_date":"2026-09-27", "compatibility_flags":["nodejs_compat"],
+  "vars":{"PROBE_MODE":"local","ALLOW_PAID_PROBES":"false"},
+  "containers":[{"class_name":"Renderer","image":"../renderer/Dockerfile","image_build_context":"../..","max_instances":1,"instance_type":"standard-2"}],
+  "durable_objects":{"bindings":[{"name":"RENDERER","class_name":"Renderer"}]},
+  "migrations":[{"tag":"v1","new_sqlite_classes":["Renderer"]}],
+  "r2_buckets":[{"binding":"MEDIA","bucket_name":"bienvu-render-probes-local"}],
+  "observability":{"enabled":true,"head_sampling_rate":1},
+  "limits":{"cpu_ms":30000}
+}

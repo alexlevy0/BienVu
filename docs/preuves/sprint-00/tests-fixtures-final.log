@@ -1,0 +1,29 @@
+
+> bienvu@0.0.0 test /Users/alexlevy0/Dev/BienVu
+> tsx --test tests/*.test.ts
+
+✔ 5 tentatives maximum ; les échecs ne réinitialisent pas le budget (30.388708ms)
+✔ frais déjà engagés + réservation respectent la pause à 25 € (0.370417ms)
+✔ coupe-circuit et changement de mois exigent action opérateur (0.481917ms)
+✔ coût brut inclut RAM/disque provisionnés pendant tout le temps actif (0.418458ms)
+✔ faits sourcés et unités explicites sur fixture (19.989333ms)
+✔ biens voisins et plusieurs annonces ne sont pas mélangés (1.031417ms)
+✔ prix contradictoires bloquent le résultat (0.701875ms)
+✔ loyer jamais présenté comme prix de vente (1.667542ms)
+✔ prix et surface non vérifiables sont omis, pas remplacés par zéro (0.329625ms)
+✔ page agence seule ou identité incomplète ne compte pas comme annonce (2.14575ms)
+✔ adaptateur agence : galerie limitée à la référence, contradiction bloquante (5.447375ms)
+✔ fixture HTTP : un rendu échoué conserve le reçu et la dépense réservée dans les preuves (505.671375ms)
+✔ URL dangereuses et domaines trompeurs refusés (7.022416ms)
+✔ IPv4/IPv6 privés, link-local, multicast et adresses mappées refusés (7.315833ms)
+✔ DNS mixte privé/public et DNS vide échouent fermés (59.470084ms)
+✔ taille limitée même sans Content-Length (4.397542ms)
+✔ renderer refuse traversée de chemin, URL, durée et droits arbitraires (4.51375ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 931.0785

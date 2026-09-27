@@ -1,0 +1,17 @@
+{
+  "at": "2026-09-27T19:17:28.711Z",
+  "target": "https://bienvu-browser-probe-staging.alexlevy0.workers.dev/photo-diagnostic",
+  "httpStatus": 200,
+  "result": {
+    "at": "2026-09-27T19:17:28.182Z",
+    "mode": "remote",
+    "sourceUrl": "https://www.espaces-atypiques.com/wp-content/uploads/149294/16624/149294-16624-60683113a.jpg",
+    "browserSessions": 0,
+    "result": {
+      "httpStatus": 200,
+      "contentType": "image/jpeg",
+      "location": null,
+      "sizeBytes": 501918
+    }
+  }
+}

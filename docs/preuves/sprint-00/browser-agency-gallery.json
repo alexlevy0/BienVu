@@ -1,0 +1,83 @@
+{
+  "at": "2026-09-27T19:13:45.073Z",
+  "target": "https://bienvu-browser-probe-staging.alexlevy0.workers.dev",
+  "httpStatus": 422,
+  "result": {
+    "ok": false,
+    "listing": {
+      "sourceUrl": "https://www.espaces-atypiques.com/ventes/75015-paris-appartement-bourgeois-avec-vue-panoramique-16624/",
+      "fetchedAt": "2026-09-27T19:13:44.266Z",
+      "adapterVersion": "espaces-atypiques-probe/1",
+      "title": {
+        "value": "Appartement bourgeois avec vue panoramique",
+        "sourcePath": "article.vente h1.annonce-title",
+        "rawEvidence": "Appartement bourgeois avec vue panoramique",
+        "status": "verified"
+      },
+      "propertyType": {
+        "value": "Apartment",
+        "sourcePath": "dataLayer.type_de_bien",
+        "rawEvidence": "Apartment",
+        "status": "verified"
+      },
+      "locality": {
+        "value": "PARIS",
+        "sourcePath": "dataLayer.ville",
+        "rawEvidence": "PARIS",
+        "status": "verified"
+      },
+      "transaction": "sale",
+      "priceCents": {
+        "value": 94900000,
+        "sourcePath": "dataLayer.prix_vente + article .info-resume",
+        "rawEvidence": "94900000",
+        "status": "verified"
+      },
+      "currency": "EUR",
+      "areaM2": null,
+      "photoUrls": [
+        "https://www.espaces-atypiques.com/wp-content/uploads/149294/16624/149294-16624-60683113a.jpg",
+        "https://www.espaces-atypiques.com/wp-content/uploads/149294/16624/149294-16624-60683113b.jpg",
+        "https://www.espaces-atypiques.com/wp-content/uploads/149294/16624/149294-16624-60683113c.jpg",
+        "https://www.espaces-atypiques.com/wp-content/uploads/149294/16624/149294-16624-60683113d.jpg",
+        "https://www.espaces-atypiques.com/wp-content/uploads/149294/16624/149294-16624-60683113e.jpg",
+        "https://www.espaces-atypiques.com/wp-content/uploads/149294/16624/149294-16624-60683113f.jpg",
+        "https://www.espaces-atypiques.com/wp-content/uploads/149294/16624/149294-16624-60683113g.jpg",
+        "https://www.espaces-atypiques.com/wp-content/uploads/149294/16624/149294-16624-60683113h.jpg",
+        "https://www.espaces-atypiques.com/wp-content/uploads/149294/16624/149294-16624-60683113i.jpg",
+        "https://www.espaces-atypiques.com/wp-content/uploads/149294/16624/149294-16624-60683113j.jpg",
+        "https://www.espaces-atypiques.com/wp-content/uploads/149294/16624/149294-16624-60683113k.jpg",
+        "https://www.espaces-atypiques.com/wp-content/uploads/149294/16624/149294-16624-60683113l.jpg"
+      ],
+      "warnings": [
+        "Surface omise : surfaces pondérée, au sol et Carrez à distinguer avant usage produit.",
+        "Extraction technique privée ; droits de réutilisation des photos non établis."
+      ]
+    },
+    "photos": [],
+    "photoBytes": 0,
+    "galleryLiveCount": 0,
+    "gallerySourceCount": 17,
+    "error": "INSUFFICIENT_PHOTOS",
+    "case": "agency-gallery-check",
+    "sourceUrl": "https://www.espaces-atypiques.com/ventes/75015-paris-appartement-bourgeois-avec-vue-panoramique-16624/",
+    "runId": "421f66f2-ab17-4214-8dee-c1263e143e11",
+    "at": "2026-09-27T19:13:44.489Z",
+    "mode": "remote",
+    "browserLocation": "cloudflare",
+    "durationMs": 5591,
+    "diagnostics": {
+      "blockedRequests": 78,
+      "requests": 124,
+      "downloadBytes": 1502178,
+      "browserClosed": true,
+      "sessionId": "27879071-0df0-4600-ad6f-b2af5a6f09f1",
+      "stage": "photos"
+    },
+    "attempts": 1,
+    "textTokens": 0,
+    "ttsCalls": 0,
+    "estimatedBrowserUsd": 0.000139775,
+    "actualBilledEur": null
+  }
+}

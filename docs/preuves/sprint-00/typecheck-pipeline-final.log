@@ -1,0 +1,4 @@
+
+> @bienvu/pipeline@0.0.0 typecheck /Users/alexlevy0/Dev/BienVu/apps/pipeline
+> tsc -p tsconfig.json
+

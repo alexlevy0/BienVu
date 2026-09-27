@@ -1,0 +1,16 @@
+
+ ⛅️ wrangler 4.142.0
+────────────────────
+Total Upload: 3959.60 KiB / gzip: 765.03 KiB
+Worker Startup Time: 59 ms
+Your Worker has access to the following bindings:
+Binding                                          Resource                  
+env.MEDIA (bienvu-s00-private)                   R2 Bucket                 
+env.BROWSER                                      Browser Run               
+env.PROBE_MODE ("remote")                        Environment Variable      
+env.ALLOW_REAL_BROWSER ("(hidden)")              Environment Variable      
+
+Uploaded bienvu-browser-probe-staging (8.66 sec)
+Deployed bienvu-browser-probe-staging triggers (2.27 sec)
+  https://bienvu-browser-probe-staging.alexlevy0.workers.dev
+Current Version ID: 13e7477e-a421-4a8d-977e-62b576477dc9

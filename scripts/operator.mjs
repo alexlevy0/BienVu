@@ -1,0 +1,10 @@
+import {localSecret,evidence,remoteUrl} from './probe-common.mjs';
+const base=process.env.RENDER_PROBE_URL??'http://localhost:8789',remote=remoteUrl(base),action=process.argv[2]??'state';
+if(remote&&!process.env.PROBE_TOKEN)throw new Error('PROBE_TOKEN requis explicitement pour la cible distante');
+const headers={Authorization:`Bearer ${await localSecret('apps/pipeline/.dev.vars')}`,'Content-Type':'application/json'};
+if(!['state','pause','budget'].includes(action))throw new Error('Action attendue : state, pause ou budget');
+const amount=Number(process.argv[3]);
+if(action==='budget'&&(!Number.isInteger(amount)||amount<0||amount>2500))throw new Error('Engagement fixe et autres dépenses en centimes requis');
+const response=await fetch(`${base}/${action}`,{method:action==='state'?'GET':action==='pause'?'POST':'PUT',headers,...(action==='budget'?{body:JSON.stringify({fixedAndOtherCents:amount})}:{})});
+await evidence(`operator-${action}`,{at:new Date().toISOString(),status:response.status,...await response.json()},remote);
+if(!response.ok)process.exitCode=1;
