@@ -1,6 +1,8 @@
 # Sprint 09 — Recette et préparation du lancement payant
 
-**Dépendance : sprint 08. Statut initial : à faire.**
+**Dépendance : sprint 08. Statut : à faire ; préparation partielle de 09.5 anticipée le 28/09/2026 à la demande d’Alex.**
+
+La page d’accueil reprend désormais la maquette fournie : promesse, illustrations synthétiques explicites, tarifs indicatifs et contact. Cette tranche ne clôt pas 09.5 : une vraie vidéo produit, les prix définitifs, l’identité de l’exploitant et les documents commerciaux complets restent à préparer. [Visuels et provenance](../design/ACCUEIL-ASSETS.md).
 
 ## Objectif
 

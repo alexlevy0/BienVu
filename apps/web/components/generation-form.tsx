@@ -5,6 +5,7 @@ import {ListingUrl, publicErrors, type NormalizedListing, type PublicErrorCode} 
 import {Icon} from './icon';
 import {useAccount} from './account';
 import {ManualListingForm} from './manual-listing-form';
+import {readListingDraft, clearListingDraft} from '../lib/listing-draft';
 
 export type ImportView = {id: string; sourceKind: 'url' | 'manual'; sourceUrl: string | null; status: 'importing' | 'ready' | 'failed'; errorCode: PublicErrorCode | null;
   createdAt: string; expiresAt: string; listing: NormalizedListing | null; title?: string | null; transaction?: 'sale' | 'rent' | null};
@@ -16,6 +17,11 @@ export function GenerationForm() {
   const [manualOpen, setManualOpen] = useState(false), [manualBusy, setManualBusy] = useState(false);
   const working = busy || manualBusy;
   const pending = useRef<{url: string; key: string} | null>(null);
+  useEffect(() => {
+    const draft = readListingDraft();
+    if (draft?.kind === 'url') setUrl(draft.url);
+    if (draft?.kind === 'manual') setManualOpen(true);
+  }, []);
   const refresh = useCallback(async () => {
     if (!me) return;
     try {const response = await fetch('/api/imports', {cache: 'no-store'}); if (response.ok) setImports((await response.json() as {imports: ImportView[]}).imports);} catch { /* le retour d'import reste visible */ }
@@ -40,6 +46,7 @@ export function GenerationForm() {
       const value = await response.json() as ImportView & {error?: {code?: PublicErrorCode}};
       if (!response.ok) throw new Error(message(value.error?.code));
       setResult(value); if (value.status !== 'importing') pending.current = null;
+      if (value.status === 'ready') clearListingDraft();
       await refresh();
     } catch (error) {setFeedback(error instanceof Error && error.name !== 'TimeoutError' ? error.message : 'La réponse tarde. Consultez vos imports avant de réessayer.'); await refresh();}
     finally {setBusy(false);}
@@ -65,7 +72,7 @@ export function GenerationForm() {
     <button className="text-button manual-toggle" type="button" aria-expanded={manualOpen} aria-controls="manual-listing-panel" disabled={working}
       onClick={() => setManualOpen(open => !open)}><span aria-hidden="true">{manualOpen ? '−' : '+'}</span> Saisir mon annonce manuellement</button>
     <div id="manual-listing-panel" hidden={!manualOpen}>
-      <ManualListingForm busy={working} setBusy={setManualBusy} onCreated={async value => {setResult(value); setFeedback(''); setManualOpen(false); await refresh();}}/>
+      <ManualListingForm busy={working} setBusy={setManualBusy} onCreated={async value => {setResult(value); setFeedback(''); setManualOpen(false); clearListingDraft(); await refresh();}}/>
     </div>
     {result && <section className="import-result" aria-live="polite">
       {result.status === 'failed' && <><h3>Cette annonce n’a pas pu être enregistrée.</h3><p className="form-feedback error">{message(result.errorCode)}</p><p className="field-help">Essayez un autre lien du même bien ou utilisez la saisie manuelle ci-dessus.</p></>}

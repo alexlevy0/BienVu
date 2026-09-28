@@ -18,7 +18,7 @@ pnpm build:web
 pnpm preview
 ```
 
-Ouvrir `http://localhost:8787`. Dans un second terminal :
+Ouvrir `http://localhost:8787` pour l’accueil public, ou `http://localhost:8787/studio` pour la vue d’ensemble du studio. Dans un second terminal :
 
 ```sh
 pnpm probe:foundations

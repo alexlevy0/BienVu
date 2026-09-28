@@ -25,7 +25,8 @@ export function Login() {
       if (!value) setFailure('Ce lien est invalide ou expiré. Demandez un nouveau lien.');
       // Le secret reste uniquement en mémoire jusqu’à la soumission du formulaire.
       window.history.replaceState(null, '', '/connexion?mode=reset');
-    } else if (url.searchParams.has('error')) setFailure(url.searchParams.get('error') === 'verification'
+    } else if (url.searchParams.get('mode') === 'signup') setMode('signup');
+    else if (url.searchParams.has('error')) setFailure(url.searchParams.get('error') === 'verification'
       ? 'Ce lien est invalide ou expiré. Demandez un nouveau lien de confirmation.' : 'La connexion n’a pas abouti. Vous pouvez réessayer.');
     else if (url.searchParams.get('verified') === '1') setNotice('Adresse confirmée. Vous pouvez vous connecter.');
   }, []);

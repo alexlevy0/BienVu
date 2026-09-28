@@ -6,11 +6,28 @@ Dernière mise à jour : 28 septembre 2026.
 
 **Sprints 02 et 03 terminés le 28/09 : [bilan actualisé](BILAN-SPRINTS.md).** Le sprint 00 est techniquement démontré, avec facture à rapprocher ; le sprint 01 est terminé. Prochaine tranche fonctionnelle : sprint 04, puis 05–09.
 
+- **Accueil public — 28/09 :** nouvelle page mise en ligne sur [bienvu.online](https://bienvu.online), d’après la maquette d’Alex ; contact public `contact@bienvu.online`. Ancienne vue d’ensemble déplacée vers `/studio`, reprise d’un lien après connexion et accès à la saisie manuelle. Images synthétiques, aperçus animés sans son et prix indicatifs explicitement présentés ; génération et facturation toujours fermées. Préparation partielle de 09.5, sans clôture du sprint 09.
+- **Vérifications de l’accueil :** build OpenNext/TypeScript, frontières (76 fichiers), sonde fondations sur huit pages et dry-run réussis ; recette navigateur locale avec compte synthétique, puis inspection de la vraie page Cloudflare en 1440 et 320 px. Recette mobile locale aussi à 390 px. HTTPS 200 sur accueil/studio/inscription, API privées 401 ; trois images et trois polices relues avec empreintes identiques. Version web `a89ad5ea-1417-4517-b0fb-99cc215d1a01`, paramètres/bindings/secrets conservés. Compte local de test supprimé et preview créée pour cette tranche arrêtée. Aucun nouvel import, rendu, e-mail ou achat. [Fichiers, commandes et limites](preuves/accueil/RAPPORT.md) · [Visuels et prompts](design/ACCUEIL-ASSETS.md).
+
 - **Sprint 02 :** Alex confirme le nouvel e-mail sur bienvu.online, le changement de mot de passe et la même agence par e-mail et Google. Deux comptes synthétiques sur les vrais Workers/D1/R2 vérifient marque persistante, PNG/JPEG privés, isolation, refus des fichiers hostiles, révocation, expiration et rejeu de reset. Formulaire et upload/remplacement inspectés dans le navigateur sur ordinateur et mobile. [Recette distante](preuves/sprint-02/RECETTE-DISTANTE.md).
 - **Sprint 03 :** import URL et saisie manuelle actifs sur bienvu.online, avec transport TLS à IP épinglée et Sharp dans un Container Cloudflare privé. Trois annonces réelles Espaces Atypiques, Orpi et Century 21 : 12/11/7 photos, descriptions persistantes, empreintes D1/R2 et isolation relues. Page JavaScript et saisie manuelle testées avec fixtures explicites ; six vraies sessions Browser Run fermées normalement. Cron du 28/09 à 13:30 UTC : dossier abandonné supprimé, dossier lié à un job synthétique conservé ; purge répétée sans effet, écritures tardives refusées, compteurs conservés. [Rapport et limites](preuves/sprint-03/CLOUDFLARE.md) · [ADR du transport](adr/0003-transport-import-cloudflare.md).
 - **Validation :** 103 tests locaux réussis, TypeScript des applications/packages et tests, frontières, build OpenNext, conteneur Docker amd64 et recettes distantes. Migration `0009` appliquée sans réinitialisation. Les pannes et défauts injectés restent distingués des essais réels dans les rapports. Vérification finale : liens documentaires sans cible manquante, `git diff --check` réussi, aucun secret effectif trouvé dans les fichiers destinés à Git. Zéro compte synthétique, import de recette ou job restant ; Alex conserve son agence et ses deux connexions. Aucun conteneur Docker ni session Browser Run laissé actif.
 - **État et budget :** conteneur d'import endormi ; renderer arrêté et en pause, aucune nouvelle vidéo. Cinq imports ont consommé le plafond global du 28/09 UTC ; disponible à nouveau le 29/09 à 02:00 Paris, sous réserve du budget mensuel. Total prudent **20 € de provisions**, **10 € de marge sur 30 €** ; alerte 20 €, coupure 25 €, facture réelle non rapprochée. Alex confirme aucune autre dépense. Les données de recette sont nettoyées, pas les compteurs.
-- **Git :** changements Google/domaine antérieurs conservés, aucun commit/push dans cette tranche. La [dernière CI main vérifiée](https://github.com/alexlevy0/BienVu/actions/runs/36404738405) couvre `3d83abf`, pas ces modifications locales.
+- **Git :** les sprints 02/03 ont été commités et poussés sur `main` dans `9e0c732`, avec [CI réussie](https://github.com/alexlevy0/BienVu/actions/runs/36430599015). À la demande d’Alex du 28/09, le lot suivant regroupe l’accueil, sa palette vert pastel, la reprise d’annonce et leur documentation pour versionnement sur `main`. Contrôle préalable : `pnpm check` réussi (103 tests locaux, TypeScript et frontières sur 76 fichiers), `git diff --check` réussi, branche distante synchronisée. Secrets, captures et journaux restent ignorés ; seuls les rapports Markdown et les assets publics nécessaires sont inclus. La CI du nouveau commit se vérifie séparément dans GitHub Actions.
+
+## Accueil — palette vert pastel, 28/09/2026
+
+À la demande d’Alex, le jaune de l’accueil est remplacé par le vert exact du panneau droit de `/connexion` : `#e1e8d9`, confirmé dans le CSS et dans le navigateur (`rgb(225, 232, 217)`). Fond uni et accents harmonisés : encadrements, menu mobile, tarifs, FAQ, modales et bandeau final. Deux textes secondaires sont assombris pour maintenir leur contraste ; les textes contrôlés sur ce fond dépassent 4,5:1. Modification applicative limitée à `apps/web/app/landing.css`.
+
+Build OpenNext avec TypeScript et dry-run réussis ; inspection locale en 1440×1000 et 390×844 sans débordement horizontal, puis contrôle visuel sur le vrai domaine. Version web publiée : `a59df97f-a3b9-4838-ac8a-927e53bc09aa`. Fond publié identique à la référence. Preuves locales : `evidence/local/landing-sage/`, dont captures et mesures. Preview créée pour la vérification arrêtée ; aucun nouvel import, rendu, e-mail ou achat. Cette retouche est regroupée avec la création de l’accueil dans le même lot Git.
+
+## Alerte Chrome examinée — 28/09/2026, 17 h 20–25 Paris
+
+Alex observe « Site dangereux » dans son onglet Chrome, avec certificat valide. Vérification en lecture seule : DNS Cloudflare et Google sans erreur, zone active, HTTP redirigé en 308 vers HTTPS ; certificat Google Trust Services valide pour `bienvu.online` et son wildcard. Version web toujours `a89ad5ea-1417-4517-b0fb-99cc215d1a01`. Accueil et connexion en 200 ; onze fichiers JavaScript identiques au build local par SHA-256, aucun script externe dans ces deux réponses. Le HTML hors scripts est identique ; les différences inline inspectées concernent les métadonnées/découpes du flux Next.js.
+
+Le [rapport public Google Safe Browsing](https://transparencyreport.google.com/safe-browsing/search?url=https%3A%2F%2Fbienvu.online%2F&hl=fr) affiche « Aucun contenu suspect détecté », actualisé le 28/09. Alex confirme que l’ouverture directe en navigation privée ne présente pas l’alerte. Cela oriente vers un ancien état d’onglet ou un verdict propre au profil Chrome ; la cause exacte n’est pas prouvée, et ces contrôles ne constituent pas un audit de sécurité exhaustif. Fermer les anciens onglets BienVu, quitter Chrome puis rouvrir l’URL normalement ; vérifier à nouveau si l’alerte revient.
+
+Preuves locales ignorées : `evidence/local/security-20260928/` (rapport technique, HTML publics et capture Google). Aucune modification DNS, de certificat, de code ou de protection du navigateur ; aucun nouvel import/rendu/e-mail, aucun coût applicatif payant. OAuth Wrangler rafraîchi pour relire la configuration ; premier appel avant rafraîchissement refusé 403. Retour du navigateur normal après redémarrage non encore confirmé.
 
 ## Historique des tranches
 
@@ -57,7 +74,7 @@ Après reconnexion Wrangler par Alex, puis activation de R2 par Alex, deux Worke
 | 06 | À faire | — | MP4 et filigrane produit |
 | 07 | À faire | — | Pipeline durable complet |
 | 08 | À faire | — | Facturation et quotas |
-| 09 | À faire | — | Recette de lancement |
+| 09 | À faire, accueil anticipé | [Accueil et limites](preuves/accueil/RAPPORT.md) ; préparation partielle de 09.5 | Vidéo produit, offres définitives, documents complets et recette de lancement |
 
 ## Décisions et hypothèses
 
@@ -231,11 +248,12 @@ Date : 28/09/2026 Europe/Paris. Aucun de ces trois imports n’utilise Cloudflar
 | 28/09/2026 | Workers Paid, Containers et domaine | 8 € fixes, 2,50 € pour cinq tentatives, 6 € de provision pour le domaine | 16,50 € provisionnés ; montant réel à rapprocher | Paid 5 € et domaine 4,99 USD déclarés par Alex | 13,50 € estimés |
 | 28/09/2026 | E-mails, Google et domaine web | Deux mails, connexions réelles, déploiements et contrôles sur les ressources existantes | Surcoût estimé nul dans les allocations existantes | Non rapprochée | 13,50 € estimés |
 | 28/09/2026 | Clôture 02 et imports Cloudflare 03 | Un troisième e-mail ; cinq imports, deux groupes opérateur, six sessions Browser Run ; D1/R2, décodage et purge | 3,50 € réservés, total prudent 20 € ; ce n'est pas une facture | Aucune autre dépense déclarée ; facture non rapprochée | 10 € de marge estimée |
+| 28/09/2026 | Accueil public | Illustrations via outil intégré, tests locaux, déploiement et lectures web existants ; aucun appel IA du projet, import ou rendu | Surcoût attendu nul dans les allocations ; provisions inchangées à 20 € | Facture non rapprochée | 10 € de marge estimée |
 
 ## Prochaine vérification
 
 1. Poursuivre le [sprint 04 — portails](sprints/SPRINT-04-PORTAILS.md), avec échantillons et fixtures avant de nouveaux appels distants. Les imports d'agences et la saisie manuelle disposent maintenant du transport hébergé ; [configuration et exploitation](IMPORTS.md#cloudflare--configuration-et-exploitation).
 2. Rapprocher facture Cloudflare, métriques et débit du domaine avec le registre de provisions avant d'élargir les essais. Le prochain mois démarre sans budget d'import actif tant qu'une base et un plafond ne sont pas enregistrés.
-3. Lors du prochain commit/push demandé, observer la nouvelle CI. Puis sprints 05 → 06 → 07 → 08 → 09 selon le [bilan](BILAN-SPRINTS.md).
+3. Contrôler la CI associée à chaque push sur `main`. Puis sprints 05 → 06 → 07 → 08 → 09 selon le [bilan](BILAN-SPRINTS.md).
 
-Le rendu Containers de 30 s et l'écoute humaine sont déjà validés ; aucun nouveau rendu n'était nécessaire pour cette tranche. Les rendus restent suspendus avec cinq tentatives consommées. La marge prudente actuelle est de 10 €, les plafonds de recette d'import sont conservés après nettoyage, et l'offre publique reste à construire.
+Le rendu Containers de 30 s et l'écoute humaine sont déjà validés ; aucun nouveau rendu n'était nécessaire pour cette tranche. Les rendus restent suspendus avec cinq tentatives consommées. La marge prudente actuelle est de 10 €, les plafonds de recette d'import sont conservés après nettoyage, et l’activation commerciale reste à préparer.

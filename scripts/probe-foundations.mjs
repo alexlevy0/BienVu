@@ -5,14 +5,14 @@ const base = process.env.BIENVU_FOUNDATIONS_URL ?? 'http://localhost:8787';
 const origin = new URL(base);
 if (!['localhost', '127.0.0.1', '[::1]'].includes(origin.hostname)) throw new Error('Sonde sprint 01 limitée au serveur local.');
 const report = {at: new Date().toISOString(), mode: 'local-workerd', externalCalls: 0, checks: []};
-for (const path of ['/', '/generer', '/agence', '/historique', '/abonnement', '/connexion', '/laboratoire']) {
+for (const path of ['/', '/studio', '/generer', '/agence', '/historique', '/abonnement', '/connexion', '/laboratoire']) {
   const response = await fetch(new URL(path, base));
   const html = await response.text();
   assert.equal(response.status, 200, path);
   assert.match(html, /<html lang="fr"/);
   assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
   assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
-  assert.match(html, /développement|bientôt disponible/);
+  assert.match(html, path === '/' ? /Accès anticipé/ : /développement|bientôt disponible/);
   report.checks.push({path, status: response.status, french: true, securityHeaders: true});
 }
 const ids = new Set();

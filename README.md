@@ -22,7 +22,7 @@ pnpm build:web
 pnpm preview
 ```
 
-Dans un second terminal : `pnpm probe:foundations`, puis `pnpm probe:web` et `pnpm probe:accounts`. L'interface est sur `http://localhost:8787`. Le build est exécuté par **workerd**. Les sondes vérifient les pages, le refus des générations, puis D1/R2 et le cookie opérateur, et nettoient leurs objets. Les tests D1 locaux couvrent aussi les clés d'agence, les contraintes et le rollback ; la sonde comptes vérifie sessions et isolation avec des identités synthétiques, sans valider Google OAuth réel ni le pipeline métier complet.
+Dans un second terminal : `pnpm probe:foundations`, puis `pnpm probe:web` et `pnpm probe:accounts`. L’accueil public est sur `http://localhost:8787` et la vue d’ensemble du studio sur `http://localhost:8787/studio`. Le build est exécuté par **workerd**. Les sondes vérifient les pages, le refus des générations, puis D1/R2 et le cookie opérateur, et nettoient leurs objets. Les tests D1 locaux couvrent aussi les clés d'agence, les contraintes et le rollback ; la sonde comptes vérifie sessions et isolation avec des identités synthétiques, sans valider Google OAuth réel ni le pipeline métier complet.
 
 Pour importer une vraie annonce en local, lancer `pnpm dev:imports` dans un second terminal puis utiliser `/generer` après connexion. Pour la recette synthétique, arrêter ce pont puis lancer `pnpm probe:imports` : la sonde démarre son propre transport sans réseau extérieur. Les deux modes sont distincts ; [limites, sécurité, nettoyage et recette réelle](docs/IMPORTS.md).
 
