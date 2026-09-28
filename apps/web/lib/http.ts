@@ -9,9 +9,9 @@ export function assertSameOrigin(request: Request, env: AuthEnvironment) {
   if (request.headers.get('origin') !== authOrigin(env) || request.headers.get('sec-fetch-site') === 'cross-site')
     throw new RequestFailure('FORBIDDEN');
 }
-export async function boundedBytes(request: Request, maxBytes: number) {
+export async function boundedBytes(request: Request, maxBytes: number, tooLarge: PublicErrorCode = 'FILE_TOO_LARGE') {
   const length = request.headers.get('content-length');
-  if (length !== null && (!/^\d+$/.test(length) || Number(length) > maxBytes)) throw new RequestFailure('FILE_TOO_LARGE');
+  if (length !== null && (!/^\d+$/.test(length) || Number(length) > maxBytes)) throw new RequestFailure(tooLarge);
   if (!request.body) throw new RequestFailure('VALIDATION_ERROR');
   const reader = request.body.getReader();
   const parts: Uint8Array[] = [];
@@ -21,7 +21,7 @@ export async function boundedBytes(request: Request, maxBytes: number) {
       const {value, done} = await reader.read();
       if (done) break;
       size += value.byteLength;
-      if (size > maxBytes) {await reader.cancel(); throw new RequestFailure('FILE_TOO_LARGE');}
+      if (size > maxBytes) {await reader.cancel(); throw new RequestFailure(tooLarge);}
       parts.push(value);
     }
   } finally {reader.releaseLock();}
@@ -30,9 +30,9 @@ export async function boundedBytes(request: Request, maxBytes: number) {
   for (const part of parts) {bytes.set(part, offset); offset += part.length;}
   return bytes;
 }
-export async function boundedJson(request: Request) {
+export async function boundedJson(request: Request, maxBytes = 8192) {
   if (request.headers.get('content-type')?.split(';')[0] !== 'application/json') throw new RequestFailure('VALIDATION_ERROR');
-  const bytes = await boundedBytes(request, 8192);
+  const bytes = await boundedBytes(request, maxBytes);
   try {return JSON.parse(new TextDecoder().decode(bytes)) as unknown;} catch {throw new RequestFailure('VALIDATION_ERROR');}
 }
 export async function respond(action: () => Promise<Response>) {

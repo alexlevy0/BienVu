@@ -16,7 +16,7 @@
     "probe:foundations": "node scripts/probe-foundations.mjs",
     "setup:local": "node scripts/setup-local.mjs",
     "fixtures": "tsx scripts/generate-fixtures.ts",
-    "test": "tsx --test tests/*.test.ts",
+    "test": "tsx --test --test-concurrency=2 tests/*.test.ts",
     "typecheck": "pnpm -r typecheck && tsc -p tsconfig.tests.json",
     "generations:pause": "node scripts/pause-generations.mjs",
     "build:web": "pnpm --filter @bienvu/web build:worker",
@@ -28,7 +28,10 @@
     "budget": "tsx scripts/budget.ts",
     "versions": "node scripts/versions.mjs",
     "probe:accounts": "node scripts/probe-accounts.mjs",
-    "probe:auth-email": "node scripts/probe-auth-email.mjs"
+    "probe:auth-email": "node scripts/probe-auth-email.mjs",
+    "dev:imports": "tsx scripts/serve-imports.ts",
+    "probe:imports": "tsx scripts/probe-imports.ts",
+    "imports:cleanup": "tsx scripts/cleanup-imports.ts"
   },
   "devDependencies": {
     "@types/node": "24.10.1",

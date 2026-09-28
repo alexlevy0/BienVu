@@ -1,6 +1,6 @@
 # Sprint 00 — procédure reproductible
 
-Toutes les commandes partent de `/Users/alexlevy0/Dev/BienVu`. **Le staging web/import, D1 et R2 ont été créés et testés le 27/09/2026** ; consulter le rapport pour leurs résultats. Les commandes de création sont destinées à une première installation : ne pas recréer les ressources existantes. Le renderer Cloudflare reste non déployé et exige Workers Paid. Ne jamais coller un secret dans Git, un argument CLI, un rapport ou une capture.
+Toutes les commandes partent de `/Users/alexlevy0/Dev/BienVu`. **Le staging web/import, D1 et R2 ont été créés et testés le 27/09/2026** ; consulter le rapport pour leurs résultats. Les commandes de création sont destinées à une première installation : ne pas recréer les ressources existantes. **Le renderer Cloudflare est déployé depuis le 28/09**, après confirmation de Workers Paid par Alex ; consulter la [recette Paid](CONTAINERS-PAID.md) avant toute reprise. Ne jamais coller un secret dans Git, un argument CLI, un rapport ou une capture.
 
 **Reprise avec Workers Free :** Alex a activé R2 après le premier refus `10042`. L'accès a ensuite réussi. `prepare-staging.mjs` prévoit le plan gratuit par défaut et retire la limite CPU personnalisée du Worker navigateur : la limite Free de 10 ms s'applique alors. Utiliser `BIENVU_WORKERS_PLAN=paid` uniquement si ce forfait est déjà activé. Le fichier du renderer reste préparé avec les appels désactivés et **ne doit pas être déployé sur Free**. Un rendu local ne valide pas Containers.
 
@@ -34,7 +34,7 @@ pnpm serve:renderer
 node scripts/probe-render-server.mjs
 ```
 
-Ce contrôle ne remplace ni Linux ni Containers. Les 17 tests `pnpm test` sont distincts : le test HTTP du journal d'échec utilise un serveur simulé et ne lance aucun rendu.
+Ce contrôle ne remplace ni Linux ni Containers. Les tests `pnpm test` sont distincts : le test HTTP du journal d'échec utilise un serveur simulé et ne lance aucun rendu. La reprise du 28/09 porte la suite à 96 tests, avec deux fichiers exécutés simultanément pour limiter la pression mémoire des runtimes workerd ; le service Node isole désormais le calcul dans un enfant borné à 540 s, tandis que le parent répond aux contrôles de santé.
 
 ## 2. Browser Run local et sources réelles
 
@@ -53,7 +53,7 @@ Une réservation R2 conditionnelle empêche une seconde tentative du même cas, 
 
 ## 3. Préparer le staging
 
-Le plafond de 30 € couvre les frais fixes, APIs et taxes. Dépense déclarée initiale : 0 €. Enveloppe proposée : 8 € pour Workers Paid et conversion/taxes, 0,50 € par tentative de rendu. Arrêt applicatif à 25 € engagés ; marge de 5 €. Avant activation, contrôler les allocations déjà consommées au niveau du compte et la facture réelle.
+Le plafond de 30 € couvre les frais fixes, APIs et taxes. Dépense initialement déclarée : 0 € ; **abonnement de 5 € déclaré le 28/09**. Provision retenue : 8 € pour Workers Paid et marge de rapprochement, 0,50 € par tentative de rendu. Arrêt applicatif à 25 € engagés ; marge de 5 €. Contrôler les allocations déjà consommées au niveau du compte ; distinguer les métriques accessibles de la facture, dont l'accès API est refusé avec les droits OAuth actuels.
 
 ```sh
 pnpm exec wrangler login
@@ -102,7 +102,7 @@ node scripts/probe-browser-status.mjs
 
 Conserver chaque échec et la source exacte. Le Figaro 108944355 a refusé l'accès durant cette recette ; rien ne permet de le dire retiré. L'historique retourné par `/status` permet de comparer `sessionId`, durée, `NormalClosure`, sessions actives et temps de navigateur consommé. Après cette recette, les cas sont réservés et les appels désactivés : ne pas relancer mécaniquement les commandes ci-dessus.
 
-Containers :
+Containers, exemple pour une **première** recette autorisée. Le budget existant est persistant : consulter l'état avant toute commande, ne pas réinitialiser les compteurs et ne pas relancer ces exemples après épuisement des cinq tentatives :
 
 ```sh
 pnpm --filter @bienvu/pipeline exec wrangler deploy --config wrangler.staging.render.jsonc --var ALLOW_PAID_PROBES:true
@@ -123,12 +123,14 @@ Vérifier aussi une lecture `GET /jobs/:id` pendant le démarrage : le statut do
 
 Mesures à ajouter : démarrage à froid, temps de rendu, upload, sommeil effectif, durée active totale, CPU facturé (pas seulement le CPU Node), type d'instance, stockage, frais fixes, taxes/change, erreurs et facture. Le budget après allocations partagées est distinct du coût marginal brut. Ne pas déduire une facture réelle d'un calcul local.
 
+Pour une correction du contrôleur ou un changement du coupe-circuit **sans modification de l'image**, ajouter `--containers-rollout none` au déploiement. Le contrôle `GET /diagnostic`, protégé par le secret opérateur, ne démarre pas une instance arrêtée : il exécute une commande fixe et bornée pour relever les processus, fichiers de sortie et disponibilité HTTP interne. Il n'accepte aucune commande fournie par le client. Ne pas publier les traces brutes contenant en-têtes, secrets ou métadonnées de connexion.
+
 ## 5. Arrêt et nettoyage
 
 ```sh
 node scripts/operator.mjs pause
 pnpm --filter @bienvu/pipeline exec wrangler deploy --config wrangler.staging.jsonc --var ALLOW_REAL_BROWSER:false
-pnpm --filter @bienvu/pipeline exec wrangler deploy --config wrangler.staging.render.jsonc --var ALLOW_PAID_PROBES:false
+pnpm --filter @bienvu/pipeline exec wrangler deploy --config wrangler.staging.render.jsonc --containers-rollout none --var ALLOW_PAID_PROBES:false
 ```
 
 La pause interdit les **nouveaux** rendus ; un job accepté continue jusqu'au résultat vérifié ou à son délai maximal. Vérifier `/state` après l'arrêt. Exporter les preuves et réconcilier la facturation avant de supprimer des ressources ; une suppression de Worker ne résilie pas Workers Paid. Pour supprimer les ressources de ce sprint, utiliser leurs noms exacts et ne toucher à aucun autre projet du compte.

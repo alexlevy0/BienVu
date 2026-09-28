@@ -7,6 +7,6 @@
   "durable_objects":{"bindings":[{"name":"RENDERER","class_name":"Renderer"}]},
   "migrations":[{"tag":"v1","new_sqlite_classes":["Renderer"]}],
   "r2_buckets":[{"binding":"MEDIA","bucket_name":"bienvu-render-probes-local"}],
-  "observability":{"enabled":true,"head_sampling_rate":1},
+  "observability":{"enabled":true,"head_sampling_rate":1,"traces":{"enabled":true,"head_sampling_rate":1}},
   "limits":{"cpu_ms":30000}
 }

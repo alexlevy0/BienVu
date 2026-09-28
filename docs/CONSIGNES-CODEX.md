@@ -15,7 +15,7 @@ Ces consignes accompagnent le cahier produit. Elles ne remplacent ni les instruc
 - Livrer un résultat fonctionnel observable, avec un périmètre limité aux dépendances utiles.
 - Favoriser des fonctions courtes, contrats validés, interfaces de fournisseur isolées et erreurs stables. Ne pas créer un framework d'agents pour ce pipeline déterminé.
 - Séparer le code compatible Workers du code Node natif. Aucun moteur de rendu vidéo dans le bundle de l'interface.
-- Conserver le parcours sans édition et sans ajout manuel de photos du bien. Ne pas contourner une difficulté d'import en ajoutant un formulaire de saisie.
+- Conserver le parcours sans éditeur vidéo. Depuis la demande d’Alex du 28/09/2026, proposer aussi une saisie manuelle dépliable sous l’import URL, avec informations du bien et upload de photos. Cette décision remplace l’exclusion initiale du formulaire ; distinguer les faits importés des informations déclarées par l’utilisateur.
 - Ne pas développer une fonction d'achat de crédits, de publication sociale ou de collaboration d'équipe non prévue.
 - Ne pas demander de décision sur chaque détail réversible. Choisir les valeurs proposées et documenter les écarts utiles.
 - Un accès ou un secret manquant ne doit pas empêcher de terminer les éléments locaux vérifiables. Décrire ensuite exactement la vérification distante restante.

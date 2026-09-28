@@ -8,10 +8,10 @@ L’option exige mode local, origine HTTP localhost/127.0.0.1 et requête sur l�
 
 | Vérification | Preuve |
 |---|---|
-| 56 tests, frontières et TypeScript | [Journal](bypass-check.log) |
-| Build Next/OpenNext | [Journal](bypass-build.log) |
-| HTTP réel sous workerd local, inscription synthétique sans compte préinséré | [Rapport](bypass-workerd.json), [journal](bypass-probe.log) |
-| Inscription navigateur et redirection automatique | [Inspection](bypass-inspection-ui.json) |
+| 56 tests, frontières et TypeScript | Journal (`docs/preuves/sprint-02/bypass-check.log`) |
+| Build Next/OpenNext | Journal (`docs/preuves/sprint-02/bypass-build.log`) |
+| HTTP réel sous workerd local, inscription synthétique sans compte préinséré | Rapport (`docs/preuves/sprint-02/bypass-workerd.json`), journal (`docs/preuves/sprint-02/bypass-probe.log`) |
+| Inscription navigateur et redirection automatique | Inspection (`docs/preuves/sprint-02/bypass-inspection-ui.json`) |
 
 La sonde contrôle le champ D1, le hachage, le cookie, l’agence unique, aucun mail, la persistance, le mauvais mot de passe, la réinscription, zéro allocation et la déconnexion. Le compte de sonde est supprimé ensuite. La recette normale avec confirmation reste couverte par les tests ; les preuves HTTP précédentes sont distinctes.
 

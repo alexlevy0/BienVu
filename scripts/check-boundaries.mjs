@@ -6,7 +6,7 @@ import ts from 'typescript';
 const root = process.cwd();
 const failures = [];
 const modules = new Set(builtinModules.flatMap(name => [name, `node:${name}`]));
-const forbidden = /^(?:@remotion\/(?:renderer|bundler|compositor[^/]*)|remotion|fluent-ffmpeg|ffmpeg[^/]*|puppeteer[^/]*|playwright(?:-core)?|@bienvu\/(?:renderer|video))(?:\/|$)/;
+const forbidden = /^(?:@remotion\/(?:renderer|bundler|compositor[^/]*)|remotion|sharp|fluent-ffmpeg|ffmpeg[^/]*|puppeteer[^/]*|playwright(?:-core)?|@bienvu\/(?:renderer|video))(?:\/|$)/;
 const roots = ['apps/web', 'apps/pipeline', 'packages/contracts', 'packages/db', 'packages/importers', 'packages/observability'];
 const portable = ['packages/contracts', 'packages/db', 'packages/importers', 'packages/observability'];
 const skip = new Set(['node_modules', '.next', '.open-next', '.wrangler', 'dist']);
@@ -31,6 +31,7 @@ async function inspectFile(path, scope) {
     if (name.startsWith('.') || name.startsWith('@/')) {
       const target = ts.resolveModuleName(name, path, options, ts.sys).resolvedModule?.resolvedFileName ?? resolve(dirname(path), name);
       if (/(?:apps\/renderer|packages\/video)\//.test(relative(root, target))) failures.push(`${relative(root, path)} : traverse la frontière Node/Workers`);
+      if (/^scripts\/(?:import-transport|serve-imports|import-fixtures)\./.test(relative(root, target))) failures.push(`${relative(root, path)} : importe le transport Node local dans un Worker`);
     }
   }
 }

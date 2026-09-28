@@ -2,7 +2,7 @@
 
 27 septembre 2026 · dépôt `/Users/alexlevy0/Dev/BienVu` · branche `codex/sprint-00-faisabilite` · aucun commit/push.
 
-**Faisabilité partiellement démontrée, sprint non terminé.** Le web fonctionne sur Workers Free, une annonce d'agence fournit ses données et trois photos depuis Cloudflare, et Remotion produit des MP4 natifs de 6 s et 30 s. Le rendu **dans Cloudflare Containers**, son sommeil et son coût réel restent non vérifiés. Aucun abonnement Workers Paid n'a été activé.
+**Mise à jour du 28/09 : faisabilité technique démontrée ; rapprochement financier ouvert.** Après activation de Workers Paid par Alex, un MP4 de 30 s est produit dans Cloudflare Containers, transféré vers R2 privé et téléchargé avec empreinte vérifiée. Alex confirme la lecture et le son ; sommeil et téléchargement sans réveil contrôlés. Les quatre échecs précédents restent comptés sur cinq tentatives. [Recette Paid complète](CONTAINERS-PAID.md). La facture n’est pas consultée ; le budget prudent laisse 19,50 € sur 30 €.
 
 ## Résultats démontrés
 
@@ -13,8 +13,8 @@
 | Agence Espaces Atypiques | Référence 16624, titre, Paris, vente, prix 949 000 €, trois JPEG distincts de 1620 ou 1621×1080 téléchargés, décodés chez Cloudflare, hachés et stockés dans R2 | Un cas statique avec galerie HTML ; ne prouve pas une couverture générale des agences |
 | Le Figaro 108944355 | Tentative Browser Run distante : `SOURCE_BLOCKED`, accès refusé par la source | Annonce non qualifiée de retirée ; aucun contournement |
 | Remotion natif | MP4 synthétiques 6 s et 30 s, H.264/AAC, 1080×1920, 30 fps ; vrai protocole HTTP asynchrone contrôlé | Ne valide pas Linux/Containers ni une voix française |
-| Linux amd64 | Image construite et vrai MP4 6 s réussi, réseau externe désactivé | Émulation Rosetta locale ; 30 s non testé dans Linux/Containers |
-| Confidentialité/arrêt | R2 public désactivé, aucun domaine public, purge `probes/` après 30 jours ; historique des sessions navigateur relevé | Pas encore de sommeil Containers observé |
+| Linux amd64 / Containers | Docker local 6 s ; Containers 30 s en 105,940 s de calcul/vérification, réseau externe désactivé | Un seul succès distant, sans voix off ni annonce réelle ; corrections du transfert comprises dans le cycle de 300,184 s |
+| Confidentialité/arrêt | R2 privé, rétention `probes/` 30 jours ; sommeil Containers et téléchargement sans réveil ; pause et plafond de cinq vérifiés | Facture et métriques complètes à rapprocher |
 | Budget | Aucun appel IA/TTS, aucune activation payante ; consommation navigateur mesurée par le fournisseur | Facture non consultée ; gratuité estimée à partir des quotas et de la consommation |
 
 URL web : [laboratoire de staging](https://bienvu-web-probe-staging.alexlevy0.workers.dev). Cette page décrit les sondes, sans achat, compte client ou éditeur. L'interface a été vue dans le navigateur intégré ; pas de recette responsive exhaustive.
@@ -63,9 +63,9 @@ Les images extraites du MP4 de 30 s à 1, 15 et 29 secondes ont été inspectée
 
 La construction Linux amd64 a réussi après suppression, à la demande d'Alex, des anciens conteneurs Docker : `build-docker-reprise.log`, image `sha256:bace81bba111d48da01d4b4b36fa247cd8f27710ec65b4876ffdce9f3e0fcf01`. Node 24.17.0 et FFmpeg 5.1.9 sont relevés dans le conteneur. La commande autorise 6 GiB, mais la VM Docker fournit 4 109 111 296 octets au total (environ 3,83 GiB) ; la mémoire disponible est moindre. Le rendu Linux court a réussi : **6 s, 735 772 octets, 471,485 s de rendu/vérification**, H.264/AAC, 1080×1920, 30 fps, environ −32,79 dBFS. Le processus x64 était exécuté sous Rosetta avec un quota de 1 vCPU ; cette durée ne prédit pas celle de Containers. Preuves : `mp4-linux-short.json`, `render-linux-short.log` et `linux-runtime-versions.json`. Trois images décodées à 1, 3 et 5 s ont été vues ; police de repli différente de macOS, mais pas de découpe observée. Le conteneur `--rm` a quitté avec le code 0 et a été supprimé ; zéro conteneur reste au contrôle. Ne pas attribuer les durées macOS à Linux ni à Cloudflare.
 
-**Aucun rendu Containers n'a été exécuté.** Le Worker de contrôle et son Dockerfile sont préparés ; `--containers-rollout none` dans un dry-run compile le Worker sans construire l'image. Les réservations persistantes, le slot unique, le dépôt R2 et le sommeil doivent être exercés chez Cloudflare.
+**Reprise du 28/09 : cinq tentatives Containers exécutées, dont une réussie.** La nouvelle image isole le calcul du serveur HTTP. Le MP4 de durée cible est réellement produit en 105,940 s ; deux incompatibilités du flux entre Containers et R2 sont corrigées dans le contrôleur, puis le même fichier est récupéré sans sixième rendu. Taille 2 505 065 octets, H.264/AAC 1080×1920/30 fps, empreinte vérifiée. Concurrence, démarrage `accepted`, rejeu, plafond, pause et sommeil observés ; lecture humaine confirmée. Les preuves détaillées et l’historique des corrections sont dans la [recette Paid](CONTAINERS-PAID.md).
 
-[Containers exige Workers Paid](https://developers.cloudflare.com/containers/platform/pricing/), à partir de 5 USD/mois, avec consommation supplémentaire éventuelle. Activer R2 ne souscrit pas à ce plan. Une recette locale réussie ne valide pas ce critère central.
+[Containers exige Workers Paid](https://developers.cloudflare.com/containers/platform/pricing/), à partir de 5 USD/mois, avec consommation supplémentaire éventuelle. Alex confirme l’avoir activé pour 5 € le 28/09. La réussite distante, distincte de la recette locale, valide maintenant le critère technique central.
 
 ## Environnements, commandes et versions
 
@@ -84,22 +84,20 @@ Les échecs antérieurs (auth expirée, R2 non activé, Chromium local en timeou
 
 ## Dépenses et limites financières
 
-Aucun Workers Paid, crédit API ou licence payante acheté. L'équipe de 1 à 3 personnes déclarée par Alex relève de la [licence gratuite Remotion](https://www.remotion.dev/docs/license/faq) à la date de vérification.
+Workers Paid déclaré activé par Alex le 28/09 pour 5 €. Aucun crédit API ni licence payante acheté. L'équipe de 1 à 3 personnes déclarée par Alex relève de la [licence gratuite Remotion](https://www.remotion.dev/docs/license/faq) à la date de vérification.
 
 [Browser Run Free](https://developers.cloudflare.com/browser-run/pricing/) inclut 10 minutes par jour. Le compteur fournisseur passe de 0 à **63,301 s** pour cinq sessions, échecs compris ; 536,699 s du quota quotidien restent disponibles au contrôle. Quatre fermetures sont normales, une par inactivité avant correction. Le dernier contrôle confirme zéro session active, appels désactivés et HTTP 503 pour un nouvel import. Voir `browser-shutdown.json` et `budget-reprise.json`. La durée de la requête Worker est différente de la durée du navigateur et n'est pas une facture.
 
 [R2 Standard](https://developers.cloudflare.com/r2/pricing/) inclut 10 GB-mois, 1 million d'opérations A et 10 millions B par mois ; les dépassements sont facturables. Les objets de cette recette représentent quelques Mo et quelques dizaines d'opérations. D1 et Workers restent dans leurs quotas Free pour ces sondes.
 
-**Dépense supplémentaire estimée de cette reprise : 0 € ; budget restant estimé : 30 €. Facture Cloudflare non consultée.** Le journal final sépare compteur mesuré, estimation après quotas et coût brut théorique. Les frais locaux d'électricité/matériel ne sont pas mesurés.
+**Historique de la recette Free du 27/09 :** dépense supplémentaire estimée 0 €, budget restant estimé 30 €, facture non consultée. **Après reprise Paid du 28/09 :** provision fixe 8 € + cinq réservations de 0,50 € = 10,50 € engagés prudemment, soit 19,50 € disponibles. Ce montant inclut les échecs et ne remplace pas la facture. Le [rapport Paid](CONTAINERS-PAID.md) distingue métriques fournisseur, estimation brute et allocations. Les frais locaux d’électricité/matériel ne sont pas mesurés.
 
 Le scénario `pnpm budget 120` reste hypothétique : standard-2, 120 s de CPU et de fonctionnement, environ 0,0043008 USD de calcul brut, hors forfait, autres services, change et taxes. Alternative interne Cloudflare si la capacité manque : standard-3, 2 vCPU/8 GiB/16 GB, 0,0073344 USD pour le même scénario de 120 s. Aucune taille ni aucun hébergeur de remplacement activé.
 
 ## Vérifications encore nécessaires
 
-1. Lors de la recette distante, lire intégralement et écouter le MP4 produit dans Containers. L'audibilité de la vidéo locale est déjà confirmée par Alex ; le signal synthétique ne valide pas une future narration française.
-2. La courte recette Linux est réussie ; la durée cible de 30 s est prouvée seulement sur macOS. Vérifier cette durée sur la cible Linux/Containers lors de la recette distante.
-3. Alex prévoit d'activer lui-même Workers Paid le 28/09/2026 et demande de rester en local jusque-là. Après confirmation de l'activation, initialiser le budget du contrôleur avec les engagements réels et exécuter la recette Containers → R2 : courte vidéo puis durée cible, trois premiers essais, cinq au maximum, échecs compris. Aucun nouvel essai distant ni achat en attendant.
-4. Observer démarrage, concurrence, fin effective, sommeil après 30 s, téléchargement R2 sans réveil, durée active/facturée, stockage et facture.
-5. Maintenir le refus explicite du Figaro et ne pas étendre la couverture sans nouveau cas testé.
+1. Rapprocher les métriques Containers complètes et la facture du compte : forfait, autres services, allocations partagées, taxes et change. Les cinq tentatives restent réservées ; aucune remise à zéro pour multiplier les essais.
+2. Les sprints produit devront mesurer le coût et la qualité d’une vraie annonce avec narration française. Un MP4 synthétique distant abouti ne donne pas de statistique de fiabilité ni de promesse de qualité TTS.
+3. Maintenir le refus explicite du Figaro et ne pas étendre la couverture sans nouveau cas testé. Les sprints 01–03 restent vérifiés en local, sans déploiement supplémentaire pendant cette reprise.
 
-La recommandation reste de poursuivre l'architecture Cloudflare proposée. Le web et un import d'agence sont démontrés en Free ; le rendu natif est disponible. **Le coût et le fonctionnement du rendu hébergé demeurent le verrou de validation du sprint.**
+La recommandation reste de poursuivre l’architecture Cloudflare : web, import d’agence et rendu hébergé sont maintenant démontrés. **Le rapprochement financier demeure ouvert**, avec les services de test arrêtés et une marge conservatrice de 19,50 €.

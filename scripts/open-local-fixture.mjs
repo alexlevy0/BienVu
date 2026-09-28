@@ -2,12 +2,13 @@
 // sont synthétiques. Aucun point d’entrée de connexion factice dans l’application.
 import {createServer} from 'node:http';
 import {readFile} from 'node:fs/promises';
-const fixture = JSON.parse(await readFile('evidence/local/sprint-02/accounts-fixture.json', 'utf8'));
+const imports = process.argv.includes('--imports');
+const fixture = JSON.parse(await readFile(imports ? 'evidence/local/sprint-03/imports-fixture.json' : 'evidence/local/sprint-02/accounts-fixture.json', 'utf8'));
 if (fixture.base !== 'http://localhost:8787' || !/^bienvu\.session_token=[a-zA-Z0-9%.=_-]+$/.test(fixture.cookie)) throw new Error('Fixture locale invalide.');
 const server = createServer((request, response) => {
   if (request.headers.host !== 'localhost:8790' || request.url !== '/' || request.method !== 'GET'
     || !['none', 'same-site', undefined].includes(request.headers['sec-fetch-site'])) {response.writeHead(403); response.end(); return;}
-  response.writeHead(302, {'Location': `${fixture.base}/agence`, 'Set-Cookie': `${fixture.cookie}; HttpOnly; SameSite=Lax; Path=/; Max-Age=3600`,
+  response.writeHead(302, {'Location': `${fixture.base}/${imports ? 'generer' : 'agence'}`, 'Set-Cookie': `${fixture.cookie}; HttpOnly; SameSite=Lax; Path=/; Max-Age=3600`,
     'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer'});
   response.end(); server.close();
 });

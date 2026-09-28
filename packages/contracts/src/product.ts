@@ -23,13 +23,14 @@ export const ListingUrl = z.string().trim().max(2048).superRefine((value, contex
 });
 
 export const ObjectKey = z.string().max(512)
-  .regex(/^agencies\/[a-zA-Z0-9_-]+\/(?:jobs|brand)\/[a-zA-Z0-9_./-]+$/)
+  .regex(/^agencies\/[a-zA-Z0-9_-]+\/(?:jobs|brand|imports)\/[a-zA-Z0-9_./-]+$/)
   .refine(value => !value.includes('..') && !value.includes('//') && !value.endsWith('/'), 'Clé de fichier invalide.');
 
 function fact<T extends z.ZodType, U extends string>(value: T, unit: U) {
   const evidence = {sourcePath: boundedText(160), rawEvidence: boundedText(500)};
   return z.discriminatedUnion('status', [
     z.object({status: z.literal('verified'), value, unit: z.literal(unit), ...evidence}).strict(),
+    z.object({status: z.literal('user_provided'), value, unit: z.literal(unit), ...evidence}).strict(),
     z.object({status: z.literal('missing'), value: z.null(), unit: z.literal(unit), sourcePath: z.null(), rawEvidence: z.null()}).strict(),
     z.object({status: z.literal('conflicting'), value: z.null(), unit: z.literal(unit),
       candidates: z.array(z.object({value, ...evidence}).strict()).min(2).max(4)
@@ -38,8 +39,14 @@ function fact<T extends z.ZodType, U extends string>(value: T, unit: U) {
 }
 
 export const TextFact = fact(boundedText(200), 'text');
+export const DESCRIPTION_MAX_CHARACTERS = 20_000;
+// Texte de l'annonce, pas une preuve que chaque affirmation commerciale est vraie.
+export const ListingDescription = z.object({text: boundedText(DESCRIPTION_MAX_CHARACTERS),
+  sourcePath: boundedText(160), truncated: z.boolean()}).strict();
+export type ListingDescription = z.infer<typeof ListingDescription>;
 export const PropertyTypeFact = fact(z.enum(['apartment', 'house', 'other']), 'category');
 export const AreaFact = fact(z.number().positive().max(100_000), 'm2');
+export const RoomsFact = fact(z.number().int().positive().max(100), 'rooms');
 export const PriceFact = fact(z.object({amountCents: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
   currency: z.literal('EUR'), period: z.enum(['total', 'month']),
   charges: z.enum(['included', 'excluded', 'not_applicable'])}).strict(), 'EUR_cent');
@@ -53,24 +60,36 @@ export const AgencyBrand = z.object({
 export type AgencyBrand = z.infer<typeof AgencyBrand>;
 
 export const PhotoAsset = z.object({
-  id: EntityId, agencyId: EntityId, listingId: EntityId, sourceUrl: ListingUrl,
+  id: EntityId, agencyId: EntityId, listingId: EntityId, sourceUrl: ListingUrl.nullable(),
   objectKey: ObjectKey, contentHash: Sha256, width: z.number().int().min(640).max(12000),
   height: z.number().int().min(360).max(12000), mime: z.enum(['image/jpeg', 'image/png', 'image/webp']),
   sizeBytes: z.number().int().positive().max(10 * 1024 * 1024), sourceOrder: z.number().int().min(0).max(11),
-}).strict().refine(asset => asset.objectKey.startsWith(`agencies/${asset.agencyId}/jobs/`), 'Le fichier doit appartenir à cette agence.');
+}).strict().refine(asset => asset.objectKey.startsWith(`agencies/${asset.agencyId}/jobs/`)
+  || asset.objectKey.startsWith(`agencies/${asset.agencyId}/imports/${asset.listingId}/`), 'Le fichier doit appartenir à cette agence et à cet import.');
 
 export const NormalizedListing = z.object({
-  id: EntityId, agencyId: EntityId, sourceUrl: ListingUrl, canonicalUrl: ListingUrl,
-  sourceHost: boundedText(253), sourceListingId: boundedText(100).nullable(),
+  id: EntityId, agencyId: EntityId, sourceKind: z.enum(['url', 'manual']).default('url'),
+  sourceUrl: ListingUrl.nullable(), canonicalUrl: ListingUrl.nullable(),
+  sourceHost: boundedText(253).nullable(), sourceListingId: boundedText(100).nullable(),
   fetchedAt: Timestamp, adapterVersion: boundedText(64), transaction: z.enum(['sale', 'rent']),
-  facts: z.object({title: TextFact, propertyType: PropertyTypeFact, locality: TextFact, price: PriceFact, area: AreaFact}).strict(),
+  description: ListingDescription.nullable().default(null),
+  facts: z.object({title: TextFact, propertyType: PropertyTypeFact, locality: TextFact, price: PriceFact, area: AreaFact, rooms: RoomsFact.optional()}).strict(),
   photos: z.array(PhotoAsset).max(12), warnings: z.array(boundedText(300)).max(12),
 }).strict().superRefine((listing, context) => {
   try {
-    if (new URL(listing.sourceUrl).hostname !== listing.sourceHost || new URL(listing.canonicalUrl).hostname !== listing.sourceHost)
+    if (listing.sourceKind === 'url' && (!listing.sourceUrl || !listing.canonicalUrl || !listing.sourceHost
+      || new URL(listing.sourceUrl).hostname !== listing.sourceHost || new URL(listing.canonicalUrl).hostname !== listing.sourceHost))
       context.addIssue({code: 'custom', path: ['sourceHost'], message: 'Le domaine canonique ne correspond pas à la source.'});
   } catch { /* Les champs URL portent déjà leur erreur de validation. */ }
-  for (const price of listing.facts.price.status === 'verified' ? [listing.facts.price.value]
+  if (listing.sourceKind === 'manual' && (listing.sourceUrl !== null || listing.canonicalUrl !== null || listing.sourceHost !== null || listing.sourceListingId !== null))
+    context.addIssue({code: 'custom', message: 'Une saisie manuelle ne possède pas de source web.'});
+  for (const value of Object.values(listing.facts)) {
+    if (listing.sourceKind === 'manual' ? value.status === 'verified' || value.status === 'conflicting' : value.status === 'user_provided')
+      context.addIssue({code: 'custom', path: ['facts'], message: 'La provenance doit correspondre au mode de création.'});
+  }
+  if (listing.photos.some(photo => listing.sourceKind === 'manual' ? photo.sourceUrl !== null : photo.sourceUrl === null))
+    context.addIssue({code: 'custom', path: ['photos'], message: 'La source des photos doit correspondre au mode de création.'});
+  for (const price of listing.facts.price.status === 'verified' || listing.facts.price.status === 'user_provided' ? [listing.facts.price.value]
     : listing.facts.price.status === 'conflicting' ? listing.facts.price.candidates.map(item => item.value) : []) {
     if (listing.transaction === 'sale' ? price.period !== 'total' || price.charges !== 'not_applicable'
       : price.period !== 'month' || price.charges === 'not_applicable')
@@ -87,7 +106,7 @@ export const NormalizedListing = z.object({
 export type NormalizedListing = z.infer<typeof NormalizedListing>;
 
 export const GeneratableListing = NormalizedListing.superRefine((listing, context) => {
-  if (['title', 'propertyType', 'locality'].some(key => listing.facts[key as 'title' | 'propertyType' | 'locality'].status !== 'verified'))
+  if (['title', 'propertyType', 'locality'].some(key => listing.facts[key as 'title' | 'propertyType' | 'locality'].status !== (listing.sourceKind === 'manual' ? 'user_provided' : 'verified')))
     context.addIssue({code: 'custom', path: ['facts'], message: 'Le titre, le type et la localisation doivent être vérifiés.'});
   if (Object.values(listing.facts).some(item => item.status === 'conflicting'))
     context.addIssue({code: 'custom', path: ['facts'], message: 'Des informations contradictoires empêchent la génération.'});

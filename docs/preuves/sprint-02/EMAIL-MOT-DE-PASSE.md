@@ -12,12 +12,12 @@ Le transport Cloudflare Email Service est préparé et simulé par Wrangler en l
 
 | Contrôle | Résultat et nature de la preuve |
 |---|---|
-| `pnpm check` | 52 tests réussis, frontières runtime et TypeScript. Nouveaux tests avec D1 local réel et transport mail capturé en mémoire. [Journal](email-check.log) |
-| `pnpm build:web` | Build Next/OpenNext réussi. Avertissement fast-png déjà présent, sans échec. [Journal](email-build.log) |
+| `pnpm check` | 52 tests réussis, frontières runtime et TypeScript. Nouveaux tests avec D1 local réel et transport mail capturé en mémoire. Journal (`docs/preuves/sprint-02/email-check.log`) |
+| `pnpm build:web` | Build Next/OpenNext réussi. Avertissement fast-png déjà présent, sans échec. Journal (`docs/preuves/sprint-02/email-build.log`) |
 | Migrations | `0005_auth_mail_limits.sql` appliquée localement ; bases vierges également créées dans les tests |
-| `pnpm probe:auth-email` | Inscription HTTP sans insertion préalable de compte, hachage scrypt sous workerd, messages **simulés par le binding**, confirmation, cookie et agence persistants, reset, refus du rejeu/ancien secret/ancienne session, CSRF, déconnexion, zéro allocation. Compte nettoyé. [Rapport expurgé](email-workerd.json), [journal](email-probe.log) |
+| `pnpm probe:auth-email` | Inscription HTTP sans insertion préalable de compte, hachage scrypt sous workerd, messages **simulés par le binding**, confirmation, cookie et agence persistants, reset, refus du rejeu/ancien secret/ancienne session, CSRF, déconnexion, zéro allocation. Compte nettoyé. Rapport expurgé (`docs/preuves/sprint-02/email-workerd.json`), journal (`docs/preuves/sprint-02/email-probe.log`) |
 | Régression des sondes | `probe:accounts`, `probe:foundations`, `probe:web` réussies après l’ajout ; D1/R2 réels locaux, identités synthétiques |
-| Interface | Recette navigateur synthétique : inscription, confirmation, connexion, agence après rechargement, déconnexion, récupération ; versions ordinateur/mobile inspectées. [Relevé](email-inspection-ui.json) |
+| Interface | Recette navigateur synthétique : inscription, confirmation, connexion, agence après rechargement, déconnexion, récupération ; versions ordinateur/mobile inspectées. Relevé (`docs/preuves/sprint-02/email-inspection-ui.json`) |
 
 Le test Google → mot de passe utilise une identité fournisseur **synthétique en D1**. L’autre sens exige le même e-mail vérifié localement et chez Google dans le code ; il ne constitue pas une preuve d’échange OAuth réel. Aucune liaison à un compte local non vérifié n’est autorisée par la configuration.
 
@@ -27,6 +27,6 @@ Fichiers principaux : `components/login.tsx`, `lib/auth.ts`, `auth-handler.ts`, 
 
 **0 € de nouvel essai externe**, aucun Docker lancé, ni mail réel envoyé. Workers Paid et un domaine expéditeur vérifié restent nécessaires à la livraison aux utilisateurs. Configurer aussi le client Google. Exécuter ensuite la recette décrite dans [AUTHENTIFICATION.md](../../AUTHENTIFICATION.md) : livraison/spam, erreurs d’envoi, connexions Google réelles, même agence entre modes, cookies HTTPS, révocation, CPU du scrypt et coûts du Worker déployé. Aucun résultat local ne valide ces points distants. La faisabilité Containers du sprint 00 reste séparée.
 
-[Contrôle des secrets et liens](email-secret-scan.json) : aucune fuite de secret connu ni lien documentaire cassé. [Nettoyage du compte de recette](email-cleanup.json) confirmé.
+Contrôle des secrets et liens (`docs/preuves/sprint-02/email-secret-scan.json`) : aucune fuite de secret connu ni lien documentaire cassé. Nettoyage du compte de recette (`docs/preuves/sprint-02/email-cleanup.json`) confirmé.
 
 Travail non committé sur `main` ; aucun push de cette extension.

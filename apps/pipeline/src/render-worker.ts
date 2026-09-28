@@ -2,6 +2,7 @@ import {Container} from '@cloudflare/containers';
 import {ProbeRender} from '@bienvu/contracts';
 import {authorized,json,smallJson} from './auth';
 import {type Budget,reserve,summary,containerGrossUsd} from './budget';
+import {storeRenderArtifact} from './render-artifact';
 type Env=RendererEnv&{PROBE_TOKEN?:string;RENDER_TOKEN?:string};
 type Job={id:string;fixture:'short'|'target';status:'accepted'|'rendering'|'ready'|'failed';startedAt:number;error?:string;objectKey?:string;report?:Record<string,unknown>};
 
@@ -16,14 +17,26 @@ export class Renderer extends Container<Env> {
   private pendingPolls=new Map<string,Promise<Job|undefined>>();
   private async call(path:string,init:RequestInit={}) {
     const headers=new Headers(init.headers);headers.set('Authorization',`Bearer ${this.env.RENDER_TOKEN}`);
-    return this.containerFetch(`http://container${path}`,{...init,headers});
+    console.log(JSON.stringify({event:'container_request',path,method:init.method??'GET'}));
+    const response=await this.containerFetch(`http://container${path}`,{...init,headers,signal:AbortSignal.timeout(30_000)});
+    console.log(JSON.stringify({event:'container_response',path,status:response.status}));
+    return response;
   }
-  async dispatch(request:Request):Promise<Response> {
+  override async fetch(request:Request):Promise<Response> {
     const url=new URL(request.url);
     if(url.pathname==='/state')return json({container:await this.getState(),active:await this.ctx.storage.get('active')??null,budget:await this.budget(),lifecycle:await this.ctx.storage.get('lifecycle')??null});
     if(url.pathname==='/pause'&&request.method==='POST'){
       const b=await this.ctx.storage.get<Budget>('budget');if(b)await this.ctx.storage.put('budget',{...b,paused:true});
       return json({paused:true});
+    }
+    if(url.pathname==='/diagnostic'&&request.method==='GET'){
+      const state=await this.getState();
+      if(!['running','healthy'].includes(state.status))return json({container:state});
+      // Diagnostic fixe et borné : jamais de commande, chemin ou argument client.
+      const command=`const fs=require('node:fs');(async()=>{const files=fs.readdirSync('/app/evidence/local/renderer');const processes=fs.readdirSync('/proc').filter(x=>/^\\d+$/.test(x)).flatMap(pid=>{try{return [{pid,name:fs.readFileSync('/proc/'+pid+'/comm','utf8').trim(),state:fs.readFileSync('/proc/'+pid+'/status','utf8').match(/State:[^\\n]+/)?.[0],wait:fs.readFileSync('/proc/'+pid+'/wchan','utf8').trim(),command:fs.readFileSync('/proc/'+pid+'/cmdline','utf8').split('\\0').slice(0,7).join(' ').slice(0,500)}]}catch{return []}});let health;try{const r=await fetch('http://127.0.0.1:8080/health',{headers:{Authorization:'Bearer '+process.env.RENDER_TOKEN},signal:AbortSignal.timeout(3000)});health={status:r.status,body:await r.json()}}catch(e){health={error:e.message}}console.log(JSON.stringify({files,processes,health}))})()`;
+      const child=await this.ctx.container!.exec(['node','-e',command],{signal:AbortSignal.timeout(10_000)});
+      const output=await child.output();
+      return json({container:state,exitCode:output.exitCode,stdout:new TextDecoder().decode(output.stdout).slice(0,8000),stderr:new TextDecoder().decode(output.stderr).slice(0,2000)});
     }
     if(url.pathname==='/budget'&&request.method==='PUT'){
       const input=await smallJson(request) as {fixedAndOtherCents?:number};
@@ -54,7 +67,8 @@ export class Renderer extends Container<Env> {
       try {
         // Le POST attend seulement le démarrage et l'acceptation, jamais le MP4 complet.
         const response=await this.call('/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input)});
-        if(!response.ok)throw new Error('RENDER_REJECTED');
+        const receipt=await response.json() as {id?:string;status?:string};
+        if(!response.ok||receipt.id!==input.id||!['accepted','rendering','ready'].includes(receipt.status??''))throw new Error('RENDER_REJECTED');
         job=await this.ctx.storage.transaction(async txn=>{
           const current=await txn.get<Job>(`job:${job.id}`);
           if(current&&current.status!=='accepted')return current;
@@ -103,20 +117,19 @@ export class Renderer extends Container<Env> {
     if(!['running','healthy'].includes(state.status))return this.fail(job,'RENDER_INTERRUPTED');
     const response=await this.call(`/jobs/${id}`);if(!response.ok)return this.fail(job,'RENDER_STATE_LOST');
     const rendered=await response.json() as {status:string;report?:Record<string,unknown>};
+    console.log(JSON.stringify({event:'renderer_job',id,status:rendered.status}));
     if(rendered.status==='failed')return this.fail({...job,report:rendered.report},'RENDER_FAILED');
     if(rendered.status!=='ready')return job;
     const report=rendered.report;
-    if(!report||typeof report.sha256!=='string'||!/^[a-f0-9]{64}$/.test(report.sha256)||typeof report.sizeBytes!=='number'||report.sizeBytes>50*1024*1024)return this.fail(job,'INVALID_RENDER_REPORT');
+    if(!report||typeof report.sha256!=='string'||!/^[a-f0-9]{64}$/.test(report.sha256)||typeof report.sizeBytes!=='number'||!Number.isSafeInteger(report.sizeBytes)||report.sizeBytes<=0||report.sizeBytes>50*1024*1024)return this.fail(job,'INVALID_RENDER_REPORT');
     const file=await this.call(`/jobs/${id}/file`);if(!file.ok||!file.body)return this.fail(job,'ARTIFACT_MISSING');
     const objectKey=`probes/renders/${id}.mp4`;
-    // R2 vérifie le checksum fourni pendant l'upload, puis la taille est relue.
-    await this.env.MEDIA.put(objectKey,file.body,{sha256:report.sha256,httpMetadata:{contentType:'video/mp4'},customMetadata:{synthetic:'true',watermarked:'true'}});
-    const head=await this.env.MEDIA.head(objectKey);
-    if(!head||head.size!==report.sizeBytes)return this.fail(job,'ARTIFACT_INTEGRITY_FAILED');
+    // R2 vérifie le checksum pendant l'upload, puis la taille est relue.
+    await storeRenderArtifact(this.env.MEDIA,objectKey,file.body,{sizeBytes:report.sizeBytes,sha256:report.sha256});
     const ready:Job={...job,status:'ready',objectKey,report};
     await this.ctx.storage.transaction(async txn=>{await txn.put(`job:${id}`,ready);if(await txn.get('active')===id)await txn.delete('active');});
     await this.env.MEDIA.put(`probes/renders/${id}.json`,JSON.stringify(ready));
-    await this.call(`/jobs/${id}`,{method:'DELETE'});
+    const cleanup=await this.call(`/jobs/${id}`,{method:'DELETE'});await cleanup.body?.cancel();
     return ready;
   }
   override async onActivityExpired() {
@@ -128,6 +141,7 @@ export class Renderer extends Container<Env> {
 export default {
   async fetch(request:Request,env:Env) {
     if(!authorized(request,env.PROBE_TOKEN))return json({error:'UNAUTHORIZED'},401);
-    try{return await env.RENDERER.getByName('sprint-00-single-slot').dispatch(request);}catch{return json({error:'PROBE_FAILED'},500);}
+    // Les requêtes/réponses HTTP du SDK Containers gardent leur durée de vie fetch.
+    try{return await env.RENDERER.getByName('sprint-00-single-slot').fetch(request);}catch{return json({error:'PROBE_FAILED'},500);}
   },
 };

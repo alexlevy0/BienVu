@@ -1,1 +1,15 @@
-{"name":"@bienvu/importers","version":"0.0.0","private":true,"type":"module","exports":"./src/extract.ts","scripts":{"typecheck":"tsc -p tsconfig.json"},"dependencies":{"@bienvu/contracts":"workspace:*","ipaddr.js":"2.5.0"}}
+{
+  "name": "@bienvu/importers",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {".": "./src/index.ts"},
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@bienvu/contracts": "workspace:*",
+    "ipaddr.js": "2.5.0",
+    "parse5": "8.0.0"
+  }
+}

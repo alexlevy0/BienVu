@@ -21,16 +21,16 @@ Fichiers principaux : `apps/web/app`, `apps/web/components`, `packages/contracts
 | Vérification | Résultat et portée |
 |---|---|
 | `pnpm check:boundaries` | 29 fichiers contrôlés ; dépendances de rendu bloquées côté Workers, pas d'API Node dans les modules portables |
-| `pnpm check` | **30 tests réussis**, puis TypeScript sur les packages et les tests ; [log](check.log) |
-| `pnpm build:web` | Build Next.js/OpenNext final réussi, sans erreur de copie de package ; [log](build-web-final.log) |
-| Copie propre | Neuf commandes réussies : installation hors ligne avec lockfile, secrets locaux neufs, fixtures, types, contrôles, migrations deux fois et build. Dossier temporaire supprimé ; [résultat](clean-copy.json), [log complet](clean-copy.log) |
+| `pnpm check` | **30 tests réussis**, puis TypeScript sur les packages et les tests ; log (`docs/preuves/sprint-01/check.log`) |
+| `pnpm build:web` | Build Next.js/OpenNext final réussi, sans erreur de copie de package ; log (`docs/preuves/sprint-01/build-web-final.log`) |
+| Copie propre | Neuf commandes réussies : installation hors ligne avec lockfile, secrets locaux neufs, fixtures, types, contrôles, migrations deux fois et build. Dossier temporaire supprimé ; résultat (`docs/preuves/sprint-01/clean-copy.json`), log complet (`docs/preuves/sprint-01/clean-copy.log`) |
 | D1 sous Miniflare/workerd | Six sous-tests et leur test parent : références inter-agences rejetées, comparaison exacte du préfixe média, lecture limitée à l'agence, concurrence/idempotence, rollback intégral, coûts dédupliqués et pause |
-| Migrations locales | Migrations appliquées ; une seconde exécution n'applique rien ; [log](migrations.log) |
-| Commande d'arrêt locale | `generation_control.enabled=0` confirmé ; [log](pause.log) |
-| Routes sous workerd | Sept pages HTTP 200, français et headers vérifiés ; générations POST 503, identifiants serveur distincts, historique et sonde sans secret 401 ; [preuve](web-workerd.json) |
-| D1/R2/cookie opérateur | Six contrôles locaux réussis, objets nettoyés ; [log](probe-web.log) |
-| Interface | Inspection sur ordinateur et mobile, lien dangereux refusé, validation de format honnête, champs/boutons futurs désactivés ; [compte rendu](inspection-ui.json) |
-| Secrets | Aucun des cinq secrets locaux trouvé dans les 195 fichiers candidats Git contrôlés ; [preuve](secret-scan.json) |
+| Migrations locales | Migrations appliquées ; une seconde exécution n'applique rien ; log (`docs/preuves/sprint-01/migrations.log`) |
+| Commande d'arrêt locale | `generation_control.enabled=0` confirmé ; log (`docs/preuves/sprint-01/pause.log`) |
+| Routes sous workerd | Sept pages HTTP 200, français et headers vérifiés ; générations POST 503, identifiants serveur distincts, historique et sonde sans secret 401 ; preuve (`docs/preuves/sprint-01/web-workerd.json`) |
+| D1/R2/cookie opérateur | Six contrôles locaux réussis, objets nettoyés ; log (`docs/preuves/sprint-01/probe-web.log`) |
+| Interface | Inspection sur ordinateur et mobile, lien dangereux refusé, validation de format honnête, champs/boutons futurs désactivés ; compte rendu (`docs/preuves/sprint-01/inspection-ui.json`) |
+| Secrets | Aucun des cinq secrets locaux trouvé dans les 195 fichiers candidats Git contrôlés ; preuve (`docs/preuves/sprint-01/secret-scan.json`) |
 
 Les 30 tests comprennent 23 tests de contrats/fixtures et six sous-tests SQL D1 plus leur parent. Toutes les données de ces essais sont synthétiques. Miniflare exécute réellement le SQL et les bindings **en local** ; ce résultat n'est pas un essai sur le service D1 distant. Les requêtes HTTP de cette tranche visent uniquement localhost. Les imports réels, MP4 locaux et dépenses du sprint 00 restent dans son propre rapport.
 

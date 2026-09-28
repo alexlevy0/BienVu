@@ -41,6 +41,7 @@ jobs:
           pnpm probe:web
           pnpm probe:accounts
           BIENVU_PREVIEW_LOG=/tmp/bienvu-preview.log pnpm probe:auth-email
+          pnpm probe:imports --manual
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -49,3 +50,4 @@ jobs:
             evidence/local/sprint-01/
             evidence/local/sprint-02/accounts-workerd.json
             evidence/local/sprint-02/email-workerd.json
+            evidence/local/sprint-03/http-report.json

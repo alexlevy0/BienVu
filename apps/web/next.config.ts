@@ -1,7 +1,7 @@
 import type {NextConfig} from 'next';
 const config: NextConfig = {
   poweredByHeader: false,
-  transpilePackages: ['@bienvu/contracts', '@bienvu/db', '@bienvu/observability'],
+  transpilePackages: ['@bienvu/contracts', '@bienvu/db', '@bienvu/observability', '@bienvu/importers'],
   async headers() {
     return [{source: '/:path*', headers: [
       {key: 'X-Content-Type-Options', value: 'nosniff'},

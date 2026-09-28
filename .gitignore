@@ -12,8 +12,19 @@ out/
 .dev.vars.*
 !.dev.vars.example
 .DS_Store
-evidence/local/
-evidence/remote/
+# Sorties de recette, rapports de couverture et journaux locaux.
+/evidence/
+coverage/
+test-results/
+playwright-report/
+*.log
+
+# Seuls les comptes rendus et procédures Markdown sont versionnés.
+# Les preuves générées (JSON, logs, captures, médias, exports DNS) restent locales.
+/docs/preuves/**/*
+!/docs/preuves/**/
+!/docs/preuves/**/*.md
+
 fixtures/generated/
 apps/pipeline/wrangler.staging*.jsonc
 apps/web/wrangler.staging.jsonc

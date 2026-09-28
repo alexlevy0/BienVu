@@ -1,6 +1,6 @@
 # Développement local
 
-Les sprints 01–02 avancent en local à la demande d'Alex sans attendre la recette Containers du sprint 00. L'architecture retenue reste Next.js/OpenNext et Cloudflare. Cette avance ne valide pas le rendu hébergé.
+Les sprints 01–03 avancent en local à la demande d'Alex sans attendre la recette Containers du sprint 00. L'architecture retenue reste Next.js/OpenNext et Cloudflare. Cette avance ne valide pas le rendu hébergé ni le transport d’import Cloudflare.
 
 ## Installation et commandes
 
@@ -24,6 +24,7 @@ Ouvrir `http://localhost:8787`. Dans un second terminal :
 pnpm probe:foundations
 pnpm probe:web
 pnpm probe:accounts
+pnpm probe:imports
 ```
 
 La première sonde vérifie les pages et le refus serveur des générations. La seconde vérifie réellement les bindings D1/R2 et le cookie sous workerd local, avec un secret opérateur généré localement. Les données de sonde sont nettoyées. Aucune requête de ces sondes ne doit viser le staging pendant la phase locale.
@@ -34,13 +35,17 @@ La première sonde vérifie les pages et le refus serveur des générations. La 
 
 `node scripts/verify-clean.mjs` vérifie une copie sans `.env`, secrets, `node_modules`, base locale ni build préexistant. Il réutilise le cache pnpm hors ligne, lance l'installation, les contrôles, les migrations deux fois et le build. Le dossier temporaire est supprimé et les preuves restent dans `evidence/local/sprint-01/`.
 
+## Fichiers à versionner
+
+Conserver le code, les migrations, les tests, le lockfile, les modèles de configuration sans secrets et les fixtures synthétiques de `fixtures/imports/`. Les comptes rendus et procédures Markdown de `docs/preuves/` sont versionnés ; leurs journaux, JSON, captures et exports restent locaux. La [politique des preuves](preuves/README.md) précise où retrouver ces archives. `evidence/`, la couverture, les rapports de tests et les journaux sont ignorés, ainsi que les secrets, bases locales et builds déjà exclus. Un nouveau clone doit fonctionner sans ces sorties de recette.
+
 ## Interface
 
 Pour s’inscrire sans confirmer une adresse en développement, utiliser `AUTH_EMAIL_VERIFICATION_BYPASS=true` dans `apps/web/.dev.vars`, puis redémarrer `pnpm preview`. Le compte est marqué vérifié et connecté automatiquement. La valeur versionnée reste `false` ; le bypass ne fonctionne que sur localhost/127.0.0.1 en mode local. [Configuration et recette](AUTHENTIFICATION.md#bypass-de-vérification-pour-le-développement).
 
 L’authentification propose maintenant e-mail/mot de passe **et** Google, sur demande d’Alex. Le binding `AUTH_EMAIL` s’ajoute aux bindings web. Sa configuration locale capture les messages sans les envoyer : ouvrir le fichier `Text: …/email-text/….txt` indiqué par Wrangler pour confirmer l’adresse. La sonde `probe:auth-email` nécessite le journal du serveur via `BIENVU_PREVIEW_LOG` ; procédure et limites dans [AUTHENTIFICATION.md](AUTHENTIFICATION.md). La migration `0005_auth_mail_limits.sql` ajoute les plafonds d’envoi. `AUTH_EMAIL_MODE` et `AUTH_EMAIL_FROM` sont publics côté configuration, les jetons des messages restent secrets. En staging, le script de préparation ferme l’envoi par défaut ; un expéditeur vérifié et Workers Paid sont nécessaires.
 
-Les routes `/`, `/generer`, `/agence`, `/historique`, `/abonnement` et `/connexion` forment la coque du produit. Les comptes et la marque sont implémentés au sprint 02 ; le bouton Google attend ses identifiants OAuth. Une session authentifiée donne accès au formulaire et aux logos privés. Les sondes utilisent explicitement des comptes synthétiques nettoyés ensuite. La génération et le paiement restent indisponibles, sans quota attribué ni job de démonstration. Le contrôle du lien ne vérifie que sa syntaxe et ne consulte aucune annonce. `/laboratoire` conserve l'état des preuves du projet.
+Les routes `/`, `/generer`, `/agence`, `/historique`, `/abonnement` et `/connexion` forment la coque du produit. Les comptes et la marque sont implémentés au sprint 02 ; le bouton Google attend ses identifiants OAuth. Le sprint 03 ajoute un import authentifié réel en local, avec galerie privée et relecture des résultats. Lancer `pnpm dev:imports` en plus du preview ; le pont natif ne fonctionne que sur loopback avec son secret local. Les sondes utilisent explicitement des comptes synthétiques nettoyés ensuite. La génération et le paiement restent indisponibles, sans quota attribué ni job de démonstration. `/laboratoire` conserve les preuves techniques du sprint 00. [Configuration, limites et purge des imports](IMPORTS.md).
 
 Les choix commerciaux restent ceux du cadrage : SaaS payant, quotas par abonnement, une vidéo d'essai filigranée après inscription, charte enregistrée et aucun éditeur. Aucun tarif proposé n'est présenté comme une offre achetable.
 
@@ -49,12 +54,14 @@ Les choix commerciaux restent ceux du cadrage : SaaS payant, quotas par abonneme
 | Environnement | Worker web | D1 | R2 | État |
 |---|---|---|---|---|
 | Local | `bienvu-web-probe-local` | `bienvu-probes-local`, ID nul réservé au local | `bienvu-probes-local` | Émulés sur le poste |
-| Staging existant du sprint 00 | `bienvu-web-probe-staging` | `bienvu-s00-staging` | `bienvu-s00-private` | Déployés au sprint 00 ; pas mis à jour aux sprints 01–02 |
+| Staging existant du sprint 00 | `bienvu-web-probe-staging` | `bienvu-s00-staging` | `bienvu-s00-private` | Déployés au sprint 00 ; pas mis à jour aux sprints 01–03 |
 | Production proposée | `bienvu-web-production` | `bienvu-production` | `bienvu-media-production` | Aucun service créé, aucun identifiant configuré |
 
 `DB`, `MEDIA` et `ASSETS` sont les bindings web. `PROBE_MODE` identifie l'environnement. `GENERATIONS_ENABLED` vaut `false`. `PROBE_TOKEN` est un secret serveur dans `apps/web/.dev.vars` ; ne jamais l'exposer au client. Le pipeline garde `BROWSER`, `MEDIA`, `PROBE_TOKEN`, `RENDER_TOKEN` et les drapeaux existants, tous les appels réels désactivés. Les secrets de staging restent dans des fichiers distincts ignorés par Git.
 
 `scripts/prepare-staging.mjs` prépare les configurations à partir d'un identifiant D1 explicite et, pour l'authentification, d'une origine HTTPS dédiée. Il ne déploie rien. Ne pas réutiliser la base ou le bucket de staging pour la production. R2 reste privé, sans `r2.dev` ni domaine public. Aucun accès direct R2 n'est exposé par la coque produit.
+
+`IMPORT_MODE` reste `disabled` dans les configurations versionnées et de staging. `setup:local` ajoute `IMPORT_MODE=local` et un `LOCAL_IMPORT_TOKEN` aléatoire dans `.dev.vars`. La migration `0006_private_imports.sql` crée imports, journal de fichiers et plafonds persistants ; `pnpm imports:cleanup` purge uniquement la base et les objets locaux éligibles. L’authentification existante continue de s’appliquer aux photos et annonces. Aucun module Sharp ou HTTPS Node n’est importé dans le Worker.
 
 ## Base et contrats
 

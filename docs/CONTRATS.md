@@ -7,9 +7,11 @@ Ces contrats sont la cible à implémenter en TypeScript avec validation runtime
 | Entité | Champs essentiels |
 |---|---|
 | Agence | `id`, `ownerUserId`, `name`, `logoAssetId?`, `primaryColor`, `secondaryColor`, `phone?`, `email?`, `website?`, `createdAt` |
-| Annonce | `id`, `agencyId`, `sourceUrl`, `canonicalUrl`, `sourceHost`, `sourceListingId?`, `fetchedAt`, `adapterVersion`, faits et provenance |
-| Fait | `value`, `sourcePath`, `rawEvidence`, `status: verified/missing/conflicting`, unité explicite |
+| Annonce | `id`, `agencyId`, `sourceUrl`, `canonicalUrl`, `sourceHost`, `sourceListingId?`, `fetchedAt`, `adapterVersion`, `description`, faits et provenance |
+| Description source | `text` en texte brut, `sourcePath`, `truncated` ; `null` si absente |
+| Fait | `value`, `sourcePath`, `rawEvidence`, `status: verified/user_provided/missing/conflicting`, unité explicite |
 | Photo | `id`, `agencyId`, `listingId`, `sourceUrl`, `objectKey`, `contentHash`, `width`, `height`, `mime`, `sizeBytes`, `sourceOrder` |
+| Import privé | `id`, `agencyId`, `idempotencyKey`, `sourceUrl`, `status`, résultat, erreur, diagnostics privés, bail et expiration |
 | Script | `id`, `listingId`, `version`, `language`, `scenes[]`, `model`, `promptVersion`, `inputHash` |
 | Scène | `id`, `photoAssetId`, `narrationText`, `captionText`, `factRefs[]`, `audioAssetId`, `durationFrames` |
 | Job | `id`, `agencyId`, `idempotencyKey`, `status`, `stage`, `attempt`, `leaseUntil?`, `workflowId?`, `reservationId`, `errorCode?`, horodatages |
@@ -37,7 +39,21 @@ Filtrer logos, avatars, publicités, biens voisins, doublons, petites vignettes 
 
 Pour le minimum de recette : trois photos distinctes, bien identifiable, type et localisation fiables. Prix et surface affichés ou prononcés seulement s'ils sont vérifiés. Toute ambiguïté significative sur l'identité, le prix ou la surface doit être résolue par des preuves ou renvoyée comme échec.
 
-## États des jobs
+Le sprint 03 implémente aussi le fait `rooms` (unité `rooms`), facultatif pour compatibilité avec les anciennes fixtures. Les images d’import utilisent `agencies/{agencyId}/imports/{listingId}/{hash}.jpg`. `RenderManifest` exige toujours les clés du job : le pipeline devra copier les médias retenus avant rendu. États d’import distincts des jobs : `importing → ready/failed → deleting`, sans reprise d’un état terminal. Toute référence de job interdit la suppression.
+
+La description du bien est importée depuis son entité structurée ou son bloc DOM identifié, avec ses paragraphes. Elle reste distincte des faits vérifiés : sa présence ne valide pas les affirmations commerciales du texte et ne crée pas automatiquement de nouveaux faits. Aucun HTML actif n’est conservé ou interprété. Le texte est limité à 20 000 caractères ; `truncated` indique une coupure et l’interface renvoie vers la source pour la suite. Une description absente n’empêche pas l’import. Les anciens résultats sans ce champ sont lus avec `description: null` ; une nouvelle récupération explicite est nécessaire pour les enrichir.
+
+## Saisie manuelle — décision du 28/09/2026
+
+`NormalizedListing.sourceKind` vaut `url` (défaut des anciens résultats) ou `manual`. Une saisie manuelle possède `sourceUrl`, `canonicalUrl`, `sourceHost`, `sourceListingId` et les `photos[].sourceUrl` à `null`. Ses valeurs sont `user_provided` avec provenance `manual.champ` ; aucune n’est annoncée comme vérifiée sur un site. Les deux modes partagent photos privées, limites, conservation, lecture et rattachement à l’agence. Les informations manquantes restent absentes.
+
+Entrée manuelle stricte : titre, type, transaction, localisation, description, prix en centimes EUR ou `null`, traitement des charges, surface/pièces ou `null` et manifeste de 3–12 fichiers (empreinte des octets, MIME, taille). Le loyer renseigné exige des charges explicites. Description limitée à 20 000 caractères, 10 Mio/fichier et 50 Mio au total. Les octets reçus doivent correspondre au manifeste ; décodage/réencodage raster, dimensions, déduplication et contrôle de stockage précèdent la publication.
+
+`POST /api/imports/manual` crée une préparation idempotente privée. `PUT /api/imports/:id/uploads/:index` reçoit une photo à la fois. `POST /api/imports/:id/complete` publie seulement après réception de toutes les photos, avec au moins trois contenus distincts. Même clé et contenu → même annonce ; contenu changé → conflit. Les étapes contrôlent session, origine et agence ; aucune URL de fichier ou clé R2 cliente n’est acceptée. Aucun crédit n’est consommé.
+
+La préparation expire après 15 minutes ; les objets d’un envoi interrompu restent journalisés pour la purge. Un import URL actif n’interdit pas une saisie manuelle. La génération depuis une annonce sauvegardée reste à connecter au sprint du pipeline.
+
+## États des jobs (pipeline)
 
 Parcours nominal : `queued → importing → scripting → voicing → rendering → ready`.
 
@@ -77,6 +93,11 @@ Garder une trace dédupliquée des événements Stripe et des factures déjà ut
 | `GET /api/me` | Utilisateur, agence et droits calculés côté serveur |
 | `PUT /api/agency` | Met à jour uniquement la marque de l'agence de la session |
 | `POST /api/agency/logo` | Upload raster authentifié, taille et contenu validés |
+| `POST /api/imports` | Corps strict `{url}` + clé d’idempotence ; import privé, sans crédit ni job ; mode local seulement à ce stade |
+| `GET /api/imports` | Imports non expirés de l’agence, limite de 30 |
+| `GET /api/imports/:id` | Résultat privé et erreur stable ; aucune donnée d’une autre agence |
+| `GET /api/imports/:id/photos/:photoId` | JPEG privé après contrôle de la session et du rattachement |
+| `DELETE /api/imports/:id` | Suppression après délai de sûreté, si aucun job ne référence l’import |
 | `POST /api/generations` | Corps `{url}` + clé d'idempotence ; crée ou retrouve le job ; réponse `202 {jobId,status}` |
 | `GET /api/generations/:id` | Statut, erreur affichable et référence d'aperçu si prêt |
 | `GET /api/generations` | Historique paginé de l'agence |
@@ -89,6 +110,8 @@ Garder une trace dédupliquée des événements Stripe et des factures déjà ut
 | `POST /api/billing/webhook` | Corps brut, signature vérifiée, déduplication, traitement persistant |
 
 Codes HTTP cohérents : 401 sans session ; 403/404 pour une ressource étrangère ; 409 pour conflit ; 422 pour entrée inexploitable ; 429 pour limite ou quota ; 503 pour pause de génération. Aucun message public ne contient un secret, une stack trace ou les données d'une autre agence.
+
+L’API d’import retourne `200` pour une représentation persistée `ready` ou `failed` (avec `errorCode`), et `202` pour un import encore en cours. Les refus avant création utilisent les codes HTTP ci-dessus. `IMPORTS_UNAVAILABLE` vaut 503 et `IMPORT_LIMIT` 429. [Limites et procédure locales](IMPORTS.md).
 
 ## Voix et timing
 

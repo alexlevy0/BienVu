@@ -1,5 +1,0 @@
-
-> bienvu@0.0.0 probe:accounts /Users/alexlevy0/Dev/BienVu
-> node scripts/probe-accounts.mjs --cleanup
-
-Comptes et logos synthétiques locaux supprimés.

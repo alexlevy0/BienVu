@@ -14,13 +14,13 @@ Références : [CONTRATS.md](../CONTRATS.md), [ARCHITECTURE.md](../ARCHITECTURE.
 - [ ] **07.2 — Créer le job durable.** Persister le job, sa réservation et l'intention de lancement de manière cohérente. Démarrer un Workflow avec identifiant stable ; une coupure entre l'écriture et le lancement doit être réconciliable. Implémenter les états exacts du contrat, sans compter sur la session HTTP du client.
 - [ ] **07.3 — Relier les étapes.** Import, script, voix et rendu lisent/écrivent des références d'assets privées. Stocker la réussite d'une étape avant de passer à la suivante. Déclencher le rendu une fois, puis attendre son état via une stratégie durable et bornée, sans maintenir une route web ouverte pendant plusieurs minutes.
 - [ ] **07.4 — Encadrer les reprises.** Respecter tentatives, délais et erreurs non rejouables. La répétition d'une étape déjà validée réutilise son résultat. Réconcilier jobs bloqués, résultats tardifs et écritures interrompues ; ne pas libérer un crédit puis accepter gratuitement le rendu tardif correspondant.
-- [ ] **07.5 — Construire l'expérience.** Un champ URL, une action principale et des étapes lisibles suffisent. Afficher l'état réel sans pourcentage inventé. Prévoir chargement, source indisponible, quota épuisé et service en pause. Ne pas intercaler d'éditeur ou de validation manuelle de fiche.
+- [ ] **07.5 — Construire l'expérience.** Champ URL avec alternative manuelle dépliable (décision d’Alex du 28/09/2026), action principale et étapes lisibles. Afficher l’état réel sans pourcentage inventé. Prévoir chargement, source indisponible, quota épuisé et service en pause. Aucun éditeur vidéo ni validation obligatoire après un import URL.
 - [ ] **07.6 — Servir la vidéo.** Ajouter historique paginé, lecteur et téléchargement du même artefact privé, avec prise en charge Range. Afficher expiration et mention de voix synthétique. Un retour sur la page retrouve les jobs existants ; un téléchargement ne crée pas de génération.
 - [ ] **07.7 — Préparer l'exploitation.** Ajouter un contrôle opérateur de pause et une réconciliation périodique bornée. Rendre consultables étape, erreur, durée et coût par job sans exposer secrets ni données d'autres agences.
 
 ## Critères d'acceptation
 
-1. Une annonce réellement importable produit une vidéo après une seule soumission, sans ressaisie ni upload des photos du bien.
+1. Une annonce réellement importable produit une vidéo après une seule soumission ; une annonce saisie manuellement doit aussi pouvoir lancer la génération une fois ses photos enregistrées.
 2. Double clic et relance HTTP avec la même clé retrouvent le même job et la même réservation ; un corps différent avec la même clé est refusé.
 3. Fermer la page n'arrête pas la génération ; un restart après import ou après upload du MP4 n'entraîne pas de duplication évitable.
 4. Un timeout de rendu et un résultat tardif n'aboutissent ni à un solde incohérent ni à un MP4 accessible sans crédit consommé.

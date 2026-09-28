@@ -7,9 +7,9 @@ export const brandFixture: AgencyBrand = {
 };
 export function saleFixture(): NormalizedListing {
   return {
-    id: 'listing-fixture', agencyId: brandFixture.id, sourceUrl: 'https://agence.example.com/annonces/fixture',
+    id: 'listing-fixture', agencyId: brandFixture.id, sourceKind: 'url', sourceUrl: 'https://agence.example.com/annonces/fixture',
     canonicalUrl: 'https://agence.example.com/annonces/fixture', sourceHost: 'agence.example.com', sourceListingId: 'fixture',
-    fetchedAt: createdAt, adapterVersion: 'synthetic/1', transaction: 'sale',
+    fetchedAt: createdAt, adapterVersion: 'synthetic/1', transaction: 'sale', description: null,
     facts: {
       title: {status: 'verified', value: 'Appartement synthétique', unit: 'text', sourcePath: 'fixture.title', rawEvidence: 'Appartement synthétique'},
       propertyType: {status: 'verified', value: 'apartment', unit: 'category', sourcePath: 'fixture.type', rawEvidence: 'Appartement'},

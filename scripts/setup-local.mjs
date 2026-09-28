@@ -13,4 +13,6 @@ if (!/^BETTER_AUTH_SECRET=.+$/m.test(existing)) {
   additions.push(`BETTER_AUTH_SECRET=${randomBytes(32).toString('hex')}`);
 }
 if (!/^GOOGLE_CLIENT_SECRET=/m.test(existing)) additions.push('GOOGLE_CLIENT_SECRET=');
+if (!/^LOCAL_IMPORT_TOKEN=.+$/m.test(existing)) additions.push(`LOCAL_IMPORT_TOKEN=${randomBytes(32).toString('hex')}`);
+if (!/^IMPORT_MODE=/m.test(existing)) additions.push('IMPORT_MODE=local');
 if (additions.length) {await appendFile(webFile, `\n${additions.join('\n')}\n`); console.log('Configuration auth locale ajoutée, secret non affiché.');}

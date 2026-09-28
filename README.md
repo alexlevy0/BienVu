@@ -1,8 +1,8 @@
 # BienVu
 
-SaaS immobilier en construction : un lien d'annonce → une vidéo verticale avec voix off, aperçu et téléchargement, sans éditeur. Les décisions produit restent dans [docs/CADRAGE.md](docs/CADRAGE.md).
+SaaS immobilier en construction : un lien d’annonce ou une saisie avec photos → une vidéo verticale avec voix off, aperçu et téléchargement, sans éditeur vidéo. Les décisions produit restent dans [docs/CADRAGE.md](docs/CADRAGE.md).
 
-**Sprint 02 : comptes et identité d’agence implémentés en local.** Connexion e-mail/mot de passe en plus de Google, confirmation et récupération, sessions Better Auth, marque persistante et logos privés. Google réel et livraison réelle des e-mails attendent configuration et recette ; l’envoi local est simulé. Aucun paiement ni essai public activé. Le sprint 00 reste partiellement validé jusqu’à la recette Cloudflare Containers. [Configuration et tests des comptes](docs/AUTHENTIFICATION.md).
+**Sprint 03 : import d’annonces implémenté en local.** Extraction TypeScript des faits et de la description, galerie privée, contrôles réseau et accès par agence. Trois annonces réelles d’agences ont été importées depuis le Mac avec trois photos chacune ; l’exécution de cette tranche sur Cloudflare reste à valider et est désactivée. [Lancer et tester les imports](docs/IMPORTS.md). Les comptes proposent e-mail/mot de passe et Google ; les confirmations et récupérations ont été reçues en boîte principale et le parcours e-mail est validé sur Cloudflare ; Google réel reste à configurer/tester. Aucun paiement ni essai vidéo public activé. **Sprint 00 : MP4 de 30 s produit dans Containers, stocké en R2 privé et lecture/audio confirmés ; tests payants désactivés, facture à rapprocher.** [Preuves Cloudflare](docs/preuves/sprint-00/CONTAINERS-PAID.md) · [Configuration des comptes](docs/AUTHENTIFICATION.md).
 
 ## Démarrer localement
 
@@ -21,6 +21,10 @@ pnpm preview
 ```
 
 Dans un second terminal : `pnpm probe:foundations`, puis `pnpm probe:web` et `pnpm probe:accounts`. L'interface est sur `http://localhost:8787`. Le build est exécuté par **workerd**. Les sondes vérifient les pages, le refus des générations, puis D1/R2 et le cookie opérateur, et nettoient leurs objets. Les tests D1 locaux couvrent aussi les clés d'agence, les contraintes et le rollback ; la sonde comptes vérifie sessions et isolation avec des identités synthétiques, sans valider Google OAuth réel ni le pipeline métier complet.
+
+Pour importer une vraie annonce en local, lancer `pnpm dev:imports` dans un second terminal puis utiliser `/generer` après connexion. Pour la recette synthétique, arrêter ce pont puis lancer `pnpm probe:imports` : la sonde démarre son propre transport sans réseau extérieur. Les deux modes sont distincts ; [limites, sécurité, nettoyage et recette réelle](docs/IMPORTS.md).
+
+Sous l’import par URL, **Saisir mon annonce manuellement** permet aussi d’enregistrer les informations du bien et 3 à 12 photos. Ce parcours utilise le même pont local pour préparer les images ; [guide de saisie et vérifications](docs/SAISIE-MANUELLE.md).
 
 Pour travailler seulement sur l'interface : `pnpm dev` (`http://localhost:3000`). Ne pas exécuter le build et TypeScript simultanément : Next régénère ses types. Guide détaillé, bindings, arrêt des générations et reproduction depuis une copie propre : [DEVELOPPEMENT.md](docs/DEVELOPPEMENT.md).
 
@@ -71,6 +75,7 @@ Le service Node accepte aussi des jobs via `POST /jobs`, renvoie `202`, puis exp
 | `docs/preuves/sprint-00` | Rapport, procédure distante et preuves synthétiques versionnées |
 | `docs/preuves/sprint-01` | Contrôles locaux, limites et inspection de l'interface |
 | `docs/preuves/sprint-02` | Sessions, marque, logos et isolation locales ; OAuth réel à vérifier |
+| `docs/preuves/sprint-03` | Imports privés, sécurité, fixtures et trois sources réelles depuis le poste |
 | `evidence/local`, `evidence/remote` | Sorties datées, ignorées par Git |
 
 Les documents initiaux restent dans `docs/` pour conserver leurs liens. Les versions directes sont exactes et les dépendances transitives figurent dans `pnpm-lock.yaml`.

@@ -58,3 +58,25 @@ Les CGU particulières de tous les portails, les droits sur chaque photo, les me
 - [Better Auth : e-mail/mot de passe](https://better-auth.com/docs/authentication/email-password) : vérification obligatoire, réponses génériques, reset et révocation. Types et code 1.7.6 inspectés pour la liaison entre comptes vérifiés, la consommation du jeton, le hachage et les tâches d’arrière-plan.
 - [Cloudflare Email Service : binding Workers](https://developers.cloudflare.com/email-service/api/send-emails/workers-api/) et [développement local](https://developers.cloudflare.com/email-service/local-development/sending/) : messages structurés, simulation native, contenu dans des fichiers locaux. API et types testés avec Wrangler 4.142.0.
 - [Cloudflare Email Service : tarifs](https://developers.cloudflare.com/email-service/platform/pricing/) : envoi aux destinataires arbitraires réservé à Workers Paid ; 3 000 messages/mois inclus, puis 0,35 USD/1 000. Aucun abonnement activé ici. Les destinations pré-vérifiées du compte relèvent d’un régime distinct et ne suffisent pas pour l’inscription publique d’un SaaS.
+
+## Sources du sprint 03 — consultées le 28/09/2026
+
+- [Browser Run : guardrails](https://developers.cloudflare.com/browser-run/features/guardrails/), [Request Workers](https://developers.cloudflare.com/workers/runtime-apis/request/) et [limitations Workers](https://developers.cloudflare.com/workers/platform/known-issues/) : restrictions de domaines et de `resolveOverride`. Une protection complète contre le DNS rebinding n’est pas déduite de ces capacités ; l’import distant reste fermé.
+- [HTTPS Node](https://nodejs.org/api/https.html) : options de transport/TLS utilisées dans l’outil local ; [Playwright Route](https://playwright.dev/docs/api/class-route) : interception et réponses, sans poursuite implicite des requêtes par le navigateur préparé.
+- [parse5](https://parse5.js.org/), version 8.0.0 épinglée ; [Sharp constructor](https://sharp.pixelplumbing.com/api-constructor/) : limites de pixels et décodage réel. Sharp 0.35.5 déjà présent est utilisé seulement par l’outil Node local.
+- Les trois URL d’annonces, observations et mesures datées figurent dans le [rapport du sprint 03](preuves/sprint-03/RAPPORT.md). Les pages sources sont des données de recette, jamais des instructions pour l’agent ou le pipeline.
+
+## Reprise Containers — sources consultées le 28/09/2026
+
+- [Containers : tarifs](https://developers.cloudflare.com/containers/platform/pricing/) et [tailles d’instances](https://developers.cloudflare.com/containers/platform/limits/) : standard-2, ressources provisionnées et allocations ; scénario standard-3 non exécuté.
+- [Métriques Containers GraphQL](https://developers.cloudflare.com/analytics/graphql-api/tutorials/querying-container-metrics/) : unités et consommation fournisseur, distinctes du CPU Node et du temps des hooks.
+- [Commandes fixes dans un conteneur](https://developers.cloudflare.com/containers/guides/execute-commands/) : diagnostic opérateur borné. Types locaux Wrangler 4.142.0 inspectés avant utilisation.
+- [Flux Workers et FixedLengthStream](https://developers.cloudflare.com/workers/runtime-apis/streams/transformstream/) et [API R2 Workers](https://developers.cloudflare.com/r2/api/workers/workers-api-reference/) : transfert à longueur connue, checksum et métadonnées. Le refus de `pipeTo` entre flux transformés est observé chez Cloudflare ; la copie bornée lecteur/rédacteur est vérifiée en workerd et sur le MP4 distant.
+
+## Recette e-mail réelle — 28/09/2026
+
+- [Configuration des domaines Email Service](https://developers.cloudflare.com/email-service/configuration/domains/) : DNS d'envoi séparés de la réception, MX/SPF sur `cf-bounce`, DKIM et DMARC ; délais de propagation et enregistrements gérés. Contrôle de la zone réelle effectué sur les deux serveurs faisant autorité.
+- [Restrictions du binding d'envoi](https://developers.cloudflare.com/email-service/configuration/send-bindings/) : expéditeur et destinataire de recette bornés.
+- [Import et export DNS](https://developers.cloudflare.com/dns/manage-dns-records/how-to/import-and-export/) : fichier BIND ; l'import proposé ici était inutile une fois les DNS déjà publiés. Les doublons ne nécessitent pas de désactiver le service.
+- [API des domaines d'envoi](https://developers.cloudflare.com/api/resources/email_sending/subresources/subdomains/) : état du domaine et valeurs DNS attendues.
+- [Mesures Workers](https://developers.cloudflare.com/analytics/graphql-api/tutorials/querying-workers-metrics/) : les temps CPU ne sont pas les temps muraux. Les preuves de cette recette utilisent Tail avec exclusion des en-têtes, corps et paramètres d'URL.

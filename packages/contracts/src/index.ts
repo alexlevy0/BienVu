@@ -3,6 +3,7 @@ import {z} from 'zod';
 export * from './product';
 export * from './errors';
 export * from './agency';
+export * from './manual-listing';
 
 export const ProbeRender = z.object({
   id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),

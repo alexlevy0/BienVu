@@ -1,1 +1,20 @@
-{"extends":"./tsconfig.base.json","compilerOptions":{"types":["node"]},"include":["tests/**/*.ts","fixtures/contracts.ts","apps/web/cloudflare-env.d.ts"]}
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "tests/**/*.ts",
+    "fixtures/contracts.ts",
+    "apps/web/cloudflare-env.d.ts",
+    "scripts/import-*.ts",
+    "scripts/serve-imports.ts",
+    "scripts/probe-imports.ts",
+    "scripts/probe-import-sources.ts",
+    "scripts/probe-import-descriptions.ts",
+    "scripts/cleanup-imports.ts",
+    "scripts/local-import-db.ts"
+  ]
+}

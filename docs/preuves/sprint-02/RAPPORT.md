@@ -22,16 +22,16 @@ L’interface sans connexion invite à se connecter ; Google reste explicitement
 
 | Vérification | Résultat | Preuve |
 |---|---|---|
-| `pnpm check` | **43 tests réussis**, contrôle des frontières, TypeScript packages + tests | [Journal](check.log) |
+| `pnpm check` | **43 tests réussis**, contrôle des frontières, TypeScript packages + tests | Journal (`docs/preuves/sprint-02/check.log`) |
 | Tests comptes | Sessions signées, expiration/falsification, attribut Secure configuré pour HTTPS, instances distinctes, hooks concurrents, CSRF, retour externe, PKCE généré, déconnexion et quotas d’upload | Inclus dans `check.log` |
 | Tests D1 | Migrations sur base vide, contraintes d’agence, marque persistante, version immuable, logo étranger et plafond de stockage | Inclus dans `check.log` |
 | Tests raster | PNG/JPEG effectivement décodés et réencodés, transparence, palette, entrelacement, métadonnées supprimées, refus SVG/HTML/troncature/CRC/dimensions/poids | Inclus dans `check.log` |
-| `pnpm db:migrate`, puis réapplication | Migration `0004` appliquée en local ; second passage sans migration restante | [Application](migrations.log), [réapplication](migrations-repeat.log) |
-| `pnpm build:web` | Next.js 16.3.6 + OpenNext 1.20.6 ; Worker construit | [Build final](build.log) |
-| `pnpm probe:accounts` sur ce build | Neuf groupes de contrôles HTTP réussis avec D1/R2 locaux, deux identités synthétiques, nettoyage final | [Rapport](accounts-workerd.json), [journal](probe-accounts.log) |
-| `pnpm probe:foundations` et `pnpm probe:web` | Pages, protections, arrêt des générations et sonde opérateur D1/R2/cookie inchangés | [Fondations](probe-foundations.log), [opérateur](probe-web.log) |
-| Inspection navigateur | Formulaire desktop, mobile 390×844, erreurs, sauvegarde, persistance après rechargement, déconnexion et accès refusé ; aucun débordement mesuré | [Constats UI](inspection-ui.json) |
-| Scan des secrets locaux connus | Aucune occurrence dans les candidats Git | [Résultat](secret-scan.json) |
+| `pnpm db:migrate`, puis réapplication | Migration `0004` appliquée en local ; second passage sans migration restante | Application (`docs/preuves/sprint-02/migrations.log`), réapplication (`docs/preuves/sprint-02/migrations-repeat.log`) |
+| `pnpm build:web` | Next.js 16.3.6 + OpenNext 1.20.6 ; Worker construit | Build final (`docs/preuves/sprint-02/build.log`) |
+| `pnpm probe:accounts` sur ce build | Neuf groupes de contrôles HTTP réussis avec D1/R2 locaux, deux identités synthétiques, nettoyage final | Rapport (`docs/preuves/sprint-02/accounts-workerd.json`), journal (`docs/preuves/sprint-02/probe-accounts.log`) |
+| `pnpm probe:foundations` et `pnpm probe:web` | Pages, protections, arrêt des générations et sonde opérateur D1/R2/cookie inchangés | Fondations (`docs/preuves/sprint-02/probe-foundations.log`), opérateur (`docs/preuves/sprint-02/probe-web.log`) |
+| Inspection navigateur | Formulaire desktop, mobile 390×844, erreurs, sauvegarde, persistance après rechargement, déconnexion et accès refusé ; aucun débordement mesuré | Constats UI (`docs/preuves/sprint-02/inspection-ui.json`) |
+| Scan des secrets locaux connus | Aucune occurrence dans les candidats Git | Résultat (`docs/preuves/sprint-02/secret-scan.json`) |
 
 La sonde vérifie les autorisations avant R2 : visiteur 401, autre agence 404, propriétaire 200. Le MP4 n’est pas impliqué dans cette recette. Remplacer un logo conserve son ancien fichier et son identifiant dans une copie de marque sérialisée. Cela ne constitue pas une preuve de rendu vidéo utilisant cette marque, prévu aux sprints 06–07.
 

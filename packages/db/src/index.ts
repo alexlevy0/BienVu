@@ -1,5 +1,6 @@
 import {CostEvent, EntityId, Job} from '@bienvu/contracts';
 export * from './agency';
+export * from './imports';
 
 // Port structurel minimal compatible D1 ; pas de transaction interactive.
 export interface SqlStatement {

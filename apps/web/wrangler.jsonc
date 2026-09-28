@@ -3,11 +3,54 @@
   "name": "bienvu-web-probe-local",
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-09-27",
-  "compatibility_flags": ["nodejs_compat"],
-  "assets": {"directory": ".open-next/assets", "binding": "ASSETS"},
-  "vars": {"PROBE_MODE": "local", "GENERATIONS_ENABLED": "false", "BETTER_AUTH_URL": "http://localhost:8787", "GOOGLE_CLIENT_ID": "", "AUTH_EMAIL_MODE": "local", "AUTH_EMAIL_FROM": "connexion@bienvu.example", "AUTH_EMAIL_VERIFICATION_BYPASS": "false"},
-  "send_email": [{"name": "AUTH_EMAIL", "remote": false}],
-  "d1_databases": [{"binding": "DB", "database_name": "bienvu-probes-local", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "../../packages/db/migrations"}],
-  "r2_buckets": [{"binding": "MEDIA", "bucket_name": "bienvu-probes-local"}],
-  "observability": {"enabled": true, "redact_query_string": true, "logs": {"enabled": true, "invocation_logs": false, "head_sampling_rate": 1}, "traces": {"enabled": true, "head_sampling_rate": 0.01}}
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "vars": {
+    "PROBE_MODE": "local",
+    "GENERATIONS_ENABLED": "false",
+    "BETTER_AUTH_URL": "http://localhost:8787",
+    "GOOGLE_CLIENT_ID": "",
+    "AUTH_EMAIL_MODE": "local",
+    "AUTH_EMAIL_FROM": "connexion@bienvu.example",
+    "AUTH_EMAIL_VERIFICATION_BYPASS": "false",
+    "IMPORT_MODE": "disabled"
+  },
+  "send_email": [
+    {
+      "name": "AUTH_EMAIL",
+      "remote": false
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "bienvu-probes-local",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "../../packages/db/migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "bienvu-probes-local"
+    }
+  ],
+  "observability": {
+    "enabled": true,
+    "redact_query_string": true,
+    "logs": {
+      "enabled": true,
+      "invocation_logs": false,
+      "head_sampling_rate": 1
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.01
+    }
+  }
 }

@@ -1169,3 +1169,43 @@ h1{
 .login-copy:has(.auth-box) h1 { font-size:44px; }
 @media (max-width:700px) { .login-copy:has(.auth-box) h1 { font-size:34px; } .login-copy:has(.auth-box) { padding:24px; } }
 @media(max-width:480px) { .agency-account { align-items:flex-start; flex-direction:column; } .color-pickers { gap:16px; } }
+
+/* Imports privés */
+.import-result { border-top:1px solid var(--line); padding-top:24px; margin-bottom:24px; overflow-wrap:anywhere; }
+.import-result h3 { margin-top:16px; line-height:1.45; }
+.import-result p { font-size:12px; }
+.import-price { color:var(--ink); font-size:20px!important; font-weight:600; }
+.import-gallery { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:20px 0; }
+.import-gallery img { display:block; width:100%; height:auto; aspect-ratio:4/3; object-fit:cover; border-radius:6px; background:#e5eadf; }
+.import-description { margin:24px 0; }
+.import-description h4 { margin:0 0 12px; font-size:14px; font-weight:600; }
+.import-description .import-description-text { white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.8; color:var(--ink); }
+.manual-toggle { display:flex; align-items:center; gap:8px; margin:4px 0 26px; font-size:13px; text-align:left; }
+.manual-toggle>span { font-size:20px; line-height:1; }
+.manual-listing-form { border:1px solid var(--line); background:#f8f9f4; padding:24px; border-radius:12px; margin-bottom:28px; }
+.manual-listing-form h3 { margin:0 0 12px; }
+.manual-fields { border:0; padding:0; margin:22px 0; min-width:0; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px 16px; }
+.manual-wide { grid-column:1/-1; }
+.manual-fields label { display:block; margin-bottom:8px; font-size:13px; font-weight:600; }
+.manual-fields label span { font-weight:400; font-size:11px; color:var(--muted); }
+.manual-fields input,.manual-fields select,.manual-fields textarea { box-sizing:border-box; width:100%; min-width:0; padding:12px; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--ink); font:inherit; font-size:14px; }
+.manual-fields textarea { resize:vertical; line-height:1.6; }
+.manual-fields :is(input,select,textarea):focus-visible { outline:2px solid var(--green); outline-offset:2px; }
+.manual-fields [aria-invalid="true"] { border-color:#a13b2a; }
+.manual-fields .form-feedback { margin:7px 0 0; }
+.manual-photos { padding:0; list-style:none; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.manual-photos li { min-width:0; }
+.manual-photos img { display:block; width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:6px; }
+.manual-photos span { display:block; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; font-size:11px; margin:6px 0; }
+.manual-photos button { border:0; padding:4px 0; color:#8c382b; background:none; font-size:12px; cursor:pointer; }
+.manual-upload { position:relative; min-height:48px; display:flex; align-items:center; justify-content:center; border:1px dashed #84988b; border-radius:8px; background:#fff; font-size:14px; }
+.manual-upload input { position:absolute; inset:0; width:100%; height:100%; padding:0; opacity:0; cursor:pointer; }
+.manual-upload:focus-within { outline:2px solid var(--green); outline-offset:2px; }
+.manual-listing-form .button { max-width:100%; }
+@media(max-width:600px) { .manual-listing-form { padding:18px 14px; } .manual-fields { grid-template-columns:1fr; } .manual-fields input,.manual-fields select,.manual-fields textarea { font-size:16px; } .manual-photos { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+.recent-imports { border-top:1px solid var(--line); padding-top:20px; margin-bottom:24px; }
+.recent-imports h3 { font-size:14px; }
+.recent-imports ul { list-style:none; padding:0; margin:0; }
+.recent-imports button { display:flex; justify-content:space-between; gap:12px; width:100%; background:transparent; border:0; border-bottom:1px solid var(--line); text-align:left; padding:12px 0; color:var(--ink); font-size:11px; }
+.recent-imports button span:first-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.recent-imports button span:last-child { flex-shrink:0; color:var(--muted); }

@@ -13,6 +13,7 @@
   "dependencies": {
     "@bienvu/contracts": "workspace:*",
     "@bienvu/db": "workspace:*",
+    "@bienvu/importers": "workspace:*",
     "@bienvu/observability": "workspace:*",
     "@opennextjs/cloudflare": "1.20.6",
     "better-auth": "1.7.6",

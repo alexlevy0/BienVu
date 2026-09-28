@@ -1,6 +1,6 @@
 # Sprint 02 — Comptes, agence et identité visuelle
 
-**Dépendance : sprint 01. Code livré et recette locale réussie le 27/09/2026. Validation complète en attente de Google OAuth réel et du staging.**
+**Dépendance : sprint 01. Code livré et recette locale réussie le 27/09/2026. Parcours e-mail validé sur le staging le 28/09 ; validation complète en attente de Google OAuth réel et des autres critères distants.**
 
 ## Objectif
 
@@ -30,7 +30,7 @@ Références : [CADRAGE.md](../CADRAGE.md), [CONTRATS.md](../CONTRATS.md), [ARCH
 
 Authentification, routes de marque, formulaire, gestion privée des logos et tests ciblés d'isolation. Documenter la configuration OAuth nécessaire sans secrets et mettre à jour [SUIVI.md](../SUIVI.md).
 
-Les abonnements, invitations et rôles d’équipe restent hors périmètre. **Extension demandée par Alex le 28/09/2026 : connexion e-mail/mot de passe en plus de Google**, avec confirmation et récupération. Elle remplace l’exclusion initiale des mots de passe. Cloudflare Email Service est préparé ; les essais utilisent son simulateur local. L’envoi réel exige Workers Paid et un domaine vérifié, sans nouveau fournisseur d’hébergement. Voir [AUTHENTIFICATION.md](../AUTHENTIFICATION.md).
+Les abonnements, invitations et rôles d’équipe restent hors périmètre. **Extension demandée par Alex le 28/09/2026 : connexion e-mail/mot de passe en plus de Google**, avec confirmation et récupération. Elle remplace l’exclusion initiale des mots de passe. Après les essais avec simulateur local, Cloudflare Email Service est vérifié réellement le 28/09 avec Workers Paid et `bienvu.online` : deux messages reçus en boîte principale, confirmation, connexion, reset, révocation et conservation de l’agence. Google réel reste non testé. [Rapport distant](../preuves/sprint-02/EMAIL-CLOUDFLARE.md). Voir [AUTHENTIFICATION.md](../AUTHENTIFICATION.md).
 
 ## Résultat du 27 septembre 2026
 

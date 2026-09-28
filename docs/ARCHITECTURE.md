@@ -52,9 +52,9 @@ Un dépôt pnpm suffit ; n'ajouter un orchestrateur de monorepo que s'il résout
 ## Chemin d'une génération
 
 1. Le serveur authentifie le client et déduit son agence depuis sa session.
-2. Il valide l'URL, contrôle l'accès, réserve atomiquement le crédit et le budget estimé, puis écrit le job et une intention de lancement persistante.
+2. Il valide l’URL ou l’annonce manuelle déjà enregistrée, contrôle l’accès, réserve atomiquement le crédit et le budget estimé, puis écrit le job et une intention de lancement persistante.
 3. Il démarre un Workflow avec un identifiant stable lié au job. Une relance de l'intention ne doit pas créer un second job ni réserver un second crédit.
-4. Le Workflow importe la page, valide et stocke les photos, puis produit le script et les pistes de voix.
+4. Le Workflow importe la page, valide et stocke les photos, ou reprend l’annonce manuelle et ses photos privées. Il produit ensuite le script et les pistes de voix, en conservant la provenance importée ou déclarée des informations.
 5. Il crée le manifeste de rendu immuable avec une copie de la charte de l'agence et le droit au filigrane fixé côté serveur.
 6. Le contrôleur déclenche le conteneur avec un identifiant de rendu. L'acceptation du travail et la fin du rendu sont distinctes ; prévoir statut et reprise, sans dépendre d'une requête HTTP ouverte jusqu'à la fin.
 7. Le conteneur mesure les pistes, calcule la timeline, rend et contrôle le MP4, puis le stocke dans R2. Le contrôleur vérifie l'existence et l'intégrité de l'artefact.
@@ -94,3 +94,9 @@ Les URL viennent des utilisateurs. Valider HTTPS, hôte, port, résolution et re
 Les pages sont des données non fiables : aucun texte HTML ne peut modifier le prompt système, lancer un outil ou injecter du code dans Remotion. Le renderer n'exécute que le template BienVu et reçoit des données validées. Les logos et photos acceptés sont des images raster contrôlées ; pas de SVG actif ou de HTML arbitraire.
 
 La préférence Cloudflare n'autorise pas un déploiement externe automatique si le rendu ou un portail échoue. Consigner le résultat, terminer les éléments vérifiables et fournir une alternative chiffrée si nécessaire.
+
+## Réalisation locale du sprint 03
+
+L’importeur TypeScript est séparé du transport. L’application workerd locale utilise un pont Node sur loopback authentifié pour les connexions HTTPS à IP épinglée et le décodage raster borné. D1 et R2 restent les bindings de l’application. Ce pont est un outil de développement, pas un nouvel hébergement retenu. Le chemin distant est fermé (`IMPORT_MODE=disabled`) tant que l’épinglage/filtrage des destinations et le décodage sûr dans Cloudflare ne sont pas prouvés. [ADR 0002](adr/0002-import-local-et-egress.md), [configuration et vérifications restantes](IMPORTS.md).
+
+Les photos privées précédant un job sont journalisées sous un préfixe d’import. La publication D1 est atomique après stockage ; une purge rejouable protège toute référence depuis un job. Le manifeste de rendu demeure limité aux fichiers de son job. Aucun crédit n’est consommé par l’import seul.
