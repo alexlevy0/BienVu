@@ -1,5 +1,7 @@
 # Sprint 01 — Fondations locales
 
+> Rapport historique de la livraison locale. Revue du 28/09 : le web et les migrations sont depuis déployés, et la CI GitHub sur `main` est vérifiée réussie. Le sprint 01 est terminé ; voir le [bilan actuel](../../BILAN-SPRINTS.md). Les limites ci-dessous sont celles du 27/09.
+
 27 septembre 2026 · `/Users/alexlevy0/Dev/BienVu` · aucun commit, push ou déploiement de cette tranche.
 
 Alex a demandé d'avancer sur le sprint suivant en restant en local, puis de reprendre Containers après son activation de Workers Paid. L'architecture Next.js/OpenNext et Cloudflare est conservée. **Le sprint 00 reste partiellement validé.**

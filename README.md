@@ -2,7 +2,9 @@
 
 SaaS immobilier en construction : un lien d’annonce ou une saisie avec photos → une vidéo verticale avec voix off, aperçu et téléchargement, sans éditeur vidéo. Les décisions produit restent dans [docs/CADRAGE.md](docs/CADRAGE.md).
 
-**Sprint 03 : import d’annonces implémenté en local.** Extraction TypeScript des faits et de la description, galerie privée, contrôles réseau et accès par agence. Trois annonces réelles d’agences ont été importées depuis le Mac avec trois photos chacune ; l’exécution de cette tranche sur Cloudflare reste à valider et est désactivée. [Lancer et tester les imports](docs/IMPORTS.md). Les comptes proposent e-mail/mot de passe et Google ; les confirmations et récupérations ont été reçues en boîte principale et le parcours e-mail est validé sur Cloudflare ; Google réel reste à configurer/tester. Aucun paiement ni essai vidéo public activé. **Sprint 00 : MP4 de 30 s produit dans Containers, stocké en R2 privé et lecture/audio confirmés ; tests payants désactivés, facture à rapprocher.** [Preuves Cloudflare](docs/preuves/sprint-00/CONTAINERS-PAID.md) · [Configuration des comptes](docs/AUTHENTIFICATION.md).
+**Sprints 02–03 : comptes et imports vérifiés sur Cloudflare.** Connexions e-mail et Google, même agence, marque persistante et isolation validées. Trois annonces réelles importées avec 12/11/7 photos et descriptions ; saisie manuelle et fallback JavaScript vérifiés séparément sur fixtures. [Guide des imports](docs/IMPORTS.md) · [Rapport Cloudflare](docs/preuves/sprint-03/CLOUDFLARE.md) · [Bilan des sprints](docs/BILAN-SPRINTS.md).
+
+[Site de développement](https://bienvu.online) · [Importer ou saisir une annonce](https://bienvu.online/generer) · [Connexion](https://bienvu.online/connexion). Plafonds de recette : cinq imports par jour UTC, toutes agences confondues, et budget suivi. La vidéo produit, les paiements et l'essai public restent à construire. Le MP4 technique du sprint 00 est validé, son renderer reste en pause ; facture à rapprocher.
 
 ## Démarrer localement
 
@@ -24,7 +26,7 @@ Dans un second terminal : `pnpm probe:foundations`, puis `pnpm probe:web` et `pn
 
 Pour importer une vraie annonce en local, lancer `pnpm dev:imports` dans un second terminal puis utiliser `/generer` après connexion. Pour la recette synthétique, arrêter ce pont puis lancer `pnpm probe:imports` : la sonde démarre son propre transport sans réseau extérieur. Les deux modes sont distincts ; [limites, sécurité, nettoyage et recette réelle](docs/IMPORTS.md).
 
-Sous l’import par URL, **Saisir mon annonce manuellement** permet aussi d’enregistrer les informations du bien et 3 à 12 photos. Ce parcours utilise le même pont local pour préparer les images ; [guide de saisie et vérifications](docs/SAISIE-MANUELLE.md).
+Sous l’import par URL, **Saisir mon annonce manuellement** permet aussi d’enregistrer les informations du bien et 3 à 12 photos. En local, ce parcours utilise le pont Node ; sur Cloudflare, un conteneur privé prépare les images ; [guide de saisie et vérifications](docs/SAISIE-MANUELLE.md).
 
 Pour travailler seulement sur l'interface : `pnpm dev` (`http://localhost:3000`). Ne pas exécuter le build et TypeScript simultanément : Next régénère ses types. Guide détaillé, bindings, arrêt des générations et reproduction depuis une copie propre : [DEVELOPPEMENT.md](docs/DEVELOPPEMENT.md).
 
@@ -67,14 +69,15 @@ Le service Node accepte aussi des jobs via `POST /jobs`, renvoie `202`, puis exp
 |---|---|
 | `apps/web` | Next.js + OpenNext, coque produit, laboratoire et sondes protégées |
 | `apps/pipeline` | Worker Browser Run, contrôleur Containers et limites du sprint |
+| `apps/importer` | Transport HTTPS à IP épinglée et Sharp, Container Cloudflare privé |
 | `apps/renderer` | Node/Linux, Remotion, FFmpeg, HTTP asynchrone |
 | `packages/contracts`, `packages/importers`, `packages/video` | Schémas, extraction bornée et composition synthétique |
 | `packages/db` | Migrations D1 métier, accès limités par agence, journal de coûts et pause |
 | `packages/observability` | Identifiants de requête et journaux sur liste blanche |
 | `scripts`, `tests`, `fixtures` | Commandes reproductibles et tests sans API payante |
-| `docs/preuves/sprint-00` | Rapport, procédure distante et preuves synthétiques versionnées |
+| `docs/preuves/sprint-00` | Rapports et procédure versionnés ; sorties brutes conservées localement |
 | `docs/preuves/sprint-01` | Contrôles locaux, limites et inspection de l'interface |
-| `docs/preuves/sprint-02` | Sessions, marque, logos et isolation locales ; OAuth réel à vérifier |
+| `docs/preuves/sprint-02` | Sessions, marque et isolation locales ; e-mails et connexion Google réels validés |
 | `docs/preuves/sprint-03` | Imports privés, sécurité, fixtures et trois sources réelles depuis le poste |
 | `evidence/local`, `evidence/remote` | Sorties datées, ignorées par Git |
 

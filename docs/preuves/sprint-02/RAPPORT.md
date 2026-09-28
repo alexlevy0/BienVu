@@ -1,5 +1,9 @@
 # Sprint 02 — travail des 27–28 septembre 2026
 
+> Rapport historique local. La recette distante du 28/09 est maintenant décrite dans le [rapport Cloudflare](RECETTE-DISTANTE.md).
+
+> Rapport historique de la tranche initiale. Les connexions e-mail et Google réelles sont depuis validées, ainsi que le domaine bienvu.online. Les comptes sont déployés ; les réserves de configuration Google ci-dessous sont levées. La recette distante marque/logos/isolation reste ouverte : voir le [bilan actuel](../../BILAN-SPRINTS.md).
+
 Ce rapport décrit la livraison initiale Google/marque. L’extension e-mail/mot de passe demandée ensuite par Alex est documentée séparément dans [EMAIL-MOT-DE-PASSE.md](EMAIL-MOT-DE-PASSE.md), avec ses preuves supplémentaires. Les 43 tests ci-dessous sont le résultat historique de la livraison initiale.
 
 **Code livré et validé localement ; sprint non entièrement validé.** La connexion Google réelle et la recette du Worker déployé restent à effectuer. Les identifiants Google OAuth sont absents. Alex a demandé de poursuivre en local en attendant Workers Paid ; aucun déploiement ni essai Cloudflare supplémentaire n’a été lancé.

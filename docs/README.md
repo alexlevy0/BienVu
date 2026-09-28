@@ -1,17 +1,17 @@
 # BienVu — dossier de construction pour Codex
 
-Version 1.0 · 27 septembre 2026 · Projet neuf · Langue produit : français.
+Version revue le 28 septembre 2026 · Projet en construction · Langue produit : français.
 
-**Promesse : coller le lien d'une annonce immobilière, obtenir une vidéo verticale avec voix off, la prévisualiser et la télécharger.**
+**Promesse : importer une annonce par URL ou la saisir avec ses photos, obtenir une vidéo verticale avec voix off, la prévisualiser et la télécharger.**
 
-Ce dossier est un cahier de construction. Il ne contient pas encore d'application, de déploiement ou de résultats de tests. Les critères ci-dessous sont à vérifier par Codex pendant l'implémentation.
+Ce dossier rassemble le cahier de construction, les sprints et leurs preuves. Une application de développement est déployée sur [bienvu.online](https://bienvu.online), avec authentification réelle. Les comptes et imports sont vérifiés en local et sur Cloudflare ; le pipeline vidéo produit et les paiements restent à construire. Consulter le [bilan des sprints](BILAN-SPRINTS.md) pour les critères ouverts et [SUIVI.md](SUIVI.md) pour le journal détaillé.
 
 ## Utilisation
 
-1. Décompresser ce dossier et le placer dans le futur dépôt, par exemple sous `docs/bienvu/`.
-2. Ouvrir le dépôt dans Codex. Aucun starter n'est présupposé.
-3. Faire lire les documents de référence, puis commencer par le sprint 00.
-4. Exécuter les sprints dans l'ordre. Mettre à jour `SUIVI.md` avec les preuves, les limites et les décisions réelles.
+1. Ouvrir le dépôt existant ; ne pas le réinitialiser.
+2. Lire les instructions du dépôt et les documents de référence.
+3. Consulter le bilan et le sprint courant avant de choisir la prochaine tranche.
+4. Respecter les dépendances des sprints. Mettre à jour leurs cases et `SUIVI.md` avec les preuves, les limites et les décisions réelles.
 5. Les sprints sont des lots fonctionnels, pas des engagements d'une semaine ou d'un nombre d'heures.
 
 ## Documents de référence
@@ -24,7 +24,8 @@ Ce dossier est un cahier de construction. Il ne contient pas encore d'applicatio
 | [BUDGET-ET-OFFRES.md](BUDGET-ET-OFFRES.md) | Budget de 30 €, coûts et offres proposées |
 | [CONSIGNES-CODEX.md](CONSIGNES-CODEX.md) | Manière de travailler et définition d'un sprint terminé |
 | [SOURCES.md](SOURCES.md) | Sources officielles et points à revérifier |
-| [SUIVI.md](SUIVI.md) | Avancement initial, à mettre à jour pendant le développement |
+| [BILAN-SPRINTS.md](BILAN-SPRINTS.md) | Revue des critères, preuves locales/réelles et priorités restantes |
+| [SUIVI.md](SUIVI.md) | État actuel et journal daté du développement |
 
 ## Ordre des sprints
 
@@ -68,4 +69,4 @@ sur la seule base d'une maquette. Mets à jour SUIVI.md à la fin.
 - La récupération de tous les liens des portails, ni de toutes leurs galeries.
 - Un coût réel inférieur à 30 € sans mesure, limitation et suivi de facturation.
 - La compatibilité de toutes les versions de Next.js, de leurs adaptateurs et des services encore en bêta.
-- La disponibilité de la marque BienVu ou d'un nom de domaine ; aucun achat n'est prévu pour les premiers tests.
+- La disponibilité de la marque BienVu. Le domaine `bienvu.online` a été acheté par Alex et raccordé ; son coût figure dans le budget.

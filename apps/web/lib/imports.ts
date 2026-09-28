@@ -7,19 +7,21 @@ import {RequestFailure} from './http';
 // Ports réels D1/R2 en workerd, injectables en recette sans réseau extérieur.
 type ImportBucket = Pick<R2Bucket, 'put' | 'get' | 'delete'>;
 export async function createPrivateImport(env: {DB: Database; MEDIA: ImportBucket}, agencyId: string, url: string, key: string,
-  transport: ImportTransport, signal?: AbortSignal) {
+  transport: ImportTransport, signal?: AbortSignal, options: {mode?: 'local' | 'cloudflare'; beforeStart?: (id: string) => Promise<void>;
+    browserHtml?: (url: string, signal: AbortSignal) => Promise<string>} = {}) {
   try {
     const {row, fresh} = await beginImport(env.DB, agencyId, publicUrl(url).href, key);
     if (!fresh) return row;
     try {
-      const {listing, diagnostics} = await importListing(url, {agencyId, importId: row.id}, {transport,
+      await options.beforeStart?.(row.id);
+      const {listing, diagnostics} = await importListing(url, {agencyId, importId: row.id}, {transport, browserHtml: options.browserHtml,
         store: async (photo, bytes, abort) => {
           abort.throwIfAborted();
           await journalImportPhoto(env.DB, agencyId, row.id, photo);
           await env.MEDIA.put(photo.objectKey, bytes, {httpMetadata: {contentType: photo.mime, cacheControl: 'private, no-store'},
             customMetadata: {importId: row.id, agencyId, sha256: photo.contentHash}});
           abort.throwIfAborted();
-        }}, {signal});
+        }}, {signal, mode: options.mode});
       await completeImport(env.DB, listing, diagnostics);
     } catch (error) {
       const code = error instanceof ImportFailure ? error.code : 'SOURCE_UNAVAILABLE';
@@ -28,6 +30,7 @@ export async function createPrivateImport(env: {DB: Database; MEDIA: ImportBucke
       // Nettoyage immédiat des objets connus ; le journal reste pour réconcilier
       // une requête put dont l'issue serait incertaine. Aucune clé de job n'est touchée.
       try {for (const objectKey of await importObjectKeys(env.DB, agencyId, row.id)) await env.MEDIA.delete(objectKey);} catch { /* reprise par purgeImports */ }
+      if (error instanceof RequestFailure) throw error;
     }
     return (await findImport(env.DB, agencyId, row.id))!;
   } catch (error) {

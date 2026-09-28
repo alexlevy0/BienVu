@@ -1,5 +1,9 @@
 # Sprint 03 — imports d’agences en local
 
+> Rapport historique local. La recette distante du 28/09 est maintenant décrite dans le [rapport Cloudflare](CLOUDFLARE.md).
+
+> Rapport historique de la tranche initiale. Revue du 28/09 : le code web et les migrations `0001`–`0008` sont depuis déployés pour les comptes, mais les imports URL/manuels restent fermés. La CI GitHub du dépôt est vérifiée réussie ; cela ne valide pas le transport Cloudflare. Voir le [bilan actuel](../../BILAN-SPRINTS.md), incluant les extensions description et saisie manuelle.
+
 Date : **28 septembre 2026, Europe/Paris**. Les horodatages UTC des premiers essais réels sont encore au 27 septembre. Code et parcours local livrés ; **transport Cloudflare et Browser Run de cette tranche non validés**. Aucun déploiement, abonnement, Docker, paiement, appel IA ou e-mail réel.
 
 Extension demandée ensuite par Alex : [description du bien importée, sauvegardée et affichée](DESCRIPTION.md), 81 tests au total et trois nouvelles lectures de pages réelles. Les résultats ci-dessous conservent la recette initiale (77 tests) ; les preuves de cette extension sont séparées.
@@ -48,4 +52,4 @@ Les flux interrompus conservent une réservation conservatrice de taille, pour n
 
 **0 appel facturable effectué dans cette tranche**, trois essais HTTPS publics depuis le poste, neuf photos, 2 241 658 octets normalisés stockés temporairement en local. Les consultations de pages nécessaires au choix des liens ont également eu lieu depuis le poste. Aucun temps Browser Run, token IA, rendu Containers ou objet R2 distant ajouté. Coût fournisseur supplémentaire des essais : 0 € ; Internet, électricité et matériel local non mesurés. Facture Cloudflare non relue, budget global de 30 € non certifié par ces chiffres.
 
-Reste précisément à réaliser : transport sûr et décodage borné compatibles Cloudflare ; recette contrôlée DNS/redirections/sous-requêtes/navigations ; vrais cycles Browser Run et mesure CPU/temps/coût ; migration et recette des trois sources sur staging ; purge périodique hébergée. Le simple passage à Workers Paid ne démontre pas ces propriétés. Les recettes Google/e-mails du sprint 02 et Containers du sprint 00 restent distinctes. [Liste de reprise](../../IMPORTS.md#cloudflare--vérification-restante).
+Reste précisément à réaliser : transport sûr et décodage borné compatibles Cloudflare ; recette contrôlée DNS/redirections/sous-requêtes/navigations ; vrais cycles Browser Run et mesure CPU/temps/coût ; migration et recette des trois sources sur staging ; purge périodique hébergée. Le simple passage à Workers Paid ne démontre pas ces propriétés. Les recettes Google/e-mails du sprint 02 et Containers du sprint 00 restent distinctes. [Liste de reprise](../../IMPORTS.md#cloudflare--configuration-et-exploitation).

@@ -4,21 +4,35 @@ if(!id||!/^[a-f0-9-]{36}$/.test(id))throw new Error('BIENVU_D1_ID requis : ident
 const plan=process.env.BIENVU_WORKERS_PLAN??'free';
 if(!['free','paid'].includes(plan))throw new Error('BIENVU_WORKERS_PLAN doit être free ou paid.');
 const targetScope=process.env.BIENVU_STAGING_TARGET??'all';
-if(!['all','web'].includes(targetScope))throw new Error('BIENVU_STAGING_TARGET doit être all ou web.');
+if(!['all','web','imports'].includes(targetScope))throw new Error('BIENVU_STAGING_TARGET doit être all, web ou imports.');
 for(const [file,target,name] of [
   ['apps/web/wrangler.jsonc','apps/web/wrangler.staging.jsonc','bienvu-web-probe-staging'],
   ['apps/pipeline/wrangler.jsonc','apps/pipeline/wrangler.staging.jsonc','bienvu-browser-probe-staging'],
+  ['apps/pipeline/wrangler.import.jsonc','apps/pipeline/wrangler.staging.import.jsonc','bienvu-import-staging'],
   ['apps/pipeline/wrangler.render.jsonc','apps/pipeline/wrangler.staging.render.jsonc','bienvu-render-probe-staging'],
 ]) {
   if(targetScope==='web'&&name!=='bienvu-web-probe-staging')continue;
+  if(targetScope==='imports'&&name!=='bienvu-import-staging')continue;
   const c=JSON.parse(await readFile(file,'utf8'));c.name=name;c.vars.PROBE_MODE='remote';
   if (name === 'bienvu-web-probe-staging') {
     const origin = process.env.BIENVU_WEB_ORIGIN ?? '';
     if (origin && (new URL(origin).origin !== origin || !origin.startsWith('https://'))) throw new Error('BIENVU_WEB_ORIGIN doit être une origine HTTPS exacte.');
     c.vars.BETTER_AUTH_URL = origin;
+    const customDomain = process.env.BIENVU_WEB_CUSTOM_DOMAIN ?? '';
+    if (customDomain) {
+      if (!/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(customDomain) || origin !== `https://${customDomain}`)
+        throw new Error('BIENVU_WEB_CUSTOM_DOMAIN doit être le nom DNS exact de BIENVU_WEB_ORIGIN, sans chemin ni protocole.');
+      c.routes = [{pattern: customDomain, custom_domain: true}];
+      // Une seule origine publique pour les cookies et callbacks d'authentification.
+      c.workers_dev = false;
+      c.preview_urls = false;
+    }
     c.vars.GOOGLE_CLIENT_ID = process.env.BIENVU_GOOGLE_CLIENT_ID ?? '';
     c.vars.AUTH_EMAIL_VERIFICATION_BYPASS = 'false';
-    c.vars.IMPORT_MODE = 'disabled';
+    const importsEnabled = process.env.BIENVU_IMPORTS_ENABLED === 'true';
+    if (importsEnabled && plan !== 'paid') throw new Error('Les imports hébergés exigent Workers Paid.');
+    c.vars.IMPORT_MODE = importsEnabled ? 'cloudflare' : 'disabled';
+    c.services = [{binding: 'IMPORT_SERVICE', service: 'bienvu-import-staging'}];
     const sender = process.env.BIENVU_AUTH_EMAIL_FROM ?? '';
     if (sender && (plan !== 'paid' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sender) || /\.(example|invalid|test)$/.test(sender)))
       throw new Error('Un expéditeur réel vérifié et BIENVU_WORKERS_PLAN=paid sont requis pour les e-mails.');
@@ -30,6 +44,11 @@ for(const [file,target,name] of [
     if (sender) c.send_email = [{name: 'AUTH_EMAIL', allowed_sender_addresses: [sender],
       ...(recipient ? {allowed_destination_addresses: [recipient]} : {})}];
     else delete c.send_email;
+  }
+  if(name==='bienvu-import-staging') {
+    c.vars.IMPORTS_ENABLED=process.env.BIENVU_IMPORTS_ENABLED==='true'?'true':'false';
+    if(c.vars.IMPORTS_ENABLED==='true'&&plan!=='paid')throw new Error('Les imports hébergés exigent Workers Paid.');
+    c.preview_urls=false;
   }
   // La limite CPU personnalisée nécessite Workers Paid. Le plan Free applique sa propre limite.
   if(name==='bienvu-browser-probe-staging'&&plan==='free')delete c.limits;

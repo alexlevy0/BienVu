@@ -20,7 +20,7 @@ export async function checkPublicDns(host:string,fetcher:typeof fetch=fetch) {
   const addresses=results.flat();
   if(!addresses.length||!addresses.every(isPublicIp)) throw new ImportFailure('UNSAFE_URL','Destination DNS privée ou réservée.');
 }
-export async function readLimited(response:Response,maximum:number):Promise<Uint8Array<ArrayBuffer>> {
+export async function readLimited(response:Pick<Response, 'headers' | 'body'>,maximum:number):Promise<Uint8Array<ArrayBuffer>> {
   if(Number(response.headers.get('content-length'))>maximum) {await response.body?.cancel();throw new Error('MEDIA_TOO_LARGE');}
   const reader=response.body?.getReader();if(!reader) return new Uint8Array();
   const chunks:Uint8Array[]=[];let size=0;

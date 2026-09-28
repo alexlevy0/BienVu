@@ -8,7 +8,10 @@ BETTER_AUTH_URL=http://localhost:8787
 # true : e-mail vérifié et session automatique, uniquement en local loopback.
 AUTH_EMAIL_VERIFICATION_BYPASS=false
 LOCAL_IMPORT_TOKEN=
-# Outil Node local : pnpm dev:imports. Le staging impose disabled.
+# Outil Node local : pnpm dev:imports. Cloudflare utilise le service privé.
 IMPORT_MODE=local
 # E-mails : valeurs locales dans wrangler.jsonc (AUTH_EMAIL_MODE=local, simulateur).
 # Ne pas y copier un expéditeur réel ; voir docs/AUTHENTIFICATION.md pour le staging.
+
+# Secret partagé web/service privé (généré séparément pour le staging).
+IMPORT_TOKEN=

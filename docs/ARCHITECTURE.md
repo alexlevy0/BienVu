@@ -1,13 +1,13 @@
 # BienVu — architecture proposée
 
-Statut : proposition à démontrer au sprint 00. Références officielles dans [SOURCES.md](SOURCES.md).
+Statut : architecture des sprints 00–03 démontrée ; pipeline vidéo et facturation encore à construire. Références officielles dans [SOURCES.md](SOURCES.md).
 
 ## Services
 
 | Composant | Choix proposé | Responsabilité |
 |---|---|---|
 | Application | Next.js standard + adaptateur Cloudflare sur Workers | Interface, sessions, routes serveur et accès autorisé aux fichiers |
-| Import | Worker TypeScript + Browser Run via `@cloudflare/playwright` | Page source, galerie et extraction structurée |
+| Import | Worker TypeScript + Browser Run + Container privé Node/Sharp | TLS à IP épinglée, extraction structurée et photos réencodées |
 | Traitement durable | Cloudflare Workflows | Enchaînement des étapes, reprises et statut des jobs |
 | Données | Cloudflare D1 | Agences, annonces, jobs, abonnements, écritures de quota et coûts |
 | Fichiers | R2 privé | Photos validées, narration, manifeste et MP4 |
@@ -39,6 +39,7 @@ Le conteneur est un service privé de calcul déclenché à la demande, avec une
 |---|---|
 | `apps/web` | Next.js, interface, Better Auth, routes utilisateur et webhook Stripe |
 | `apps/pipeline` | Worker d'import, Workflow et accès privé au contrôleur de rendu |
+| `apps/importer` | Transport Node TLS et décodage Sharp, Container privé `basic` |
 | `apps/renderer` | Serveur Node du conteneur, Remotion renderer, mesure audio et vérification MP4 |
 | `packages/contracts` | Types TypeScript et schémas de validation partagés, sans dépendance Node native |
 | `packages/video` | Composition React Remotion et primitives visuelles |
@@ -47,7 +48,7 @@ Le conteneur est un service privé de calcul déclenché à la demande, avec une
 | `fixtures` | Petits échantillons autorisés ou synthétiques, expurgés et déterministes |
 | `docs/bienvu` | Ce dossier, suivi et rapports de sprint |
 
-Un dépôt pnpm suffit ; n'ajouter un orchestrateur de monorepo que s'il résout un besoin identifié. Les Dockerfiles sont réservés au renderer et aux outils locaux nécessitant Linux.
+Un dépôt pnpm suffit ; n'ajouter un orchestrateur de monorepo que s'il résout un besoin identifié. Les Dockerfiles couvrent le renderer, le transport d'import privé et les outils locaux Linux. L'extension au transport d'import est motivée dans l'[ADR 0003](adr/0003-transport-import-cloudflare.md).
 
 ## Chemin d'une génération
 
@@ -95,8 +96,8 @@ Les pages sont des données non fiables : aucun texte HTML ne peut modifier le p
 
 La préférence Cloudflare n'autorise pas un déploiement externe automatique si le rendu ou un portail échoue. Consigner le résultat, terminer les éléments vérifiables et fournir une alternative chiffrée si nécessaire.
 
-## Réalisation locale du sprint 03
+## Réalisation du sprint 03
 
-L’importeur TypeScript est séparé du transport. L’application workerd locale utilise un pont Node sur loopback authentifié pour les connexions HTTPS à IP épinglée et le décodage raster borné. D1 et R2 restent les bindings de l’application. Ce pont est un outil de développement, pas un nouvel hébergement retenu. Le chemin distant est fermé (`IMPORT_MODE=disabled`) tant que l’épinglage/filtrage des destinations et le décodage sûr dans Cloudflare ne sont pas prouvés. [ADR 0002](adr/0002-import-local-et-egress.md), [configuration et vérifications restantes](IMPORTS.md).
+L’importeur TypeScript est séparé du transport. L’application workerd locale utilise un pont Node sur loopback authentifié pour les connexions HTTPS à IP épinglée et le décodage raster borné. D1 et R2 restent les bindings de l’application. Ce pont est un outil de développement, pas un nouvel hébergement retenu. Le chemin distant utilise depuis le 28/09 un Container Cloudflare `basic`, séparé du renderer, via Service Binding privé. Browser Run délègue tout trafic autorisé au même transport à IP épinglée ; photos URL et manuelles passent par Sharp dans le conteneur. Un cron purge les imports abandonnés/expirés avec protection des références de jobs. [ADR 0003](adr/0003-transport-import-cloudflare.md), [configuration et recette](IMPORTS.md), [rapport distant](preuves/sprint-03/CLOUDFLARE.md).
 
 Les photos privées précédant un job sont journalisées sous un préfixe d’import. La publication D1 est atomique après stockage ; une purge rejouable protège toute référence depuis un job. Le manifeste de rendu demeure limité aux fichiers de son job. Aucun crédit n’est consommé par l’import seul.

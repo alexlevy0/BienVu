@@ -1,4 +1,4 @@
-// Outil Node local uniquement. Ne pas importer dans un bundle Worker.
+// Transport Node du pont local et du conteneur privé d'import. Jamais dans un Worker.
 import {lookup} from 'node:dns/promises';
 import {request} from 'node:https';
 import sharp from 'sharp';
@@ -17,7 +17,7 @@ const realPorts: NetworkPorts = {
       maxHeaderSize: 16_384, signal, family: address.family,
       // Le nom TLS et le Host restent ceux de l'URL ; aucune seconde résolution.
       lookup: (_host, _options, callback) => callback(null, address.address, address.family),
-      headers: {'Accept-Encoding': 'identity', 'Accept': '*/*', 'User-Agent': 'BienVu-Local-Import/0.3'}}, res => {
+      headers: {'Accept-Encoding': 'identity', 'Accept': '*/*', 'User-Agent': 'BienVu-Import/0.3'}}, res => {
       const status = res.statusCode ?? 502;
       if (status < 200 || status >= 300) {
         resolve({status, headers: res.headers, bytes: new Uint8Array()}); res.destroy(); return;
@@ -42,7 +42,7 @@ export async function normalizePhoto(bytes: Uint8Array, mime: string) {
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(mime) || bytes.length > IMPORT_LIMITS.imageBytes)
     throw new ImportFailure('INSUFFICIENT_PHOTOS', 'Format ou poids de photo refusé.');
   try {
-    const input = sharp(bytes, {limitInputPixels: 16_000_000, failOn: 'warning', animated: false});
+    const input = sharp(bytes, {limitInputPixels: 16_000_000, failOn: 'warning', animated: false}).timeout({seconds: 12});
     const meta = await input.metadata();
     const formats: Record<string, string> = {jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp'};
     const format = formats[meta.format ?? ''];

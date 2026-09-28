@@ -34,4 +34,4 @@ Commandes : tests ciblés, `pnpm check`, `pnpm db:migrate` puis réapplication, 
 
 HTML et textes complets restent dans `evidence/local/sprint-03/descriptions/`, hors Git. Le rapport versionné contient URL, version, provenance, taille, durée et empreinte. Cet échantillon ne prouve pas la prise en charge de toutes les annonces.
 
-**0 € fournisseur supplémentaire**, zéro appel payant, IA, Browser Run, Containers ou R2 distant. Facture non consultée ; réseau et matériel local non mesurés. Aucun déploiement, commit ou push. [Recette Cloudflare restante](../../IMPORTS.md#cloudflare--vérification-restante) inchangée.
+**0 € fournisseur supplémentaire**, zéro appel payant, IA, Browser Run, Containers ou R2 distant. Facture non consultée ; réseau et matériel local non mesurés. Aucun déploiement, commit ou push. [Recette Cloudflare restante](../../IMPORTS.md#cloudflare--configuration-et-exploitation) inchangée.

@@ -4,7 +4,7 @@
 
 ## Objectif
 
-Produire automatiquement une présentation française agréable à écouter, fondée uniquement sur les informations vérifiées de l'annonce. Générer des pistes vocales par scène pour permettre une synchronisation fiable dans la vidéo.
+Produire automatiquement une présentation française agréable à écouter, fondée uniquement sur les informations de l'annonce enregistrée : faits importés `verified` ou données manuelles `user_provided`, sans transformer ces dernières en faits vérifiés sur un site. Générer des pistes vocales par scène pour permettre une synchronisation fiable dans la vidéo. Cette prise en compte de la saisie manuelle reprend la décision d'Alex du 28/09 ; le sprint reste à réaliser.
 
 Références : [CONTRATS.md](../CONTRATS.md), [CADRAGE.md](../CADRAGE.md), [BUDGET-ET-OFFRES.md](../BUDGET-ET-OFFRES.md), sources OpenAI de [SOURCES.md](../SOURCES.md).
 
@@ -20,7 +20,7 @@ Références : [CONTRATS.md](../CONTRATS.md), [CADRAGE.md](../CADRAGE.md), [BUDG
 ## Critères d'acceptation
 
 1. Des cas synthétiques vérifient vente, location, champ absent, gros montant, décimale de surface et instruction malveillante dans une description.
-2. Chaque fait chiffré prononcé ou affiché correspond aux données vérifiées ; aucun champ absent n'est remplacé par une supposition.
+2. Chaque fait chiffré prononcé ou affiché correspond aux données de l'annonce et conserve sa provenance importée/manuelle ; aucun champ absent n'est remplacé par une supposition. Tester les deux modes de création.
 3. Une écoute réelle confirme l'intelligibilité du français, des montants, des unités et des noms de ville sur un petit échantillon.
 4. L'échec TTS, un retour invalide et un dépassement de durée sont bornés et propagés proprement au job.
 5. Les pistes et scripts restent privés et une reprise identique n'entraîne pas d'appels déjà évitables.

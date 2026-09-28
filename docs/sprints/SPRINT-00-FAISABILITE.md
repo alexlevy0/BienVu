@@ -2,7 +2,7 @@
 
 **Dépendance : aucune. Statut initial : à faire.**
 
-**État au 28/09/2026 : validation technique terminée, rapprochement financier ouvert.** Web et import d’agence démontrés chez Cloudflare ; MP4 natifs 6/30 s, Linux 6 s et Containers 30 s produits. Transfert R2 privé, empreinte, sommeil et limites contrôlés ; Alex confirme la lecture et l’audio du MP4 distant. Cinq tentatives consommées, appels désactivés, 19,50 € disponibles selon la provision prudente. Les métriques complètes et la facture restent à rapprocher. Voir la [recette Paid](../preuves/sprint-00/CONTAINERS-PAID.md) et le [suivi](../SUIVI.md).
+**État revu au 28/09/2026 : validation technique terminée, rapprochement financier ouvert.** Web et import d’agence démontrés chez Cloudflare ; MP4 natifs 6/30 s, Linux 6 s et Containers 30 s produits. Transfert R2 privé, empreinte, sommeil et limites contrôlés ; Alex confirme la lecture et l’audio du MP4 distant. Cinq tentatives consommées, dont quatre échecs, appels désactivés. Après provision de 6 € pour le domaine acheté depuis la recette, **13,50 € restent disponibles selon l’estimation prudente**, et non une facture vérifiée. Voir la [recette Paid](../preuves/sprint-00/CONTAINERS-PAID.md), le [budget actualisé](../BUDGET-ET-OFFRES.md) et la [revue des sprints](../BILAN-SPRINTS.md).
 
 ## Objectif
 
@@ -32,3 +32,10 @@ Si des accès manquent, livrer les sondes locales et les commandes exactes de v�
 ## Livrables
 
 Sondes exécutables, configuration d'exemple, ADR d'hébergement, rapport de faisabilité et suivi actualisé. Aucun paiement client, site commercial ou éditeur n'est attendu ici.
+
+## Vérifications encore ouvertes
+
+- [ ] Rapprocher les métriques des cinq tentatives avec la facture, le forfait et le débit réel du domaine en euros. Les valeurs à 19,50 € des premières preuves sont antérieures à l'achat du domaine.
+- [ ] Avant toute nouvelle campagne payante, réconcilier le registre/contrôleur de budget avec toutes les dépenses du mois ; conserver les cinq tentatives consommées et la pause actuelle.
+
+Il n'est pas nécessaire de relancer un rendu pour refaire la preuve technique. Le MP4 reste synthétique : il ne valide ni une voix TTS française ni la vidéo de marque du sprint 06.

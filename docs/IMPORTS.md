@@ -1,6 +1,8 @@
 # Imports d’annonces — sprint 03
 
-Le parcours local transforme un lien en annonce privée et galerie persistante. Depuis la demande d’Alex du 28/09/2026, un bouton sous l’import ouvre aussi une [saisie manuelle avec photos](SAISIE-MANUELLE.md). Les deux modes utilisent la session et l’agence du sprint 02, sans job vidéo, crédit ou essai consommé. Aucun éditeur vidéo n’est ajouté.
+Le parcours local ou Cloudflare transforme un lien en annonce privée et galerie persistante. Depuis la demande d’Alex du 28/09/2026, un bouton sous l’import ouvre aussi une [saisie manuelle avec photos](SAISIE-MANUELLE.md). Les deux modes utilisent la session et l’agence du sprint 02, sans job vidéo, crédit ou essai consommé. Aucun éditeur vidéo n’est ajouté.
+
+**État au 28/09 :** imports URL et saisie manuelle actifs sur bienvu.online, avec Container privé à IP épinglée/Sharp, fallback Browser Run et D1/R2 existants. Trois agences réelles importées avec 12/11/7 photos ; recette séparée pour la page JavaScript et la saisie synthétiques. [Rapport Cloudflare](preuves/sprint-03/CLOUDFLARE.md).
 
 ## Lancer et utiliser
 
@@ -28,7 +30,7 @@ Le pont natif écoute uniquement sur `127.0.0.1:8791`. Il exige `LOCAL_IMPORT_TO
 
 Les adaptateurs 3.2 extraient aussi la description liée au bien. Le HTML est converti en texte brut, entités décodées, paragraphes et sauts de ligne conservés, éléments actifs et blocs de navigation ignorés. La provenance est enregistrée dans `description.sourcePath`. Aucun résumé ni reformulation automatique : la description conserve le texte de la source et reste séparée des faits vérifiés. Le champ vaut `null` si le bloc manque ou si plusieurs blocs candidats ont des textes différents. L’interface affiche cette absence ; aucun éditeur n’est ajouté.
 
-Le transport Node de développement résout toutes les adresses d’un hôte et refuse une résolution vide, mixte publique/privée ou réservée. Il épingle l’adresse publique dans la connexion HTTPS en conservant le nom TLS/SNI et la vérification du certificat. Chaque redirection repasse par les contrôles ; aucune deuxième résolution implicite par `fetch`. Pas de cookie, authentification, proxy ou en-tête de l’utilisateur transmis aux agences. Pages limitées à l’hôte source ; CDN d’images autorisés explicitement par adaptateur. Pas de joker ni de nouvel hôte autorisé parce que la page le demande. Les URL de toute la galerie sont contrôlées avant son téléchargement.
+Le même transport Node en local et dans le Container Cloudflare résout toutes les adresses d’un hôte et refuse une résolution vide, mixte publique/privée ou réservée. Il épingle l’adresse publique dans la connexion HTTPS en conservant le nom TLS/SNI et la vérification du certificat. Chaque redirection repasse par les contrôles ; aucune deuxième résolution implicite par `fetch`. Pas de cookie, authentification, proxy ou en-tête de l’utilisateur transmis aux agences. Pages limitées à l’hôte source ; CDN d’images autorisés explicitement par adaptateur. Pas de joker ni de nouvel hôte autorisé parce que la page le demande. Les URL de toute la galerie sont contrôlées avant son téléchargement.
 
 Les galeries sont délimitées par la structure de l’annonce et, lorsque disponible, sa référence. Lazy loading et `srcset` sont résolus à partir des URL présentes. Logos, avatars, plans identifiés et recommandations hors galerie sont écartés ; aucun classifieur visuel ne garantit l’exclusion d’un visuel mal étiqueté par la source. Sharp décode réellement JPEG/PNG/WebP, vérifie les dimensions et réencode en JPEG orienté sans métadonnées. Les empreintes du contenu normalisé dédupliquent les photos ; l’ordre de la galerie est conservé. Les filigranes présents sur les photos des agences restent présents.
 
@@ -44,11 +46,11 @@ Les galeries sont délimitées par la structure de l’annonce et, lorsque dispo
 | Image décodée | 16 millions de pixels maximum ; minimum 640×360 |
 | JPEG stocké | 2 048×2 048 maximum, ratio préservé |
 | Imports URL actifs / dossiers stockés par agence | 1 / 30, tous modes pour le stockage |
-| Tentatives d’import locales, toutes agences | 5 par jour UTC / 30 par mois UTC |
-| Récupérations simultanées du pont | 2 |
+| Tentatives d’import, toutes agences | 5 par jour UTC / 30 par mois UTC |
+| Récupérations simultanées du pont/conteneur | 2 |
 | Conservation / bail / délai avant purge | 30 jours / 90 s URL, 15 min saisie / bail + 5 min |
 
-Une récupération échouée garde toute sa réservation d’octets, car son volume reçu peut être inconnu. La dernière requête reçoit seulement le budget restant. Les limites de tentatives sont atomiques dans D1 et persistantes après purge ; un rejeu idempotent ne les consomme pas à nouveau. Ce sont des limites techniques de recette, pas les quotas des abonnements ni une garantie de facture. Les sondes HTTP synthétiques exercent ces mêmes compteurs ; leur nettoyage opérateur retire uniquement les tentatives de leurs identités synthétiques. Aucun remboursement n’existe dans la purge produit.
+Une récupération échouée garde toute sa réservation d’octets, car son volume reçu peut être inconnu. La dernière requête reçoit seulement le budget restant. Les limites de tentatives sont atomiques dans D1 et persistantes après purge ; un rejeu idempotent ne les consomme pas à nouveau. Ce sont des limites techniques de recette, pas les quotas des abonnements ni une garantie de facture. Les sondes locales isolées peuvent retirer leurs tentatives synthétiques ; la recette Cloudflare conserve toutes ses tentatives et réservations après nettoyage. Aucun remboursement n’existe dans la purge produit.
 
 ## Persistance et nettoyage
 
@@ -62,11 +64,11 @@ La migration `0008_manual_listings.sql` ajoute le mode de création et le manife
 pnpm imports:cleanup
 ```
 
-Cette commande opérateur agit seulement sur D1/R2 **locaux**, traite au plus 30 imports expirés, échoués ou abandonnés par passage, puis peut être relancée. Elle passe l’import en suppression, efface les clés journalisées puis les métadonnées. Une écriture tardive ne peut pas republier un import supprimé. Tout job référençant l’annonce, même terminé, protège ses fichiers ; la politique de purge des jobs viendra avec le pipeline. Aucun compteur de tentatives n’est remis à zéro. La purge périodique hébergée reste à brancher avant exploitation ; la date affichée ne signifie pas qu’un cron distant est déjà actif.
+Cette commande opérateur agit seulement sur D1/R2 **locaux**, traite au plus 30 imports expirés, échoués ou abandonnés par passage, puis peut être relancée. Elle passe l’import en suppression, efface les clés journalisées puis les métadonnées. Une écriture tardive ne peut pas republier un import supprimé. Tout job référençant l’annonce, même terminé, protège ses fichiers ; la politique de purge des jobs viendra avec le pipeline. Aucun compteur de tentatives n’est remis à zéro. Sur Cloudflare, le même traitement est branché au cron toutes les dix minutes et à une route opérateur authentifiée ; voir la recette distante.
 
 Les fichiers d’import ne sont pas directement acceptés comme médias de rendu : `RenderManifest` conserve son préfixe de job. Le sprint du pipeline devra copier les photos retenues vers des clés propres au job et vérifier leurs empreintes.
 
-## API locale
+## API locale et Cloudflare
 
 | Route | Résultat |
 |---|---|
@@ -106,10 +108,26 @@ Trois URL fixes, trois photos maximum par annonce, une tentative sans relance. D
 
 `pnpm exec tsx scripts/probe-import-descriptions.ts --real` vérifie seulement l’extraction des descriptions sur ces trois pages publiques, une tentative chacune, sans télécharger de photos. Les textes complets restent hors Git dans `evidence/local/sprint-03/descriptions/`. Le rapport partageable contient les tailles, la provenance et les empreintes, pas les descriptions intégrales. Cette sonde ne vérifie ni la persistance ni Cloudflare ; la recette HTTP sur fixtures couvre séparément la sauvegarde et la relecture locales.
 
-## Cloudflare : vérification restante
+## Cloudflare : configuration et exploitation
 
-La vérification d’un DNS suivie d’un `fetch` par nom ne démontre pas une protection contre le DNS rebinding. Les guardrails Browser Run contrôlent des domaines ; cette documentation ne constitue pas une preuve d’épinglage des IP. `resolveOverride` a des restrictions de zone et le `fetch` Worker ne permet pas simplement de remplacer le nom par l’IP. Voir la [décision de transport](adr/0002-import-local-et-egress.md).
+Le portage utilise `apps/importer` et `apps/pipeline/wrangler.import.jsonc`, conformément à l'[ADR 0003](adr/0003-transport-import-cloudflare.md). La configuration staging ignorée cible `bienvu-import-staging`, D1/R2 existants, une instance `basic`, sommeil 30 s. `IMPORT_TOKEN` est un secret aléatoire commun au web et au service ; `PROBE_TOKEN` opérateur est distinct. Le web possède le Service Binding `IMPORT_SERVICE`, `IMPORT_MODE=cloudflare` et son origine HTTPS exacte. Le mode local reste strictement réservé au loopback.
 
-Le module `apps/pipeline/src/import-browser.ts` prépare un fallback avec fermeture systématique, `waitUntil` en cas de lancement tardif, blocage des service workers/WebSocket et interception des requêtes. Il exige un transport sûr injecté ; les routes ne sont jamais poursuivies par `route.continue()` ou `route.fetch()`. Il n’est **pas activé** dans l’application. Ses tests de cycle de vie utilisent un navigateur factice, pas Browser Run.
+La préparation `scripts/prepare-staging.mjs` accepte `BIENVU_STAGING_TARGET=imports` et `BIENVU_IMPORTS_ENABLED=true`, avec `BIENVU_WORKERS_PLAN=paid`. Préparer séparément le web en conservant origine, client Google, expéditeur et destinataire existants. Ne pas régénérer la configuration du renderer en pause pour déployer l'importeur. Appliquer les migrations manquantes, puis déployer le service avant le web. Utiliser `wrangler deploy --secrets-file` pour ajouter les secrets sans remplacer ceux d'authentification. Après un changement du code web, refaire `pnpm build:web`.
 
-Avant activation distante : démontrer un transport compatible Cloudflare qui applique les contrôles à la connexion effective et aux redirections ; fournir un décodage raster borné dans ce runtime ; tester une page contrôlée avec DNS rebinding, IPv4/IPv6 privés, sous-requêtes, nouvelles navigations, popups et redirections d’images ; vérifier fermeture réelle Browser Run sur succès/exception/timeout et coût ; migrer le staging, brancher la purge et refaire la recette de trois annonces avec relecture R2 privée. En attendant, pages uniquement JavaScript et destinations non prouvées sont refusées. Un abonnement Workers Paid seul ne résout pas cette frontière réseau.
+La migration `0009` crée le registre mensuel, fermé par défaut. La base inclut **toutes les autres dépenses et provisions du mois**, pas seulement Workers. Réservation 0,50 € par import avant ressource payante, 48 ressources/50 Mio maximum, échecs conservés. Un slot Browser Run, une seule tentative par dossier ; tous les accès autorisés passent par le transport épinglé, jamais `route.fetch()`/`continue()`. Les tests réseau injectés restent distincts des vrais refus distants.
+
+```sh
+# OAuth Wrangler existant ; aucune valeur secrète dans les arguments.
+pnpm exec wrangler whoami
+node scripts/import-operator.mjs state
+node scripts/import-operator.mjs pause
+# Après rapprochement : montants en centimes, plafond <= 2500 ; met en pause.
+node scripts/import-operator.mjs budget 1650 2500
+node scripts/import-operator.mjs resume
+```
+
+Ces commandes ciblent uniquement les ressources de staging connues. `pause` arrête aussi le conteneur d'import. `resume` exige un mois configuré et au moins 0,50 € disponible. Elles ne réinitialisent aucun compteur. L'état indique une alerte à 20 € de provisions ; la coupure à 25 € laisse 5 € sur l'enveloppe de 30 €. Un mois nouveau exige un nouveau rapprochement explicite. La facture fournisseur reste une vérification séparée.
+
+Les sondes `scripts/probe-import-cloudflare.mjs` sont **réelles et payantes potentiellement**, réservées à une campagne bornée : `fixtures`, `gates`, `operator <cas>`, `import <agence|javascript>`, `manual`, `status`. Elles refusent de relancer un cas déjà enregistré. Les étapes utilisant des comptes nécessitent les seules fixtures `probe-accounts --remote --keep-fixtures`. Les cas opérateur exigent temporairement `IMPORT_PROBES_ENABLED=true` ; ce drapeau est désactivé après recette. Ne pas effacer les réservations R2/D1 pour recommencer.
+
+La purge se vérifie via `scripts/probe-import-purge.mjs seed`, puis `verify` après un passage du cron, et `cleanup` avant suppression des comptes de recette. Le seed crée exclusivement un import antidaté et un job synthétiques, jamais un rendu ; il conserve sa tentative au registre. Les contenus source complets, captures et fichiers de recette restent dans `evidence/remote/`, hors Git.

@@ -79,7 +79,7 @@ test('imports : D1 et R2 réels en local, aucune génération ni consommation de
     // Midi UTC évite de franchir un jour de quota avec +700 s près de minuit.
     const tomorrow = Date.parse(`${new Date(now + 2 * 86400_000).toISOString().slice(0, 10)}T12:00:00.000Z`);
     const attempts = await Promise.allSettled(['b', 'c', 'd', 'e', 'f', 'g', 'h'].map(a => beginImport(DB, a, source, `quota-key-fixture-${a}`, tomorrow)));
-    assert.equal(attempts.filter(x => x.status === 'fulfilled').length, 5);
+    assert.equal(attempts.filter(x => x.status === 'fulfilled').length, 5, attempts.map(x => x.status === 'fulfilled' ? 'accepted' : String(x.reason)).join(', '));
     for (const outcome of attempts) if (outcome.status === 'fulfilled') {
       const row = outcome.value.row; await failImport(DB, row.agencyId, row.id, 'NOT_A_LISTING', {});
       await purgeImport(env, row.agencyId, row.id, tomorrow + 600_000);

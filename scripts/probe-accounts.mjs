@@ -6,26 +6,40 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import sharp from 'sharp';
 import {localSecret} from './probe-common.mjs';
+import {createRequire} from 'node:module';
+import {pathToFileURL} from 'node:url';
+import {remoteSql} from './cloudflare-operator.mjs';
 
 const run = promisify(execFile), root = process.cwd(), web = resolve(root, 'apps/web');
-const base = 'http://localhost:8787', folder = resolve(root, 'evidence/local/sprint-02');
+const remote = process.argv.includes('--remote');
+const base = remote ? 'https://bienvu.online' : 'http://localhost:8787';
+const folder = resolve(root, remote ? 'evidence/remote/sprint-02-acceptance' : 'evidence/local/sprint-02');
+const config = JSON.parse(await readFile(resolve(web, remote ? 'wrangler.staging.jsonc' : 'wrangler.jsonc'), 'utf8'));
+if (remote) {
+  assert.equal(config.name, 'bienvu-web-probe-staging');
+  assert.equal(config.vars.BETTER_AUTH_URL, base);
+  assert.equal(config.vars.AUTH_EMAIL_VERIFICATION_BYPASS, 'false');
+  assert.equal(config.d1_databases[0].database_id, '0219384e-d439-4421-840e-32c551afdb0d');
+}
+const scope = remote ? ['--remote', '--config', 'wrangler.staging.jsonc'] : ['--local'];
 const fixturePath = resolve(folder, 'accounts-fixture.json');
 await mkdir(folder, {recursive: true});
 const sqlQuote = value => `'${String(value).replaceAll("'", "''")}'`;
 async function sql(statement) {
+  if (remote) return remoteSql(statement);
   const path = resolve(folder, `${randomUUID()}.sql`);
   await writeFile(path, statement, {mode: 0o600});
   try {
-    const {stdout} = await run('pnpm', ['exec', 'wrangler', 'd1', 'execute', 'DB', '--local', '--file', path, '--json'], {cwd: web, maxBuffer: 2 * 1024 * 1024});
+    const {stdout} = await run('pnpm', ['exec', 'wrangler', 'd1', 'execute', 'DB', ...scope, '--file', path, '--json'], {cwd: web, maxBuffer: 2 * 1024 * 1024});
     const results = JSON.parse(stdout);
     return results.at(-1)?.results ?? [];
-  } catch {throw new Error('Échec D1 local ; détails masqués car le fichier peut contenir des sessions synthétiques.');}
+  } catch {throw new Error('Échec D1 de recette ; détails sensibles masqués.');}
   finally {await unlink(path);}
 }
 async function cleanup(users) {
   const ids = users.map(u => {assert.match(u.id, /^[0-9a-f-]{36}$/); return sqlQuote(u.id);}).join(',');
   const assets = await sql(`SELECT object_key FROM media_assets WHERE agency_id IN (SELECT id FROM agencies WHERE owner_user_id IN (${ids}));`);
-  for (const {object_key: key} of assets) await run('pnpm', ['exec', 'wrangler', 'r2', 'object', 'delete', `bienvu-probes-local/${key}`, '--local'], {cwd: web});
+  for (const {object_key: key} of assets) await run('pnpm', ['exec', 'wrangler', 'r2', 'object', 'delete', `${config.r2_buckets[0].bucket_name}/${key}`, ...scope], {cwd: web});
   await sql(`UPDATE agencies SET logo_asset_id=NULL WHERE owner_user_id IN (${ids});
     DELETE FROM media_assets WHERE agency_id IN (SELECT id FROM agencies WHERE owner_user_id IN (${ids}));
     DELETE FROM agency_write_limits WHERE owner_user_id IN (${ids});
@@ -35,27 +49,49 @@ async function cleanup(users) {
 }
 if (process.argv.includes('--cleanup')) {
   const {users} = JSON.parse(await readFile(fixturePath, 'utf8'));
-  await cleanup(users); await unlink(fixturePath); console.log('Comptes et logos synthétiques locaux supprimés.'); process.exit(0);
+  await cleanup(users); await unlink(fixturePath); console.log('Comptes et logos synthétiques de recette supprimés.'); process.exit(0);
 }
-const secret = await localSecret('apps/web/.dev.vars', 'BETTER_AUTH_SECRET');
-const users = ['A', 'B'].map(label => ({id: randomUUID(), label, token: randomBytes(32).toString('hex')}));
-const cookie = user => `bienvu.session_token=${encodeURIComponent(`${user.token}.${createHmac('sha256', secret).update(user.token).digest('base64')}`)}`;
+const secret = remote ? '' : await localSecret('apps/web/.dev.vars', 'BETTER_AUTH_SECRET');
+const users = ['A', 'B'].map(label => ({id: randomUUID(), label, token: randomBytes(32).toString('hex'), password: randomBytes(24).toString('base64url'), cookie: ''}));
+const cookie = user => remote ? user.cookie : `bienvu.session_token=${encodeURIComponent(`${user.token}.${createHmac('sha256', secret).update(user.token).digest('base64')}`)}`;
 async function seedSession(user) {
   const now = Date.now();
   await sql(`INSERT INTO auth_session(id,expiresAt,token,createdAt,updatedAt,userId) VALUES(${sqlQuote(randomUUID())},${now + 3600000},${sqlQuote(user.token)},${now},${now},${sqlQuote(user.id)});`);
 }
-const report = {at: new Date().toISOString(), mode: 'local-workerd-d1-r2', identities: 'synthetic-direct-d1-fixtures', googleOAuth: 'not-tested', externalCalls: 0, checks: []};
+const report = {at: new Date().toISOString(), origin: base, mode: remote ? 'cloudflare-real-workers-d1-r2' : 'local-workerd-d1-r2', identities: 'synthetic-direct-d1-fixtures', googleOAuth: 'prior-human-success-plus-negative-cases', emailDelivery: 'not-tested-no-email-requested', checks: []};
 function checked(name) {report.checks.push(name); console.log(`✓ ${name}`);}
 async function request(path, user, method = 'GET', body, headers = {}) {
-  return fetch(new URL(path, base), {method, redirect: 'manual', headers: {origin: base, ...(user ? {cookie: cookie(user)} : {}), ...headers},
+  return fetch(new URL(path, base), {method, redirect: 'manual', signal: AbortSignal.timeout(30_000), headers: {origin: base, ...(user ? {cookie: cookie(user)} : {}), ...headers},
     ...(body !== undefined ? {body: typeof body === 'string' || body instanceof Uint8Array ? body : JSON.stringify(body)} : {})});
 }
 async function json(path, user) {const response = await request(path, user); assert.equal(response.status, 200, path); return response.json();}
+async function login(user) {
+  const response = await request('/api/auth/sign-in/email', null, 'POST', {email: user.email, password: user.password}, {'Content-Type': 'application/json'});
+  assert.equal(response.status, 200, 'Connexion du compte synthétique');
+  const setCookie = response.headers.get('set-cookie') ?? '';
+  assert.match(setCookie, /Secure/); assert.match(setCookie, /HttpOnly/); assert.match(setCookie, /SameSite=Lax/i);
+  user.cookie = setCookie.split(';')[0]; assert.ok(user.cookie);
+}
 let keep = false;
+// Persist the exact fixture IDs before any remote write, including a failed recipe.
+for (const user of users) user.email = `${user.id}@example.invalid`;
+if (remote) {
+  try {await readFile(fixturePath); throw new Error('FIXTURE_EXISTS: nettoyer la recette existante avant de relancer');}
+  catch(error) {if (error.code !== 'ENOENT') throw error;}
+}
+if (remote) await writeFile(fixturePath, JSON.stringify({users, base}, null, 2), {mode: 0o600});
 try {
   const now = Date.now();
-  await sql(users.map(u => `INSERT INTO auth_user(id,name,email,emailVerified,createdAt,updatedAt) VALUES(${sqlQuote(u.id)},${sqlQuote(`Agence synthétique ${u.label}`)},${sqlQuote(`${u.id}@example.com`)},1,${now},${now});`).join('\n'));
-  for (const user of users) await seedSession(user);
+  await sql(users.map(u => `INSERT INTO auth_user(id,name,email,emailVerified,createdAt,updatedAt) VALUES(${sqlQuote(u.id)},${sqlQuote(`Agence synthétique ${u.label}`)},${sqlQuote(u.email)},1,${now},${now});`).join('\n'));
+  if (remote) {
+    const require = createRequire(resolve(web, 'package.json'));
+    const {hashPassword} = await import(pathToFileURL(require.resolve('better-auth/crypto')).href);
+    for (const user of users) {
+      const hash = await hashPassword(user.password);
+      await sql(`INSERT INTO auth_account(id,accountId,providerId,userId,password,createdAt,updatedAt) VALUES(${sqlQuote(randomUUID())},${sqlQuote(user.id)},'credential',${sqlQuote(user.id)},${sqlQuote(hash)},${now},${now});`);
+      await login(user);
+    }
+  } else for (const user of users) await seedSession(user);
   const [a,b] = users;
   assert.equal((await request('/api/me')).status, 401);
   assert.equal((await request('/api/agency', null, 'PUT', {}, {'Content-Type': 'application/json'})).status, 401);
@@ -101,6 +137,18 @@ try {
   assert.equal((await request('/api/agency/logo', a, 'POST', new Uint8Array(2 * 1024 * 1024 + 1), {'Content-Type': 'image/png'})).status, 413);
   assert.equal((await json('/api/me', a)).agency.logoAssetId, logo2);
   checked('SVG déguisé, fichier tronqué et dépassement de poids refusés sans remplacer le logo');
+  if (remote) {
+    const max = await sharp({create: {width: 1024, height: 1024, channels: 4, background: '#619C90'}}).png().toBuffer();
+    const started = performance.now();
+    const large = await request('/api/agency/logo', b, 'POST', max, {'Content-Type': 'image/png'});
+    assert.equal(large.status, 201);
+    report.maxLogo = {width: 1024, height: 1024, bytes: max.length, wallMs: Math.round(performance.now() - started), status: large.status};
+    const tooWide = await sharp({create: {width: 1025, height: 16, channels: 4, background: '#619C90'}}).png().toBuffer();
+    assert.equal((await request('/api/agency/logo', b, 'POST', tooWide, {'Content-Type': 'image/png'})).status, 422);
+    await writeFile(resolve(folder, 'logo-ui.png'), png);
+    await writeFile(resolve(folder, 'logo-ui.jpg'), jpeg);
+    checked('Logo au plafond de 1024 px décodé sur Workers, dimension supérieure refusée');
+  }
   assert.equal((await request('/api/auth/sign-in/social', null, 'POST', {provider: 'google', callbackURL: 'https://evil.example.com'}, {'Content-Type': 'application/json'})).status, 422);
   assert.equal((await request('/api/auth/sign-in/email', null, 'POST', {}, {'Content-Type': 'application/json'})).status, 422);
   assert.equal((await request('/api/auth/get-access-token', a, 'POST', {}, {'Content-Type': 'application/json'})).status, 404);
@@ -113,17 +161,27 @@ try {
   assert.equal(signOut.status, 200); assert.match(signOut.headers.get('Set-Cookie') ?? '', /Max-Age=0/);
   assert.equal((await request('/api/me', a)).status, 401);
   checked('Déconnexion réelle, cookie expiré dans la réponse et session révoquée en D1');
+  if (remote) {
+    await login(a); assert.equal((await json('/api/me', a)).agency.id, firstA.agency.id);
+    checked('Reconnexion e-mail HTTP réelle du compte synthétique, agence inchangée');
+    for (const path of ['/api/auth/callback/google', '/api/auth/callback/google?error=access_denied', '/api/auth/callback/google?state=forged&code=fixture']) {
+      const rejected = await request(path); assert.equal(rejected.status, 302);
+      assert.equal(new URL(rejected.headers.get('location')).pathname, '/connexion');
+      assert.ok(!rejected.headers.get('set-cookie')?.includes('__Secure-bienvu.session_token='));
+    }
+    checked('Callbacks OAuth sans état, annulé et rejoué refusés sans session');
+  }
   const agencies = (await sql(`SELECT id FROM agencies WHERE owner_user_id IN (${users.map(u=>sqlQuote(u.id)).join(',')})`)).map(a=>sqlQuote(a.id)).join(',');
   for (const table of ['allocations','jobs','cost_events']) assert.equal((await sql(`SELECT count(*) n FROM ${table} WHERE agency_id IN (${agencies});`))[0].n, 0);
   checked('Aucune allocation, génération ni consommation créée par la marque');
   if (process.argv.includes('--keep-fixtures')) {
-    a.token = randomBytes(32).toString('hex'); await seedSession(a);
+    if (!remote) {a.token = randomBytes(32).toString('hex'); await seedSession(a);}
     await writeFile(fixturePath, JSON.stringify({users, cookie: cookie(a), base}, null, 2), {mode: 0o600});
-    keep = true; checked('Fixtures locales conservées temporairement pour inspection UI, secret hors Git');
+    keep = true; checked('Fixtures conservées temporairement pour inspection UI, secrets hors Git');
   }
   report.passed = true;
 } finally {
-  if (!keep) {await cleanup(users); report.cleaned = true;}
+  if (!keep) {await cleanup(users); report.cleaned = true; if (remote) await unlink(fixturePath).catch(() => {});}
   await writeFile(resolve(folder, 'accounts-workerd.json'), JSON.stringify(report, null, 2));
 }
-console.log('Sonde comptes terminée ; Google OAuth réel reste à vérifier.');
+console.log('Sonde comptes terminée ; identités synthétiques explicitement distinctes de la connexion Google humaine.');

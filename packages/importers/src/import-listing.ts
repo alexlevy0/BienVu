@@ -3,7 +3,7 @@ import {extractListingHtml} from './listing';
 import {IMPORT_LIMITS, publicUrl, scopedUrl, sourcePolicy, type ImportTransport} from './network';
 
 export type ImportDiagnostics = {durationMs: number; resources: number; sourceBytes: number; storedBytes: number;
-  rejected: Array<{order: number; reason: string}>; duplicatePhotos: number; mode: 'local'; browserUsed: boolean};
+  rejected: Array<{order: number; reason: string}>; duplicatePhotos: number; mode: 'local' | 'cloudflare'; browserUsed: boolean};
 export async function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
   signal.throwIfAborted();
   let onAbort: () => void = () => {};
@@ -15,12 +15,12 @@ export async function importListing(url: string, context: {agencyId: string; imp
   transport: ImportTransport;
   store(photo: NormalizedListing['photos'][number], bytes: Uint8Array<ArrayBuffer>, signal: AbortSignal): Promise<void>;
   browserHtml?: (url: string, signal: AbortSignal) => Promise<string>;
-}, options: {signal?: AbortSignal; maxPhotos?: number} = {}) {
+}, options: {signal?: AbortSignal; maxPhotos?: number; mode?: 'local' | 'cloudflare'} = {}) {
   const start = Date.now(), timeout = AbortSignal.timeout(IMPORT_LIMITS.durationMs);
   const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
   const agencyId = EntityId.parse(context.agencyId), id = EntityId.parse(context.importId), source = publicUrl(url).href;
   const policy = sourcePolicy(source);
-  const diagnostics: ImportDiagnostics = {durationMs: 0, resources: 0, sourceBytes: 0, storedBytes: 0, rejected: [], duplicatePhotos: 0, mode: 'local', browserUsed: false};
+  const diagnostics: ImportDiagnostics = {durationMs: 0, resources: 0, sourceBytes: 0, storedBytes: 0, rejected: [], duplicatePhotos: 0, mode: options.mode ?? 'local', browserUsed: false};
   // Une récupération échouée garde sa réservation : ses octets ne sont pas
   // toujours mesurables (flux interrompu ou image indécodable).
   let byteBudgetUsed = 0;

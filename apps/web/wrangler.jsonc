@@ -1,7 +1,7 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "bienvu-web-probe-local",
-  "main": ".open-next/worker.js",
+  "main": "worker.ts",
   "compatibility_date": "2026-09-27",
   "compatibility_flags": [
     "nodejs_compat"
@@ -52,5 +52,11 @@
       "enabled": true,
       "head_sampling_rate": 0.01
     }
-  }
+  },
+  "services": [
+    {
+      "binding": "IMPORT_SERVICE",
+      "service": "bienvu-import-local"
+    }
+  ]
 }

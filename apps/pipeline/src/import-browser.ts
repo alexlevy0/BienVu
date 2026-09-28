@@ -2,11 +2,12 @@ import type {BrowserEndpoint} from '@cloudflare/playwright';
 import {ImportFailure} from '@bienvu/contracts';
 import {abortable, IMPORT_LIMITS, scopedUrl, sourcePolicy, type ImportTransport} from '@bienvu/importers';
 
-// Point de reprise pour Browser Run. Aucune route publique ne l'active dans cette
-// tranche locale. Un transport garantissant l'IP épinglée est obligatoire.
+// Le service d'import réserve le budget et le slot avant cet appel. Tout accès
+// réseau du navigateur passe par le transport à IP épinglée, sans credentials.
 export async function withImportBrowser<B extends {close(): Promise<void>}, T>(open: () => Promise<B>,
   task: (browser: B, signal: AbortSignal) => Promise<T>, waitUntil: (promise: Promise<unknown>) => void,
   signal = AbortSignal.timeout(60_000)): Promise<T> {
+  signal.throwIfAborted();
   let browser: B | undefined;
   const pending = open();
   try {
@@ -41,7 +42,9 @@ export async function guardedBrowserHtml(binding: BrowserEndpoint, url: string, 
         if (!['document', 'script', 'xhr', 'fetch'].includes(kind) || request.frame() !== page.mainFrame()) throw new Error('RESOURCE_REFUSED');
         // Jamais route.continue()/route.fetch() : le navigateur ne résout pas
         // lui-même une destination issue de l'annonce ni ne suit une redirection.
-        const resource = await transport.load(request.url(), kind === 'document' ? 'page' : 'asset', hosts, abort);
+        const remaining = Math.min(IMPORT_LIMITS.htmlBytes, IMPORT_LIMITS.totalBytes - bytes);
+        if (remaining <= 0) throw new Error('BODY_LIMIT');
+        const resource = await transport.load(request.url(), kind === 'document' ? 'page' : 'asset', hosts, abort, remaining);
         scopedUrl(resource.url, hosts); bytes += resource.sourceBytes;
         if (resource.bytes.length > IMPORT_LIMITS.htmlBytes || bytes > IMPORT_LIMITS.totalBytes) throw new Error('BODY_LIMIT');
         if (resource.url !== request.url()) await route.fulfill({status: 302, headers: {location: resource.url}, body: ''});

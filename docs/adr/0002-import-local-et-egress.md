@@ -1,6 +1,6 @@
 # ADR 0002 — Import fonctionnel local, transport Cloudflare fermé
 
-Date : 28 septembre 2026. Statut : retenu pour la tranche locale du sprint 03 ; choix du transport de production non arrêté.
+Date : 28 septembre 2026. Statut : décision historique de la tranche locale ; **complétée pour l'hébergement par l'[ADR 0003](0003-transport-import-cloudflare.md)** après recette Cloudflare le même jour. Les réserves ci-dessous décrivent l'état avant ce portage.
 
 ## Contexte
 
@@ -21,4 +21,4 @@ Le fallback Browser Run préparé requiert le même contrat de transport sûr et
 
 ## Conséquences
 
-Le parcours local, les imports réels depuis le Mac, D1/R2 privés, l’isolation et la purge peuvent être livrés et mesurés. La recette ne prouve pas l’accès depuis Cloudflare, l’hydratation JavaScript ni la consommation CPU du décodage dans Workers. Ces points restent explicitement ouverts dans [IMPORTS.md](../IMPORTS.md#cloudflare--vérification-restante), sans publier une fausse réussite de sécurité. La contrainte Cloudflare ne change pas ; le pont local n’est pas une architecture de production implicite.
+Le parcours local, les imports réels depuis le Mac, D1/R2 privés, l’isolation et la purge peuvent être livrés et mesurés. La recette ne prouve pas l’accès depuis Cloudflare, l’hydratation JavaScript ni la consommation CPU du décodage dans Workers. Ces points restent explicitement ouverts dans [IMPORTS.md](../IMPORTS.md#cloudflare--configuration-et-exploitation), sans publier une fausse réussite de sécurité. La contrainte Cloudflare ne change pas ; le pont local n’est pas une architecture de production implicite.

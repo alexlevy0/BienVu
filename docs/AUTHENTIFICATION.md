@@ -2,7 +2,7 @@
 
 ## Ce qui fonctionne localement
 
-Better Auth **1.7.6** utilise le binding D1 natif, sans ORM supplémentaire. Les sessions, l’agence unique par propriétaire, les réglages et les logos privés fonctionnent dans le build OpenNext exécuté par workerd. Les tests injectent des identités synthétiques dans D1 : **ils ne prouvent pas une connexion réussie à Google**. Aucun compte Google réel n’a été utilisé pendant cette tranche.
+Better Auth **1.7.6** utilise le binding D1 natif, sans ORM supplémentaire. Les sessions, l’agence unique par propriétaire, les réglages et les logos privés fonctionnent dans le build OpenNext exécuté par workerd. Les tests injectent des identités synthétiques dans D1 : **ils ne prouvent pas une connexion réussie à Google**. Séparément, le 28/09/2026, Alex a renseigné les identifiants OAuth dans `.dev.vars`, repris `pnpm preview` et confirmé une connexion Google réelle réussie en local. Après activation sur Cloudflare à sa demande, il confirme aussi la connexion et le retour à son agence sur le Worker de staging. [Rapport de cette recette réelle](preuves/sprint-02/GOOGLE-CLOUDFLARE.md).
 
 **Alex a demandé le 28/09/2026 la connexion e-mail/mot de passe en plus de Google.** Better Auth/D1 reste le choix technique retenu. L’inscription, la confirmation, la connexion et la réinitialisation sont implémentées. Le transport est le binding Cloudflare Email Service. Après les essais locaux, Alex a activé Workers Paid et acheté `bienvu.online` ; la recette distante décrite ci-dessous utilise ces ressources.
 
@@ -90,7 +90,31 @@ Pour la recette workerd locale, utiliser exactement :
 
 Dans **`apps/web/.dev.vars`**, compléter `GOOGLE_CLIENT_ID` et `GOOGLE_CLIENT_SECRET`. Conserver le `BETTER_AUTH_SECRET` aléatoire créé par `pnpm setup:local` ; minimum 32 caractères. Ne pas mettre ces secrets dans une variable `NEXT_PUBLIC_*`, une commande enregistrée dans l’historique, Git ou une conversation. Le modèle sans valeurs sensibles est `.dev.vars.example`. Redémarrer `pnpm preview` après modification. Le bouton Google reste désactivé quand ses identifiants sont absents. Le callback doit correspondre au client déclaré ; voir [l’intégration Google de Better Auth](https://better-auth.com/docs/authentication/google).
 
-La recette restante doit utiliser deux comptes de test distincts : connexion et consentement, retour `/agence`, rechargement, changement d’identité, déconnexion, reconnexion avec la même agence et refus d’accès au logo de l’autre. Vérifier aussi annulation du consentement, callback rejoué, état absent/cookie absent et absence de jetons dans réponses/journaux. Ne pas conserver de codes OAuth, cookies ni captures contenant des données personnelles dans les preuves versionnées.
+Un parcours de connexion réel est confirmé par Alex en local puis sur Cloudflare, avec son agence retrouvée. La recette complémentaire doit documenter deux comptes de test distincts : rechargement, changement d’identité, déconnexion, reconnexion et refus d’accès au logo de l’autre. Compléter aussi les scénarios Google ↔ mot de passe, l’annulation du consentement, le callback rejoué, l’état absent/cookie absent et l’absence de jetons dans réponses/journaux. Ces scénarios ne sont pas déduits de la seule confirmation de connexion. Ne pas conserver de codes OAuth, cookies ni captures contenant des données personnelles dans les preuves versionnées.
+
+### Google sur le Worker de staging
+
+Première activation réalisée le 28/09/2026 à la demande d'Alex, version `bdff9a5d-e1a8-4aba-a5b7-d56e4deaaa03`, sur `https://bienvu-web-probe-staging.alexlevy0.workers.dev/connexion`. Le callback de cette recette était `https://bienvu-web-probe-staging.alexlevy0.workers.dev/api/auth/callback/google`. Le domaine utilisé désormais est décrit ci-dessous ; le rapport initial conserve ses URL historiques.
+
+`GOOGLE_CLIENT_ID` est renseigné dans les `vars` du fichier local ignoré `apps/web/wrangler.staging.jsonc`. `GOOGLE_CLIENT_SECRET` est ajouté à `apps/web/.dev.vars.staging` (0600, ignoré), puis envoyé comme secret Cloudflare avec `wrangler deploy --secrets-file`. Les secrets `BETTER_AUTH_SECRET` et `PROBE_TOKEN` de staging sont conservés ; ne pas les remplacer par leurs valeurs locales. Lors d'une nouvelle exécution de `prepare-staging.mjs`, fournir également `BIENVU_GOOGLE_CLIENT_ID` pour conserver l'activation Google.
+
+Les contrôles HTTP distants valident la configuration, l'URL Google, le callback, PKCE, le cookie d'état sécurisé et les refus d'accès. Alex a ensuite effectué lui-même la connexion Google et confirmé son agence retrouvée. Le bypass de vérification reste à `false`, les restrictions d'envoi d'e-mails sont préservées et les imports/générations restent suspendus.
+
+### Domaine bienvu.online
+
+Le domaine acheté par Alex est rattaché au **même Worker de test**, avec les mêmes comptes, agences, base D1 et bucket privé. Adresse de connexion : [bienvu.online/connexion](https://bienvu.online/connexion). Le service reste en développement ; ce rattachement n'ouvre pas les paiements, imports ou générations.
+
+Dans Google Auth Platform → Clients → le client Web BienVu, Alex a confirmé avoir ajouté :
+
+| Réglage | Valeur |
+|---|---|
+| Origine JavaScript | `https://bienvu.online` |
+| URI de redirection | `https://bienvu.online/api/auth/callback/google` |
+| `BETTER_AUTH_URL` distant | `https://bienvu.online` |
+
+Conserver les entrées locales et les anciennes entrées OAuth pour un éventuel retour arrière. Les identifiants Google restent identiques. `.dev.vars` garde son origine locale ; les cookies ne sont pas partagés entre localhost, workers.dev et bienvu.online, donc une reconnexion sur le nouveau domaine est nécessaire.
+
+`BIENVU_WEB_CUSTOM_DOMAIN=bienvu.online` prépare la route Wrangler `custom_domain: true`. Le nom doit correspondre exactement à l'origine HTTPS. La préparation désactive `workers_dev` et les URL de prévisualisation pour utiliser une seule adresse publique d'authentification. Cloudflare gère le DNS web et le certificat ; les DNS d'envoi d'e-mails sont conservés. Le point d'entrée `apps/web/worker.ts` réutilise OpenNext et redirige les requêtes HTTP distantes vers l'origine HTTPS configurée, tout en conservant le développement local en HTTP. [Rapport du raccordement et recette](preuves/sprint-02/DOMAINE-WEB.md).
 
 ## Staging, après reprise autorisée des essais distants
 
@@ -98,7 +122,7 @@ La recette restante doit utiliser deux comptes de test distincts : connexion et 
 
 Le précontrôle sans domaine (`docs/preuves/sprint-02/email-remote-preflight.json`) reste une preuve historique antérieure à l'achat. Le fichier DNS (`docs/preuves/sprint-02/bienvu.online-email-dns.txt`) est un relevé public daté, **à ne pas réimporter sur la zone désormais configurée**. Après une rotation DKIM, relire les valeurs actuelles auprès de Cloudflare.
 
-Le Worker existant `bienvu-web-probe-staging` héberge maintenant le parcours de comptes sur [son adresse de test](https://bienvu-web-probe-staging.alexlevy0.workers.dev/connexion). Version déployée : `84a0f420-90bc-4c34-89fc-fc72b3ebc1bf`. D1 `bienvu-s00-staging` et R2 privé `bienvu-s00-private` sont conservés. Les migrations `0001` à `0008` sont appliquées ; les imports et les générations restent désactivés. Le site n'a pas été rattaché à la racine `bienvu.online` dans cette recette d'envoi.
+Le Worker existant `bienvu-web-probe-staging` héberge le parcours de comptes, désormais sur [bienvu.online](https://bienvu.online/connexion). Version utilisée pour la recette e-mail historique sur workers.dev : `84a0f420-90bc-4c34-89fc-fc72b3ebc1bf`, remplacée ensuite par les versions Google puis domaine décrites ci-dessus. D1 `bienvu-s00-staging` et R2 privé `bienvu-s00-private` sont conservés. Les migrations `0001` à `0008` sont appliquées ; les imports et les générations restent désactivés. Le rattachement web à `bienvu.online` est postérieur à cette recette d'envoi.
 
 Le binding d'envoi est restreint à **un expéditeur et au seul destinataire confirmé**. Cette configuration de test ne permet pas l'ouverture des inscriptions au public. `AUTH_EMAIL_VERIFICATION_BYPASS=false` est imposé en staging ; le bypass local demandé par Alex reste actif uniquement sur le poste. Un secret Better Auth distinct du local a été créé, stocké avec les droits 0600 hors Git et transmis avec le déploiement. Les adresses personnelles, mots de passe, cookies et liens reçus restent hors des preuves versionnées.
 
@@ -112,13 +136,15 @@ Les deux messages ont été reçus **en boîte principale**, avec clic de confir
 BIENVU_STAGING_TARGET=web \
 BIENVU_D1_ID=0219384e-d439-4421-840e-32c551afdb0d \
 BIENVU_WORKERS_PLAN=paid \
-BIENVU_WEB_ORIGIN=https://bienvu-web-probe-staging.alexlevy0.workers.dev \
+BIENVU_WEB_ORIGIN=https://bienvu.online \
+BIENVU_WEB_CUSTOM_DOMAIN=bienvu.online \
+BIENVU_GOOGLE_CLIENT_ID='<identifiant du client Google existant>' \
 BIENVU_AUTH_EMAIL_FROM=connexion@bienvu.online \
 BIENVU_AUTH_EMAIL_TO='<adresse autorisée>' \
 node scripts/prepare-staging.mjs
 ```
 
-Remplacer le destinataire par l'adresse confirmée, sans l'enregistrer dans Git. `BIENVU_AUTH_EMAIL_TO` est optionnel pour une configuration future ouverte, mais obligatoire pour la sonde distante bornée. Sans expéditeur, le script désactive les mails ; sans origine HTTPS exacte, l'authentification reste fermée. Le mode Paid et l'adresse d'expéditeur sont validés. `send_email.remote` n'est pas copié dans le déploiement.
+Remplacer le destinataire par l'adresse confirmée, sans l'enregistrer dans Git, et fournir l'identifiant Google actuel. `BIENVU_AUTH_EMAIL_TO` est optionnel pour une configuration future ouverte, mais obligatoire pour la sonde distante bornée. Sans expéditeur, le script désactive les mails ; sans origine HTTPS exacte, l'authentification reste fermée. Omettre `BIENVU_WEB_CUSTOM_DOMAIN` uniquement pour revenir volontairement à workers.dev avec l'origine correspondante. Le mode Paid et l'adresse d'expéditeur sont validés. `send_email.remote` n'est pas copié dans le déploiement.
 
 ```sh
 pnpm build:web
@@ -133,7 +159,7 @@ Ces commandes modifient le staging lors des deux dernières étapes. Le fichier 
 
 ### Exécuter la recette réelle, en deux messages
 
-La sonde `scripts/probe-auth-email-remote.mjs` est séparée de la sonde locale. Elle vise uniquement ce Worker de staging, exige le destinataire unique du binding et refuse de remplacer un compte existant. Elle ne modifie jamais directement `emailVerified` en D1. La confirmation doit venir du message réellement reçu ; Alex choisit le mot de passe final dans le formulaire reçu, sans le communiquer à l'agent.
+La sonde `scripts/probe-auth-email-remote.mjs` est séparée de la sonde locale. Elle vise uniquement ce Worker de staging, sur ses deux adresses connues, exige le destinataire unique du binding et refuse de remplacer un compte existant. Elle refuse aussi de reprendre un état enregistré sur une autre origine : les preuves et cookies de l'ancienne recette workers.dev ne sont pas réutilisés sur bienvu.online. Elle ne modifie jamais directement `emailVerified` en D1. La confirmation doit venir du message réellement reçu ; Alex choisit le mot de passe final dans le formulaire reçu, sans le communiquer à l'agent.
 
 ```sh
 # Une seule fois, avec l'adresse déjà autorisée dans le binding :
@@ -153,7 +179,7 @@ L'état privé est `evidence/remote/auth-email/credentials.json` (0600, ignoré)
 
 ### Limites qui restent distinctes de l'envoi e-mail
 
-Google reste désactivé faute de client OAuth. Le callback distant à déclarer ultérieurement sera l'origine HTTPS retenue + `/api/auth/callback/google`. Consentement Google, liaison Google ↔ mot de passe, deux propriétaires réels et recette distante complète des logos restent à faire. Expiration et replay du reset sont couverts par les tests locaux, pas automatiquement par cette recette humaine de deux messages.
+La recette distante complémentaire est terminée : e-mail sur bienvu.online, mot de passe et Google avec même agence confirmés par Alex ; deux comptes synthétiques isolés, marque et logos réels dans Workers/R2, déconnexion/révocation et rechargement mobile. Expiration/rejeu du reset utilisent des jetons synthétiques dans le vrai service, sans altérer le compte d'Alex. [Rapport de clôture](preuves/sprint-02/RECETTE-DISTANTE.md). Le destinataire e-mail reste restreint : les inscriptions publiques ne sont pas encore ouvertes.
 
 Plafonds applicatifs : 50 messages/jour pour le service, 3 par adresse sur une fenêtre de 10 minutes, compteurs D1 atomiques et clés d'adresse HMACées. Ils s'ajoutent aux limites IP de Better Auth (5 connexions/mot de passe par minute, 3 inscriptions ou demandes de mail par minute). Les erreurs de livraison en arrière-plan ne divulguent pas l'existence du compte. Aucun renvoi automatique n'est mis en place. Les 3 000 e-mails mensuels inclus sont partagés au compte ; quota fournisseur constaté avant le test : 1 000/jour, zéro consommé. [Tarifs Cloudflare](https://developers.cloudflare.com/email-service/platform/pricing/) · [Budget du mois, domaine inclus](BUDGET-ET-OFFRES.md).
 

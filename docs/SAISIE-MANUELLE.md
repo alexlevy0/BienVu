@@ -2,9 +2,11 @@
 
 Décision d’Alex du **28 septembre 2026** : permettre la saisie d’un bien et l’ajout de ses photos, notamment lorsqu’un site ne peut pas être importé. Elle remplace l’exclusion initiale de ce parcours. L’import URL reste disponible ; aucun éditeur vidéo n’est ajouté.
 
-## Utilisation locale
+## Utilisation
 
-Après `pnpm db:migrate` et `pnpm build:web`, lancer `pnpm preview` et `pnpm dev:imports` dans deux terminaux. Se connecter sur `http://localhost:8787/generer`, puis cliquer sur **Saisir mon annonce manuellement** sous l’import URL.
+Sur Cloudflare : ouvrir [bienvu.online/generer](https://bienvu.online/generer) après connexion ; aucun serveur local nécessaire. Les plafonds de recette sont partagés avec les imports URL.
+
+En local : Après `pnpm db:migrate` et `pnpm build:web`, lancer `pnpm preview` et `pnpm dev:imports` dans deux terminaux. Se connecter sur `http://localhost:8787/generer`, puis cliquer sur **Saisir mon annonce manuellement** sous l’import URL.
 
 Renseigner le titre, le type de bien et la localisation, choisir vente ou location, puis ajouter si disponibles prix, surface, pièces et description. Un loyer renseigné exige de préciser si les charges sont comprises. Ajouter 3 à 12 photos du bien ; les aperçus permettent de retirer un fichier avant envoi. Le formulaire conserve les champs lorsqu’il est replié ou qu’un envoi échoue.
 
@@ -21,14 +23,14 @@ Renseigner le titre, le type de bien et la localisation, choisir vente ou locati
 ## API, persistance et reprise
 
 1. `POST /api/imports/manual`, JSON strict et `Idempotency-Key` : valide les champs et un manifeste de fichiers (MIME, taille, SHA-256 des octets originaux). Crée un dossier privé avec bail de 15 minutes, ou renvoie le même dossier pour la même clé/contenu. Un changement sous la même clé est refusé.
-2. `PUT /api/imports/:id/uploads/:index` : un fichier par requête, corps borné avant lecture complète. La session fixe l’agence ; taille, MIME et empreinte doivent correspondre au manifeste. Le fichier est décodé/réencodé par le service natif local authentifié, puis journalisé dans D1 avant écriture R2 privée. Les doublons normalisés sont refusés. Une reprise du même slot retrouve le fichier ou répare un `put` interrompu.
+2. `PUT /api/imports/:id/uploads/:index` : un fichier par requête, corps borné avant lecture complète. La session fixe l’agence ; taille, MIME et empreinte doivent correspondre au manifeste. Le fichier est décodé/réencodé par le service natif authentifié (pont local ou Container Cloudflare privé), puis journalisé dans D1 avant écriture R2 privée. Les doublons normalisés sont refusés. Une reprise du même slot retrouve le fichier ou répare un `put` interrompu.
 3. `POST /api/imports/:id/complete` : vérifie toutes les entrées et les métadonnées R2, puis publie l’annonce atomiquement. Les répétitions et la finalisation concurrente renvoient la même annonce. Les routes privées existantes servent le résultat et les photos.
 
 Toutes les mutations contrôlent session, origine et rattachement à l’agence. Aucun nom de fichier, identifiant d’agence, clé R2 ou URL de photo fourni par le client n’est utilisé comme chemin de stockage. Le champ `input_json` n’est pas exposé par les routes de consultation. L’API `head` de R2 permet la vérification avant publication sans recharger les corps ([documentation officielle](https://developers.cloudflare.com/r2/api/workers/workers-api-reference/), consultée le 28/09/2026).
 
 La migration `0008` ajoute `source_kind`, `input_json` et `input_hash`, une unicité par slot photo et des contrôles de publication. Pour conserver sans reconstruction destructive les colonnes SQL historiques `NOT NULL`, une absence de source est stockée comme chaîne vide dans ces seules colonnes ; le contrat/API expose `null`, jamais une URL inventée. Les anciennes lignes restent de type `url`.
 
-Un dossier partiel n’est pas une annonce publiée. Un échec réseau garde la clé d’idempotence tant que le formulaire est ouvert et inchangé : réessayer reprend les fichiers déjà reçus. Après rechargement de page, les fichiers locaux doivent être sélectionnés à nouveau et une nouvelle saisie est créée. Les dossiers abandonnés sont purgés par `pnpm imports:cleanup` après leur bail et cinq minutes de grâce. Tout job référençant une annonce en empêche la purge. Les compteurs de tentative persistent après purge produit.
+Un dossier partiel n’est pas une annonce publiée. Un échec réseau garde la clé d’idempotence tant que le formulaire est ouvert et inchangé : réessayer reprend les fichiers déjà reçus. Après rechargement de page, les fichiers locaux doivent être sélectionnés à nouveau et une nouvelle saisie est créée. Les dossiers abandonnés sont purgés par le cron Cloudflare, ou `pnpm imports:cleanup` en local, après leur bail et cinq minutes de grâce. Tout job référençant une annonce en empêche la purge. Les compteurs de tentative persistent après purge produit.
 
 ## Validation et limites d’hébergement
 
@@ -36,8 +38,7 @@ Un dossier partiel n’est pas une annonce publiée. Un échec réseau garde la 
 
 Avec preview au port 8787 et aucun pont sur 8791, `pnpm probe:imports --manual --keep` teste les vraies routes HTTP et conserve temporairement les seuls comptes de recette pour inspection. `node scripts/open-local-fixture.mjs --imports` ouvre leur session ; `pnpm exec tsx scripts/serve-imports.ts --fixtures` permet ensuite l’upload dans le navigateur sans récupération externe. Finir par `pnpm probe:imports --cleanup`, arrêter le pont de fixtures et relancer `pnpm dev:imports` pour l’usage normal.
 
-Le décodage utilise actuellement le pont **Node local** déjà présent pour les imports, avec une route binaire authentifiée `/normalize-photo`. Le Worker n’embarque pas Sharp. Le mode local et l’origine localhost sont exigés par les trois routes ; staging demeure fermé. Aucune compatibilité du décodage hébergé, mesure CPU/facture ou purge périodique Cloudflare n’est déduite des tests locaux. Aucune dépense ou infrastructure supplémentaire autorisée par cette extension.
-
+Le décodage hébergé utilise désormais un Container Cloudflare privé, sans Sharp dans le Worker. La recette distante vérifie les trois uploads, la reprise, la publication, la description et la consultation privée avec deux agences synthétiques ; aucune preuve de compatibilité d'un site n'en est déduite. [Rapport et limites](preuves/sprint-03/CLOUDFLARE.md).
 ### Base de recette isolée
 
 Si le quota technique de la base habituelle est atteint, ne pas remettre ses compteurs à zéro pour une sonde. Arrêter la preview habituelle et utiliser un répertoire local séparé :

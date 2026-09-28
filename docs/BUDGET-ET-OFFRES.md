@@ -73,7 +73,13 @@ Le rapport sépare coût marginal estimé, coût après allocations disponibles 
 
 **Ces contrôles ne constituent pas une garantie de plafond de facture fournisseur.** Une consommation déjà engagée, des données de facturation retardées ou du trafic extérieur peuvent dépasser les estimations. Le plafond de 30 € impose aussi le suivi des comptes, les limites réellement disponibles chez les fournisseurs et l'arrêt des tests à temps. Ne pas confondre alerte budgétaire et coupure automatique.
 
-**Sprint 03 local, 28/09/2026 :** limite conservatrice supplémentaire de 5 tentatives d’import par jour UTC et 30 par mois UTC, persistée en D1, sans consommation de crédit vidéo. Trois annonces publiques ont été testées depuis le poste, sans Browser Run, IA ou stockage Cloudflare distant : coût fournisseur supplémentaire de ces appels 0 €, hors accès Internet et matériel local déjà disponibles. Ces mesures ne renseignent pas le coût d’un import hébergé. La recette distante reste fermée ; le plafond mensuel de 30 € et la facture du compte ne sont pas déclarés validés par ces tests.
+**Sprint 03, portage Cloudflare du 28/09/2026 :** cinq imports réels du parcours hébergé (trois annonces d'agences, une page JS et une saisie synthétiques), plus deux groupes opérateur bornés, provisionnés 7 × 0,50 € = **3,50 €** en D1 avant exécution. Six sessions Browser Run fermées, conteneur `basic` endormi, aucune voix/rendu IA ni nouvelle vidéo. Le sixième import est refusé 429 ; les cinq tentatives du jour restent après purge. Un dossier synthétique antidaté pour vérifier la purge ajoute séparément une tentative au jour précédent, sans lancement de transport.
+
+Alex confirme aucune autre dépense : **8 € fixes + 2,50 € rendus antérieurs + 6 € domaine + 3,50 € imports = 20 € de provisions**, **10 € encore dans l'enveloppe de 30 €**. Le nouveau registre mensuel tient compte du domaine et des anciens rendus ; le contrôleur renderer est laissé en pause avec ses cinq essais, son ancien instantané n'est pas le budget global courant. Alerte opérateur à 20 €, coupure au plus à 25 €. Les seuils restent prudents : facture TTC, conversion du domaine et allocations effectivement disponibles non rapprochées.
+
+La réservation d'un import précède les ressources et persiste après échec/purge. Pas de mois nouveau automatiquement ouvert ; `node scripts/import-operator.mjs state|pause|resume` et la commande `budget <base_centimes> <plafond_centimes>` permettent le suivi explicite. [Exploitation](IMPORTS.md#cloudflare--configuration-et-exploitation) · [mesures et limites](preuves/sprint-03/CLOUDFLARE.md).
+
+Le troisième e-mail réel valide le domaine actuel, réception et parcours confirmés par Alex ; surcoût e-mail attendu nul dans les inclusions, sans le confondre avec une facture vérifiée.
 
 ## Offres proposées, non validées par Alex
 

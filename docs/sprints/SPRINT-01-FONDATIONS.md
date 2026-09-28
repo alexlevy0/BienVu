@@ -1,8 +1,8 @@
 # Sprint 01 — Installer les fondations du projet
 
-**Dépendance : sprint 00, avec architecture retenue documentée. Statut initial : à faire.**
+**Dépendance : sprint 00, avec architecture retenue documentée. Statut revu au 28/09/2026 : terminé.**
 
-**État au 27/09/2026 : livré et vérifié en local.** Alex a demandé d’avancer sans attendre son activation de Workers Paid. Cette avance conserve l’architecture retenue et laisse la recette Containers du sprint 00 ouverte. Contrôles, limites et commandes dans le [rapport](../preuves/sprint-01/RAPPORT.md), le [guide local](../DEVELOPPEMENT.md) et le [suivi](../SUIVI.md). Aucun déploiement de cette tranche ni exécution GitHub Actions.
+Les fondations ont été livrées et vérifiées localement le 27/09, puis déployées sur Cloudflare avec les comptes. Les migrations `0001`–`0008` sont appliquées au staging et le site répond sur bienvu.online. La [CI GitHub du commit main `3d83abf`](https://github.com/alexlevy0/BienVu/actions/runs/36404738405), consultée le 28/09, a réussi : installation propre, tests/types, migrations répétées, build et sondes workerd. Le contrôle de l'état local actuel passe avec **100 tests**, types et frontières. Les changements de domaine/authentification encore non commités ne sont pas couverts par cette exécution GitHub ; leur build et leurs contrôles locaux/distants sont documentés séparément. [Revue des sprints](../BILAN-SPRINTS.md) · [rapport historique](../preuves/sprint-01/RAPPORT.md) · [guide local](../DEVELOPPEMENT.md).
 
 ## Objectif
 
@@ -33,3 +33,5 @@ Références : [ARCHITECTURE.md](../ARCHITECTURE.md), [CONTRATS.md](../CONTRATS.
 Dépôt structuré, scripts, migrations initiales, contrats, fixtures, interface de base et guide de démarrage. Noter les commandes réellement exécutées et les contrôles distants restants dans [SUIVI.md](../SUIVI.md).
 
 Le paiement et la génération publique restent désactivés. La couverture de tests se concentre ici sur les contrats et le build ; ne pas écrire de tests qui reproduisent simplement des composants visuels statiques.
+
+Les cinq critères de ce sprint disposent de preuves. La CI devra être recontrôlée lors du prochain commit/push des modifications actuelles ; cela ne remet pas en attente les fondations déjà démontrées.

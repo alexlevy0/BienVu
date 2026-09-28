@@ -13,12 +13,13 @@ const configPath = 'apps/web/wrangler.staging.jsonc';
 const config = JSON.parse(await readFile(configPath, 'utf8'));
 const origin = config.vars.BETTER_AUTH_URL;
 assert.equal(config.name, 'bienvu-web-probe-staging');
-assert.equal(origin, 'https://bienvu-web-probe-staging.alexlevy0.workers.dev');
+assert.ok(['https://bienvu-web-probe-staging.alexlevy0.workers.dev', 'https://bienvu.online'].includes(origin),
+  'La sonde est limitée aux deux adresses connues du Worker de staging.');
 assert.equal(config.vars.PROBE_MODE, 'remote');
 assert.equal(config.vars.AUTH_EMAIL_MODE, 'cloudflare');
 assert.equal(config.vars.AUTH_EMAIL_VERIFICATION_BYPASS, 'false');
 assert.equal(config.vars.GENERATIONS_ENABLED, 'false');
-assert.equal(config.vars.IMPORT_MODE, 'disabled');
+assert.ok(['disabled', 'cloudflare'].includes(config.vars.IMPORT_MODE));
 const destinations = config.send_email?.[0]?.allowed_destination_addresses;
 assert.equal(destinations?.length, 1, 'La recette exige un binding limité au destinataire autorisé.');
 const dir = 'evidence/remote/auth-email';
@@ -55,6 +56,8 @@ let state = await readFile(statePath, 'utf8').then(JSON.parse).catch(error => {
   if (error.code !== 'ENOENT') throw error;
   return null;
 });
+if (state) assert.equal(state.report.origin, origin,
+  'Recette existante sur une autre origine : conserver ses preuves, sans reprendre ses cookies ni renvoyer de mail.');
 if (step === 'start') {
   assert.ok(state === null, 'Une recette existe déjà : utiliser status, sans renvoyer de message.');
   const email = process.env.BIENVU_AUTH_EMAIL_TO?.trim().toLowerCase();
@@ -124,7 +127,7 @@ if (step === 'start') {
     state.stage = 'complete'; delete state.password; delete state.cookie;
     state.report.reception = 'verification-link-used-and-reset-applied';
     state.report.remaining = ['Réception inbox/spam et reconnexion avec le mot de passe choisi : retour humain.',
-      'Expiration et replay du reset : vérifiés localement uniquement.', 'OAuth Google : non configuré.'];
+      'Expiration et replay du reset : vérifiés localement uniquement.', 'OAuth Google : vérification distincte de cette sonde e-mail.'];
   }
 }
 state.report.stage = state.stage; state.report.updatedAt = new Date().toISOString();

@@ -30,7 +30,7 @@ async function inspectFile(path, scope) {
     if (portable.includes(scope) && modules.has(name)) failures.push(`${relative(root, path)} : API Node interdite (${name})`);
     if (name.startsWith('.') || name.startsWith('@/')) {
       const target = ts.resolveModuleName(name, path, options, ts.sys).resolvedModule?.resolvedFileName ?? resolve(dirname(path), name);
-      if (/(?:apps\/renderer|packages\/video)\//.test(relative(root, target))) failures.push(`${relative(root, path)} : traverse la frontière Node/Workers`);
+      if (/(?:apps\/(?:renderer|importer)|packages\/video)\//.test(relative(root, target))) failures.push(`${relative(root, path)} : traverse la frontière Node/Workers`);
       if (/^scripts\/(?:import-transport|serve-imports|import-fixtures)\./.test(relative(root, target))) failures.push(`${relative(root, path)} : importe le transport Node local dans un Worker`);
     }
   }
