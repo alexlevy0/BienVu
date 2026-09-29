@@ -19,7 +19,8 @@ async function cleanup(users: User[]) {
   await localSql(`DELETE FROM import_usage WHERE attempts=${amount} AND ${amount}>0;
     UPDATE import_usage SET attempts=attempts-${amount} WHERE ${amount}>0 AND attempts>${amount};`);
   await localSql(`UPDATE listing_imports SET status='deleting' WHERE ${where}; DELETE FROM listing_imports WHERE ${where};
-    DELETE FROM trial_claims WHERE owner_user_id IN (${ids}); DELETE FROM agencies WHERE owner_user_id IN (${ids});
+    DELETE FROM trial_claims WHERE owner_user_id IN (${ids});
+    DELETE FROM allocations WHERE ${where}; DELETE FROM agencies WHERE owner_user_id IN (${ids});
     DELETE FROM auth_user WHERE id IN (${ids});`);
 }
 if (process.argv.includes('--cleanup')) {

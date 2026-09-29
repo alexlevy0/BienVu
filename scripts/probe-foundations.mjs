@@ -5,14 +5,25 @@ const base = process.env.BIENVU_FOUNDATIONS_URL ?? 'http://localhost:8787';
 const origin = new URL(base);
 if (!['localhost', '127.0.0.1', '[::1]'].includes(origin.hostname)) throw new Error('Sonde sprint 01 limitée au serveur local.');
 const report = {at: new Date().toISOString(), mode: 'local-workerd', externalCalls: 0, checks: []};
-for (const path of ['/', '/studio', '/sources', '/generer', '/agence', '/historique', '/abonnement', '/connexion', '/laboratoire']) {
+const pages = new Map([
+  ['/', /Une annonce\./],
+  ['/studio', /VOTRE PROCHAINE BELLE HISTOIRE/],
+  ['/sources', /IMPORTER VOTRE ANNONCE/],
+  ['/generer', /UNE ANNONCE, UNE HISTOIRE/],
+  ['/agence', /Votre identité, sur chaque vidéo\./],
+  ['/historique', /Toutes vos créations, au même endroit\./],
+  ['/abonnement', /Les offres sont en préparation/],
+  ['/connexion', /Votre studio immobilier/],
+  ['/laboratoire', /Cette interface est en développement/],
+]);
+for (const [path, expectedContent] of pages) {
   const response = await fetch(new URL(path, base));
   const html = await response.text();
   assert.equal(response.status, 200, path);
   assert.match(html, /<html lang="fr"/);
   assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
   assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
-  assert.match(html, path === '/' ? /Accès anticipé/ : /développement|bientôt disponible/);
+  assert.ok(expectedContent.test(html), `Contenu attendu absent sur ${path}: ${expectedContent}`);
   report.checks.push({path, status: response.status, french: true, securityHeaders: true});
 }
 const ids = new Set();

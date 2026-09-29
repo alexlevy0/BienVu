@@ -2,9 +2,11 @@ import type {Database} from './index';
 
 // Anchor every boundary to signup, rather than the previous (possibly clamped)
 // month: January 31 -> February 28/29 -> March 31, at the same UTC time.
-export function creditPeriod(signup:number,now=Date.now()) {
-  const anchor=new Date(signup),date=new Date(now);
-  if(!Number.isFinite(signup)||signup>now)throw new Error('INVALID_CREDIT_ANCHOR');
+export function creditPeriod(signup:number|string,now=Date.now()) {
+  // Better Auth writes ISO dates to D1; older direct fixtures use epoch milliseconds.
+  const signupMs=typeof signup==='number'?signup:Date.parse(signup);
+  if(!Number.isFinite(signupMs)||signupMs>now)throw new Error('INVALID_CREDIT_ANCHOR');
+  const anchor=new Date(signupMs),date=new Date(now);
   const boundary=(n:number)=>{
     const m=anchor.getUTCMonth()+n,y=anchor.getUTCFullYear();
     const last=new Date(Date.UTC(y,m+1,0)).getUTCDate();
@@ -25,7 +27,7 @@ export async function creditGrant(db:Database,agencyId:string,now=Date.now()):Pr
   // or paused. Paid period/allocation management stays with the existing ledger.
   if(await db.prepare("SELECT 1 FROM subscriptions WHERE agency_id=? AND status NOT IN ('canceled','incomplete_expired')").bind(agencyId).first())return null;
   const user=await db.prepare(`SELECT u.createdAt FROM auth_user u JOIN agencies a ON a.owner_user_id=u.id
-    WHERE a.id=? AND u.emailVerified=1`).bind(agencyId).first<{createdAt:number}>();
+    WHERE a.id=? AND u.emailVerified=1`).bind(agencyId).first<{createdAt:number|string}>();
   if(!user)return null;
   const period=creditPeriod(user.createdAt,now);
   await db.prepare(`INSERT INTO allocations(id,agency_id,kind,period_key,quota_limit,valid_from,valid_until)

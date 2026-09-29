@@ -44,6 +44,7 @@ async function cleanup(users) {
     DELETE FROM media_assets WHERE agency_id IN (SELECT id FROM agencies WHERE owner_user_id IN (${ids}));
     DELETE FROM agency_write_limits WHERE owner_user_id IN (${ids});
     DELETE FROM trial_claims WHERE owner_user_id IN (${ids});
+    DELETE FROM allocations WHERE agency_id IN (SELECT id FROM agencies WHERE owner_user_id IN (${ids}));
     DELETE FROM agencies WHERE owner_user_id IN (${ids});
     DELETE FROM auth_user WHERE id IN (${ids});`);
 }
@@ -172,8 +173,14 @@ try {
     checked('Callbacks OAuth sans état, annulé et rejoué refusés sans session');
   }
   const agencies = (await sql(`SELECT id FROM agencies WHERE owner_user_id IN (${users.map(u=>sqlQuote(u.id)).join(',')})`)).map(a=>sqlQuote(a.id)).join(',');
-  for (const table of ['allocations','jobs','cost_events']) assert.equal((await sql(`SELECT count(*) n FROM ${table} WHERE agency_id IN (${agencies});`))[0].n, 0);
-  checked('Aucune allocation, génération ni consommation créée par la marque');
+  const grants = await sql(`SELECT kind,quota_limit,reserved,consumed FROM allocations WHERE agency_id IN (${agencies});`);
+  assert.equal(grants.length, users.length);
+  for (const grant of grants) {
+    assert.equal(grant.kind, 'free'); assert.equal(grant.quota_limit, 3);
+    assert.equal(grant.reserved, 0); assert.equal(grant.consumed, 0);
+  }
+  for (const table of ['jobs','cost_events']) assert.equal((await sql(`SELECT count(*) n FROM ${table} WHERE agency_id IN (${agencies});`))[0].n, 0);
+  checked('Allocations gratuites inactives créées à la lecture du compte ; aucun job ni coût');
   if (process.argv.includes('--keep-fixtures')) {
     if (!remote) {a.token = randomBytes(32).toString('hex'); await seedSession(a);}
     await writeFile(fixturePath, JSON.stringify({users, cookie: cookie(a), base}, null, 2), {mode: 0o600});

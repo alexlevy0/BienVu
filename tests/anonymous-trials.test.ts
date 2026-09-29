@@ -12,7 +12,7 @@ async function setup(t:any) {
   await env.DB.prepare('INSERT INTO hosted_import_budget(month,baseline_cents,ceiling_cents,paused) VALUES(?,0,2500,0)').bind(new Date().toISOString().slice(0,7)).run();
   return env;
 }
-async function owner(DB:D1Database,label:string,at=Date.now()-1000) {
+async function owner(DB:D1Database,label:string,at:number|string=Date.now()-1000) {
   await DB.prepare('INSERT INTO auth_user(id,name,email,emailVerified,createdAt,updatedAt) VALUES(?,?,?,1,?,?)').bind(label,label,label+'@example.com',at,at).run();
   return ensureAgency(DB,{id:label,email:label+'@example.com'});
 }
@@ -25,7 +25,18 @@ async function ready(DB:D1Database,id:string){const at=new Date().toISOString();
 test('anniversaire UTC : mois courts, année bissextile, aucun cumul',()=>{
   const from=Date.parse('2024-01-31T10:42:03.123Z');
   assert.deepEqual(creditPeriod(from,Date.parse('2024-02-29T10:42:03.123Z')),{from:'2024-02-29T10:42:03.123Z',until:'2024-03-31T10:42:03.123Z'});
+  assert.deepEqual(creditPeriod('2024-01-31T10:42:03.123Z',Date.parse('2024-02-29T10:42:03.123Z')),
+    {from:'2024-02-29T10:42:03.123Z',until:'2024-03-31T10:42:03.123Z'});
   assert.equal(creditPeriod(from,Date.parse('2025-03-30T20:00:00Z')).from,'2025-02-28T10:42:03.123Z');
+  assert.throws(()=>creditPeriod('invalid',Date.now()),/INVALID_CREDIT_ANCHOR/);
+});
+test('date ISO écrite par Better Auth : allocation gratuite et période d’inscription',async t=>{
+  const {DB}=await setup(t),signup=new Date(Date.now()-60_000).toISOString();
+  const agency=await owner(DB,'iso-owner',signup),grant=await creditGrant(DB,agency.id);
+  assert.equal(grant?.kind,'free');assert.equal(grant?.remaining,3);
+  const row=await DB.prepare('SELECT period_key AS periodKey,valid_from AS validFrom FROM allocations WHERE agency_id=?')
+    .bind(agency.id).first<{periodKey:string;validFrom:string}>();
+  assert.deepEqual(row,{periodKey:signup,validFrom:signup});
 });
 test('session opaque, admission concurrente, preview uniquement, propriété et débit atomiques',async t=>{
   const {DB}=await setup(t),{session,proof:cookie}=await createAnonymousSession(DB);

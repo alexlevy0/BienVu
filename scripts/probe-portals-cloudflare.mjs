@@ -85,6 +85,7 @@ if (step === 'init') {
       DELETE FROM listing_imports WHERE ${scope};
       DELETE FROM trial_claims WHERE owner_user_id IN (${ids});
       DELETE FROM agency_write_limits WHERE owner_user_id IN (${ids});
+      DELETE FROM allocations WHERE ${scope};
       DELETE FROM agencies WHERE owner_user_id IN (${ids});
       DELETE FROM auth_user WHERE id IN (${ids});`);
     assert.deepEqual(await usage(), beforeUsage);

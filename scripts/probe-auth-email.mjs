@@ -67,10 +67,11 @@ async function probeBypass() {
   const reload = await (await fetch(`${base}/api/me`, {headers: {cookie}})).json(); assert.equal(reload.agency.id, me.agency.id);
   assert.equal((await post('sign-in/email', {email, password: nextPassword})).status, 400);
   assert.equal((await post('sign-up/email', {email, password: nextPassword})).status, 400);
-  const [counts] = await sql(`SELECT count(*) n FROM allocations WHERE agency_id=${quote(me.agency.id)};`); assert.equal(counts.n, 0);
+  const grants = await sql(`SELECT kind,quota_limit,reserved,consumed FROM allocations WHERE agency_id=${quote(me.agency.id)};`);
+  assert.deepEqual(grants, [{kind: 'free', quota_limit: 3, reserved: 0, consumed: 0}]);
   assert.equal((await post('sign-out', {}, cookie)).status, 200);
   assert.equal((await fetch(`${base}/api/me`, {headers: {cookie}})).status, 401);
-  checked('Session persistante, mauvais mot de passe et réinscription refusés, zéro allocation, déconnexion');
+  checked('Session persistante, mauvais mot de passe et réinscription refusés, allocation gratuite inactive, déconnexion');
 }
 try {
   if (bypass) await probeBypass();
@@ -103,13 +104,16 @@ try {
   assert.equal((await post('sign-in/email', {email, password: nextPassword}, '', {origin: 'https://foreign.example'})).status, 403);
   assert.equal((await post('sign-out', {}, cookie)).status, 200);
   assert.equal((await fetch(`${base}/api/me`, {headers: {cookie}})).status, 401);
-  const [count] = await sql(`SELECT (SELECT count(*) FROM trial_claims WHERE owner_user_id=u.id) claims,(SELECT count(*) FROM allocations WHERE agency_id=${quote(me.agency.id)}) allocations FROM auth_user u WHERE email=${quote(email)};`);
-  assert.equal(count.claims, 1); assert.equal(count.allocations, 0);
-  checked('CSRF refusé, déconnexion et essai unique conservés, zéro allocation');
+  const [count] = await sql(`SELECT (SELECT count(*) FROM trial_claims WHERE owner_user_id=u.id) claims,
+    (SELECT count(*) FROM allocations WHERE agency_id=${quote(me.agency.id)} AND kind='free' AND reserved=0 AND consumed=0) allocations
+    FROM auth_user u WHERE email=${quote(email)};`);
+  assert.equal(count.claims, 1); assert.equal(count.allocations, 1);
+  checked('CSRF refusé, déconnexion et essai unique conservés, allocation gratuite inactive');
   }
 } finally {
   await sql(`DELETE FROM auth_verification WHERE value IN (SELECT id FROM auth_user WHERE email=${quote(email)});
     DELETE FROM trial_claims WHERE owner_user_id IN (SELECT id FROM auth_user WHERE email=${quote(email)});
+    DELETE FROM allocations WHERE agency_id IN (SELECT id FROM agencies WHERE owner_user_id IN (SELECT id FROM auth_user WHERE email=${quote(email)}));
     DELETE FROM agencies WHERE owner_user_id IN (SELECT id FROM auth_user WHERE email=${quote(email)});
     DELETE FROM auth_user WHERE email=${quote(email)};`);
   console.log('Identité synthétique, sessions et agence supprimées.');
