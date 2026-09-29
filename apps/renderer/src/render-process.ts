@@ -2,7 +2,7 @@ import {spawn} from 'node:child_process';
 import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
-import {ProbeRender} from '@bienvu/contracts';
+import {ProbeRender, Sha256, VideoReport} from '@bienvu/contracts';
 import {outputDir} from './paths';
 
 // Le serveur reste disponible même si Chromium, un chargement natif ou un rendu se bloque.
@@ -29,4 +29,11 @@ export async function renderInProcess(input:unknown,signal?:AbortSignal) {
   const request=ProbeRender.parse(input);
   await runBoundedNode([...process.execArgv,fileURLToPath(new URL('./cli.ts',import.meta.url)),request.id,request.fixture],{timeoutMs:540_000,signal});
   return JSON.parse(await readFile(path.join(outputDir,`${request.id}.json`),'utf8')) as Record<string,unknown>;
+}
+export async function renderVideoInProcess(directory:string,id:string,signal?:AbortSignal) {
+  Sha256.parse(id);
+  await runBoundedNode([...process.execArgv,fileURLToPath(new URL('./listing-cli.ts',import.meta.url)),directory],{timeoutMs:540_000,signal});
+  const report=VideoReport.parse(JSON.parse(await readFile(path.join(directory,'report.json'),'utf8')));
+  if(report.id!==id||report.manifestHash!==id)throw new Error('VIDEO_REPORT_INVALID');
+  return report;
 }

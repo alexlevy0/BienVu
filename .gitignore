@@ -8,10 +8,14 @@ out/
 .env
 .env.*
 !.env.example
+!.env.voice.example
+!.env.script.example
 .dev.vars
 .dev.vars.*
 !.dev.vars.example
 .DS_Store
+# Identifiants Google Cloud locaux, jamais versionnés.
+/.secrets/
 # Sorties de recette, rapports de couverture et journaux locaux.
 /evidence/
 coverage/
@@ -27,4 +31,4 @@ playwright-report/
 
 fixtures/generated/
 apps/pipeline/wrangler.staging*.jsonc
-apps/web/wrangler.staging.jsonc
+apps/web/wrangler.staging*.jsonc

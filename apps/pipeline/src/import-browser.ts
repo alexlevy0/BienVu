@@ -1,6 +1,6 @@
 import type {BrowserEndpoint} from '@cloudflare/playwright';
 import {ImportFailure} from '@bienvu/contracts';
-import {abortable, IMPORT_LIMITS, scopedUrl, sourcePolicy, type ImportTransport} from '@bienvu/importers';
+import {abortable, assertListingDestination, IMPORT_LIMITS, scopedUrl, sourcePolicy, type ImportTransport} from '@bienvu/importers';
 
 // Le service d'import réserve le budget et le slot avant cet appel. Tout accès
 // réseau du navigateur passe par le transport à IP épinglée, sans credentials.
@@ -27,12 +27,13 @@ export async function guardedBrowserHtml(binding: BrowserEndpoint, url: string, 
   ctx: {waitUntil(promise: Promise<unknown>): void}, signal: AbortSignal) {
   const {launch} = await import('@cloudflare/playwright');
   const policy = sourcePolicy(url), hosts = policy.pageHosts;
-  return withImportBrowser(() => launch(binding, {keep_alive: 60_000, guardrails: {allowedDomains: hosts}}), async (browser, abort) => {
+  return withImportBrowser(() => launch(binding, {keep_alive: 60_000, guardrails: {allowedDomains: [...hosts]}}), async (browser, abort) => {
     const context = await browser.newContext({serviceWorkers: 'block', acceptDownloads: false});
     await context.routeWebSocket('**/*', socket => socket.close());
     const page = await context.newPage();
     context.on('page', extra => {if (extra !== page) ctx.waitUntil(extra.close());});
     let requests = 0, bytes = 0, unsafe = false;
+    let documentFailure: ImportFailure | undefined;
     await context.route('**/*', async route => {
       try {
         const request = route.request();
@@ -50,13 +51,17 @@ export async function guardedBrowserHtml(binding: BrowserEndpoint, url: string, 
         if (resource.url !== request.url()) await route.fulfill({status: 302, headers: {location: resource.url}, body: ''});
         else await route.fulfill({status: 200, headers: {'content-type': resource.mime}, body: Buffer.from(resource.bytes)});
       } catch (error) {
+        if (error instanceof ImportFailure && route.request().isNavigationRequest() && route.request().frame() === page.mainFrame()) documentFailure = error;
         if (error instanceof ImportFailure && error.code === 'UNSAFE_URL') unsafe = true;
         await route.abort().catch(() => undefined);
       }
     });
-    await page.goto(scopedUrl(url, hosts).href, {waitUntil: 'networkidle', timeout: 45_000});
+    try {await page.goto(scopedUrl(url, hosts).href, {waitUntil: 'networkidle', timeout: 45_000});}
+    catch (error) {throw documentFailure ?? error;}
+    if (documentFailure) throw documentFailure;
     if (unsafe) throw new ImportFailure('UNSAFE_URL', 'Sous-requête dangereuse détectée.');
     scopedUrl(page.url(), hosts);
+    assertListingDestination(url, page.url());
     const html = await page.evaluate(limit => {
       const content = document.documentElement.outerHTML;
       return content.length <= limit ? content : null;

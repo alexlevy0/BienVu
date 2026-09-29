@@ -1,0 +1,21 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "bienvu-narration-local",
+  "main": "src/narration-worker.ts",
+  "compatibility_date": "2026-09-28",
+  "workers_dev": true,
+  "preview_urls": false,
+  "secrets": {"required":["NARRATION_TOKEN","OPENAI_API_KEY","GOOGLE_SERVICE_ACCOUNT_JSON"]},
+  "vars": {
+    "NARRATION_ENABLED": "false",
+    "NARRATION_AGENCY_ID": "",
+    "NARRATION_JOB_ID": "",
+    "GOOGLE_CLOUD_PROJECT": "",
+    "GOOGLE_TTS_VOICE": "fr-FR-Chirp3-HD-Aoede",
+    "SCRIPT_MODEL": "gpt-5.4-mini-2026-03-17"
+  },
+  "d1_databases": [{"binding":"DB","database_name":"bienvu-probes-local","database_id":"00000000-0000-0000-0000-000000000000","migrations_dir":"../../packages/db/migrations"}],
+  "r2_buckets": [{"binding":"MEDIA","bucket_name":"bienvu-probes-local"}],
+  "observability": {"enabled":true,"redact_query_string":true,"logs":{"enabled":true,"invocation_logs":false},"traces":{"enabled":true,"head_sampling_rate":0.1}},
+  "limits": {"cpu_ms":30000}
+}

@@ -1,9 +1,11 @@
-import {EntityId, GeneratableListing, ImportFailure, type NormalizedListing} from '@bienvu/contracts';
+import {EntityId, GeneratableListing, ImportFailure, type ImportFailureReason, type NormalizedListing} from '@bienvu/contracts';
 import {extractListingHtml} from './listing';
 import {IMPORT_LIMITS, publicUrl, scopedUrl, sourcePolicy, type ImportTransport} from './network';
+import {assertListingDestination, selectAdapter} from './registry';
 
 export type ImportDiagnostics = {durationMs: number; resources: number; sourceBytes: number; storedBytes: number;
-  rejected: Array<{order: number; reason: string}>; duplicatePhotos: number; mode: 'local' | 'cloudflare'; browserUsed: boolean};
+  rejected: Array<{order: number; reason: string}>; duplicatePhotos: number; mode: 'local' | 'cloudflare'; browserUsed: boolean;
+  failureReason?: ImportFailureReason};
 export async function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
   signal.throwIfAborted();
   let onAbort: () => void = () => {};
@@ -43,10 +45,12 @@ export async function importListing(url: string, context: {agencyId: string; imp
     return resource;
   };
   try {
+    selectAdapter(source);
     const page = await load(source, 'page');
+    assertListingDestination(source, page.url);
     let extracted;
     try {extracted = extractListingHtml(new TextDecoder('utf-8', {fatal: true}).decode(page.bytes), page.url);} catch (error) {
-      if (!(error instanceof ImportFailure) || error.code !== 'NOT_A_LISTING' || !ports.browserHtml) throw error;
+      if (!(error instanceof ImportFailure) || error.code !== 'NOT_A_LISTING' || error.reason === 'not_listing' || !ports.browserHtml) throw error;
       diagnostics.browserUsed = true;
       extracted = extractListingHtml(await abortable(ports.browserHtml(page.url, signal), signal), page.url);
     }
@@ -89,6 +93,7 @@ export async function importListing(url: string, context: {agencyId: string; imp
     diagnostics.durationMs = Date.now() - start;
     const failure = signal.aborted ? new ImportFailure('IMPORT_TIMEOUT', 'Temps maximal d’import dépassé.')
       : error instanceof ImportFailure ? error : new ImportFailure('INCOMPLETE_LISTING', 'Les données ne respectent pas le contrat d’import.');
+    if (failure.reason) diagnostics.failureReason = failure.reason;
     throw Object.assign(failure, {diagnostics});
   }
 }

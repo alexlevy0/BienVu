@@ -1,6 +1,6 @@
 # BienVu — architecture proposée
 
-Statut : architecture des sprints 00–03 démontrée ; pipeline vidéo et facturation encore à construire. Références officielles dans [SOURCES.md](SOURCES.md).
+Statut : comptes/imports et narration démontrés sur Cloudflare ; composition vidéo et rendu Containers du sprint 06 démontrés ; retour de lecture humaine du fichier distant en attente. Workflow public et facturation encore à construire. Références officielles dans [SOURCES.md](SOURCES.md).
 
 ## Services
 
@@ -14,7 +14,8 @@ Statut : architecture des sprints 00–03 démontrée ; pipeline vidéo et factu
 | Rendu | Remotion dans Cloudflare Containers | Chromium et encodage vidéo dans un environnement Linux/Node |
 | Authentification | Better Auth + D1 ; e-mail/mot de passe et Google | Sessions et identité vérifiée ; deux modes demandés par Alex |
 | E-mails de compte | Binding Cloudflare Email Service | Confirmation et récupération ; simulateur local, domaine et Workers Paid requis pour le réel |
-| Texte et voix | API OpenAI, modèles configurables | Script factuel et synthèse vocale |
+| Texte | OpenAI Responses, `gpt-5.4-mini-2026-03-17` proposé/configurable | Sélection de formulations factuelles validées ; vrais appels depuis le Mac et Cloudflare validés au sprint 05 |
+| Voix | Google Cloud Text-to-Speech, Chirp 3 HD choisi par Alex le 28/09 | Synthèse française configurable ; [configuration et limites](VOIX-GOOGLE.md) |
 | Abonnements | Stripe Checkout + Billing + Customer Portal | Paiement récurrent et gestion client |
 
 « Tout Cloudflare » concerne l'hébergement applicatif, les données et le calcul. Stripe, Google OAuth et l'API d'IA sont des services externes proposés, pas des hébergeurs supplémentaires pour le code de BienVu. Ces choix restent documentés et remplaçables.
@@ -42,9 +43,11 @@ Le conteneur est un service privé de calcul déclenché à la demande, avec une
 | `apps/importer` | Transport Node TLS et décodage Sharp, Container privé `basic` |
 | `apps/renderer` | Serveur Node du conteneur, Remotion renderer, mesure audio et vérification MP4 |
 | `packages/contracts` | Types TypeScript et schémas de validation partagés, sans dépendance Node native |
+| `packages/narration`, `packages/voice` | Script et provenance, APIs texte/TTS, mesure PCM et timing compatibles Workers |
 | `packages/video` | Composition React Remotion et primitives visuelles |
 | `packages/db` | Schéma D1, migrations et fonctions d'accès côté serveur |
 | `packages/importers` | Extraction générique et adaptateurs par source |
+| `packages/voice` | Connecteur Google TTS et authentification compatibles Web APIs, mesure audio séparée dans Node |
 | `fixtures` | Petits échantillons autorisés ou synthétiques, expurgés et déterministes |
 | `docs/bienvu` | Ce dossier, suivi et rapports de sprint |
 
@@ -101,3 +104,21 @@ La préférence Cloudflare n'autorise pas un déploiement externe automatique si
 L’importeur TypeScript est séparé du transport. L’application workerd locale utilise un pont Node sur loopback authentifié pour les connexions HTTPS à IP épinglée et le décodage raster borné. D1 et R2 restent les bindings de l’application. Ce pont est un outil de développement, pas un nouvel hébergement retenu. Le chemin distant utilise depuis le 28/09 un Container Cloudflare `basic`, séparé du renderer, via Service Binding privé. Browser Run délègue tout trafic autorisé au même transport à IP épinglée ; photos URL et manuelles passent par Sharp dans le conteneur. Un cron purge les imports abandonnés/expirés avec protection des références de jobs. [ADR 0003](adr/0003-transport-import-cloudflare.md), [configuration et recette](IMPORTS.md), [rapport distant](preuves/sprint-03/CLOUDFLARE.md).
 
 Les photos privées précédant un job sont journalisées sous un préfixe d’import. La publication D1 est atomique après stockage ; une purge rejouable protège toute référence depuis un job. Le manifeste de rendu demeure limité aux fichiers de son job. Aucun crédit n’est consommé par l’import seul.
+
+## Réalisation du sprint 05
+
+L'étape `prepareJobNarration` et les connecteurs OpenAI/Google sont compatibles Workers sans Node : Web Crypto pour OAuth, requêtes REST bornées, mesure directe du PCM et timing par scène. Le Worker opérateur `narration-worker.ts` utilise D1/R2 et une portée agence/job fixée côté serveur, avec jeton obligatoire. Une recette réelle sur une base D1 isolée a produit cinq voix ; la reprise après redéploiement ne rappelle aucun fournisseur. La configuration et son budget sont ensuite remis en pause. [Guide](NARRATION.md), [preuve réelle](preuves/sprint-05/CLOUDFLARE.md).
+
+Les fixtures synthétiques servent à valider l'hébergement et les fournisseurs, sans prétendre à une extraction de portail ou à une vidéo produit. La fonction prépare script/WAV ; le manifeste vidéo immuable et la composition sont implémentés au sprint 06, puis viennent le Workflow et les transitions/quotas du parcours au sprint 07. Les coûts de cette campagne sont réservés globalement avant les appels, sans ouvrir la génération publique.
+
+## Réalisation du sprint 06
+
+`prepareJobVideo` dérive un manifeste version 2 de la réservation active, du script factuel et de la marque figée. La migration 0012 interdit de modifier son contenu et son hash. Photos/logo sont copiés sous le préfixe du job après contrôle ; les WAV existants sont réutilisés sans fournisseur. Les droits d'essai/payants ne viennent jamais du navigateur.
+
+Le Worker privé utilise un Durable Object SQLite `VideoRenderer` et les callbacks persistants `Container.schedule`, sans remplacer l'alarme du SDK. Il réserve une tentative avant le démarrage, borne un slot, transfère seulement les médias autorisés et accepte rapidement les demandes identiques. Le serveur Node authentifié lance le rendu dans un processus borné ; Chromium accède uniquement aux fichiers validés par un serveur loopback fermé. Le conteneur n'a pas d'accès Internet.
+
+La publication persistée dans R2 avec checksum fait autorité avant le nettoyage. Une reprise de publication peut finaliser sans renderer ; une perte après lancement du calcul devient un échec explicite. La composition, les MP4 natifs et un vrai rendu Containers sont vérifiés. La reprise du premier échec conserve son historique, provisionne une seule nouvelle tentative et publie dans R2 ; le résultat et son hash restent identiques après redéploiement. Service ensuite remis en pause et conteneur arrêté. Lecture technique desktop/mobile émulé validée ; retour humain distant restant. Ce contrôleur opérateur n'est pas le Workflow produit ni une file multi-agences. [Protocole](VIDEO.md), [recette et limites](preuves/sprint-06/RAPPORT.md).
+
+## Parcours durable livré au sprint 07
+
+Le web transmet l’agence authentifiée au service privé de génération. La migration 0014 lie allocation de développement, réservation, job et intention de lancement atomiquement. Un Cloudflare Workflow orchestre les imports, les checkpoints texte/voix et le rendu idempotent ; le cron réconcilie les interruptions. L’historique sert le MP4 R2 privé avec Range après consommation atomique du quota. Aucun droit public n’est créé à la migration. [Détails, limites et commandes](GENERATIONS.md).

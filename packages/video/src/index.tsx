@@ -1,6 +1,7 @@
 import React from 'react';
 import {AbsoluteFill, Audio, Composition, Img, Sequence, interpolate, registerRoot, staticFile, useCurrentFrame} from 'remotion';
 import type {VideoFixture} from '@bienvu/contracts';
+import {ListingFilm, type ListingVideoProps} from './listing';
 
 const defaults: VideoFixture = {
   schemaVersion:1, kind:'synthetic-fixture', fps:30, width:1080, height:1920, durationSeconds:6,
@@ -29,5 +30,10 @@ function Film(props: VideoFixture) {
     <div style={{position:'absolute',bottom:105,left:76,color:'#d7e9db',fontSize:25}}>Images synthétiques · Signal audio de test · Aucune annonce réelle</div>
   </AbsoluteFill>;
 }
-const Root = () => <Composition id="BienVuProbe" component={Film} width={1080} height={1920} fps={30} durationInFrames={180} defaultProps={defaults} calculateMetadata={({props})=>({durationInFrames:props.durationSeconds*props.fps})}/>;
+const Root = () => <>
+  <Composition id="BienVuProbe" component={Film} width={1080} height={1920} fps={30} durationInFrames={180} defaultProps={defaults} calculateMetadata={({props})=>({durationInFrames:props.durationSeconds*props.fps})}/>
+  <Composition id="BienVuListing" component={ListingFilm} width={1080} height={1920} fps={30} durationInFrames={600}
+    defaultProps={{manifest:null,media:{},logoBackground:'#ffffff',fontUrl:staticFile('video-font.woff2')}}
+    calculateMetadata={({props}: {props: ListingVideoProps}) => ({durationInFrames:props.manifest?.scenes.reduce((n,s)=>n+s.durationFrames,0) ?? 600})}/>
+</>;
 registerRoot(Root);

@@ -41,7 +41,8 @@ const server = createServer(async (request, response) => {
       'X-Image-Width': String(result.width ?? 0), 'X-Image-Height': String(result.height ?? 0)});
     response.end(result.bytes);
   } catch (error) {
-    if (!response.headersSent) response.writeHead(422, {'X-Import-Error': error instanceof ImportFailure ? error.code : 'SOURCE_UNAVAILABLE'});
+    if (!response.headersSent) response.writeHead(422, {'X-Import-Error': error instanceof ImportFailure ? error.code : 'SOURCE_UNAVAILABLE',
+      ...(error instanceof ImportFailure && error.reason ? {'X-Import-Reason': error.reason} : {})});
     response.end();
   } finally {
     clearTimeout(timer); active--;

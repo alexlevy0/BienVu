@@ -17,7 +17,7 @@ Référence du 27 septembre 2026. Les décisions confirmées priment sur les pro
 | Revenus | Plusieurs abonnements selon le nombre de vidéos |
 | Essai | Une vidéo gratuite avec filigrane après inscription |
 | Hébergement | Tout chez Cloudflare si techniquement possible |
-| Budget avant clients | 30 € maximum par mois, hébergement et API de test compris |
+| Budget avant clients | 40 € maximum par mois, hébergement et API de test compris (hausse de 10 € autorisée le 28/09/2026) |
 
 La préférence de développement est Next.js et TypeScript. Remotion est le moteur vidéo envisagé. Python et Scrapling ne constituent pas une obligation.
 

@@ -7,8 +7,8 @@ type SelectedPhoto = {id: string; file: File; preview: string};
 class FormFailure extends Error {}
 const labels: Record<string, string> = {title: 'titre', locality: 'localisation', propertyType: 'type de bien', description: 'description',
   priceCents: 'prix', charges: 'charges', area: 'surface', rooms: 'nombre de pièces', photos: 'photos'};
-export function ManualListingForm({busy, setBusy, onCreated}: {
-  busy: boolean; setBusy(value: boolean): void; onCreated(value: ImportView): Promise<void>;
+export function ManualListingForm({busy, setBusy, onCreated, generate=false}: {
+  busy: boolean; generate?: boolean; setBusy(value: boolean): void; onCreated(value: ImportView): Promise<void>;
 }) {
   const [transaction, setTransaction] = useState('sale'), [photos, setPhotos] = useState<SelectedPhoto[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({}), [feedback, setFeedback] = useState(''), [progress, setProgress] = useState('');
@@ -116,6 +116,6 @@ export function ManualListingForm({busy, setBusy, onCreated}: {
     <p className="field-help">Ajoutez uniquement les informations et photos du bien que vous êtes autorisé à utiliser.</p>
     {feedback && <div className="form-feedback error" role="alert"><p>{feedback}</p>{Object.entries(errors).filter(([, value]) => value).map(([name, value]) => <p key={name}>{labels[name] ?? name} : {value}</p>)}</div>}
     {progress && <p role="status" className="field-help">{progress}</p>}
-    <button className="button primary" type="submit" disabled={busy}>{progress ? 'Enregistrement en cours…' : 'Enregistrer mon annonce'}</button>
+    <button className="button primary" type="submit" disabled={busy}>{progress ? 'Préparation en cours…' : generate ? 'Créer la vidéo de mon annonce' : 'Enregistrer mon annonce'}</button>
   </form>;
 }

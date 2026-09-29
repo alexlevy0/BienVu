@@ -1,0 +1,88 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "bienvu-generation-local",
+  "main": "src/generation-worker.ts",
+  "compatibility_date": "2026-09-27",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "vars": {
+    "VIDEO_ENABLED": "false",
+    "VIDEO_AGENCY_ID": "fixture-agency",
+    "VIDEO_JOB_ID": "fixture-job",
+    "VIDEO_BUDGET_MONTH": "2026-09",
+    "VIDEO_OTHER_CENTS": "0",
+    "VIDEO_MAX_ATTEMPTS": "5",
+    "VIDEO_CEILING_CENTS": "3500",
+    "VIDEO_ENVELOPE_CENTS": "4000",
+    "VIDEO_RETRY_FAILED_AT": "0",
+    "GENERATIONS_ENABLED": "false",
+    "GOOGLE_CLOUD_PROJECT": "bienvu-fixture",
+    "GOOGLE_TTS_VOICE": "fr-FR-Chirp3-HD-Aoede",
+    "SCRIPT_MODEL": "gpt-5.4-mini-2026-03-17"
+  },
+  "containers": [
+    {
+      "class_name": "VideoRenderer",
+      "image": "../renderer/Dockerfile",
+      "image_build_context": "../..",
+      "max_instances": 1,
+      "instance_type": "standard-2"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "RENDERER",
+        "class_name": "VideoRenderer"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "VideoRenderer"
+      ]
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "bienvu-video-local",
+      "database_id": "00000000-0000-0000-0000-000000000006",
+      "migrations_dir": "../../packages/db/migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "bienvu-video-local"
+    }
+  ],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "limits": {
+    "cpu_ms": 30000
+  },
+  "workflows": [
+    {
+      "name": "bienvu-generation-local",
+      "binding": "GENERATION_WORKFLOW",
+      "class_name": "GenerationWorkflow"
+    }
+  ],
+  "services": [
+    {
+      "binding": "IMPORT_SERVICE",
+      "service": "bienvu-import-local"
+    }
+  ],
+  "triggers": {
+    "crons": [
+      "*/5 * * * *"
+    ]
+  }
+}

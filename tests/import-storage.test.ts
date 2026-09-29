@@ -16,7 +16,7 @@ test('imports : D1 et R2 réels en local, aucune génération ni consommation de
   for (const file of (await readdir(new URL('../packages/db/migrations/', import.meta.url))).filter(f => f.endsWith('.sql')).sort())
     await DB.exec((await readFile(new URL(`../packages/db/migrations/${file}`, import.meta.url), 'utf8')).replace(/^--.*$/gm, '').replace(/\n/g, ' '));
   const now = Date.now(), at = new Date(now).toISOString(), env = {DB, MEDIA};
-  for (const id of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'])
+  for (const id of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm'])
     await DB.prepare('INSERT INTO agencies(id,owner_user_id,name,created_at,updated_at) VALUES(?,?,?,?,?)').bind(id, `owner-${id}`, `Fixture ${id}`, at, at).run();
   const source = 'https://fixtures.bienvu.example/vente', key = 'fixture-idempotent-001';
   const ready = await createPrivateImport(env, 'a', source, key, fixtureImportTransport());
@@ -78,14 +78,14 @@ test('imports : D1 et R2 réels en local, aucune génération ni consommation de
   await t.test('plafond persistant sous concurrence, purge sans restitution du budget d’essai', async () => {
     // Midi UTC évite de franchir un jour de quota avec +700 s près de minuit.
     const tomorrow = Date.parse(`${new Date(now + 2 * 86400_000).toISOString().slice(0, 10)}T12:00:00.000Z`);
-    const attempts = await Promise.allSettled(['b', 'c', 'd', 'e', 'f', 'g', 'h'].map(a => beginImport(DB, a, source, `quota-key-fixture-${a}`, tomorrow)));
-    assert.equal(attempts.filter(x => x.status === 'fulfilled').length, 5, attempts.map(x => x.status === 'fulfilled' ? 'accepted' : String(x.reason)).join(', '));
+    const attempts = await Promise.allSettled(['b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm'].map(a => beginImport(DB, a, source, `quota-key-fixture-${a}`, tomorrow)));
+    assert.equal(attempts.filter(x => x.status === 'fulfilled').length, 10, attempts.map(x => x.status === 'fulfilled' ? 'accepted' : String(x.reason)).join(', '));
     for (const outcome of attempts) if (outcome.status === 'fulfilled') {
       const row = outcome.value.row; await failImport(DB, row.agencyId, row.id, 'NOT_A_LISTING', {});
       await purgeImport(env, row.agencyId, row.id, tomorrow + 600_000);
     }
     await assert.rejects(beginImport(DB, 'h', source, 'quota-key-after-cleanup', tomorrow + 700_000), /IMPORT_LIMIT/);
-    assert.equal((await DB.prepare('SELECT attempts FROM import_usage WHERE day=?').bind(new Date(tomorrow).toISOString().slice(0, 10)).first<{attempts: number}>())?.attempts, 5);
+    assert.equal((await DB.prepare('SELECT attempts FROM import_usage WHERE day=?').bind(new Date(tomorrow).toISOString().slice(0, 10)).first<{attempts: number}>())?.attempts, 10);
   });
 });
 test('transport local impossible en staging, sur URL publique ou sans secret', () => {

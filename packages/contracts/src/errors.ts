@@ -32,6 +32,10 @@ export const publicErrors = {
   CONFLICT: [409, 'Cette opération entre en conflit avec un traitement existant.'],
   QUOTA_EXHAUSTED: [429, 'Votre quota de vidéos est épuisé pour cette période.'],
   GENERATIONS_PAUSED: [503, 'La génération de vidéos est temporairement indisponible. Aucun crédit n’a été utilisé.'],
+  GENERATION_BUSY: [409, 'Une vidéo est déjà en préparation. Retrouvez-la dans votre historique.'],
+  GENERATION_BUDGET_LIMIT: [429, 'Le budget des générations de développement est atteint.'],
+  GENERATION_FAILED: [422, 'La vidéo n’a pas pu être terminée. Votre crédit vidéo a été libéré.'],
+  GENERATION_TIMEOUT: [422, 'La préparation a dépassé le délai autorisé. Votre crédit vidéo a été libéré.'],
   FEATURE_UNAVAILABLE: [503, 'Cette fonctionnalité est en cours de développement.'],
   INTERNAL_ERROR: [500, 'Une erreur est survenue. Réessayez plus tard.'],
 } as const;

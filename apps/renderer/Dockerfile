@@ -11,10 +11,14 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc tsconfig.base.json .
 COPY apps/renderer apps/renderer
 COPY packages/contracts packages/contracts
 COPY packages/video packages/video
+COPY packages/voice packages/voice
+COPY apps/web/public/fonts/inter-tight.woff2 apps/web/public/fonts/inter-tight.woff2
 COPY scripts/generate-fixtures.ts scripts/generate-fixtures.ts
 RUN pnpm install --frozen-lockfile --filter @bienvu/renderer... --filter bienvu
 RUN pnpm fixtures && pnpm --filter @bienvu/renderer bundle
-RUN mkdir -p /app/evidence/local/renderer && chown -R node:node /app
+# Seul le répertoire de travail doit être modifiable à l'exécution.
+# Évite aussi de recopier tous les node_modules dans une couche chown.
+RUN mkdir -p /app/evidence/local/renderer && chown -R node:node /app/evidence
 USER node
 ENV PORT=8080
 EXPOSE 8080

@@ -19,6 +19,7 @@
     "test": "tsx --test --test-concurrency=2 tests/*.test.ts",
     "typecheck": "pnpm -r typecheck && tsc -p tsconfig.tests.json",
     "generations:pause": "node scripts/pause-generations.mjs",
+    "probe:generations": "tsx scripts/generation-operator.mjs",
     "build:web": "pnpm --filter @bienvu/web build:worker",
     "probe:web": "node scripts/probe-web.mjs",
     "probe:browser": "node scripts/probe-browser.mjs",
@@ -31,7 +32,18 @@
     "probe:auth-email": "node scripts/probe-auth-email.mjs",
     "dev:imports": "tsx scripts/serve-imports.ts",
     "probe:imports": "tsx scripts/probe-imports.ts",
-    "imports:cleanup": "tsx scripts/cleanup-imports.ts"
+    "probe:portals": "tsx scripts/probe-portals.ts",
+    "probe:voice": "tsx scripts/probe-voice.ts",
+    "probe:voice:worker": "node scripts/probe-voice-worker.mjs",
+    "probe:narration": "tsx scripts/probe-narration.ts",
+    "probe:narration:worker": "tsx scripts/probe-narration-worker.ts",
+    "probe:narration:cloudflare": "node --import tsx scripts/probe-narration-cloudflare.mjs",
+    "imports:cleanup": "tsx scripts/cleanup-imports.ts",
+    "fixtures:video": "tsx scripts/prepare-video-fixtures.ts",
+    "render:video": "node scripts/renderer-native.mjs video",
+    "probe:video:cloudflare": "node --import tsx scripts/probe-video-cloudflare.mjs",
+    "probe:video:container": "node --import tsx scripts/probe-video-container.mjs",
+    "preview:video": "node scripts/preview-video.mjs"
   },
   "devDependencies": {
     "@types/node": "24.10.1",

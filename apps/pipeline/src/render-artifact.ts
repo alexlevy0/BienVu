@@ -1,4 +1,5 @@
-export async function storeRenderArtifact(bucket:R2Bucket,key:string,body:ReadableStream<Uint8Array>,report:{sizeBytes:number;sha256:string}) {
+export async function storeRenderArtifact(bucket:R2Bucket,key:string,body:ReadableStream<Uint8Array>,report:{sizeBytes:number;sha256:string},
+  metadata:Record<string,string>={synthetic:'true',watermarked:'true'}) {
   if(!Number.isSafeInteger(report.sizeBytes)||report.sizeBytes<=0||report.sizeBytes>50*1024*1024||!/^[a-f0-9]{64}$/.test(report.sha256))throw new Error('INVALID_RENDER_REPORT');
   // Le proxy Containers ne conserve pas la longueur interne du flux pour R2.
   // FixedLengthStream borne le transfert sans charger le MP4 en mémoire.
@@ -11,7 +12,7 @@ export async function storeRenderArtifact(bucket:R2Bucket,key:string,body:Readab
   }catch(error){await writer.abort(error).catch(()=>{});throw error;}})();
   try {await Promise.all([
     copy,
-    bucket.put(key,fixed.readable,{sha256:report.sha256,httpMetadata:{contentType:'video/mp4'},customMetadata:{synthetic:'true',watermarked:'true'}}),
+    bucket.put(key,fixed.readable,{sha256:report.sha256,httpMetadata:{contentType:'video/mp4'},customMetadata:metadata}),
   ]);}catch(error){await Promise.allSettled([reader.cancel(error),writer.abort(error)]);throw error;}
   finally{reader.releaseLock();writer.releaseLock();}
   const head=await bucket.head(key);

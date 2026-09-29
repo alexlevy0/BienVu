@@ -2,11 +2,13 @@ import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import sharp from 'sharp';
-const folder='evidence/remote/imports-cloudflare';
+const sprint04=process.argv.includes('--portals');
+const folder=sprint04?'evidence/local/sprint-04/container':'evidence/remote/imports-cloudflare';
+await mkdir(folder,{recursive:true});
 const secret=(await readFile('apps/pipeline/.dev.vars.import.staging','utf8')).match(/^IMPORT_TOKEN=(.+)$/m)?.[1];
 assert.ok(secret?.length>=32);
 const run=(args)=>{const r=spawnSync('/usr/local/bin/docker',args,{encoding:'utf8',env:{...process.env,IMPORT_TOKEN:secret}});if(r.status!==0)throw new Error(r.stderr);return r.stdout.trim();};
-const id=run(['run','-d','--rm','--platform','linux/amd64','--name','bienvu-import-recipe','-p','127.0.0.1::8080','-e','IMPORT_TOKEN','bienvu-importer:sprint-03','node','--import','tsx','apps/importer/src/server.ts']);
+const id=run(['run','-d','--rm','--platform','linux/amd64','--name','bienvu-import-recipe','-p','127.0.0.1::8080','-e','IMPORT_TOKEN',sprint04?'bienvu-importer:sprint-04':'bienvu-importer:sprint-03','node','--import','tsx','apps/importer/src/server.ts']);
 const checks=[],started=Date.now();
 try {
  const base='http://'+run(['port',id,'8080/tcp']);

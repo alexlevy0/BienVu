@@ -5,7 +5,7 @@ import {fileURLToPath} from 'node:url';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
 const mode=process.argv[2];
-if(!['render','serve'].includes(mode))throw new Error('Choisir render ou serve');
+if(!['render','serve','video'].includes(mode))throw new Error('Choisir render, serve ou video');
 const env={...process.env};
 if(process.platform==='darwin') {
   const require=createRequire(new URL('../apps/renderer/package.json',import.meta.url));
@@ -16,7 +16,7 @@ if(process.platform==='darwin') {
 }
 const args=mode==='serve'
   ?['--env-file=apps/pipeline/.dev.vars','--import','tsx','apps/renderer/src/server.ts']
-  :['--import','tsx','apps/renderer/src/cli.ts',...process.argv.slice(3)];
+  :['--import','tsx',mode==='video'?'apps/renderer/src/listing-cli.ts':'apps/renderer/src/cli.ts',...process.argv.slice(3)];
 const child=spawn(process.execPath,args,{cwd:root,env,stdio:'inherit'});
 for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>child.kill(signal));
 child.on('error',error=>{console.error(error.message);process.exitCode=1;});

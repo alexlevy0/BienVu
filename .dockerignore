@@ -4,6 +4,7 @@
 **/.wrangler
 **/.env*
 **/.dev.vars*
+.secrets
 .git
 evidence
 docs

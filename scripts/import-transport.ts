@@ -77,7 +77,9 @@ export function nodeImportTransport(ports: NetworkPorts = realPorts): ImportTran
           if (typeof location !== 'string' || hop === IMPORT_LIMITS.redirects) throw new ImportFailure('UNSAFE_URL', 'Redirection non vérifiable.');
           url = scopedUrl(new URL(location, url).href, hosts); continue;
         }
-        if ([401, 403, 429].includes(reply.status)) throw new ImportFailure('SOURCE_BLOCKED', 'Accès refusé par la source.');
+        if ([401, 403, 429].includes(reply.status)) throw new ImportFailure('SOURCE_BLOCKED', 'Accès refusé par la source.',
+          reply.status === 401 ? 'login_required' : reply.status === 429 ? 'rate_limited' : 'access_denied');
+        if ([404, 410].includes(reply.status)) throw new ImportFailure('SOURCE_UNAVAILABLE', 'Annonce introuvable.', 'not_found');
         if (reply.status < 200 || reply.status >= 300) throw new ImportFailure('SOURCE_UNAVAILABLE', 'La source est indisponible.');
         const mime = String(reply.headers['content-type'] ?? '').split(';')[0].toLowerCase().trim();
         if (kind !== 'image') {

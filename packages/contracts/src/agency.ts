@@ -19,7 +19,7 @@ export type AgencyProfile = z.infer<typeof AgencyProfile>;
 export const Me = z.object({
   user: z.object({id: EntityId, name: z.string(), email: z.email()}).strict(),
   agency: AgencyProfile,
-  rights: z.object({generationEnabled: z.literal(false), trial: z.enum(['eligible', 'used']), watermarked: z.literal(true)}).strict(),
+  rights: z.object({generationEnabled: z.boolean(), developmentRemaining: z.number().int().nonnegative().default(0), importRetryAt: Timestamp.nullable().default(null), trial: z.enum(['eligible', 'used']), watermarked: z.literal(true)}).strict(),
 }).strict();
 export type Me = z.infer<typeof Me>;
 export const LOGO_MAX_BYTES = 2 * 1024 * 1024;

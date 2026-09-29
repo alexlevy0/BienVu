@@ -39,7 +39,7 @@ Filtrer logos, avatars, publicités, biens voisins, doublons, petites vignettes 
 
 Pour le minimum de recette : trois photos distinctes, bien identifiable, type et localisation fiables. Prix et surface affichés ou prononcés seulement s'ils sont vérifiés. Toute ambiguïté significative sur l'identité, le prix ou la surface doit être résolue par des preuves ou renvoyée comme échec.
 
-Le sprint 03 implémente aussi le fait `rooms` (unité `rooms`), facultatif pour compatibilité avec les anciennes fixtures. Les images d’import utilisent `agencies/{agencyId}/imports/{listingId}/{hash}.jpg`. `RenderManifest` exige toujours les clés du job : le pipeline devra copier les médias retenus avant rendu. États d’import distincts des jobs : `importing → ready/failed → deleting`, sans reprise d’un état terminal. Toute référence de job interdit la suppression.
+Le sprint 03 implémente aussi le fait `rooms` (unité `rooms`), facultatif pour compatibilité avec les anciennes fixtures. Les images d’import utilisent `agencies/{agencyId}/imports/{listingId}/{hash}.jpg`. Le manifeste exige les clés du job : le sprint 06 copie les médias retenus avant rendu. `RenderManifest` v1 reste une fixture historique des fondations ; le renderer produit reçoit `VideoManifest` v2, figé dans `video_manifests`, avec logo, WAV mesurés et droit essai/payant issu de la réservation serveur. Le client ne fournit ni ces droits ni des URL de médias. [Protocole et limites du renderer](VIDEO.md). États d’import distincts des jobs : `importing → ready/failed → deleting`, sans reprise d’un état terminal. Toute référence de job interdit la suppression.
 
 La description du bien est importée depuis son entité structurée ou son bloc DOM identifié, avec ses paragraphes. Elle reste distincte des faits vérifiés : sa présence ne valide pas les affirmations commerciales du texte et ne crée pas automatiquement de nouveaux faits. Aucun HTML actif n’est conservé ou interprété. Le texte est limité à 20 000 caractères ; `truncated` indique une coupure et l’interface renvoie vers la source pour la suite. Une description absente n’empêche pas l’import. Les anciens résultats sans ce champ sont lus avec `description: null` ; une nouvelle récupération explicite est nécessaire pour les enrichir.
 
@@ -122,3 +122,7 @@ La durée vidéo suit l'audio mesuré. Ne pas couper une phrase pour atteindre 3
 ## Conservation proposée
 
 Médias bruts, narrations et vidéos : 30 jours par défaut, avec expiration annoncée avant téléchargement et dans l'historique. Les assets de marque persistent jusqu'à modification ou suppression du compte. La purge combine métadonnées et règles R2, et ne supprime pas les fichiers d'un job actif. Les justificatifs comptables et traces de facturation ont une politique séparée à définir selon les obligations applicables ; ne pas les supprimer avec un simple fichier vidéo.
+
+## Contrat de parcours — sprint 07
+
+`GenerationInput` / `GenerationRequest` : union stricte `{url}` ou `{listingId}` ; l’agence, les droits et les coûts sont déduits côté serveur. `GenerationView` retourne statut/étape/tentative, erreur publique, date d’expiration, titre et liens privés de lecture/téléchargement. Aucun objectKey, secret, prompt ou manifeste n’est rendu au client. Le curseur de l’historique est revalidé et reste soumis au filtre de l’agence. Voir [GENERATIONS.md](GENERATIONS.md).

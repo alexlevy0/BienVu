@@ -1,47 +1,39 @@
-import {ImportFailure, type NormalizedListing} from '@bienvu/contracts';
+import {ImportFailure, sameSourceHost, type NormalizedListing} from '@bienvu/contracts';
 import {absolute, attr, children, descendants, hasClass, htmlDocument, imageCandidate, rawText, tag, text, type HtmlNode} from './html';
 import {descriptionFromNodes, descriptionFromString} from './description';
 import {IMPORT_LIMITS, publicUrl} from './network';
+import {selectAdapter} from './registry';
+import {clean, missing, numeric, unique, verified} from './facts';
+import {extractBienici} from './portals/bienici';
+export {verified, missing} from './facts';
 
 type Obj = Record<string, unknown>;
 const obj = (v: unknown): Obj => v !== null && typeof v === 'object' && !Array.isArray(v) ? v as Obj : {};
 const list = (v: unknown): unknown[] => v === undefined || v === null ? [] : Array.isArray(v) ? v : [v];
 const types = (v: Obj) => list(v['@type']).map(t => String(t).replace(/^https?:\/\/schema.org\//, ''));
 const homeTypes: Record<string, 'apartment' | 'house' | 'other'> = {Apartment: 'apartment', House: 'house', SingleFamilyResidence: 'house', Residence: 'other'};
-export const verified = <T, U extends string>(value: T, unit: U, sourcePath: string, raw: unknown = value) =>
-  ({status: 'verified' as const, value, unit, sourcePath, rawEvidence: (typeof raw === 'object' ? JSON.stringify(raw) : String(raw)).trim().slice(0, 500)});
-export const missing = <U extends string>(unit: U) => ({status: 'missing' as const, value: null, unit, sourcePath: null, rawEvidence: null});
 export type ExtractedListing = Omit<NormalizedListing, 'id' | 'agencyId' | 'photos' | 'sourceUrl' | 'fetchedAt' | 'sourceHost' | 'sourceKind'> & {photoUrls: string[]};
-function numeric(value: unknown): number | null {
-  if (typeof value !== 'string' && typeof value !== 'number') return null;
-  const raw = String(value).replace(/[\s\u00a0\u202f]/g, '');
-  if (!/^\d+(?:[.,]\d{1,2})?$/.test(raw)) return null;
-  const n = Number(raw.replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null;
-}
-function unique<T>(values: T[], message: string): T | undefined {
-  const distinct = [...new Map(values.map(v => [JSON.stringify(v), v])).values()];
-  if (distinct.length > 1) throw new ImportFailure('CONFLICTING_FACTS', message);
-  return distinct[0];
-}
-const clean = (v: unknown) => typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() : '';
 function canonical(nodes: HtmlNode[], url: string) {
   const found = nodes.filter(n => tag(n) === 'link' && attr(n, 'rel').split(/\s+/).includes('canonical')).map(n => absolute(attr(n, 'href'), url));
   const value = unique(found, 'Plusieurs URL canoniques.') ?? url;
   const a = publicUrl(value), b = publicUrl(url);
   // Le canonique peut enlever la query de suivi, jamais changer de bien.
-  if (a.origin !== b.origin || a.pathname !== b.pathname || a.search && a.search !== b.search)
+  if (!sameSourceHost(a.hostname, b.hostname) || a.pathname !== b.pathname || a.search && a.search !== b.search)
     throw new ImportFailure('CONFLICTING_FACTS', 'Le canonique désigne une autre annonce.');
   return a.href;
 }
 function identity(node: Obj, url: string) {
   for (const value of [node.url, obj(node.mainEntityOfPage)['@id']]) if (typeof value === 'string') {
     const u = new URL(value, url), current = new URL(url);
-    if (u.origin !== current.origin || u.pathname !== current.pathname)
+    if (u.protocol !== current.protocol || u.port !== current.port || u.username || u.password
+      || !sameSourceHost(u.hostname, current.hostname) || u.pathname !== current.pathname)
       throw new ImportFailure('CONFLICTING_FACTS', 'Les données désignent une autre annonce.');
   }
 }
 function structured(documents: unknown[], url: string, canonicalUrl: string): ExtractedListing {
   const nodes = documents.flatMap(v => Array.isArray(v) ? v : list(obj(v)['@graph'] ?? v)).map(obj);
+  if (nodes.some(n => types(n).some(t => ['ItemList', 'CollectionPage', 'SearchResultsPage'].includes(t))))
+    throw new ImportFailure('NOT_A_LISTING', 'Une liste de résultats ne constitue pas une annonce.', 'not_listing');
   if (nodes.length > 200) throw new ImportFailure('NOT_A_LISTING', 'Trop d’entités structurées.');
   const resolve = (v: unknown): Obj => {
     const value = obj(v), id = value['@id'];
@@ -150,7 +142,7 @@ function espaces(nodes: HtmlNode[], url: string, canonicalUrl: string): Extracte
 }
 
 function domAgency(nodes: HtmlNode[], url: string, canonicalUrl: string): ExtractedListing | undefined {
-  const u = new URL(url), century = u.hostname === 'www.century21.fr', orpi = u.hostname === 'www.orpi.com';
+  const u = new URL(url), adapter = selectAdapter(url), century = adapter.id === 'century21', orpi = adapter.id === 'orpi';
   if (!century && !orpi) return undefined;
   const id = century ? u.pathname.match(/^\/trouver_logement\/detail\/(\d+)\/$/)?.[1]
     : u.pathname.match(/^\/annonce-vente-.*-([a-f0-9]{8}-[a-f0-9-]{27})\/$/)?.[1];
@@ -199,13 +191,14 @@ function domAgency(nodes: HtmlNode[], url: string, canonicalUrl: string): Extrac
 }
 
 export function extractListingHtml(html: string, url: string): ExtractedListing {
+  const adapter = selectAdapter(url);
   const {nodes} = htmlDocument(html), canonicalUrl = canonical(nodes, url);
   const scripts = nodes.filter(n => tag(n) === 'script' && attr(n, 'type') === 'application/ld+json');
   if (scripts.length > 20) throw new ImportFailure('NOT_A_LISTING', 'Trop de blocs JSON-LD.');
   const documents = scripts.flatMap(n => {const content = rawText(n); if (content.length > 128_000) throw new ImportFailure('NOT_A_LISTING', 'JSON-LD trop volumineux.'); try {return [JSON.parse(content) as unknown];} catch {return [];}});
   let output: ExtractedListing | undefined;
   try {if (documents.length) output = structured(documents, url, canonicalUrl);} catch (error) {
-    if (!(error instanceof ImportFailure) || error.code !== 'NOT_A_LISTING') throw error;
+    if (!(error instanceof ImportFailure) || error.code !== 'NOT_A_LISTING' || error.reason === 'not_listing') throw error;
   }
   const microHomes = nodes.filter(n => /\/(House|Apartment|SingleFamilyResidence|Residence)$/.test(attr(n, 'itemtype')));
   if (microHomes.length > 1) throw new ImportFailure('CONFLICTING_FACTS', 'Plusieurs biens dans le DOM.');
@@ -237,7 +230,7 @@ export function extractListingHtml(html: string, url: string): ExtractedListing 
       output.description ??= micro.description;
     } else output = micro;
   }
-  if (new URL(url).hostname === 'www.espaces-atypiques.com' && new URL(url).pathname.startsWith('/ventes/')) {
+  if (adapter.id === 'espaces-atypiques') {
     const agency = espaces(nodes, url, canonicalUrl);
     if (output) for (const field of ['price', 'propertyType', 'locality'] as const) {
       const a = output.facts[field], b = agency.facts[field];
@@ -246,7 +239,7 @@ export function extractListingHtml(html: string, url: string): ExtractedListing 
     agency.description ??= output?.description ?? null;
     output = agency;
   }
-  const dom = domAgency(nodes, url, canonicalUrl);
+  const dom = adapter.id === 'bienici' ? extractBienici(nodes, documents, url, canonicalUrl, adapter.listingId!) : domAgency(nodes, url, canonicalUrl);
   if (dom) {
     if (output) for (const field of ['price', 'propertyType', 'locality', 'area'] as const) {
       const a = output.facts[field], b = dom.facts[field];
@@ -255,7 +248,7 @@ export function extractListingHtml(html: string, url: string): ExtractedListing 
     dom.description ??= output?.description ?? null;
     output = dom;
   }
-  if (!output) throw new ImportFailure('NOT_A_LISTING', 'Aucune annonce structurée exploitable.');
+  if (!output) throw new ImportFailure('NOT_A_LISTING', 'Aucune annonce structurée exploitable.', 'structure_changed');
   // Les URLs douteuses de la galerie sont refusées avant tout téléchargement.
   output.photoUrls = output.photoUrls.filter(v => !/(?:logo|avatar|floor.?plan|plan[-_]|dpe|ges)(?:[-_.\/]|$)/i.test(new URL(v).pathname));
   if (output.photoUrls.length < 3) throw new ImportFailure('INSUFFICIENT_PHOTOS', 'La galerie liée au bien est insuffisante.');

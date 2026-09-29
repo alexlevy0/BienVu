@@ -9,8 +9,9 @@ test('renderer : un calcul bloqué est tué sans bloquer les réponses du parent
   assert.ok(ticks>=5);assert.ok(Date.now()-start<3000);
 });
 test('renderer : sortie en erreur et annulation explicites, succès distinct',async()=>{
-  await runBoundedNode(['-e','process.exit(0)'],{timeoutMs:3000});
-  await assert.rejects(runBoundedNode(['-e','console.error("x".repeat(20000));process.exitCode=2'],{timeoutMs:3000}),error=>{
+  // Ici on vérifie le code de sortie, pas la vitesse de démarrage sous charge CI.
+  await runBoundedNode(['-e','process.exit(0)'],{timeoutMs:10000});
+  await assert.rejects(runBoundedNode(['-e','console.error("x".repeat(20000));process.exitCode=2'],{timeoutMs:10000}),error=>{
     assert.ok(error instanceof Error);assert.equal(error.message,'RENDER_PROCESS_FAILED');
     assert.ok(error.cause&&typeof error.cause==='object'&&'stderr' in error.cause);
     assert.equal(String(error.cause.stderr).length,4000);return true;

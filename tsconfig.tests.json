@@ -8,13 +8,29 @@
   "include": [
     "tests/**/*.ts",
     "fixtures/contracts.ts",
+    "fixtures/voice-worker.ts",
+    "fixtures/narration-worker.ts",
     "apps/web/cloudflare-env.d.ts",
+    "apps/pipeline/narration-env.d.ts",
     "scripts/import-*.ts",
     "scripts/serve-imports.ts",
     "scripts/probe-imports.ts",
     "scripts/probe-import-sources.ts",
     "scripts/probe-import-descriptions.ts",
+    "scripts/probe-portals.ts",
+    "scripts/probe-voice.ts",
+    "scripts/voice-probe-store.ts",
+    "scripts/probe-narration.ts",
+    "scripts/probe-narration-worker.ts",
+    "scripts/narration-fixtures.ts",
+    "scripts/narration-preview.ts",
+    "scripts/narration-probe-runtime.ts",
     "scripts/cleanup-imports.ts",
-    "scripts/local-import-db.ts"
+    "scripts/local-import-db.ts",
+    "apps/pipeline/video-env.d.ts",
+    "fixtures/video-worker.ts",
+    "fixtures/generation-worker.ts",
+    "scripts/video-fixtures.ts",
+    "scripts/prepare-video-fixtures.ts"
   ]
 }

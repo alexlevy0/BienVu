@@ -6,6 +6,7 @@ import path from 'node:path';
 import {ProbeRender} from '@bienvu/contracts';
 import {renderInProcess} from './render-process';
 import {outputDir} from './paths';
+import {VideoService} from './video-service';
 
 // Un serveur Node et au plus un calcul enfant. L'état durable est dans le contrôleur.
 // Les fichiers/états locaux ne sont jamais présentés comme récupérables après destruction.
@@ -15,6 +16,8 @@ const token = process.env.RENDER_TOKEN;
 if (!token || token.length<32) throw new Error('RENDER_TOKEN_REQUIRED');
 const bootedAt = new Date().toISOString();
 const shutdown=new AbortController();
+const videos=new VideoService({root:path.join(outputDir,'videos'),signal:shutdown.signal,
+  claim:id=>{if(active)return false;active=id;return true;},release:id=>{if(active===id)active=null;}});
 process.once('SIGTERM',()=>{shutdown.abort();setTimeout(()=>process.exit(0),1000).unref();});
 createServer(async(req,res)=>{
   const json = (body:unknown,status=200)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(body));};
@@ -23,6 +26,7 @@ createServer(async(req,res)=>{
     if(Buffer.byteLength(supplied)!==Buffer.byteLength(token)||!timingSafeEqual(Buffer.from(token),Buffer.from(supplied))) return json({error:'UNAUTHORIZED'},401);
     const url = new URL(req.url??'/', 'http://localhost');
     if(url.pathname==='/health') return json({ok:true,active,bootedAt,uptimeSeconds:process.uptime()});
+    if(await videos.handle(req,res))return;
     if(req.method==='POST'&&url.pathname==='/jobs') {
       let raw=''; for await(const chunk of req) {raw+=chunk.toString();if(raw.length>1024) return json({error:'BODY_TOO_LARGE'},413);}
       const parsed = ProbeRender.safeParse(JSON.parse(raw));

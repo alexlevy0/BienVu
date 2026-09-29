@@ -1,11 +1,14 @@
 'use client';
 import Link from 'next/link';
 import {useCallback, useEffect, useRef, useState, type FormEvent} from 'react';
-import {ListingUrl, publicErrors, type NormalizedListing, type PublicErrorCode} from '@bienvu/contracts';
+import {ImportUrl, publicErrors, type NormalizedListing, type PublicErrorCode} from '@bienvu/contracts';
 import {Icon} from './icon';
 import {useAccount} from './account';
 import {ManualListingForm} from './manual-listing-form';
 import {readListingDraft, clearListingDraft} from '../lib/listing-draft';
+import {GenerationProgress,generationActive,useGenerationProgress} from './generation-progress';
+import type {GenerationRequest,GenerationView} from '@bienvu/contracts';
+import {ImportCoverage} from './import-coverage';
 
 export type ImportView = {id: string; sourceKind: 'url' | 'manual'; sourceUrl: string | null; status: 'importing' | 'ready' | 'failed'; errorCode: PublicErrorCode | null;
   createdAt: string; expiresAt: string; listing: NormalizedListing | null; title?: string | null; transaction?: 'sale' | 'rent' | null};
@@ -15,7 +18,8 @@ export function GenerationForm() {
   const [url, setUrl] = useState(''), [feedback, setFeedback] = useState(''), [busy, setBusy] = useState(false);
   const [imports, setImports] = useState<ImportView[]>([]), [result, setResult] = useState<ImportView | null>(null);
   const [manualOpen, setManualOpen] = useState(false), [manualBusy, setManualBusy] = useState(false);
-  const working = busy || manualBusy;
+  const {job,setJob,unavailable}=useGenerationProgress(me?.agency.id);
+  const working = busy || manualBusy || generationActive(job);
   const pending = useRef<{url: string; key: string} | null>(null);
   useEffect(() => {
     const draft = readListingDraft();
@@ -34,13 +38,26 @@ export function GenerationForm() {
       setResult(value); if (value.sourceUrl) setUrl(value.sourceUrl); pending.current = null;
     } catch (error) {setFeedback(error instanceof Error ? error.message : message());}
   }
+  async function generate(input:GenerationRequest) {
+    const body=JSON.stringify(input),storageKey=`bienvu:generation:${me!.agency.id}`;
+    let previous:{body:string;key:string}|null=null;
+    try{previous=JSON.parse(sessionStorage.getItem(storageKey)??'null');}catch{}
+    const attempt=previous?.body===body?previous:{body,key:crypto.randomUUID()};
+    try{sessionStorage.setItem(storageKey,JSON.stringify(attempt));}catch{}
+    const response=await fetch('/api/generations',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':attempt.key},body});
+    const value=await response.json() as GenerationView&{error?:{code?:PublicErrorCode}};
+    if(!response.ok)throw new Error(message(value.error?.code));
+    setJob(value);clearListingDraft();try{sessionStorage.removeItem(storageKey);}catch{}
+  }
+  async function generateSaved(id:string){if(working)return;setBusy(true);setFeedback('');try{await generate({listingId:id});}catch(error){setFeedback(error instanceof Error?error.message:message());}finally{setBusy(false);}}
   async function submit(event: FormEvent) {
     event.preventDefault(); if (working) return;
-    const parsed = ListingUrl.safeParse(url);
+    const parsed = ImportUrl.safeParse(url);
     if (!parsed.success) {setFeedback('Saisissez le lien HTTPS public d’une annonce.'); return;}
     setBusy(true); setFeedback(''); setResult(null);
     if (!pending.current || pending.current.url !== parsed.data) pending.current = {url: parsed.data, key: crypto.randomUUID()};
     try {
+      if(me?.rights.generationEnabled){await generate({url:parsed.data});return;}
       const response = await fetch('/api/imports', {method: 'POST', headers: {'Content-Type': 'application/json', 'Idempotency-Key': pending.current.key},
         body: JSON.stringify({url: parsed.data}), signal: AbortSignal.timeout(75_000)});
       const value = await response.json() as ImportView & {error?: {code?: PublicErrorCode}};
@@ -55,6 +72,9 @@ export function GenerationForm() {
   if (!me) return <div className="information-note"><p>Connectez-vous pour importer une annonce dans votre espace privé.</p><Link className="button primary" href="/connexion">Se connecter <Icon name="arrow" size={16}/></Link></div>;
   const listing = result?.listing, facts = listing?.facts;
   return <>
+    <p className="field-help">{me.rights.generationEnabled?`Accès de développement · ${me.rights.developmentRemaining} vidéo(s) disponible(s).`:'La génération est momentanément fermée. Vous pouvez préparer vos annonces.'}</p>
+    {me.rights.importRetryAt&&<p className="information-note" role="status">La limite des imports de test est atteinte. Les nouvelles annonces seront disponibles à partir du {new Date(me.rights.importRetryAt).toLocaleString('fr-FR')}. Vos annonces déjà enregistrées restent utilisables.</p>}
+    {job&&<GenerationProgress job={job} unavailable={unavailable}/>}
     <form className="generation-form" onSubmit={submit} noValidate>
       <label htmlFor="listing-url">Le lien de votre annonce</label>
       <div className={`url-field ${feedback ? 'invalid' : ''}`}><Icon name="link"/>
@@ -64,15 +84,16 @@ export function GenerationForm() {
           aria-invalid={Boolean(feedback)} aria-describedby="url-help url-feedback"/>
       </div>
       <p id="url-help" className="field-help">Un lien public du bien que vous êtes autorisé à utiliser. Vos données restent privées.</p>
+      <ImportCoverage url={url}/>
       <p id="url-feedback" role="alert" className="form-feedback error">{feedback}</p>
-      <div className="generation-action"><button className="button primary" disabled={working} type="submit">
-        {busy ? 'Import en cours…' : 'Importer l’annonce'}<Icon name="arrow" size={18}/></button></div>
+      <div className="generation-action"><button className="button primary" disabled={working||Boolean(me.rights.importRetryAt)} type="submit">
+        {busy ? 'Préparation…' : me.rights.generationEnabled ? 'Créer ma vidéo' : 'Importer l’annonce'}<Icon name="arrow" size={18}/></button></div>
       {busy && <p className="field-help" role="status">Lecture de l’annonce et vérification de la galerie…</p>}
     </form>
     <button className="text-button manual-toggle" type="button" aria-expanded={manualOpen} aria-controls="manual-listing-panel" disabled={working}
       onClick={() => setManualOpen(open => !open)}><span aria-hidden="true">{manualOpen ? '−' : '+'}</span> Saisir mon annonce manuellement</button>
     <div id="manual-listing-panel" hidden={!manualOpen}>
-      <ManualListingForm busy={working} setBusy={setManualBusy} onCreated={async value => {setResult(value); setFeedback(''); setManualOpen(false); clearListingDraft(); await refresh();}}/>
+      <ManualListingForm generate={me.rights.generationEnabled} busy={working} setBusy={setManualBusy} onCreated={async value => {setResult(value); setFeedback(''); setManualOpen(false); clearListingDraft(); await refresh(); if(me.rights.generationEnabled)await generate({listingId:value.id});}}/>
     </div>
     {result && <section className="import-result" aria-live="polite">
       {result.status === 'failed' && <><h3>Cette annonce n’a pas pu être enregistrée.</h3><p className="form-feedback error">{message(result.errorCode)}</p><p className="field-help">Essayez un autre lien du même bien ou utilisez la saisie manuelle ci-dessus.</p></>}
@@ -93,6 +114,7 @@ export function GenerationForm() {
         </div>
         {listing.warnings.map(warning => <p className="field-help" key={warning}>{warning}</p>)}
         <p className="field-help">{listing.photos.length} photos enregistrées · Conservation jusqu’au {new Date(result.expiresAt).toLocaleDateString('fr-FR')}.</p>
+        {me.rights.generationEnabled&&<button className="button primary" disabled={working||me.rights.developmentRemaining===0} onClick={()=>void generateSaved(result.id)}>Créer la vidéo de cette annonce</button>}
         {listing.canonicalUrl && <a className="text-button" href={listing.canonicalUrl} target="_blank" rel="noopener noreferrer">Consulter l’annonce source</a>}
       </>}
     </section>}

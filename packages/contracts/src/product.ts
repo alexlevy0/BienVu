@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import {sameSourceHost, sourceForHost, sourceListingId} from './import-sources';
 
 export const EntityId = z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/);
 export const Sha256 = z.string().regex(/^[a-f0-9]{64}$/);
@@ -21,6 +22,19 @@ export const ListingUrl = z.string().trim().max(2048).superRefine((value, contex
     context.addIssue({code: 'custom', message: 'Utilisez un domaine public en HTTPS, sans identifiants ni port personnalisé.'});
   }
 });
+
+// Les liens copiés depuis les résultats SeLoger portent ce fragment de suivi.
+// Seule cette variante observée est nettoyée avant la validation habituelle.
+export const ImportUrl = z.string().trim().max(2048).transform(value => {
+  try {
+    const url = new URL(value), source = sourceForHost(url.hostname);
+    if (source?.id === 'seloger' && sourceListingId(source, url.pathname) && url.hash.startsWith('#ln=')) {
+      url.hash = ''; return url.href;
+    }
+  } catch { /* ListingUrl fournit le message de validation. */ }
+  return value;
+}).pipe(ListingUrl);
+export const ImportInput = z.object({url: ImportUrl}).strict();
 
 export const ObjectKey = z.string().max(512)
   .regex(/^agencies\/[a-zA-Z0-9_-]+\/(?:jobs|brand|imports)\/[a-zA-Z0-9_./-]+$/)
@@ -78,7 +92,7 @@ export const NormalizedListing = z.object({
 }).strict().superRefine((listing, context) => {
   try {
     if (listing.sourceKind === 'url' && (!listing.sourceUrl || !listing.canonicalUrl || !listing.sourceHost
-      || new URL(listing.sourceUrl).hostname !== listing.sourceHost || new URL(listing.canonicalUrl).hostname !== listing.sourceHost))
+      || new URL(listing.sourceUrl).hostname !== listing.sourceHost || !sameSourceHost(new URL(listing.canonicalUrl).hostname, listing.sourceHost)))
       context.addIssue({code: 'custom', path: ['sourceHost'], message: 'Le domaine canonique ne correspond pas à la source.'});
   } catch { /* Les champs URL portent déjà leur erreur de validation. */ }
   if (listing.sourceKind === 'manual' && (listing.sourceUrl !== null || listing.canonicalUrl !== null || listing.sourceHost !== null || listing.sourceListingId !== null))
@@ -177,4 +191,4 @@ export const CostEvent = z.object({
 }).strict().refine(event => !event.jobId || Boolean(event.agencyId), 'Un coût de traitement doit être rattaché à une agence.');
 export type CostEvent = z.infer<typeof CostEvent>;
 
-export const GenerationInput = z.object({url: ListingUrl}).strict();
+export const GenerationInput = z.union([z.object({url:ImportUrl}).strict(),z.object({listingId:EntityId}).strict()]);

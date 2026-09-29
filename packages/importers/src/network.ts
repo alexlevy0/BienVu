@@ -1,4 +1,4 @@
-import {ImportFailure, ListingUrl} from '@bienvu/contracts';
+import {ImportFailure, ListingUrl, sourceForHost} from '@bienvu/contracts';
 import {isPublicIp} from './safety';
 
 export const IMPORT_LIMITS = {htmlBytes: 2 * 1024 * 1024, imageBytes: 10 * 1024 * 1024,
@@ -14,14 +14,9 @@ export function publicUrl(value: string): URL {
 }
 
 // Aucun joker ni hôte fourni par le contenu de la page. Les CDN sont explicites.
-const mediaHosts: Record<string, readonly string[]> = {
-  'www.espaces-atypiques.com': ['www.espaces-atypiques.com'],
-  'www.orpi.com': ['www.orpi.com', 'cutjhqvjma.cloudimg.io'],
-  'www.century21.fr': ['www.century21.fr', 'images.century21.fr'],
-};
 export function sourcePolicy(source: string) {
-  const host = publicUrl(source).hostname;
-  return {pageHosts: [host], imageHosts: mediaHosts[host] ?? [host]};
+  const host = publicUrl(source).hostname, registered = sourceForHost(host);
+  return {pageHosts: registered?.hosts ?? [host], imageHosts: registered ? [...new Set([...registered.hosts, ...registered.mediaHosts])] : [host]};
 }
 export function scopedUrl(value: string, hosts: readonly string[]) {
   const url = publicUrl(value);

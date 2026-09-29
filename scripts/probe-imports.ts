@@ -87,6 +87,20 @@ try {
   const failed = await bad.json() as {status: string; errorCode: string; listing: unknown};
   assert.equal(failed.status, 'failed'); assert.equal(failed.errorCode, 'CONFLICTING_FACTS'); assert.equal(failed.listing, null);
   checked('Contradiction conservée comme échec explicite, sans faux résultat');
+  if (process.argv.includes('--portals')) {
+    for (const [path, code, reason] of [['/acces-refuse', 'SOURCE_BLOCKED', 'access_denied'], ['/page-recherche', 'NOT_A_LISTING', 'not_listing'],
+      ['/annonce-retiree', 'SOURCE_UNAVAILABLE', 'not_found']]) {
+      const response = await request('/api/imports', a, 'POST', {url: `https://fixtures.bienvu.example${path}`}, {'Idempotency-Key': randomUUID()});
+      assert.equal(response.status, 200);
+      const failed = await response.json() as {id: string; status: string; errorCode: string; listing: unknown};
+      assert.equal(failed.status, 'failed'); assert.equal(failed.errorCode, code); assert.equal(failed.listing, null);
+      assert.equal('diagnostics' in failed, false);
+      const rows = await localSql<{diagnostics: string}>(`SELECT diagnostics_json AS diagnostics FROM listing_imports WHERE id=${q(failed.id)};`);
+      const diagnostics = JSON.parse(rows[0].diagnostics);
+      assert.equal(diagnostics.failureReason, reason); assert.equal(diagnostics.browserUsed, false); assert.equal(diagnostics.resources, 1);
+    }
+    checked('Portails simulés : refus, recherche et retrait persistés, motifs privés, un accès sans relance');
+  }
   const counts = await localSql<{n: number}>(`SELECT count(*) n FROM jobs WHERE agency_id=${q(result.listing.agencyId)};`);
   assert.equal(counts[0].n, 0); checked('Aucun job, aucune vidéo ni droit d’essai consommé');
   if (process.argv.includes('--manual')) {

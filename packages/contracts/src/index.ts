@@ -4,6 +4,11 @@ export * from './product';
 export * from './errors';
 export * from './agency';
 export * from './manual-listing';
+export * from './import-sources';
+export * from './voice';
+export * from './narration';
+export * from './video';
+export * from './generation';
 
 export const ProbeRender = z.object({
   id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
@@ -14,8 +19,14 @@ export type ProbeRender = z.infer<typeof ProbeRender>;
 export const errorCodes = ['INVALID_URL', 'UNSAFE_URL', 'SOURCE_BLOCKED', 'SOURCE_UNAVAILABLE',
   'NOT_A_LISTING', 'INCOMPLETE_LISTING', 'CONFLICTING_FACTS', 'INSUFFICIENT_PHOTOS', 'IMPORT_TIMEOUT'] as const;
 export type ImportErrorCode = typeof errorCodes[number];
+export const importFailureReasons = ['access_denied', 'login_required', 'rate_limited', 'challenge', 'not_found',
+  'listing_redirect', 'not_listing', 'structure_changed'] as const;
+export type ImportFailureReason = typeof importFailureReasons[number];
+export function importFailureReason(value: unknown): ImportFailureReason | undefined {
+  return importFailureReasons.find(reason => reason === value);
+}
 export class ImportFailure extends Error {
-  constructor(public code: ImportErrorCode, message: string) {super(message);}
+  constructor(public code: ImportErrorCode, message: string, public reason?: ImportFailureReason) {super(message);}
 }
 
 const fact = <T extends z.ZodType>(value: T) => z.object({

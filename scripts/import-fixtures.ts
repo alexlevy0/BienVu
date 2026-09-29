@@ -9,7 +9,9 @@ export function fixtureImportTransport(): ImportTransport {
     const u = new URL(url);
     if (u.hostname !== 'fixtures.bienvu.example') throw new ImportFailure('SOURCE_UNAVAILABLE', 'Recette hors ligne : source inconnue.');
     if (kind === 'page') {
-      const file = {'/vente': 'sale', '/location': 'rent', '/doublons': 'duplicates', '/contradiction': 'conflict', '/absent': 'missing-price', '/hors-annonce': 'not-listing'}[u.pathname];
+      if (u.pathname === '/acces-refuse') throw new ImportFailure('SOURCE_BLOCKED', 'Refus synthétique du transport.', 'access_denied');
+      const file = {'/vente': 'sale', '/location': 'rent', '/doublons': 'duplicates', '/contradiction': 'conflict', '/absent': 'missing-price', '/hors-annonce': 'not-listing',
+        '/page-recherche': 'portals/search', '/annonce-retiree': 'portals/removed'}[u.pathname];
       if (!file) throw new ImportFailure('NOT_A_LISTING', 'Fixture absente.');
       const content = (await readFile(new URL(`../fixtures/imports/${file}.html`, import.meta.url), 'utf8')).replaceAll('https://fixtures.bienvu.example/vente', url);
       const bytes = new TextEncoder().encode(content);

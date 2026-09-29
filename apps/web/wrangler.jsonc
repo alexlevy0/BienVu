@@ -57,6 +57,10 @@
     {
       "binding": "IMPORT_SERVICE",
       "service": "bienvu-import-local"
+    },
+    {
+      "binding": "GENERATION_SERVICE",
+      "service": "bienvu-generation-local"
     }
   ]
 }

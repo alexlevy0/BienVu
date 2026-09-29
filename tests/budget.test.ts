@@ -20,3 +20,13 @@ test('coût brut inclut RAM/disque provisionnés pendant tout le temps actif',()
   assert.ok(Math.abs(containerGrossUsd(120,120)-0.0043008)<1e-10);
   assert.throws(()=>containerGrossUsd(-1,120));
 });
+test('hausse explicite à 40 € : historique préservé, coupure 35 € et marge de 5 €',()=>{
+  const old={...fresh(),fixedAndOtherCents:2425,committedCents:50,attempts:1,days:{'2026-09-27':1}};
+  assert.throws(()=>reserve(old,now),/BUDGET_LIMIT/);
+  const raised=reserve({...old,ceilingCents:3500,envelopeCents:4000},now);
+  assert.equal(raised.attempts,2);assert.equal(raised.committedCents,100);assert.equal(raised.days['2026-09-27'],2);
+  assert.equal(summary(raised).remainingEnvelopeCents,1475);
+  assert.throws(()=>reserve({...raised,fixedAndOtherCents:3351},now),/BUDGET_LIMIT/);
+  assert.throws(()=>reserve({...raised,ceilingCents:3501},now),/BUDGET_CONFIG_INVALID/);
+  assert.throws(()=>reserve({...raised,envelopeCents:3500},now),/BUDGET_CONFIG_INVALID/);
+});

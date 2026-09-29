@@ -1,10 +1,12 @@
-# Imports d’annonces — sprint 03
+# Imports d’annonces — sprints 03 et 04
 
 Le parcours local ou Cloudflare transforme un lien en annonce privée et galerie persistante. Depuis la demande d’Alex du 28/09/2026, un bouton sous l’import ouvre aussi une [saisie manuelle avec photos](SAISIE-MANUELLE.md). Les deux modes utilisent la session et l’agence du sprint 02, sans job vidéo, crédit ou essai consommé. Aucun éditeur vidéo n’est ajouté.
 
 **État au 28/09 :** imports URL et saisie manuelle actifs sur bienvu.online, avec Container privé à IP épinglée/Sharp, fallback Browser Run et D1/R2 existants. Trois agences réelles importées avec 12/11/7 photos ; recette séparée pour la page JavaScript et la saisie synthétiques. [Rapport Cloudflare](preuves/sprint-03/CLOUDFLARE.md).
 
 ## Lancer et utiliser
+
+La tranche locale du **sprint 04** ajoute le [registre et la couverture datée](preuves/sprint-04/RAPPORT.md), visibles sur `/sources` et sous le champ d’URL. Les trois agences ci-dessus disposent d’une preuve Cloudflare du sprint 03. Aucun des quatre portails n’a encore produit un import automatique complet validé ; la nouvelle tranche n’est pas encore déployée.
 
 Après `pnpm install --frozen-lockfile` et `pnpm setup:local` :
 
@@ -36,6 +38,16 @@ Les galeries sont délimitées par la structure de l’annonce et, lorsque dispo
 
 ## Limites effectives
 
+### Registre et portails
+
+`packages/contracts/src/import-sources.ts` centralise les hôtes exacts, leurs alias, routes d’annonces, CDN explicites et résultats datés. Le registre dans `packages/importers/src/registry.ts` refuse une recherche sur un portail connu avant le réseau et vérifie qu’une redirection conserve la même référence. Un domaine inconnu reste sur l’import générique protégé ; aucun CDN ne lui est accordé par ressemblance de nom. Un canonique peut utiliser un alias enregistré, sans changer de chemin. Les fragments de suivi SeLoger observés (`#ln=…`) sont retirés par `ImportUrl` avant la validation ; les autres fragments restent refusés.
+
+`portals/bienici.ts` est un adaptateur du **DOM après JavaScript**, recoupant titre/adresse/prix avec `Accommodation` et `Product`, ainsi que la référence de chaque image. Il ne devine ni API ni URL haute résolution. Le DOM de vente capturé manuellement fournit 17 candidats, dont 16 URL limitées à 600 px ; la location observée présente un écart de prix et est refusée. Cela ne prouve pas un import automatique : acquisition avec le navigateur produit, dimensions réellement décodées et persistance hébergée restent à vérifier. Le Browser Run actuel limite aussi scripts/XHR aux hôtes de pages enregistrés ; le CDN JavaScript observé `res.bienici.com` n’est pas autorisé silencieusement.
+
+Les HTTP 401/403/429 produisent `SOURCE_BLOCKED` avec un motif privé `login_required`/`access_denied`/`rate_limited`. Les challenges HTML reconnus arrêtent aussi l’essai ; HTTP 404/410 et pages retirées donnent `SOURCE_UNAVAILABLE`/`not_found`. Une redirection vers d’autres résultats porte `listing_redirect`. Ces motifs sont transportés par un en-tête privé sur liste fermée puis enregistrés dans les diagnostics ; ils ne contiennent ni corps fournisseur ni jeton. Les codes publics restent stables. Aucun retry automatique ; le fallback navigateur unique est réservé à une page sans données exploitables, pas à un refus explicite ou une liste de résultats.
+
+### Plafonds conservés
+
 | Limite | Valeur |
 |---|---|
 | Durée d’un import / d’une ressource | 60 s / 12 s |
@@ -46,7 +58,7 @@ Les galeries sont délimitées par la structure de l’annonce et, lorsque dispo
 | Image décodée | 16 millions de pixels maximum ; minimum 640×360 |
 | JPEG stocké | 2 048×2 048 maximum, ratio préservé |
 | Imports URL actifs / dossiers stockés par agence | 1 / 30, tous modes pour le stockage |
-| Tentatives d’import, toutes agences | 5 par jour UTC / 30 par mois UTC |
+| Tentatives d’import, toutes agences | 10 par jour UTC / 30 par mois UTC |
 | Récupérations simultanées du pont/conteneur | 2 |
 | Conservation / bail / délai avant purge | 30 jours / 90 s URL, 15 min saisie / bail + 5 min |
 
@@ -88,6 +100,8 @@ pnpm check
 pnpm probe:imports
 # Inclure les routes de saisie manuelle et les uploads binaires :
 pnpm probe:imports --manual
+# Recette distincte après nettoyage : refus/recherche/retrait simulés, zéro réseau externe :
+pnpm probe:imports --portals
 # Pour l’inspection UI, conservation temporaire des seules identités synthétiques :
 pnpm probe:imports --keep
 node scripts/open-local-fixture.mjs --imports
@@ -110,6 +124,25 @@ Trois URL fixes, trois photos maximum par annonce, une tentative sans relance. D
 
 ## Cloudflare : configuration et exploitation
 
+Le 28/09/2026, Alex autorise **10 imports par jour UTC**, au lieu de 5. La migration `0010_imports_daily_limit.sql` remplace le trigger : compteurs conservés, 30 imports/mois inchangés, idempotence et réservations financières conservées. Migration appliquée en local et sur D1 Cloudflare ; les cinq tentatives du jour sont restées à cinq lors du contrôle après migration. Il s’agit d’une limite de test BienVu partagée entre agences (URL et saisie manuelle), pas d’un plafond imposé par Cloudflare ni du quota vidéo d’un abonnement.
+
+### Reprendre une recette de portail
+
+```sh
+# Afficher les sept liens datés, sans réseau :
+pnpm probe:portals --list
+# Uniquement lors d’une nouvelle campagne volontaire, un cas à la fois :
+pnpm probe:portals --real seloger-sale
+```
+
+La seconde commande utilise le transport HTTPS Node réel, sans navigateur, proxy, cookie ou API payante. Une seule annonce et trois photos maximum ; une seconde tentative du même cas le même jour UTC est refusée par le dossier de preuve. Le succès local exige les contrats, un stockage D1/R2 Miniflare isolé et une relecture des fichiers avec SHA-256 ; il exige encore une inspection visuelle et ne démontre pas Cloudflare. Un refus rend le code de sortie 2. Les données/galeries brutes restent dans `evidence/local/sprint-04/probes/` ignoré. Ne pas lancer ces URL de fixtures sur Internet ; cette commande utilise uniquement les liens réels explicitement listés.
+
+Pour la recette **hébergée** du sprint 04, `node scripts/probe-portals-cloudflare.mjs init` prépare deux identités synthétiques. `import figaro|seloger|leboncoin|bienici` tente une seule annonce publique, via l’API authentifiée et les vrais services. Chaque cas est journalisé avant son exécution et refuse une seconde invocation ; les échecs restent comptés. Vérifier le résultat avant de lancer le cas suivant. `cleanup` retire uniquement ces identités et leurs données, en vérifiant que compteurs et réservations restent intacts. Aucune capture de portail ni session secrète n’est versionnée.
+
+La migration `0010` permet cette recette dès le 28/09 sans réinitialiser le compteur. Les quatre essais réservent au plus 2 € supplémentaires (0,50 € par tentative, **provision et non prix fournisseur**), sous le plafond financier existant. Le renderer reste en pause. [Résultats distants et limites](preuves/sprint-04/RAPPORT.md#recette-cloudflare).
+
+### Configuration existante
+
 Le portage utilise `apps/importer` et `apps/pipeline/wrangler.import.jsonc`, conformément à l'[ADR 0003](adr/0003-transport-import-cloudflare.md). La configuration staging ignorée cible `bienvu-import-staging`, D1/R2 existants, une instance `basic`, sommeil 30 s. `IMPORT_TOKEN` est un secret aléatoire commun au web et au service ; `PROBE_TOKEN` opérateur est distinct. Le web possède le Service Binding `IMPORT_SERVICE`, `IMPORT_MODE=cloudflare` et son origine HTTPS exacte. Le mode local reste strictement réservé au loopback.
 
 La préparation `scripts/prepare-staging.mjs` accepte `BIENVU_STAGING_TARGET=imports` et `BIENVU_IMPORTS_ENABLED=true`, avec `BIENVU_WORKERS_PLAN=paid`. Préparer séparément le web en conservant origine, client Google, expéditeur et destinataire existants. Ne pas régénérer la configuration du renderer en pause pour déployer l'importeur. Appliquer les migrations manquantes, puis déployer le service avant le web. Utiliser `wrangler deploy --secrets-file` pour ajouter les secrets sans remplacer ceux d'authentification. Après un changement du code web, refaire `pnpm build:web`.
@@ -126,7 +159,7 @@ node scripts/import-operator.mjs budget 1650 2500
 node scripts/import-operator.mjs resume
 ```
 
-Ces commandes ciblent uniquement les ressources de staging connues. `pause` arrête aussi le conteneur d'import. `resume` exige un mois configuré et au moins 0,50 € disponible. Elles ne réinitialisent aucun compteur. L'état indique une alerte à 20 € de provisions ; la coupure à 25 € laisse 5 € sur l'enveloppe de 30 €. Un mois nouveau exige un nouveau rapprochement explicite. La facture fournisseur reste une vérification séparée.
+Ces commandes ciblent uniquement les ressources de staging connues. `pause` arrête aussi le conteneur d'import. `resume` exige un mois configuré et au moins 0,50 € disponible. Elles ne réinitialisent aucun compteur. L'état indique une alerte à 20 € de provisions ; la coupure à 35 € laisse 5 € sur l’enveloppe de 40 €, après la hausse explicite d’Alex du 28/09 (migration 0013 et mise à jour opérateur du mois ; les anciens journaux gardent leur plafond). Un mois nouveau exige un nouveau rapprochement explicite. La facture fournisseur reste une vérification séparée.
 
 Les sondes `scripts/probe-import-cloudflare.mjs` sont **réelles et payantes potentiellement**, réservées à une campagne bornée : `fixtures`, `gates`, `operator <cas>`, `import <agence|javascript>`, `manual`, `status`. Elles refusent de relancer un cas déjà enregistré. Les étapes utilisant des comptes nécessitent les seules fixtures `probe-accounts --remote --keep-fixtures`. Les cas opérateur exigent temporairement `IMPORT_PROBES_ENABLED=true` ; ce drapeau est désactivé après recette. Ne pas effacer les réservations R2/D1 pour recommencer.
 

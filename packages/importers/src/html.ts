@@ -22,8 +22,20 @@ export function htmlDocument(html: string) {
   if (new TextEncoder().encode(html).length > IMPORT_LIMITS.htmlBytes) throw new ImportFailure('NOT_A_LISTING', 'HTML trop volumineux.');
   const root = parse(html), nodes = descendants(root);
   const title = text(nodes.find(n => tag(n) === 'title'));
-  if (/captcha|access denied|accès refusé|verify you are human|just a moment/i.test(title))
-    throw new ImportFailure('SOURCE_BLOCKED', 'Protection d’accès détectée.');
+  const headings = nodes.filter(n => tag(n) === 'h1').map(text).join(' ').slice(0, 1000);
+  const mainTitle = `${title} ${headings}`;
+  const challengeFrame = nodes.some(n => tag(n) === 'iframe' && /^https:\/\/(?:geo|ct)\.captcha-delivery\.com\/(?:captcha|challenge)\//.test(attr(n, 'src')));
+  const shortBody = nodes.filter(n => ['p', 'h1'].includes(tag(n))).map(text).join(' ');
+  if (/captcha|access denied|accès refusé|verify you are human|just a moment|vérifiez que vous êtes humain/i.test(mainTitle)
+    || challengeFrame || shortBody.length < 600 && /please enable js and disable any ad blocker|vérification de sécurité requise/i.test(shortBody))
+    throw new ImportFailure('SOURCE_BLOCKED', 'Protection d’accès détectée.', 'challenge');
+  if (/too many requests|trop de requêtes|limite de requêtes atteinte/i.test(mainTitle))
+    throw new ImportFailure('SOURCE_BLOCKED', 'La source limite les requêtes.', 'rate_limited');
+  if (/^(?:connexion|se connecter|sign in|log in|authentification)(?:\s*[|—–-]|\s*$)/i.test(title)
+    || /connectez-vous pour (?:consulter|accéder|voir) (?:à )?(?:cette\s+|l[’'])annonce/i.test(headings))
+    throw new ImportFailure('SOURCE_BLOCKED', 'La source demande une connexion.', 'login_required');
+  if (/(?:cette |l[’'])annonce (?:n[’']est plus disponible|a été (?:supprimée|retirée)|est expirée)|annonce (?:introuvable|supprimée|retirée)|page (?:introuvable|non trouvée)|404 not found/i.test(mainTitle))
+    throw new ImportFailure('SOURCE_UNAVAILABLE', 'Cette annonce n’est plus accessible.', 'not_found');
   return {root, nodes, title};
 }
 export function absolute(value: string, base: string) {

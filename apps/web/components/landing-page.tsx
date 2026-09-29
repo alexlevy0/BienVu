@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import {useEffect, useRef, useState, type FormEvent, type ReactNode} from 'react';
-import {ListingUrl} from '@bienvu/contracts';
+import {ImportUrl} from '@bienvu/contracts';
 import {useAccount} from './account';
 import {Icon} from './icon';
 import {saveListingDraft} from '../lib/listing-draft';
@@ -58,7 +58,7 @@ export function LandingPage() {
   }, [dialog]);
   function start(event: FormEvent) {
     event.preventDefault();
-    const parsed = ListingUrl.safeParse(url.trim());
+    const parsed = ImportUrl.safeParse(url.trim());
     if (!parsed.success) {setError('Collez le lien HTTPS public de votre annonce.'); return;}
     if (!saveListingDraft({kind: 'url', url: parsed.data})) {setError('Votre navigateur ne peut pas conserver le lien. Ouvrez le studio pour le saisir.'); return;}
     window.location.assign(me ? '/generer' : '/connexion?mode=signup');
@@ -104,7 +104,7 @@ export function LandingPage() {
       ].map((offer, index) => <article key={offer.name} className={index === 1 ? 'plan-featured' : ''}><div className="plan-heading"><h3>{offer.name}</h3>{index === 1 && <span>LE BON RYTHME</span>}</div><p className="plan-description">{offer.copy}</p><p className="plan-price">{offer.price} € <span>/ mois HT</span></p><p className="plan-quota">{offer.videos} vidéos / mois</p><ul>{['Voix off française', 'Identité d’agence', 'Sans filigrane BienVu'].map(feature => <li key={feature}><Icon name="check" size={18}/>{feature}</li>)}</ul><button type="button" className={`landing-button ${index !== 1 ? 'landing-button-outline' : ''}`} onClick={() => {setPlan(offer.name); setDialog('plan');}}>Découvrir cette offre <ArrowUp size={16}/></button></article>)}</div><p className="landing-pricing-note">Offres en préparation. Aucun paiement ni abonnement actif pour le moment.</p></section>
 
       <section className="landing-faq" aria-labelledby="faq-title"><div className="landing-wrap"><div className="landing-section-heading"><div><p className="landing-eyebrow">FAQ</p><h2 className="landing-section-title" id="faq-title">Les bonnes <em>questions.</em></h2></div><p>Une question ? On vous répond simplement.</p></div><div className="landing-questions">{[
-        {q: 'Quels liens puis-je utiliser ?', a: 'Commencez par un lien public d’un site d’agence. La compatibilité dépend de la source : BienVu vous indique si l’annonce peut être importée. Si un site ne fonctionne pas, la saisie manuelle reste disponible.'},
+        {q: 'Quels liens puis-je utiliser ?', a: <>Commencez par un lien public d’un site d’agence. La compatibilité dépend de la source : consultez <Link href="/sources">les sources testées et leurs limites</Link>. Si un site ne fonctionne pas, la saisie manuelle reste disponible.</>},
         {q: 'Dois-je importer mes photos ?', a: 'BienVu essaie de récupérer les photos depuis votre lien. Vous pouvez aussi saisir l’annonce vous-même et ajouter entre 3 et 12 photos que vous êtes autorisé à utiliser.'},
         {q: 'Puis-je essayer gratuitement ?', a: 'À l’ouverture de la génération, une vidéo d’essai avec filigrane sera offerte après inscription. Dès maintenant, vous pouvez créer votre compte, enregistrer votre agence et préparer vos annonces gratuitement.'},
         {q: 'Ma vidéo sera-t-elle à mes couleurs ?', a: 'Oui. Enregistrez une fois votre logo, vos couleurs et vos coordonnées dans votre espace agence. Cette identité est prévue pour être réutilisée dans vos prochaines vidéos, sans montage à effectuer.'},

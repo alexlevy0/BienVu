@@ -1,3 +1,4 @@
+import {generationRights} from '@bienvu/db';
 import {Me} from '@bienvu/contracts';
 import {requireOwner} from '../../../lib/owner';
 import {respond} from '../../../lib/http';
@@ -8,6 +9,6 @@ export async function GET(request: Request) {
     const trial = await env.DB.prepare('SELECT consumed_at FROM trial_claims WHERE owner_user_id=?').bind(user.id)
       .first<{consumed_at: string | null}>();
     return Response.json(Me.parse({user: {id: user.id, name: user.name, email: user.email}, agency,
-      rights: {generationEnabled: false, trial: trial?.consumed_at ? 'used' : 'eligible', watermarked: true}}));
+      rights: {...await generationRights(env.DB, agency.id, env.GENERATIONS_ENABLED), trial: trial?.consumed_at ? 'used' : 'eligible', watermarked: true}}));
   });
 }
