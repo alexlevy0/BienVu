@@ -1,6 +1,6 @@
 import {WorkflowEntrypoint,type WorkflowEvent,type WorkflowStep} from 'cloudflare:workers';
 import {EntityId,GenerationRequest,VideoReport,publicErrors,videoObjectKey,videoPreviewKey} from '@bienvu/contracts';
-import {admitGeneration,findGeneration,generationView,GenerationFailure,failGeneration,setGenerationStage,type GenerationRow} from '@bienvu/db';
+import {admitGeneration,findGeneration,generationView,GenerationFailure,failGeneration,setGenerationStage,setGenerationProgress,type GenerationRow} from '@bienvu/db';
 import {authorized,json} from './auth';
 import {VideoRenderer} from './video-worker';
 import {getJobVideo,prepareJobVideo} from './video-manifest';
@@ -54,7 +54,7 @@ async function settleVideo(env:GenerationEnv,row:GenerationRow,result:unknown){
     env.DB.prepare(`INSERT INTO generation_artifacts(job_id,object_key,report_json,created_at)
       SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM jobs WHERE id=? AND status NOT IN ('failed')) ON CONFLICT(job_id) DO NOTHING`)
       .bind(row.jobId,key,JSON.stringify(report),at,row.jobId),
-    env.DB.prepare("UPDATE jobs SET status='ready',stage='rendering',lease_until=NULL,error_code=NULL,updated_at=? WHERE id=? AND agency_id=? AND status NOT IN ('ready','failed')")
+    env.DB.prepare("UPDATE jobs SET status='ready',stage='rendering',progress_percent=100,lease_until=NULL,error_code=NULL,updated_at=? WHERE id=? AND agency_id=? AND status NOT IN ('ready','failed')")
       .bind(at,row.jobId,row.agencyId),
   ]);return true;
 }
@@ -103,7 +103,8 @@ export class GenerationWorkflow extends WorkflowEntrypoint<GenerationEnv,{agency
           if(['ready','failed'].includes(row.status))return {done:true};
           if(row.deadline<=new Date().toISOString())throw new Error('GENERATION_TIMEOUT');
           const response=await controller(this.env).fetch(`https://video/status/${render.hash}`);if(!response.ok)throw new Error('VIDEO_STATE_UNAVAILABLE');
-          const data=await response.json() as {status:string};if(data.status==='failed')throw new Error('VIDEO_RENDER_FAILED');
+          const data=await response.json() as {status:string;progressPercent?:number};if(data.status==='failed')throw new Error('VIDEO_RENDER_FAILED');
+          if(data.status==='rendering'||data.status==='publishing')await setGenerationProgress(this.env.DB,row,data.progressPercent??0);
           return {done:await settleVideo(this.env,row,data)};
         });
         if(result.done)return {jobId,completed:true};

@@ -5,10 +5,10 @@ import {findImport} from './imports';
 
 export class GenerationFailure extends Error {constructor(public code:PublicErrorCode){super(code);}}
 export type GenerationRow={ownerAgencyId:string|null;anonymousSessionId:string|null;retention:'available'|'expiring'|'expired';creditStatus:'unfunded'|'reserved'|'consumed'|'released';previewKey:string|null;previewReport:string|null;jobId:string;agencyId:string;inputHash:string;input:string;brand:string;deadline:string;expiresAt:string;
-  status:GenerationView['status'];stage:GenerationView['stage'];attempt:number;errorCode:string|null;createdAt:string;updatedAt:string;sourceKind:'url'|'manual'|null;
+  status:GenerationView['status'];stage:GenerationView['stage'];progressPercent:number;attempt:number;errorCode:string|null;createdAt:string;updatedAt:string;sourceKind:'url'|'manual'|null;
   workflowId:string;listingId:string|null;objectKey:string|null;report:string|null;launchStatus:string;title:string;locality:string|null};
 const columns=`g.owner_agency_id AS ownerAgencyId,g.anonymous_session_id AS anonymousSessionId,g.retention,r.status AS creditStatus,p.object_key AS previewKey,p.report_json AS previewReport,g.job_id AS jobId,g.agency_id AS agencyId,g.input_hash AS inputHash,g.input_json AS input,g.brand_json AS brand,
-  g.deadline,g.expires_at AS expiresAt,j.status,j.stage,j.attempt,j.error_code AS errorCode,j.created_at AS createdAt,j.updated_at AS updatedAt,
+  g.deadline,g.expires_at AS expiresAt,j.status,j.stage,j.progress_percent AS progressPercent,j.attempt,j.error_code AS errorCode,j.created_at AS createdAt,j.updated_at AS updatedAt,
   j.workflow_id AS workflowId,j.listing_id AS listingId,a.object_key AS objectKey,a.report_json AS report,l.status AS launchStatus,
   coalesce(json_extract(i.result_json,'$.facts.title.value'),'Votre annonce') AS title,
   json_extract(i.result_json,'$.facts.locality.value') AS locality,
@@ -27,7 +27,7 @@ export function generationView(row:GenerationRow,now=Date.now(),audience:'owner'
   const available=row.retention==='available'&&row.status==='ready'&&Boolean(row.objectKey)&&row.expiresAt>new Date(now).toISOString();
   const unlocked=audience==='owner'&&!!row.ownerAgencyId&&row.creditStatus==='consumed';
   const preview=available&&Boolean(row.previewKey);
-  return GenerationView.parse({ownership:row.ownerAgencyId?'owned':'anonymous',masterAccess:unlocked?'unlocked':row.creditStatus==='reserved'?'reserved':'locked',retention:row.retention,id:row.jobId,status:row.status,stage:row.stage,attempt:row.attempt,sourceKind:row.sourceKind,
+  return GenerationView.parse({ownership:row.ownerAgencyId?'owned':'anonymous',masterAccess:unlocked?'unlocked':row.creditStatus==='reserved'?'reserved':'locked',retention:row.retention,id:row.jobId,status:row.status,stage:row.stage,progressPercent:row.progressPercent,attempt:row.attempt,sourceKind:row.sourceKind,
     errorCode:row.errorCode&&row.errorCode in publicErrors?row.errorCode:row.errorCode?'GENERATION_FAILED':null,
     createdAt:row.createdAt,updatedAt:row.updatedAt,expiresAt:row.expiresAt,title:row.title,locality:row.locality,
     videoUrl:available&&unlocked?`/api/generations/${row.jobId}/video`:preview?audience==='anonymous'?`/api/trial/${row.jobId}/preview`:`/api/generations/${row.jobId}/preview`:null,downloadUrl:available&&unlocked?`/api/generations/${row.jobId}/video?download=1`:null,
@@ -102,6 +102,11 @@ export async function listGenerations(db:Database,agencyId:string,before?:string
 export async function setGenerationStage(db:Database,row:GenerationRow,stage:GenerationView['stage']){
   await db.prepare(`UPDATE jobs SET status=?,stage=?,updated_at=? WHERE id=? AND agency_id=? AND status NOT IN ('ready','failed')`)
     .bind(stage,stage,new Date().toISOString(),row.jobId,row.agencyId).run();
+}
+export async function setGenerationProgress(db:Database,row:GenerationRow,percent:number){
+  if(!Number.isInteger(percent)||percent<0||percent>99)return;
+  await db.prepare(`UPDATE jobs SET progress_percent=?,updated_at=? WHERE id=? AND agency_id=? AND status='rendering' AND progress_percent<?`)
+    .bind(percent,new Date().toISOString(),row.jobId,row.agencyId,percent).run();
 }
 export async function failGeneration(db:Database,row:GenerationRow,code:string){
   await db.prepare(`UPDATE jobs SET status='failed',error_code=?,lease_until=NULL,updated_at=? WHERE id=? AND agency_id=? AND status NOT IN ('ready','failed')`)

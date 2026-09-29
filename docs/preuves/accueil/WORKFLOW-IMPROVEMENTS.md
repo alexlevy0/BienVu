@@ -1,6 +1,6 @@
 # Workflow de création — vérification locale du 29/09/2026
 
-Cette extension est **locale et non déployée**. Elle réutilise les imports, l'admission des jobs, Workflows, R2, les crédits, l'essai anonyme et le partage volontaire existants. Migration additive 0019 requise avant toute publication. Les anciennes annonces prêtes et les jobs existants gardent leurs accès.
+Ce document consigne la **recette locale avant publication**. La version a ensuite été publiée sur `bienvu.online` après la hausse de budget autorisée : [contrôles et limites de la publication](DEPLOIEMENT-29-09.md). Elle réutilise les imports, l'admission des jobs, Workflows, R2, les crédits, l'essai anonyme et le partage volontaire existants. Les anciennes annonces prêtes et les jobs existants gardent leurs accès.
 
 ## Fonctionnement livré
 
@@ -22,7 +22,7 @@ Cette extension est **locale et non déployée**. Elle réutilise les imports, l
 
 Le coût facturé de l'unique appel OpenAI réel n'est pas certifié par cette sonde ; 0,05 € sont provisionnés prudemment dans le [budget](../../BUDGET-ET-OFFRES.md) et dans son rapport local, soit 29,90 € au total connu. Les tests ordinaires ne représentent pas des appels fournisseur, une recette sur Cloudflare, une facture contrôlée ni une lecture sur téléphone physique.
 
-## Avant activation sur bienvu.online
+## Liste de contrôle établie avant activation sur bienvu.online
 
 1. Rapprocher la facture et la marge sous le **pilote 30 €/mois, coupure 25 €** demandé le 29/09. Le registre historique 40 €/35 € reste conservé, mais l'extraction utilise le plafond le plus strict. Le cumul prudent est 29,90 € : **aucune marge actuellement pour un appel via le parcours hébergé**. Vérifier le mois actif de `hosted_import_budget` : l'absence d'une ligne non pausée ferme l'extraction.
 2. Sauvegarder D1, appliquer 0019, puis publier ensemble le Worker de génération et le web avec leurs secrets et Service Bindings existants. Cette tâche n'a exécuté aucune migration distante et aucun déploiement.

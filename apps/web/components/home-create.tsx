@@ -288,8 +288,12 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     {screen.kind==='error'&&<p className="home-form-feedback" role="alert">{screen.message} Votre saisie est conservée pour réessayer.</p>}
     {feedback && <p className="home-form-feedback" id="home-url-error" role="alert">{feedback}</p>}
     {!me && trial.challenge && trial.siteKey && <TrialChallenge siteKey={trial.siteKey} version={trial.widgetVersion}
-      purpose={guestPending.current?'description':'trial'} onToken={token=>{trial.setToken(token);const pending=guestPending.current;
-        if(token&&pending)void analyzeGuest(pending.text,pending.key,token);}} onError={trial.setFailure}/>}
+      purpose={guestPending.current?'description':'trial'} onToken={token=>{trial.setToken(token);if(!token)return;
+        const pending=guestPending.current;if(pending){trial.setChallenge(false);void analyzeGuest(pending.text,pending.key,token);return;}
+        const parsed=ImportUrl.safeParse(url.trim());if(!parsed.success){trial.setChallenge(false);setFeedback('Collez un lien HTTPS public valide.');return;}
+        trial.setChallenge(false);setScreen({kind:'sending',request:{kind:'url',text:parsed.data}});
+        void trial.start(parsed.data,token);
+      }} onError={trial.setFailure}/>}
     {!me && trial.failure && screen.kind !== 'error' && <p className="home-form-feedback" role="alert">{trial.failure} <Link href="/connexion">Se connecter</Link></p>}
     {importPaused && <p className="home-form-note" role="status">La limite d’imports est atteinte. Vous pourrez ajouter une annonce à partir du {new Date(me!.rights.importRetryAt!).toLocaleString('fr-FR')}.</p>}
     {noCredits && <p className="home-form-note">Vos crédits vidéo sont utilisés. <Link href="/historique">Retrouvez vos vidéos</Link>.</p>}

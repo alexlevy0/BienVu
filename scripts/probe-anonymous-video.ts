@@ -37,6 +37,7 @@ const fixture=await videoFixture('anonymous');
 for(const asset of videoAssets(fixture.manifest))await writeFile(path.join(directory,videoAssetFile(asset)),fixture.files.get(asset.id)!);
 await writeFile(path.join(directory,'manifest.json'),JSON.stringify(fixture.manifest,null,2));
 const report=await renderListingVideo(fixture.manifest,directory);assert.equal(report.watermarked,false);assert.equal(report.preview?.watermarked,true);assert.notEqual(report.sha256,report.preview?.sha256);
+assert.equal((await readFile(path.join(directory,'progress.txt'),'utf8')).trim(),'95');
 const frames=[0,Math.floor(report.durationFrames/2),report.durationFrames-1],comparisons=[];
 for(const frame of frames){const samples=[];
   for(const variant of ['video','preview']){

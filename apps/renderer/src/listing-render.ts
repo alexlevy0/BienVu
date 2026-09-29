@@ -1,5 +1,5 @@
 import {createServer} from 'node:http';
-import {createReadStream} from 'node:fs';
+import {createReadStream,renameSync,writeFileSync} from 'node:fs';
 import {chmod, mkdir, readFile, rename, rm, stat, writeFile} from 'node:fs/promises';
 import {createHash, randomBytes} from 'node:crypto';
 import {execFile} from 'node:child_process';
@@ -136,20 +136,33 @@ export async function renderListingVideo(input: unknown, directory: string): Pro
   const manifest=VideoManifest.parse(input), id=await videoManifestHash(manifest);
   const startedAt=new Date().toISOString(), start=performance.now(), frames=manifest.scenes.reduce((n,s)=>n+s.durationFrames,0);
   const raw=path.join(directory,'raw.mp4'), partial=path.join(directory,'partial.mp4'), output=path.join(directory,'video.mp4');
+  const progressFile=path.join(directory,'progress.txt'),progressTemp=path.join(directory,'.progress.tmp');
+  let lastProgress=-1;
+  const progress=(percent:number)=>{
+    const next=Math.max(0,Math.min(95,Math.floor(percent)));
+    if(next<=lastProgress)return;
+    try{writeFileSync(progressTemp,String(next),{mode:0o600});renameSync(progressTemp,progressFile);lastProgress=next;}
+    catch{/* La télémétrie ne doit jamais interrompre la création du MP4. */}
+  };
   try {
+    progress(0);
     await withVideoAssets(manifest,directory,async props=>{
       const composition=await selectComposition({serveUrl:bundleDir,id:'BienVuListing',inputProps:props,...browser()});
       await renderMedia({serveUrl:bundleDir,composition,inputProps:props,...browser(),codec:'h264',audioCodec:'aac',
         pixelFormat:'yuv420p',outputLocation:raw,concurrency:1,timeoutInMilliseconds:120_000,
-        audioBitrate:'192k',crf:21,logLevel:'error'});
+        audioBitrate:'192k',crf:21,logLevel:'error',onProgress:state=>progress(state.progress*85)});
     });
+    progress(85);
     if((await stat(raw)).size>50*1024*1024)throw new Error('VIDEO_TOO_LARGE');
     if(isFastStart(await readFile(raw)))await rename(raw,partial);
     else await exec(binary('ffmpeg'),['-v','error','-i',raw,'-map','0','-c','copy','-movflags','+faststart','-y',partial],{cwd:cwd(binary('ffmpeg')),timeout:60_000});
     const report=await verifyVideoArtifact(partial,id,frames,manifest.rights.watermarked,startedAt,start);
     await rename(partial,output);await chmod(output,0o600);
+    progress(90);
     if(manifest.rights.kind==='anonymous')report.preview=await createWatermarkedPreview(output,directory,id,frames);
+    progress(94);
     await writeFile(path.join(directory,'report.json'),JSON.stringify(report,null,2)+'\n',{mode:0o600});
+    progress(95);
     return report;
   }finally{await Promise.all([raw,partial].map(file=>rm(file,{force:true})));}
 }

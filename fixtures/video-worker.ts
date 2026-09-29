@@ -17,7 +17,8 @@ export class FixtureVideo extends DurableObject<Env> {
       if(path.endsWith('/preview'))return new Response(new Uint8Array([3,2,1]));
       if(path.endsWith('/file'))return new Response(new Uint8Array([1,2,3]));
       if(init?.method==='DELETE'){await this.ctx.storage.put('cleaned',true);return Response.json({ok:true});}
-      return Response.json({id:await this.ctx.storage.get('id'),status:await this.ctx.storage.get('hold')?'rendering':'ready',report:await this.ctx.storage.get('report')});
+      return Response.json({id:await this.ctx.storage.get('id'),status:await this.ctx.storage.get('hold')?'rendering':'ready',
+        progressPercent:await this.ctx.storage.get('progressPercent')??0,report:await this.ctx.storage.get('report')});
     },running:async()=>!await this.ctx.storage.get('stopped'),stop:async()=>{await this.ctx.storage.put('stopped',true);},schedule:async()=>{},
     now:()=>this.clock,maxAttempts:4,budget:{month:new Date().toISOString().slice(0,7),paused:false,fixedAndOtherCents:2425,
       ceilingCents:3500,envelopeCents:4000,committedCents:0,attempts:0,days:{}}});

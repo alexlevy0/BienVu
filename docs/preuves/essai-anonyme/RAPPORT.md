@@ -1,6 +1,6 @@
 # Essai anonyme — recette locale du 29 septembre 2026
 
-**Implémenté localement, non déployé, nouveaux essais désactivés.** Le code utilise Better Auth, les allocations/réservations D1, l’outbox/Workflow, le contrôleur de rendu et R2 existants. Aucun service acheté, aucun appel fournisseur payant ni aucune mutation Cloudflare distante pendant cette tâche. Les modifications UI présentes avant cette tâche sont conservées.
+**Rapport de recette locale avant publication.** Le code utilise Better Auth, les allocations/réservations D1, l’outbox/Workflow, le contrôleur de rendu et R2 existants. Aucun service acheté, aucun appel fournisseur payant ni aucune mutation Cloudflare distante pendant cette phase. Le déploiement ultérieur et ses limites sont consignés dans le [rapport de publication](../accueil/DEPLOIEMENT-29-09.md). Les modifications UI présentes avant cette phase sont conservées.
 
 [Configuration et architecture](../../ESSAI-ANONYME.md) · [Suivi](../../SUIVI.md) · [Budget](../../BUDGET-ET-OFFRES.md).
 

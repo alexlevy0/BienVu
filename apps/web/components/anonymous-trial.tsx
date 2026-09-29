@@ -21,19 +21,20 @@ export function useAnonymousTrial(enabled:boolean) {
   const refresh=useCallback(async()=>{try{const data=await value(await fetch('/api/trial',{cache:'no-store'}));setAvailable(data.enabled);setSiteKey(data.siteKey);setUsed(data.used);setJob(data.job?GenerationView.parse(data.job):null);setLoaded(true);setFailure('');}catch{setFailure('Impossible de retrouver votre essai. Réessayez.');setLoaded(true);}},[]);
   useEffect(()=>{if(enabled)void refresh();},[enabled,refresh]);
   useEffect(()=>{if(!enabled||!job||!generationActive(job)||job.ownership==='owned')return;const timer=setInterval(()=>void refresh(),4000);return()=>clearInterval(timer);},[enabled,job?.id,job?.status,job?.ownership,refresh]);
-  async function start(url:string) {
+  async function start(url:string,verifiedToken?:string) {
     if(lock.current)return;setFailure('');
     if(!loaded){setFailure('Votre navigateur est en cours de vérification. Réessayez dans un instant.');return;}
     if(!available){setFailure(publicErrors.ANONYMOUS_UNAVAILABLE[1]);return;}
     if(used){setFailure(publicErrors.TRIAL_USED[1]);return;}
     if(job&&generationActive(job)){return;}
-    if(!token&&!intent.current){setChallenge(true);return;}
+    const currentToken=verifiedToken??token;
+    if(!currentToken&&!intent.current){setChallenge(true);return;}
     if(intent.current?.url!==url)intent.current={url,key:crypto.randomUUID()};
     if(!intent.current)intent.current={url,key:crypto.randomUUID()};
     lock.current=true;
     try{
-      const response=await fetch('/api/trial',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':intent.current.key},body:JSON.stringify({url,turnstileToken:token})});
-      const body=await response.json() as {error?:{code?:string;message?:string}};if(!response.ok){if(body.error?.code==='BOT_VERIFICATION_FAILED')setChallenge(true);throw new Error(body.error?.message??'La création n’a pas démarré. Réessayez.');}
+      const response=await fetch('/api/trial',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':intent.current.key},body:JSON.stringify({url,turnstileToken:currentToken})});
+      const body=await response.json() as {error?:{code?:string;message?:string}};if(!response.ok){if(body.error?.code==='BOT_VERIFICATION_FAILED'){intent.current=null;setChallenge(true);}throw new Error(body.error?.message??'La création n’a pas démarré. Réessayez.');}
       setJob(GenerationView.parse(body));setChallenge(false);intent.current=null;
     }catch(e){setFailure(e instanceof Error?e.message:'La connexion a été interrompue. Réessayez pour retrouver votre demande.');}
     finally{setToken('');setWidgetVersion(n=>n+1);lock.current=false;}
@@ -43,12 +44,17 @@ export function useAnonymousTrial(enabled:boolean) {
 export function TrialChallenge({siteKey,version,onToken,onError,purpose='trial'}:{siteKey:string;version:number;onToken:(token:string)=>void;
   onError:(text:string)=>void;purpose?:'trial'|'description'}) {
   const container=useRef<HTMLDivElement>(null);
+  const callbacks=useRef({onToken,onError});
+  useEffect(()=>{callbacks.current={onToken,onError};},[onToken,onError]);
   useEffect(()=>{let disposed=false,id:string|undefined;void loadTurnstile().then(()=>{
     if(disposed||!container.current||!window.turnstile)return;
-    id=window.turnstile.render(container.current,{sitekey:siteKey,action:'anonymous_trial',theme:'light',size:'flexible',callback:onToken,
-      'expired-callback':()=>onToken(''),'error-callback':()=>{onToken('');onError('La vérification a échoué. Rechargez-la et réessayez.');}});
-  }).catch(e=>onError(e.message));return()=>{disposed=true;if(id)window.turnstile?.remove(id);};},[siteKey,version,onToken,onError]);
-  return <div className="trial-challenge"><p>{purpose==='description'?'Vérifiez que vous êtes humain pour préparer votre annonce.':'Vérifiez que vous êtes humain, puis cliquez sur « Créer ma vidéo ».'}</p><div ref={container}/></div>;
+    id=window.turnstile.render(container.current,{sitekey:siteKey,action:'anonymous_trial',theme:'light',size:'flexible',
+      callback:(token:string)=>callbacks.current.onToken(token),
+      'expired-callback':()=>callbacks.current.onToken(''),
+      'error-callback':()=>{callbacks.current.onToken('');callbacks.current.onError('La vérification a échoué. Rechargez-la et réessayez.');}});
+  }).catch(e=>{if(!disposed)callbacks.current.onError(e.message);});
+  return()=>{disposed=true;if(id)window.turnstile?.remove(id);};},[siteKey,version]);
+  return <div className="trial-challenge"><p>{purpose==='description'?'Vérifiez que vous êtes humain pour préparer votre annonce.':'Vérifiez que vous êtes humain pour lancer la création.'}</p><div ref={container}/></div>;
 }
 const steps:Record<GenerationView['status'],string>={queued:'Votre vidéo attend son démarrage',importing:'Lecture de l’annonce',scripting:'Rédaction de la narration',voicing:'Création de la voix off',rendering:'Préparation de la vidéo',retry_wait:'Reprise en attente',ready:'Votre vidéo est prête',failed:'La création n’a pas abouti'};
 export function AnonymousTrialResult({job}:{job:GenerationView}) {

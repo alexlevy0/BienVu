@@ -55,6 +55,10 @@ test('service privé : idempotence concurrente, fichiers bornés, reprise et cle
   assert.equal((await bad.json() as {error:string}).error,'VIDEO_ASSET_HASH_MISMATCH');
   const requests=await Promise.all([1,2].map(()=>call(`/videos/${id}/start`,{method:'POST'})));
   assert.ok(requests.every(r=>[202,409].includes(r.status)));assert.equal(executions,1);
+  await writeFile(path.join(root,id,'progress.txt'),'42');
+  assert.equal((await (await call(`/videos/${id}`)).json() as {progressPercent:number}).progressPercent,42);
+  await writeFile(path.join(root,id,'progress.txt'),'101');
+  assert.equal((await (await call(`/videos/${id}`)).json() as {progressPercent:number}).progressPercent,0);
   assert.equal((await submit()).status,202);complete();
   let state:{status:string}={status:''};
   for(let i=0;i<40;i++){state=await (await call(`/videos/${id}`)).json() as typeof state;if(state.status==='ready')break;await new Promise(r=>setTimeout(r,10));}

@@ -58,6 +58,14 @@ test('contrôleur durable workerd : budget, concurrence, R2, timeout et coupures
   await accept('crash');await call('crash','/control',{hold:true});await call('crash','/advance');
   assert.equal((await snapshot('crash')).job.status,'rendering');await call('crash','/control',{stopped:true});await call('crash','/advance');
   state=await snapshot('crash');assert.equal(state.job.error,'VIDEO_RENDER_INTERRUPTED');assert.equal(state.starts,1);assert.equal(state.state.budget.committedCents,50);
+  await accept('progress');await call('progress','/control',{hold:true,progressPercent:42});await call('progress','/advance');
+  assert.equal((await snapshot('progress')).job.progressPercent,42);
+  await call('progress','/control',{progressPercent:17});await call('progress','/advance');
+  assert.equal((await snapshot('progress')).job.progressPercent,42,'Une mesure tardive ne fait pas reculer la barre');
+  await call('progress','/control',{progressPercent:101});await call('progress','/advance');
+  assert.equal((await snapshot('progress')).job.progressPercent,42,'Une valeur invalide est ignorée');
+  await call('progress','/control',{hold:false,progressPercent:95});await call('progress','/advance');
+  assert.equal((await snapshot('progress')).job.progressPercent,100);
   await accept('timeout');await call('timeout','/control',{clock:Date.now()+700_000});await call('timeout','/advance');
   state=await snapshot('timeout');assert.equal(state.job.error,'VIDEO_TIMEOUT');assert.equal(state.starts,0);assert.equal(state.stopped,true);
   await accept('stale-cancel');await call('stale-cancel','/control',{hold:true});await call('stale-cancel','/advance');

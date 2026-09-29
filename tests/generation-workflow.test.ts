@@ -7,7 +7,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import {migrateNarrationProbe,seedNarrationFixture} from '../scripts/narration-fixtures';
-import {admitGeneration} from '../packages/db/src/index';
+import {admitGeneration,setGenerationProgress,findGeneration} from '../packages/db/src/index';
 import {videoFixture} from '../fixtures/video';
 
 test('Workflow workerd réel, fournisseurs simulés : déconnexion, restart puis réconciliation après upload et quota unique',async t=>{
@@ -45,6 +45,10 @@ test('Workflow workerd réel, fournisseurs simulés : déconnexion, restart puis
   let row:{status:string}|null=null;
   for(let i=0;i<70;i++){row=await env.DB.prepare('SELECT status FROM jobs WHERE id=?').bind(job.id).first();if(['rendering','ready','failed'].includes(row!.status))break;await new Promise(r=>setTimeout(r,200));}
   assert.equal(row!.status,'rendering');
+  const progressRow=(await findGeneration(env.DB,scope.agencyId,job.id))!;
+  await setGenerationProgress(env.DB,progressRow,42);
+  await setGenerationProgress(env.DB,progressRow,17);
+  assert.equal((await env.DB.prepare('SELECT progress_percent AS percent FROM jobs WHERE id=?').bind(job.id).first<{percent:number}>())!.percent,42);
   // Détruire workerd pendant le sleep, après le stockage R2. La requête HTTP est terminée depuis longtemps.
   const beforeCalls=(await env.DB.prepare('SELECT count(*) AS n FROM narration_calls').first<{n:number}>())!.n;
   assert.ok(beforeCalls>1);
@@ -52,6 +56,7 @@ test('Workflow workerd réel, fournisseurs simulés : déconnexion, restart puis
   await mf.dispatchFetch(`https://test/reconcile/${job.id}`,{headers});
   for(let i=0;i<100;i++){row=await env.DB.prepare('SELECT status FROM jobs WHERE id=?').bind(job.id).first();if(['ready','failed'].includes(row!.status))break;await new Promise(r=>setTimeout(r,200));}
   assert.equal(row!.status,'ready');
+  assert.equal((await env.DB.prepare('SELECT progress_percent AS percent FROM jobs WHERE id=?').bind(job.id).first<{percent:number}>())!.percent,100);
   assert.deepEqual(await env.DB.prepare('SELECT reserved,consumed FROM allocations WHERE agency_id=?').bind(scope.agencyId).first(),{reserved:0,consumed:1});
   assert.equal((await env.DB.prepare('SELECT count(*) AS n FROM generation_artifacts').first<{n:number}>())!.n,1);
   assert.equal((await env.DB.prepare('SELECT count(*) AS n FROM narration_calls').first<{n:number}>())!.n,beforeCalls);

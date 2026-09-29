@@ -64,7 +64,14 @@ export class VideoService {
       const id=match[1],state=await this.load(id);if(!state){json(res,{error:'NOT_FOUND'},404);return true;}
       const directory=this.dir(id),manifest=VideoManifest.parse(JSON.parse(await readFile(path.join(directory,'manifest.json'),'utf8')));
       if(await videoManifestHash(manifest)!==id)throw new Error('VIDEO_MANIFEST_CONFLICT');
-      if(!match[2]&&req.method==='GET'){json(res,state);return true;}
+      if(!match[2]&&req.method==='GET'){
+        let progressPercent=state.status==='ready'?100:0;
+        if(state.status==='rendering'){
+          const value=await readFile(path.join(directory,'progress.txt'),'utf8').catch(()=>null);
+          if(value!==null&&/^\d{1,2}$/.test(value)&&Number(value)<=95)progressPercent=Number(value);
+        }
+        json(res,{...state,progressPercent});return true;
+      }
       if(match[3]&&req.method==='PUT') {
         if(state.status!=='staging'){json(res,{error:'VIDEO_ALREADY_STARTED'},409);return true;}
         const asset=videoAssets(manifest).find(a=>a.id===match[3]);

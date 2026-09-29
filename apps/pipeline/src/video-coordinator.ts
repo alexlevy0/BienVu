@@ -3,7 +3,7 @@ import {reserve, budgetLimits, type Budget} from './budget';
 import {storeRenderArtifact} from './render-artifact';
 
 export type VideoJob = {id:string;manifest:VideoManifest;status:'accepted'|'staging'|'starting'|'rendering'|'publishing'|'ready'|'failed';
-  startedAt:number;updatedAt:number;report?:VideoReport;objectKey?:string;error?:string;failures:number;
+  startedAt:number;updatedAt:number;report?:VideoReport;objectKey?:string;error?:string;failures:number;progressPercent?:number;
   diagnostic?:{operation:'submit'|'boot';httpStatus?:number;code?:string};attempt?:number;retryOf?:number};
 type Dependencies = {storage:DurableObjectStorage;bucket:R2Bucket;call:(path:string,init?:RequestInit)=>Promise<Response>;
   running:()=>Promise<boolean>;stop:()=>Promise<void>;schedule:()=>Promise<unknown>;now?:()=>number;
@@ -152,15 +152,21 @@ export class VideoCoordinator {
       if(job.status==='rendering') {
         const response=await this.deps.call(`/videos/${id}`);
         if(!response.ok)throw new Error('VIDEO_STATE_LOST');
-        const result=await response.json() as {id?:string;status?:string;report?:unknown;error?:string};
+        const result=await response.json() as {id?:string;status?:string;report?:unknown;error?:string;progressPercent?:number};
         if(result.id!==id)throw new Error('VIDEO_STATE_LOST');
         if(result.status==='failed')throw new Error(result.error??'VIDEO_RENDER_FAILED');
-        if(result.status!=='ready'){await this.deps.schedule();return;}
+        if(result.status!=='ready'){
+          const percent=result.progressPercent;
+          if(typeof percent==='number'&&Number.isInteger(percent)&&percent>=0&&percent<=95&&percent>(job.progressPercent??0)){
+            job={...job,progressPercent:percent};await this.save(job);
+          }
+          await this.deps.schedule();return;
+        }
         const report=VideoReport.parse(result.report),frames=job.manifest.scenes.reduce((n,s)=>n+s.durationFrames,0);
         if(report.id!==id||report.manifestHash!==id||report.watermarked!==job.manifest.rights.watermarked||report.durationFrames!==frames
           ||Math.abs(report.durationSeconds-frames/30)>.12)throw new Error('VIDEO_REPORT_INVALID');
         if(job.manifest.rights.kind==='anonymous'&&(!report.preview||!report.preview.watermarked||report.preview.manifestHash!==id||report.preview.id!==id||report.preview.durationFrames!==frames||Math.abs(report.preview.durationSeconds-report.durationSeconds)>.12||report.preview.sha256===report.sha256))throw new Error('VIDEO_PREVIEW_INVALID');
-        job={...job,status:'publishing',report,objectKey:videoObjectKey(job.manifest,id)};await this.save(job);
+        job={...job,status:'publishing',progressPercent:96,report,objectKey:videoObjectKey(job.manifest,id)};await this.save(job);
       }
       if(job.status==='publishing'&&job.report&&job.objectKey) {
         if(!await this.stored(job)) {
@@ -203,7 +209,7 @@ export class VideoCoordinator {
     return true;
   }
   private async complete(job:VideoJob) {
-    await this.finish({...job,status:'ready'});
+    await this.finish({...job,status:'ready',progressPercent:100});
     // Le résultat R2 est autoritaire avant le nettoyage de l'espace éphémère.
     try {if(await this.deps.running()) {
       const response=await this.deps.call(`/videos/${job.id}`,{method:'DELETE'});await response.body?.cancel();
