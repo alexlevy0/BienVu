@@ -2,12 +2,13 @@ import {readFile,writeFile,mkdir,copyFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import path from 'node:path';
 import sharp from 'sharp';
-import {PreparedNarration,VideoManifest,videoAssetFile,type VideoAsset} from '../packages/contracts/src/index';
+import {PreparedNarration,VideoManifest,videoAssetFile,videoPresentation,type VideoAsset} from '../packages/contracts/src/index';
 import {narrationBrand,narrationListing} from '../fixtures/narration';
 import {compileScript,DEFAULT_SCRIPT_MODEL,scriptContext} from '../packages/narration/src/index';
 
 const hash=(bytes:Uint8Array)=>createHash('sha256').update(bytes).digest('hex');
-export async function makeVideoFixture(kind:'trial'|'paid'='trial', agencyId=`s06-${kind}`,jobId=`job-video-${kind}`) {
+export async function makeVideoFixture(kind:'trial'|'paid'='trial', agencyId=`s06-${kind}`,jobId=`job-video-${kind}`,
+  templateVersion:'bienvu-vertical/1'|'bienvu-vertical/2'='bienvu-vertical/1') {
   const directory=path.resolve(`evidence/local/sprint-06/${jobId}`);await mkdir(directory,{recursive:true,mode:0o700});
   const source=path.resolve('evidence/remote/sprint-05/naturalness'), proof=JSON.parse(await readFile(path.join(source,'run.json'),'utf8'));
   if(proof.providerMock===true || proof.humanListening?.status!=='validated')throw new Error('VALIDATED_VOICE_REQUIRED');
@@ -39,9 +40,10 @@ export async function makeVideoFixture(kind:'trial'|'paid'='trial', agencyId=`s0
       sizeBytes:bytes.length,mime:'audio/wav',durationMs:original.durationMs};
     audio.push(a);await copyFile(path.join(source,`scene-${i+1}.wav`),path.join(directory,videoAssetFile(a)));
   }
-  const manifest=VideoManifest.parse({schemaVersion:2,templateVersion:'bienvu-vertical/1',agencyId,jobId,listingId:listing.id,brand,contact:ctx.contact,
+  const manifest=VideoManifest.parse({schemaVersion:2,templateVersion,agencyId,jobId,listingId:listing.id,brand,contact:ctx.contact,
     logo,width:1080,height:1920,fps:30,disclosure:script.disclosure,rights:{kind,allocationId:`allocation-${jobId}`,watermarked:kind==='trial'},
-    photos,audio,scenes:script.scenes.map((s,i)=>({...s,audioAssetId:audio[i].id,durationFrames:prepared.durationFrames[i]}))});
+    photos,audio,scenes:script.scenes.map((s,i)=>({...s,audioAssetId:audio[i].id,durationFrames:prepared.durationFrames[i]})),
+    ...(templateVersion==='bienvu-vertical/2'?{presentation:videoPresentation(listing)}:{})});
   await writeFile(path.join(directory,'manifest.json'),JSON.stringify(manifest,null,2)+'\n',{mode:0o600});
   await writeFile(path.join(directory,'fixture.json'),JSON.stringify({syntheticListing:true,syntheticImages:true,voice:'existing_real_google_audio',
     sourceListingId:prepared.script.listingId,sourceProviderMock:false,newTtsCalls:0,newTextCalls:0,listing,script},null,2)+'\n',{mode:0o600});

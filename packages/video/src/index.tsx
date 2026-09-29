@@ -33,7 +33,7 @@ function Film(props: VideoFixture) {
 const Root = () => <>
   <Composition id="BienVuProbe" component={Film} width={1080} height={1920} fps={30} durationInFrames={180} defaultProps={defaults} calculateMetadata={({props})=>({durationInFrames:props.durationSeconds*props.fps})}/>
   <Composition id="BienVuListing" component={ListingFilm} width={1080} height={1920} fps={30} durationInFrames={600}
-    defaultProps={{manifest:null,media:{},logoBackground:'#ffffff',fontUrl:staticFile('video-font.woff2')}}
+    defaultProps={{manifest:null,media:{},logoBackground:'#ffffff',fontUrl:staticFile('video-font.woff2'),displayFontUrl:staticFile('video-display.ttf')}}
     calculateMetadata={({props}: {props: ListingVideoProps}) => ({durationInFrames:props.manifest?.scenes.reduce((n,s)=>n+s.durationFrames,0) ?? 600})}/>
 </>;
 registerRoot(Root);

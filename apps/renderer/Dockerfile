@@ -13,9 +13,13 @@ COPY packages/contracts packages/contracts
 COPY packages/video packages/video
 COPY packages/voice packages/voice
 COPY apps/web/public/fonts/inter-tight.woff2 apps/web/public/fonts/inter-tight.woff2
+COPY apps/web/public/fonts/anton-regular.ttf apps/web/public/fonts/anton-regular.ttf
+COPY apps/web/public/fonts/anton-OFL.txt apps/web/public/fonts/anton-OFL.txt
 COPY scripts/generate-fixtures.ts scripts/generate-fixtures.ts
 RUN pnpm install --frozen-lockfile --filter @bienvu/renderer... --filter bienvu
 RUN pnpm fixtures && pnpm --filter @bienvu/renderer bundle
+ENV REMOTION_BROWSER_EXECUTABLE=/app/apps/renderer/node_modules/.remotion/chrome-headless-shell/linux64/chrome-headless-shell-linux64/chrome-headless-shell
+RUN test -x "$REMOTION_BROWSER_EXECUTABLE"
 # Seul le répertoire de travail doit être modifiable à l'exécution.
 # Évite aussi de recopier tous les node_modules dans une couche chown.
 RUN mkdir -p /app/evidence/local/renderer && chown -R node:node /app/evidence

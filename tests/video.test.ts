@@ -4,11 +4,11 @@ import {createServer} from 'node:http';
 import {mkdtemp,readFile,writeFile,mkdir,rm,readdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
-import {VideoManifest,videoManifestHash,videoAssets,videoAssetFile} from '../packages/contracts/src/index';
+import {VideoManifest,videoManifestHash,videoAssets,videoAssetFile,videoPresentation} from '../packages/contracts/src/index';
 import {videoFixture,videoReport} from '../fixtures/video';
 import {VideoService} from '../apps/renderer/src/video-service';
 import {isFastStart,parseRange,withVideoAssets} from '../apps/renderer/src/listing-render';
-import {subtitleGroups,fitFont} from '../packages/video/src/layout';
+import {subtitleGroups,fitFont,displayArea,displayPrice,displayRooms,displayLocation} from '../packages/video/src/layout';
 
 test('manifeste vidéo : droit, périmètre, timeline, sources figés',async()=>{
   const {manifest:m}=await videoFixture();
@@ -19,6 +19,26 @@ test('manifeste vidéo : droit, périmètre, timeline, sources figés',async()=>
   assert.equal(await videoManifestHash(m),await videoManifestHash(JSON.parse(JSON.stringify(m))));
   assert.notEqual(await videoManifestHash(m),await videoManifestHash({...m,brand:{...m.brand,name:'Nouvelle agence'}}));
   assert.equal((await videoFixture('paid')).manifest.rights.watermarked,false);
+});
+test('le modèle plein écran fige les faits admis et conserve les anciens manifestes',async()=>{
+  const {manifest:legacy,listing}=await videoFixture();
+  const presentation=videoPresentation(listing);
+  assert.equal(presentation.locality,'Lyon');
+  assert.equal(presentation.priceCents,37900000);
+  assert.equal(presentation.areaM2,42.06);
+  assert.equal(VideoManifest.safeParse({...legacy,templateVersion:'bienvu-vertical/2'}).success,false);
+  const editorial=VideoManifest.parse({...legacy,templateVersion:'bienvu-vertical/2',presentation});
+  assert.notEqual(await videoManifestHash(editorial),await videoManifestHash(legacy));
+  assert.equal(VideoManifest.safeParse({...legacy,presentation}).success,false);
+  const unresolved=structuredClone(listing);
+  unresolved.facts.price={status:'missing',value:null,unit:'EUR_cent',sourcePath:null,rawEvidence:null};
+  unresolved.facts.area={status:'missing',value:null,unit:'m2',sourcePath:null,rawEvidence:null};
+  assert.equal(videoPresentation(unresolved).priceCents,null);
+  assert.equal(videoPresentation(unresolved).areaM2,null);
+  assert.equal(displayPrice(37900000).replace(/\s/g,' '),'379 000 €');
+  assert.equal(displayArea(42.06).replace(/\s/g,' '),'42,06 m²');
+  assert.equal(displayRooms(1),'1 pièce');
+  assert.equal(displayLocation('Lyon 6e'),'LYON 6e');
 });
 test('sous-titres et taille : toutes les phrases conservées, longues lignes adaptées',()=>{
   const words='Une description immobilière très longue avec toutes les informations utiles. '.repeat(5).trim();

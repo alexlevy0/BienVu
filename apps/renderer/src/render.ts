@@ -29,7 +29,8 @@ async function renderVideo(input: unknown) {
   const file = path.join(outputDir,`${request.id}.mp4`);
   const partial = path.join(outputDir,`${request.id}.partial.mp4`);
   const browserExecutable=process.env.REMOTION_BROWSER_EXECUTABLE;
-  const chromeMode=browserExecutable?'chrome-for-testing' as const:'headless-shell' as const;
+  const chromeMode=browserExecutable&&!browserExecutable.includes('chrome-headless-shell')
+    ?'chrome-for-testing' as const:'headless-shell' as const;
   const composition = await selectComposition({serveUrl:bundleDir,id:'BienVuProbe',inputProps:props,browserExecutable,chromeMode});
   await renderMedia({serveUrl:bundleDir,composition,inputProps:props,browserExecutable,chromeMode,codec:'h264',audioCodec:'aac',pixelFormat:'yuv420p',outputLocation:partial,concurrency:1,timeoutInMilliseconds:120_000});
   const ffprobe=process.env.BIENVU_FFPROBE_PATH??'ffprobe';

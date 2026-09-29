@@ -20,14 +20,15 @@ export function subtitleGroups(text: string, limit = 100): string[] {
   return groups.length ? groups : [text];
 }
 const fitted=new Map<string,number>();
-export function fitFont(text: string, width: number, height: number, maximum: number, minimum = 24) {
-  const ready=typeof document!=='undefined'&&Array.from(document.fonts).some(f=>f.family==='BienVu Video'&&f.status==='loaded');
-  const key=JSON.stringify([text,width,height,maximum,minimum]);
+export function fitFont(text: string, width: number, height: number, maximum: number, minimum = 24,
+  family = 'BienVu Video', weight = 650, lineHeight = 1.3) {
+  const ready=typeof document!=='undefined'&&Array.from(document.fonts).some(f=>f.family===family&&f.status==='loaded');
+  const key=JSON.stringify([text,width,height,maximum,minimum,family,weight,lineHeight]);
   if(ready&&fitted.has(key))return fitted.get(key)!;
   const context=ready?document.createElement('canvas').getContext('2d'):null;
   for (let size = maximum; size >= minimum; size--) {
-    if(context)context.font=`650 ${size}px "BienVu Video"`;
-    const measure=(s:string)=>context?context.measureText(s).width:s.length*size*.7;
+    if(context)context.font=`${weight} ${size}px "${family}"`;
+    const measure=(s:string)=>context?context.measureText(s).width:s.length*size*(family==='BienVu Display'?.55:.7);
     const rows=text.split('\n').reduce((sum,paragraph)=>{
       let line='',count=1;
       for(const word of paragraph.split(' ')) {
@@ -38,7 +39,14 @@ export function fitFont(text: string, width: number, height: number, maximum: nu
       }
       return sum+count;
     },0);
-    if (rows * size * 1.3 <= height) {if(ready)fitted.set(key,size);return size;}
+    if (rows * size * lineHeight <= height) {if(ready)fitted.set(key,size);return size;}
   }
   return minimum;
 }
+export const fitDisplayFont = (text: string, width: number, height: number, maximum: number, minimum = 70) =>
+  fitFont(text,width,height,maximum,minimum,'BienVu Display',400,.98);
+export const displayLocation = (value: string) => value.toLocaleUpperCase('fr-FR').replace(/(\d+)(ER|E)\b/g,(_,n:string,s:string)=>`${n}${s.toLowerCase()}`);
+export const displayPrice = (cents: number, monthly = false) => `${new Intl.NumberFormat('fr-FR', {
+  minimumFractionDigits:cents%100?2:0,maximumFractionDigits:cents%100?2:0}).format(cents/100)} €${monthly?' / mois':''}`;
+export const displayArea = (area: number) => `${new Intl.NumberFormat('fr-FR',{maximumFractionDigits:2}).format(area)} m²`;
+export const displayRooms = (rooms: number) => `${rooms} ${rooms===1?'pièce':'pièces'}`;

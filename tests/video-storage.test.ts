@@ -27,6 +27,9 @@ test('manifeste D1/R2 : copie vérifiée, droits serveur immuables et isolation'
   // Deux préparations concurrentes convergent sur le même snapshot.
   const [first,second]=await Promise.all([1,2].map(()=>prepareJobVideo(env,scope.agencyId,scope.jobId)));
   assert.deepEqual(first,second);assert.equal(first.state,'prepared');assert.deepEqual(first.manifest.rights,{kind:'trial',allocationId:'allocation-video',watermarked:true});
+  assert.equal(first.manifest.templateVersion,'bienvu-vertical/2');
+  assert.equal(first.manifest.presentation?.locality,listing.facts.locality.value);
+  assert.equal(first.manifest.presentation?.priceCents,listing.facts.price.value?.amountCents);
   for(const p of first.manifest.photos)assert.equal((await env.MEDIA.get(p.objectKey))!.size,p.sizeBytes);
   await env.DB.prepare('UPDATE agencies SET name=? WHERE id=?').bind('Nouvelle identité après départ',scope.agencyId).run();
   assert.deepEqual(await prepareJobVideo(env,scope.agencyId,scope.jobId),first);

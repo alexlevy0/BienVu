@@ -1,11 +1,11 @@
 import React, {useEffect, useState} from 'react';
 import {AbsoluteFill, Audio, Img, Sequence, cancelRender, continueRender, delayRender, interpolate, useCurrentFrame} from 'remotion';
-import {VideoManifest} from '@bienvu/contracts';
-import {fitFont, subtitleGroups, VIDEO_SAFE as safe} from './layout';
+import {VideoManifest, type VideoPresentation} from '@bienvu/contracts';
+import {contrastInk, displayArea, displayLocation, displayPrice, displayRooms, fitDisplayFont, fitFont, subtitleGroups, VIDEO_SAFE as safe} from './layout';
 
 // Ces URL sont résolues uniquement par le renderer Node vers son serveur
 // loopback privé. Le manifeste serveur n'accepte jamais d'URL d'asset cliente.
-export type ListingVideoProps = {manifest: VideoManifest | null; media: Record<string, string>; logoBackground: string; fontUrl: string};
+export type ListingVideoProps = {manifest: VideoManifest | null; media: Record<string, string>; logoBackground: string; fontUrl: string; displayFontUrl: string};
 const dark = '#132a23', paper = '#f5f7f0';
 function PhotoScene({manifest: m, media, index}: {manifest: VideoManifest; media: Record<string,string>; index: number}) {
   const f = useCurrentFrame(), scene = m.scenes[index], photo = m.photos.find(a => a.id === scene.photoAssetId)!;
@@ -43,21 +43,93 @@ function PhotoScene({manifest: m, media, index}: {manifest: VideoManifest; media
     <Audio src={media[audio.id]} volume={1}/>
   </AbsoluteFill>;
 }
+const propertyName = (type: VideoPresentation['propertyType']) => type==='apartment'?'Appartement':type==='house'?'Maison':'Bien immobilier';
+function posterHeadline(kind: VideoManifest['scenes'][number]['kind'], p: VideoPresentation, contact: boolean) {
+  if(kind==='intro'||kind==='location')return displayLocation(p.locality);
+  if(kind==='area'&&p.areaM2!==null)return displayArea(p.areaM2).toLocaleUpperCase('fr-FR');
+  if(kind==='rooms'&&p.rooms!==null)return displayRooms(p.rooms).toLocaleUpperCase('fr-FR');
+  if(kind==='price'&&p.priceCents!==null)return displayPrice(p.priceCents).toLocaleUpperCase('fr-FR');
+  if(kind==='gallery')return 'EN IMAGES';
+  return contact?'PARLONS-EN':'À DÉCOUVRIR';
+}
+function posterLabel(kind: VideoManifest['scenes'][number]['kind'], p: VideoPresentation, contact: boolean) {
+  if(kind==='intro')return p.transaction==='sale'?'À VENDRE':'À LOUER';
+  if(kind==='area')return 'LA SURFACE';
+  if(kind==='rooms')return 'LES PIÈCES';
+  if(kind==='price')return p.transaction==='sale'?'LE PRIX':'LE LOYER';
+  if(kind==='location')return 'LA LOCALISATION';
+  if(kind==='gallery')return 'LA VISITE';
+  return contact?'VOTRE CONTACT':'POUR EN SAVOIR PLUS';
+}
+function EditorialPhotoScene({manifest:m,media,index}: {manifest:VideoManifest;media:Record<string,string>;index:number}) {
+  const f=useCurrentFrame(),scene=m.scenes[index],photo=m.photos.find(a=>a.id===scene.photoAssetId)!;
+  const p=m.presentation!,contact=scene.kind==='contact',intro=scene.kind==='intro';
+  const shortTitle=p.title.length<=75?p.title:propertyName(p.propertyType);
+  const heading=posterHeadline(scene.kind,p,m.contact!=='none');
+  const audio=m.audio.find(a=>a.id===scene.audioAssetId)!,voiceFrames=Math.ceil(audio.durationMs!*30/1000);
+  const groups=subtitleGroups(scene.narrationText,68),totalChars=groups.reduce((n,g)=>n+g.length,0);
+  let threshold=0;
+  const subtitle=groups.find(g=>{threshold+=g.length/totalChars*voiceFrames;return f<threshold;})??groups.at(-1)!;
+  const opacity=interpolate(f,[0,7],[index?0:1,1],{extrapolateRight:'clamp'});
+  const accent=m.brand.primaryColor,ink=contrastInk(accent),width=safe.width;
+  const zoom=interpolate(f,[0,scene.durationFrames],[1.01,1.055],{extrapolateRight:'clamp'});
+  return <AbsoluteFill style={{opacity,background:'#151b16',color:'#fff',overflow:'hidden'}}>
+    <Img src={media[photo.id]} style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:'center',transform:`scale(${zoom})`}}/>
+    <AbsoluteFill style={{background:'linear-gradient(180deg,rgba(8,13,10,.30) 0%,rgba(8,13,10,.06) 36%,rgba(8,13,10,.15) 51%,rgba(8,13,10,.54) 70%,rgba(8,13,10,.78) 100%)'}}/>
+    <div style={{position:'absolute',left:safe.left,top:186,maxWidth:width,background:accent,color:ink,
+      padding:'13px 27px 11px',fontSize:38,fontWeight:750,letterSpacing:8,lineHeight:1.1}}>{posterLabel(scene.kind,p,m.contact!=='none')}</div>
+    <div style={{position:'absolute',left:safe.left,right:safe.right,top:286,maxHeight:385,
+      fontFamily:'BienVu Display, Impact, sans-serif',fontSize:fitDisplayFont(heading,width,370,240,42),
+      lineHeight:.98,letterSpacing:-2,textShadow:'0 4px 28px #0008',overflowWrap:'anywhere'}}>{heading}</div>
+    <div style={{position:'absolute',left:safe.left,right:safe.right,bottom:675,
+      background:'rgba(15,23,18,.78)',borderLeft:`7px solid ${accent}`,padding:'20px 25px',
+      fontSize:fitFont(subtitle,width-57,170,49,34),fontWeight:600,lineHeight:1.2,
+      overflowWrap:'anywhere',whiteSpace:'pre-wrap'}}>{subtitle}</div>
+    {intro && <div style={{position:'absolute',left:safe.left,right:safe.right,bottom:337}}>
+      {p.priceCents!==null && <div style={{fontFamily:'BienVu Display, Impact, sans-serif',
+        fontSize:fitDisplayFont(displayPrice(p.priceCents),width,190,190,45),lineHeight:1,
+        textShadow:'0 4px 20px #0008'}}>{displayPrice(p.priceCents)}{p.transaction==='rent'&&<span style={{fontFamily:'BienVu Video, sans-serif',fontSize:34,fontWeight:650,marginLeft:16}}> / mois</span>}</div>}
+      <div style={{fontSize:fitFont(shortTitle,width,120,57,30),fontWeight:700,lineHeight:1.12,
+        maxHeight:130,overflowWrap:'anywhere',textShadow:'0 3px 12px #000a'}}>{shortTitle}</div>
+      <div style={{display:'flex',gap:14,marginTop:28,flexWrap:'wrap'}}>
+        {p.areaM2!==null&&<span style={{background:accent,color:ink,padding:'8px 19px',fontSize:42,fontWeight:750}}>{displayArea(p.areaM2)}</span>}
+        {p.rooms!==null&&<span style={{background:accent,color:ink,padding:'8px 19px',fontSize:42,fontWeight:750}}>{displayRooms(p.rooms)}</span>}
+      </div>
+    </div>}
+    {!intro&&!contact&&<div style={{position:'absolute',left:safe.left,right:safe.right,bottom:350}}>
+      <div style={{width:136,height:7,background:accent,marginBottom:22}}/>
+      <div style={{fontSize:fitFont(shortTitle,width,170,62,30),fontWeight:700,lineHeight:1.15,
+        overflowWrap:'anywhere',textShadow:'0 3px 12px #000a'}}>{shortTitle}</div>
+      <div style={{fontSize:34,marginTop:22,opacity:.94}}>{propertyName(p.propertyType)} · {p.locality}</div>
+    </div>}
+    {contact&&<div style={{position:'absolute',left:safe.left,right:safe.right,bottom:340,
+      padding:'26px 30px',background:'rgba(225,232,217,.94)',color:dark,borderTop:`8px solid ${accent}`}}>
+      <div style={{fontSize:fitFont(m.brand.name,width-60,135,73,24),fontWeight:750,lineHeight:1.08,overflowWrap:'anywhere'}}>{m.brand.name}</div>
+      {m.contact!=='none'&&<div style={{marginTop:18,fontSize:fitFont(m.brand[m.contact]!,width-60,125,51,20),
+        fontWeight:600,lineHeight:1.16,overflowWrap:'anywhere'}}>{m.brand[m.contact]}</div>}
+    </div>}
+    <Audio src={media[audio.id]} volume={1}/>
+  </AbsoluteFill>;
+}
 export function ListingFilm(props: ListingVideoProps) {
   const m = VideoManifest.parse(props.manifest), f = useCurrentFrame();
   const [fontWait] = useState(() => delayRender('Chargement de la police locale'));
   const [,setFontLoaded]=useState(false);
   useEffect(() => {
-    const face = new FontFace('BienVu Video', `url('${props.fontUrl}')`, {weight:'100 900'});
-    face.load().then(loaded => {document.fonts.add(loaded);setFontLoaded(true);requestAnimationFrame(()=>continueRender(fontWait));}).catch(cancelRender);
-  }, [fontWait, props.fontUrl]);
+    const faces=[new FontFace('BienVu Video', `url('${props.fontUrl}')`, {weight:'100 900'})];
+    if(m.templateVersion==='bienvu-vertical/2')faces.push(new FontFace('BienVu Display',`url('${props.displayFontUrl}')`,{weight:'400'}));
+    Promise.all(faces.map(face=>face.load())).then(loaded=>{for(const face of loaded)document.fonts.add(face);
+      setFontLoaded(true);requestAnimationFrame(()=>continueRender(fontWait));}).catch(cancelRender);
+  }, [fontWait, props.fontUrl, props.displayFontUrl, m.templateVersion]);
   let at = 0;
   const scenes = m.scenes.map((s, index) => {const from = at; at += s.durationFrames; return {s,index,from};});
-  return <AbsoluteFill style={{background:paper,fontFamily:'BienVu Video, DejaVu Sans, sans-serif',color:dark}}>
+  const editorial=m.templateVersion==='bienvu-vertical/2';
+  const compactBrand=m.brand.name.length<=28?m.brand.name:null;
+  return <AbsoluteFill style={{background:editorial?'#151b16':paper,fontFamily:'BienVu Video, DejaVu Sans, sans-serif',color:editorial?'#fff':dark}}>
     {scenes.map(({s,index,from}) => <Sequence key={s.id} from={from} durationInFrames={s.durationFrames}>
-      <PhotoScene manifest={m} media={props.media} index={index}/>
+      {editorial?<EditorialPhotoScene manifest={m} media={props.media} index={index}/>:<PhotoScene manifest={m} media={props.media} index={index}/>}
     </Sequence>)}
-    <div style={{position:'absolute',left:safe.left,right:safe.right,top:190,minHeight:112,display:'flex',alignItems:'flex-start',gap:24}}>
+    {!editorial&&<div style={{position:'absolute',left:safe.left,right:safe.right,top:190,minHeight:112,display:'flex',alignItems:'flex-start',gap:24}}>
       {m.logo && <div style={{width:112,height:112,flexShrink:0,borderRadius:18,background:props.logoBackground,padding:14,boxSizing:'border-box'}}>
         <Img src={props.media[m.logo.id]} style={{width:'100%',height:'100%',objectFit:'contain'}}/>
       </div>}
@@ -65,14 +137,15 @@ export function ListingFilm(props: ListingVideoProps) {
         <div style={{fontSize:fitFont(m.brand.name,m.logo ? 690 : safe.width,80,42,22),fontWeight:650,lineHeight:1.12,overflowWrap:'anywhere'}}>{m.brand.name}</div>
         <div style={{marginTop:10,fontSize:19,letterSpacing:3,fontWeight:500}}>L’IMMOBILIER, EN MOUVEMENT</div>
       </div>
-    </div>
-    <div style={{position:'absolute',left:safe.left,right:safe.right,top:338,height:4,background:m.brand.primaryColor}}/>
-    <div style={{position:'absolute',left:safe.left,right:safe.right,top:338,height:4,background:m.brand.secondaryColor,
+    </div>}
+    {editorial&&(m.logo||compactBrand)&&<div style={{position:'absolute',top:132,right:safe.right,maxWidth:260,display:'flex',alignItems:'center',gap:11,
+      padding:'8px 13px',background:'rgba(15,23,18,.72)',fontSize:25,fontWeight:700,lineHeight:1.08,
+      overflowWrap:'anywhere'}}>{m.logo&&<Img src={props.media[m.logo.id]} style={{width:44,height:44,objectFit:'contain',background:props.logoBackground}}/>}{compactBrand}</div>}
+    <div style={{position:'absolute',left:safe.left,right:safe.right,top:editorial?118:338,height:4,background:m.brand.primaryColor}}/>
+    <div style={{position:'absolute',left:safe.left,right:safe.right,top:editorial?118:338,height:4,background:m.brand.secondaryColor,
       transformOrigin:'left center',transform:`scaleX(${f / Math.max(1,at-1)})`}}/>
-    {m.rights.watermarked && <div style={{position:'absolute',left:262,top:f >= scenes.at(-1)!.from ? 540 : 780,transform:'rotate(-14deg)',
+    {m.rights.watermarked && <div style={{position:'absolute',left:editorial?235:262,top:editorial?785:f >= scenes.at(-1)!.from ? 540 : 780,transform:'rotate(-14deg)',
       background:'#132a23d9',border:'2px solid #ffffffa0',borderRadius:12,padding:'18px 30px',color:'#fff',
       fontWeight:750,fontSize:35,letterSpacing:2}}>BIENVU · VIDÉO D’ESSAI</div>}
-    <div style={{position:'absolute',left:safe.left,right:safe.right,bottom:320,fontSize:26,fontWeight:500,color:dark,
-      background:'#f5f7f0ee',padding:'6px 10px',borderRadius:8}}>Voix de synthèse générée par intelligence artificielle.</div>
   </AbsoluteFill>;
 }

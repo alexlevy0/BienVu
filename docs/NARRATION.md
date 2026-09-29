@@ -49,7 +49,7 @@ Le rapport distingue tokens retournés par OpenAI, caractères comptés dans les
 
 Les [recommandations de rédaction Google](https://docs.cloud.google.com/text-to-speech/docs/chirp3-hd?hl=fr#scripting-and-prompting-tips), consultées le 28/09/2026, motivent ce travail sur le phrasé et la ponctuation. Aucun « euh », rire ou point de suspension systématique n'est ajouté. La voix Aoede et sa vitesse par défaut sont conservées pour la comparaison. Google documente aussi des contrôles de débit et du SSML en aperçu ; cette tranche ne les active pas et n'envoie aucun faux champ de prompt de style. La préférence de timbre/prosodie demande une écoute humaine, distincte de la validation technique.
 
-OpenAI Responses : sortie structurée stricte, 1 200 tokens maximum, 45 s couvrant également la lecture du corps, réponse limitée à 128 Ko, pas d'outil et `store: false`. Les refus et erreurs utilisent des codes stables sans réponse brute ni secret. La mention **« Voix de synthèse générée par intelligence artificielle. »** est présente dans le contrat ; son affichage dans la vidéo et le lecteur appartient aux sprints 06–07.
+OpenAI Responses : sortie structurée stricte, 1 200 tokens maximum, 45 s couvrant également la lecture du corps, réponse limitée à 128 Ko, pas d'outil et `store: false`. Les refus et erreurs utilisent des codes stables sans réponse brute ni secret. La mention **« Voix de synthèse générée par intelligence artificielle. »** reste dans le contrat et le manifeste serveur comme donnée de provenance ; elle n'est plus incrustée dans l'image de la vidéo.
 
 ## Intégration et migrations
 

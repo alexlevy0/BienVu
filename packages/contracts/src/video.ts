@@ -1,5 +1,5 @@
 import {z} from 'zod';
-import {AgencyBrand, EntityId, ObjectKey, Sha256} from './product';
+import {AgencyBrand, EntityId, ObjectKey, Sha256, type NormalizedListing} from './product';
 import {ScriptScene} from './narration';
 import {SYNTHETIC_VOICE_DISCLOSURE} from './voice';
 
@@ -10,7 +10,22 @@ export const VideoAsset = z.object({id: EntityId, objectKey: ObjectKey, sha256: 
   durationMs: z.number().int().positive().max(35000).optional(),
 }).strict();
 export type VideoAsset = z.infer<typeof VideoAsset>;
-export const VideoManifest = z.object({schemaVersion: z.literal(2), templateVersion: z.literal('bienvu-vertical/1'),
+export const VideoPresentation = z.object({
+  transaction: z.enum(['sale', 'rent']), propertyType: z.enum(['apartment', 'house', 'other']),
+  locality: z.string().trim().min(1).max(200), title: z.string().trim().min(1).max(200),
+  priceCents: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).nullable(),
+  areaM2: z.number().positive().max(100_000).nullable(), rooms: z.number().int().positive().max(100).nullable(),
+}).strict();
+export type VideoPresentation = z.infer<typeof VideoPresentation>;
+export function videoPresentation(listing: NormalizedListing): VideoPresentation {
+  const {facts} = listing;
+  const known = <T>(fact: {status: string; value: T | null} | undefined): T | null =>
+    fact && (fact.status === 'verified' || fact.status === 'user_provided') ? fact.value : null;
+  return VideoPresentation.parse({transaction: listing.transaction, propertyType: known(facts.propertyType),
+    locality: known(facts.locality), title: known(facts.title),
+    priceCents: known(facts.price)?.amountCents ?? null, areaM2: known(facts.area), rooms: known(facts.rooms)});
+}
+export const VideoManifest = z.object({schemaVersion: z.literal(2), templateVersion: z.enum(['bienvu-vertical/1', 'bienvu-vertical/2']),
   agencyId: EntityId, jobId: EntityId, listingId: EntityId, brand: AgencyBrand,
   contact: z.enum(['phone', 'email', 'website', 'none']), logo: VideoAsset.nullable(),
   width: z.literal(1080), height: z.literal(1920), fps: z.literal(30),
@@ -23,8 +38,10 @@ export const VideoManifest = z.object({schemaVersion: z.literal(2), templateVers
   ]),
   photos: z.array(VideoAsset).min(3).max(6), audio: z.array(VideoAsset).min(4).max(6),
   scenes: z.array(ScriptScene.extend({audioAssetId: EntityId, durationFrames: z.number().int().positive().max(1050)})).min(4).max(6),
+  presentation: VideoPresentation.optional(),
 }).strict().superRefine((m, ctx) => {
   const fail = (message: string) => ctx.addIssue({code: 'custom', message});
+  if (m.templateVersion === 'bienvu-vertical/2' ? !m.presentation : Boolean(m.presentation)) fail('Présentation incompatible avec le modèle vidéo.');
   if(m.rights.kind==='anonymous'&&(!m.brand.neutral||m.contact!=='none'))fail('Habillage anonyme invalide.');
   const assets = videoAssets(m), prefix = `agencies/${m.agencyId}/jobs/${m.jobId}/`;
   if (m.brand.id !== m.agencyId || (m.contact==='none' ? !m.brand.neutral : !m.brand[m.contact]) || Boolean(m.brand.logoAssetId) !== Boolean(m.logo)

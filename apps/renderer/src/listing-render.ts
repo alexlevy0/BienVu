@@ -14,8 +14,11 @@ import type {ListingVideoProps} from '../../../packages/video/src/listing';
 const exec = promisify(execFile), sha = (b: Uint8Array) => createHash('sha256').update(b).digest('hex');
 const binary = (name: 'ffmpeg' | 'ffprobe') => process.env[name === 'ffmpeg' ? 'BIENVU_FFMPEG_PATH' : 'BIENVU_FFPROBE_PATH'] ?? name;
 const cwd = (name: string) => path.isAbsolute(name) ? path.dirname(name) : undefined;
-const browser = () => ({browserExecutable: process.env.REMOTION_BROWSER_EXECUTABLE,
-  chromeMode: process.env.REMOTION_BROWSER_EXECUTABLE ? 'chrome-for-testing' as const : 'headless-shell' as const});
+const browser = () => {
+  const browserExecutable=process.env.REMOTION_BROWSER_EXECUTABLE;
+  return {browserExecutable,chromeMode:browserExecutable&&!browserExecutable.includes('chrome-headless-shell')
+    ? 'chrome-for-testing' as const : 'headless-shell' as const};
+};
 
 export function parseRange(value: string | undefined, size: number): {start: number; end: number} | null | false {
   if (!value) return null;
@@ -63,6 +66,8 @@ export async function withVideoAssets<T>(input: unknown, directory: string, use:
   }
   const font = path.join(bundleDir,'public/video-font.woff2');
   files.set('font.woff2',{file:font,mime:'font/woff2',size:(await stat(font)).size});
+  const displayFont = path.join(bundleDir,'public/video-display.ttf');
+  files.set('display.ttf',{file:displayFont,mime:'font/ttf',size:(await stat(displayFont)).size});
   const server = createServer((req,res) => {
     const prefix=`/${token}/`, key=req.url?.startsWith(prefix) ? req.url.slice(prefix.length) : '';
     const asset=files.get(key);
@@ -79,7 +84,7 @@ export async function withVideoAssets<T>(input: unknown, directory: string, use:
     const address=server.address();if(!address || typeof address==='string')throw new Error('VIDEO_ASSET_SERVER_FAILED');
     const base=`http://127.0.0.1:${address.port}/${token}/`;
     for(const asset of videoAssets(manifest))media[asset.id]=base+videoAssetFile(asset);
-    return await use({manifest,media,logoBackground,fontUrl:base+'font.woff2'});
+    return await use({manifest,media,logoBackground,fontUrl:base+'font.woff2',displayFontUrl:base+'display.ttf'});
   }finally{server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));}
 }
 export async function verifyVideoArtifact(file:string,id:string,frames:number,watermarked:boolean,startedAt:string,start:number) {
