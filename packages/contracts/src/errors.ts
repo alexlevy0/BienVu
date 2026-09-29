@@ -1,6 +1,12 @@
 import {z} from 'zod';
 
 export const publicErrors = {
+  ANONYMOUS_UNAVAILABLE: [503, 'L’essai sans compte est momentanément indisponible. Vous pouvez vous connecter.'],
+  TRIAL_USED: [429, 'L’essai de ce navigateur a déjà été utilisé. Connectez-vous pour retrouver vos vidéos.'],
+  TRIAL_LIMIT: [429, 'La limite des essais est atteinte. Réessayez plus tard ou connectez-vous.'],
+  TRIAL_EXPIRED: [410, 'Cet essai a expiré. Aucun nouveau traitement ne sera lancé automatiquement.'],
+  TRIAL_SOURCE_UNSUPPORTED: [422, 'Pour l’essai sans compte, utilisez une annonce Espaces Atypiques, Orpi ou Century 21. Connectez-vous pour utiliser les autres imports ou vos photos.'],
+  BOT_VERIFICATION_FAILED: [422, 'La vérification a expiré ou échoué. Validez à nouveau puis réessayez.'],
   INVALID_URL: [422, 'Le lien de l’annonce est invalide.'],
   UNSAFE_URL: [422, 'Ce lien ne peut pas être consulté en toute sécurité.'],
   SOURCE_BLOCKED: [422, 'Ce site refuse actuellement l’accès à cette annonce. Essayez un autre lien autorisé.'],

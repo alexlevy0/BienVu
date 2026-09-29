@@ -1209,6 +1209,9 @@ h1{
 .recent-imports button { display:flex; justify-content:space-between; gap:12px; width:100%; background:transparent; border:0; border-bottom:1px solid var(--line); text-align:left; padding:12px 0; color:var(--ink); font-size:11px; }
 .recent-imports button span:first-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .recent-imports button span:last-child { flex-shrink:0; color:var(--muted); }
+.studio-notification {position:fixed;right:20px;bottom:20px;z-index:100;display:flex;align-items:center;gap:14px;max-width:min(92vw,440px);padding:14px 16px;border:1px solid #b9c9b4;border-radius:12px;background:#f8faf5;color:#1d281d;box-shadow:0 12px 32px #17251a25;font-size:14px}
+.studio-notification a {color:#26542a;font-weight:700;white-space:nowrap}
+.studio-notification button {border:0;background:transparent;font-size:22px;cursor:pointer}
 
 .generation-progress {padding:24px; margin-block:24px; min-width:0; overflow:hidden;}
 .generation-progress h3 {font-size:1.5rem; margin:12px 0;}

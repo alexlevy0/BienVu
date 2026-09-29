@@ -1,4 +1,4 @@
-import {VideoManifest, VideoReport, videoAssets, videoManifestHash, videoObjectKey} from '@bienvu/contracts';
+import {VideoManifest, VideoReport, videoAssets, videoManifestHash, videoObjectKey,videoPreviewKey} from '@bienvu/contracts';
 import {reserve, budgetLimits, type Budget} from './budget';
 import {storeRenderArtifact} from './render-artifact';
 
@@ -32,7 +32,7 @@ export class VideoCoordinator {
       if(await tx.get('active'))throw new Error('VIDEO_BUSY');
       const budget=await tx.get<Budget>('budget')??this.deps.budget;
       if(budget.attempts>=this.deps.maxAttempts)throw new Error('VIDEO_ATTEMPT_LIMIT');
-      await tx.put('budget',reserve(budget,new Date(this.now())));
+      await tx.put('budget',reserve(budget,new Date(this.now()),manifest.rights.kind==='anonymous'?50+manifest.rights.previewProvisionCents:50));
       const job:VideoJob={id,manifest,status:'accepted',startedAt:this.now(),updatedAt:this.now(),failures:0,attempt:1};
       await tx.put(`video:${id}`,job);await tx.put('active',id);return job;
     });
@@ -82,7 +82,7 @@ export class VideoCoordinator {
         throw new Error('VIDEO_BUDGET_RECONCILIATION_REQUIRED');
       if(previous.attempts>=this.deps.maxAttempts)throw new Error('VIDEO_ATTEMPT_LIMIT');
       const budget={...previous,...budgetLimits(this.deps.budget),fixedAndOtherCents:this.deps.budget.fixedAndOtherCents,paused:false};
-      await tx.put('budget',reserve(budget,new Date(this.now())));
+      await tx.put('budget',reserve(budget,new Date(this.now()),old.manifest.rights.kind==='anonymous'?50+old.manifest.rights.previewProvisionCents:50));
       await tx.put(`video-attempt:${id}:${old.attempt??1}`,old);
       const job:VideoJob={id,manifest:old.manifest,status:'accepted',startedAt:this.now(),updatedAt:this.now(),failures:0,
         attempt:(old.attempt??1)+1,retryOf:failedAt};
@@ -159,6 +159,7 @@ export class VideoCoordinator {
         const report=VideoReport.parse(result.report),frames=job.manifest.scenes.reduce((n,s)=>n+s.durationFrames,0);
         if(report.id!==id||report.manifestHash!==id||report.watermarked!==job.manifest.rights.watermarked||report.durationFrames!==frames
           ||Math.abs(report.durationSeconds-frames/30)>.12)throw new Error('VIDEO_REPORT_INVALID');
+        if(job.manifest.rights.kind==='anonymous'&&(!report.preview||!report.preview.watermarked||report.preview.manifestHash!==id||report.preview.id!==id||report.preview.durationFrames!==frames||Math.abs(report.preview.durationSeconds-report.durationSeconds)>.12||report.preview.sha256===report.sha256))throw new Error('VIDEO_PREVIEW_INVALID');
         job={...job,status:'publishing',report,objectKey:videoObjectKey(job.manifest,id)};await this.save(job);
       }
       if(job.status==='publishing'&&job.report&&job.objectKey) {
@@ -168,6 +169,13 @@ export class VideoCoordinator {
           await storeRenderArtifact(this.deps.bucket,job.objectKey,file.body,job.report,
             {manifestHash:id,watermarked:String(job.manifest.rights.watermarked),sha256:job.report.sha256});
         }
+        if(job.manifest.rights.kind==='anonymous'&&job.report.preview){
+          const preview=await this.deps.call(`/videos/${id}/preview`);
+          if(!preview.ok||!preview.body)throw new Error('VIDEO_FILE_MISSING');
+          await storeRenderArtifact(this.deps.bucket,videoPreviewKey(job.manifest,id),preview.body,job.report.preview,
+            {manifestHash:id,watermarked:'true',sha256:job.report.preview.sha256});
+        }
+        if(!await this.stored(job))throw new Error('VIDEO_FILE_MISSING');
         await this.complete(job);
       }
     }catch(error){
@@ -186,6 +194,12 @@ export class VideoCoordinator {
     const head=await this.deps.bucket.head(job.objectKey);if(!head)return false;
     if(head.size!==job.report.sizeBytes||head.customMetadata?.sha256!==job.report.sha256||head.customMetadata?.manifestHash!==job.id)
       throw new Error('VIDEO_ARTIFACT_CONFLICT');
+    if(job.manifest.rights.kind==='anonymous'){
+      if(!job.report.preview)return false;
+      const preview=await this.deps.bucket.head(videoPreviewKey(job.manifest,job.id));
+      if(!preview)return false;
+      if(preview.size!==job.report.preview.sizeBytes||preview.customMetadata?.sha256!==job.report.preview.sha256||preview.customMetadata?.manifestHash!==job.id)throw new Error('VIDEO_ARTIFACT_CONFLICT');
+    }
     return true;
   }
   private async complete(job:VideoJob) {

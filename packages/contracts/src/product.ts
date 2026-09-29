@@ -66,11 +66,11 @@ export const PriceFact = fact(z.object({amountCents: z.number().int().positive()
   charges: z.enum(['included', 'excluded', 'not_applicable'])}).strict(), 'EUR_cent');
 
 export const AgencyBrand = z.object({
-  id: EntityId, ownerUserId: EntityId, name: boundedText(100), logoAssetId: EntityId.nullable(),
+  id: EntityId, ownerUserId: EntityId, name: boundedText(100), logoAssetId: EntityId.nullable(), neutral: z.literal(true).optional(),
   primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/), secondaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   phone: z.string().regex(/^\+?[0-9 ().-]{6,25}$/).nullable(), email: z.email().max(254).nullable(),
   website: ListingUrl.nullable(), createdAt: Timestamp,
-}).strict().refine(agency => Boolean(agency.phone || agency.email || agency.website), 'Ajoutez au moins un moyen de contact pour votre agence.');
+}).strict().refine(agency => agency.neutral ? agency.name === 'BienVu' && !agency.phone && !agency.email && !agency.website && !agency.logoAssetId : Boolean(agency.phone || agency.email || agency.website), 'Ajoutez au moins un moyen de contact pour votre agence.');
 export type AgencyBrand = z.infer<typeof AgencyBrand>;
 
 export const PhotoAsset = z.object({
@@ -98,10 +98,10 @@ export const NormalizedListing = z.object({
   if (listing.sourceKind === 'manual' && (listing.sourceUrl !== null || listing.canonicalUrl !== null || listing.sourceHost !== null || listing.sourceListingId !== null))
     context.addIssue({code: 'custom', message: 'Une saisie manuelle ne possède pas de source web.'});
   for (const value of Object.values(listing.facts)) {
-    if (listing.sourceKind === 'manual' ? value.status === 'verified' || value.status === 'conflicting' : value.status === 'user_provided')
+    if (listing.sourceKind === 'manual' && (value.status === 'verified' || value.status === 'conflicting'))
       context.addIssue({code: 'custom', path: ['facts'], message: 'La provenance doit correspondre au mode de création.'});
   }
-  if (listing.photos.some(photo => listing.sourceKind === 'manual' ? photo.sourceUrl !== null : photo.sourceUrl === null))
+  if (listing.photos.some(photo => listing.sourceKind === 'manual' && photo.sourceUrl !== null))
     context.addIssue({code: 'custom', path: ['photos'], message: 'La source des photos doit correspondre au mode de création.'});
   for (const price of listing.facts.price.status === 'verified' || listing.facts.price.status === 'user_provided' ? [listing.facts.price.value]
     : listing.facts.price.status === 'conflicting' ? listing.facts.price.candidates.map(item => item.value) : []) {
@@ -120,7 +120,7 @@ export const NormalizedListing = z.object({
 export type NormalizedListing = z.infer<typeof NormalizedListing>;
 
 export const GeneratableListing = NormalizedListing.superRefine((listing, context) => {
-  if (['title', 'propertyType', 'locality'].some(key => listing.facts[key as 'title' | 'propertyType' | 'locality'].status !== (listing.sourceKind === 'manual' ? 'user_provided' : 'verified')))
+  if (['title', 'propertyType', 'locality'].some(key => !['verified','user_provided'].includes(listing.facts[key as 'title' | 'propertyType' | 'locality'].status)))
     context.addIssue({code: 'custom', path: ['facts'], message: 'Le titre, le type et la localisation doivent être vérifiés.'});
   if (Object.values(listing.facts).some(item => item.status === 'conflicting'))
     context.addIssue({code: 'custom', path: ['facts'], message: 'Des informations contradictoires empêchent la génération.'});

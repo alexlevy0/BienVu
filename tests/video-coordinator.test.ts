@@ -7,7 +7,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import {videoFixture,videoReport} from '../fixtures/video';
-import {videoManifestHash,videoAssets} from '../packages/contracts/src/index';
+import {videoManifestHash,videoAssets,videoPreviewKey} from '../packages/contracts/src/index';
 import type {VideoJob} from '../apps/pipeline/src/video-coordinator';
 type Snapshot={starts:number;cleaned:boolean;stopped:boolean;job:VideoJob;state:{active:string|null;budget:{attempts:number;committedCents:number}}};
 test('contrôleur durable workerd : budget, concurrence, R2, timeout et coupures',async t=>{
@@ -68,6 +68,19 @@ test('contrôleur durable workerd : budget, concurrence, R2, timeout et coupures
   await call('stale-cancel','/cancel',{id});state=await snapshot('stale-cancel');
   assert.equal(state.job.id,nextId);assert.equal(state.job.status,'rendering');assert.equal(state.stopped,false);
   await call('stale-cancel','/cancel',{id:nextId});
+  // Paired outputs use the same rendered job. Both objects are required before ready.
+  const anonymous=await videoFixture('anonymous'),anonymousId=await videoManifestHash(anonymous.manifest);
+  const paired={...videoReport(anonymousId,anonymous.manifest),preview:{...videoReport(anonymousId,anonymous.manifest,new Uint8Array([3,2,1])),watermarked:true}};
+  for(const asset of videoAssets(anonymous.manifest))await bucket.put(asset.objectKey,new Uint8Array(anonymous.files.get(asset.id)!));
+  await call('anonymous','/accept',{manifest:anonymous.manifest,report:paired});await call('anonymous','/advance');
+  state=await snapshot('anonymous');assert.equal(state.job.status,'ready');assert.equal(state.starts,1);assert.equal(state.state.budget.committedCents,80);
+  assert.equal((await bucket.head(state.job.objectKey!))!.customMetadata!.watermarked,'false');
+  assert.equal((await bucket.head(videoPreviewKey(anonymous.manifest,anonymousId)))!.customMetadata!.watermarked,'true');
+  await call('anonymous','/publishing',{});await call('anonymous','/advance');assert.equal((await snapshot('anonymous')).starts,1);
+  assert.equal((await snapshot('anonymous')).job.status,'ready');
+  await call('missing-preview','/accept',{manifest:anonymous.manifest,report:videoReport(anonymousId,anonymous.manifest)});await call('missing-preview','/advance');
+  assert.equal((await snapshot('missing-preview')).job.error,'VIDEO_PREVIEW_INVALID');
+  assert.equal((await snapshot('missing-preview')).state.budget.committedCents,80);
   await bucket.delete(manifest.photos[0].objectKey);await accept('missing');await call('missing','/advance');
   state=await snapshot('missing');assert.equal(state.job.error,'VIDEO_ASSET_MISSING');assert.equal(state.starts,0);assert.equal(state.state.active,null);
 });

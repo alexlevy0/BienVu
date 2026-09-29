@@ -12,21 +12,24 @@ export const VideoAsset = z.object({id: EntityId, objectKey: ObjectKey, sha256: 
 export type VideoAsset = z.infer<typeof VideoAsset>;
 export const VideoManifest = z.object({schemaVersion: z.literal(2), templateVersion: z.literal('bienvu-vertical/1'),
   agencyId: EntityId, jobId: EntityId, listingId: EntityId, brand: AgencyBrand,
-  contact: z.enum(['phone', 'email', 'website']), logo: VideoAsset.nullable(),
+  contact: z.enum(['phone', 'email', 'website', 'none']), logo: VideoAsset.nullable(),
   width: z.literal(1080), height: z.literal(1920), fps: z.literal(30),
   disclosure: z.literal(SYNTHETIC_VOICE_DISCLOSURE),
   rights: z.discriminatedUnion('kind', [
     z.object({kind: z.literal('trial'), allocationId: EntityId, watermarked: z.literal(true)}).strict(),
+    z.object({kind: z.literal('anonymous'), watermarked: z.literal(false), previewProvisionCents:z.number().int().min(0).max(50).default(30)}).strict(),
+    z.object({kind: z.literal('free'), allocationId: EntityId, watermarked: z.literal(false)}).strict(),
     z.object({kind: z.literal('paid'), allocationId: EntityId, watermarked: z.literal(false)}).strict(),
   ]),
   photos: z.array(VideoAsset).min(3).max(6), audio: z.array(VideoAsset).min(4).max(6),
   scenes: z.array(ScriptScene.extend({audioAssetId: EntityId, durationFrames: z.number().int().positive().max(1050)})).min(4).max(6),
 }).strict().superRefine((m, ctx) => {
   const fail = (message: string) => ctx.addIssue({code: 'custom', message});
+  if(m.rights.kind==='anonymous'&&(!m.brand.neutral||m.contact!=='none'))fail('Habillage anonyme invalide.');
   const assets = videoAssets(m), prefix = `agencies/${m.agencyId}/jobs/${m.jobId}/`;
-  if (m.brand.id !== m.agencyId || !m.brand[m.contact] || Boolean(m.brand.logoAssetId) !== Boolean(m.logo)
+  if (m.brand.id !== m.agencyId || (m.contact==='none' ? !m.brand.neutral : !m.brand[m.contact]) || Boolean(m.brand.logoAssetId) !== Boolean(m.logo)
     || m.logo && m.logo.id !== m.brand.logoAssetId) fail('Marque ou contact incohérent.');
-  if((m.brand[m.contact]?.length??0)>180)fail('Coordonnée trop longue pour la carte de contact.');
+  if(m.contact!=='none'&&(m.brand[m.contact]?.length??0)>180)fail('Coordonnée trop longue pour la carte de contact.');
   if (assets.some(a => !a.objectKey.startsWith(prefix)) || new Set(assets.map(a => a.id)).size !== assets.length
     || assets.reduce((n, a) => n + a.sizeBytes, 0) > 70 * 1024 * 1024) fail('Médias hors périmètre ou trop volumineux.');
   if ([...m.photos, ...(m.logo ? [m.logo] : [])].some(a => !a.mime.startsWith('image/') || !a.width || !a.height || a.durationMs)
@@ -55,13 +58,14 @@ export function videoAssetFile(asset: VideoAsset) {
 }
 export const VideoSubmission = z.object({id: Sha256, manifest: VideoManifest}).strict();
 export type VideoSubmission = z.infer<typeof VideoSubmission>;
-export const VideoReport = z.object({id: Sha256, manifestHash: Sha256, sha256: Sha256,
+export const VideoArtifactReport = z.object({id: Sha256, manifestHash: Sha256, sha256: Sha256,
   sizeBytes: z.number().int().positive().max(50 * 1024 * 1024),
   width: z.literal(1080), height: z.literal(1920), fps: z.literal(30), codec: z.literal('h264'), audioCodec: z.literal('aac'),
   durationFrames: z.number().int().min(600).max(1050), durationSeconds: z.number().min(19.9).max(35.2),
   fastStart: z.literal(true), watermarked: z.boolean(), meanVolumeDb: z.number().finite(),
   startedAt: z.iso.datetime(), endedAt: z.iso.datetime(), renderAndVerifySeconds: z.number().nonnegative(),
 }).strict();
+export const VideoReport = VideoArtifactReport.extend({preview:VideoArtifactReport.optional()});
 export type VideoReport = z.infer<typeof VideoReport>;
 export async function videoManifestHash(input: unknown) {
   const data = new TextEncoder().encode(JSON.stringify(VideoManifest.parse(input)));
@@ -71,6 +75,7 @@ export function videoObjectKey(manifest: VideoManifest, hash: string) {
   Sha256.parse(hash);
   return `agencies/${manifest.agencyId}/jobs/${manifest.jobId}/video/${hash}.mp4`;
 }
+export function videoPreviewKey(manifest:VideoManifest,hash:string){return videoObjectKey(manifest,hash).replace(/\.mp4$/,'.preview.mp4');}
 export class VideoFailure extends Error {
   constructor(readonly code: string) {super(/^[A-Z_]{3,64}$/.test(code) ? code : 'VIDEO_FAILED'); this.name = 'VideoFailure';}
 }

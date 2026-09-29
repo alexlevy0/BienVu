@@ -2,7 +2,7 @@ import {AgencyProfile, AgencyUpdate, EntityId} from '@bienvu/contracts';
 import type {Database} from './index';
 
 const columns = `id, owner_user_id AS ownerUserId, name, logo_asset_id AS logoAssetId,
-  primary_color AS primaryColor, secondary_color AS secondaryColor, phone, email, website,
+  primary_color AS primaryColor, secondary_color AS secondaryColor, phone, email, website, city,
   created_at AS createdAt, updated_at AS updatedAt, brand_version AS brandVersion`;
 
 export async function agencyForUser(db: Database, userId: string): Promise<AgencyProfile | null> {
@@ -27,9 +27,9 @@ export async function ensureAgency(db: Database, user: {id: string; email: strin
 
 export async function updateAgency(db: Database, userId: string, input: AgencyUpdate): Promise<AgencyProfile> {
   const brand = AgencyUpdate.parse(input);
-  const row = await db.prepare(`UPDATE agencies SET name=?,primary_color=?,secondary_color=?,phone=?,email=?,website=?,
+  const row = await db.prepare(`UPDATE agencies SET name=?,primary_color=?,secondary_color=?,phone=?,email=?,website=?,city=?,
     updated_at=?,brand_version=brand_version+1 WHERE owner_user_id=? RETURNING ${columns}`)
-    .bind(brand.name, brand.primaryColor, brand.secondaryColor, brand.phone, brand.email, brand.website,
+    .bind(brand.name, brand.primaryColor, brand.secondaryColor, brand.phone, brand.email, brand.website, brand.city ?? null,
       new Date().toISOString(), EntityId.parse(userId)).first();
   return AgencyProfile.parse(row);
 }

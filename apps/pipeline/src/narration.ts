@@ -21,7 +21,7 @@ const codeOf = (error: unknown) => error instanceof NarrationFailure || error in
 // Étape privée appelée avec agencyId issu du contexte serveur. Aucun endpoint
 // public, lancement de Workflow, débit de quota client ou rendu dans ce module.
 export async function prepareJobNarration(env: {DB: Database; MEDIA: NarrationBucket}, agencyId: string, jobId: string,
-  providers: NarrationProviders, options: {contact?: 'phone' | 'email' | 'website'; now?: () => number; brand?: unknown; onVoicing?: () => Promise<void>} = {}): Promise<PreparedNarration> {
+  providers: NarrationProviders, options: {contact?: 'phone' | 'email' | 'website' | 'none'; now?: () => number; brand?: unknown; onVoicing?: () => Promise<void>} = {}): Promise<PreparedNarration> {
   const now = options.now ?? Date.now;
   const job = await narrationJobInput(env.DB, agencyId, jobId);
   const existing = await findNarration(env.DB, agencyId, jobId);

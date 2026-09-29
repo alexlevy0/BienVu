@@ -1,7 +1,27 @@
 import Link from 'next/link';
+import {HomeWordmark} from '../../components/home-icons';
 import {Login} from '../../components/login';
-import {VideoIllustration} from '../../components/video-illustration';
+import {LoginDemo} from '../../components/login-demo';
+import '../landing.css';
+import './login.css';
+
 export const metadata = {title: 'Connexion'};
+
 export default function Page() {
-  return <main className="login-page"><section className="login-copy"><Link href="/" className="wordmark">bienvu<span className="brand-dot">.</span><span className="brand-mark">↗</span></Link><div><p className="eyebrow">BIENVENUE DANS VOTRE STUDIO</p><h1>Votre agence,<br/><em>en un seul endroit.</em></h1><Login/></div><span className="field-help">Version de développement. L’essai vidéo avec filigrane sera disponible après l’ouverture du service.</span></section><aside className="login-art"><VideoIllustration/><p>Moins de montage.<br/><em>Plus de présence.</em></p></aside></main>;
+  return <main className="login-studio">
+    <section className="login-studio-left" aria-labelledby="login-studio-title">
+      <header className="login-studio-header">
+        <Link href="/" aria-label="BienVu, retour à l’accueil"><HomeWordmark/></Link>
+        <span>Votre studio immobilier</span>
+      </header>
+      <div className="login-studio-content">
+        <p className="login-studio-kicker">L’IMMOBILIER, EN MOUVEMENT</p>
+        <h1 id="login-studio-title">Chaque bien<br/>a sa <em>story.</em></h1>
+        <p className="login-studio-intro">Connectez-vous pour retrouver votre agence, vos créations et vos prochaines idées.</p>
+        <Login/>
+      </div>
+      <footer className="login-studio-footer"><span>© BienVu</span><Link href="/explorer">Explorer les vidéos <span aria-hidden="true">↗</span></Link></footer>
+    </section>
+    <LoginDemo/>
+  </main>;
 }

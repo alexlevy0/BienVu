@@ -5,13 +5,13 @@ import {displayEuros, displayNumber, frenchDecimal, frenchEuros, frenchInteger} 
 export const PROMPT_VERSION = 'narration-fr/1' as const;
 export const COPY_VERSION = 'factual-copy/2' as const;
 export type Copy = {id: string; kind: SceneKind; narrationText: string; captionText: string; factRefs: ScriptFactRef[]};
-export type ScriptContext = {listing: NormalizedListing; brand: AgencyBrand; contact: 'phone' | 'email' | 'website';
+export type ScriptContext = {listing: NormalizedListing; brand: AgencyBrand; contact: 'phone' | 'email' | 'website' | 'none';
   copyVersion: ScriptCopyVersion; copies: Copy[]; provenance: ListingScript['provenance']; inputHash: string};
 export async function hashJson(value: unknown) {
   const bytes = new TextEncoder().encode(JSON.stringify(value)), hash = await crypto.subtle.digest('SHA-256', bytes);
   return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
-export async function scriptContext(listingInput: unknown, brandInput: unknown, contact?: 'phone' | 'email' | 'website',
+export async function scriptContext(listingInput: unknown, brandInput: unknown, contact?: 'phone' | 'email' | 'website' | 'none',
   copyVersionInput: ScriptCopyVersion = COPY_VERSION): Promise<ScriptContext> {
   const versionResult = ScriptCopyVersion.safeParse(copyVersionInput);
   if (!versionResult.success) throw new NarrationFailure('SCRIPT_INPUT_INVALID');
@@ -19,8 +19,8 @@ export async function scriptContext(listingInput: unknown, brandInput: unknown, 
   const parsed = GeneratableListing.safeParse(listingInput), parsedBrand = AgencyBrand.safeParse(brandInput);
   if (!parsed.success || !parsedBrand.success || parsed.data.agencyId !== parsedBrand.data.id) throw new NarrationFailure('SCRIPT_INPUT_INVALID');
   const listing = parsed.data, brand = parsedBrand.data;
-  const channel = contact ?? (brand.phone ? 'phone' : brand.email ? 'email' : 'website');
-  if (!brand[channel]) throw new NarrationFailure('SCRIPT_INPUT_INVALID');
+  const channel = contact ?? (brand.neutral ? 'none' : brand.phone ? 'phone' : brand.email ? 'email' : 'website');
+  if (channel==='none' ? !brand.neutral : !brand[channel]) throw new NarrationFailure('SCRIPT_INPUT_INVALID');
   const known = <T>(fact: {status: string; value: T}) => fact.status === 'verified' || fact.status === 'user_provided';
   const locality = listing.facts.locality.value!, category = listing.facts.propertyType.value!;
   if ([locality, brand.name].some(s => /[<>\u0000-\u001f\u007f]/.test(s))) throw new NarrationFailure('SCRIPT_INPUT_INVALID');
@@ -71,7 +71,10 @@ export async function scriptContext(listingInput: unknown, brandInput: unknown, 
   add('gallery', ['photos'], 'Le bien en images',
     ['Découvrez les photographies de ce bien.', 'Poursuivez la visite en images.', 'Le bien en images.'],
     ['Prenons un instant pour découvrir les lieux en images.', 'On vous laisse découvrir les lieux en images.', 'Le bien en images.']);
-  add('contact', ['agency.name', 'agency.contact'], `${brand.name}\n${brand[channel]}`,
+  if(channel==='none')add('contact',['photos'],'Découvrez le bien',
+    ['Retrouvez les détails dans cette annonce.', 'Consultez cette annonce pour en savoir plus.', 'Découvrez cette annonce.'],
+    ['Ce bien vous intéresse ? Retrouvez les détails dans cette annonce.', 'Pour en savoir plus, découvrez cette annonce.', 'Découvrez cette annonce.']);
+  else add('contact', ['agency.name', 'agency.contact'], `${brand.name}\n${brand[channel]}`,
     [`Pour en savoir plus, contactez ${brand.name}.`, `${brand.name} est votre contact pour en savoir plus.`, `Contactez ${brand.name}.`],
     [`Envie d'en savoir plus ? Contactez ${brand.name}.`, `Ce bien vous intéresse ? Parlons-en avec ${brand.name}.`, `Contactez ${brand.name}.`]);
   const status = listing.sourceKind === 'manual' ? 'user_provided' as const : 'verified' as const;
@@ -81,7 +84,8 @@ export async function scriptContext(listingInput: unknown, brandInput: unknown, 
     if (fact && (fact.status === 'verified' || fact.status === 'user_provided')) provenance.push({ref: key, status: fact.status, sourcePath: fact.sourcePath});
   }
   provenance.push({ref: 'transaction', status, sourcePath: listing.sourceKind === 'manual' ? 'manual.transaction' : 'listing.transaction'},
-    {ref: 'photos', status, sourcePath: 'listing.photos'}, {ref: 'agency.name', status: 'user_provided', sourcePath: 'agency.name'},
+    {ref: 'photos', status, sourcePath: 'listing.photos'});
+  if(channel!=='none')provenance.push({ref: 'agency.name', status: 'user_provided', sourcePath: 'agency.name'},
     {ref: 'agency.contact', status: 'user_provided', sourcePath: `agency.${channel}`});
   // Ni description commerciale, ni titre libre, ni URL, ni secret envoyé au LLM.
   const inputHash = await hashJson({listingId: listing.id, agencyId: listing.agencyId, sourceKind: listing.sourceKind,

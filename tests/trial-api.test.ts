@@ -1,0 +1,67 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
+import {migrateNarrationProbe} from '../scripts/narration-fixtures';
+import {trialSessionResponse,startTrial,trialPreview,verifyTrialBot,ipFingerprint,trialLoginIntent,type TrialEnv} from '../apps/web/lib/trials';
+import {generationVideo,generationPreview} from '../apps/web/lib/generations';
+import {claimTrial,creditGrant,createAnonymousSession,admitAnonymous,ensureAgency,anonymousSession,generationView,findGeneration} from '../packages/db/src/index';
+import {videoFixture,videoReport} from '../fixtures/video';
+const base='https://bienvu.test',url='https://www.century21.fr/trouver_logement/detail/123456/';
+const settings={PROBE_MODE:'remote',BETTER_AUTH_URL:base,BETTER_AUTH_SECRET:'a'.repeat(32),GENERATIONS_ENABLED:'true',ANONYMOUS_TRIALS_ENABLED:'true',TURNSTILE_SITE_KEY:'fixture-key',TURNSTILE_SECRET_KEY:'fixture-private',TRIAL_IP_HMAC_SECRET:'b'.repeat(32)};
+test('Siteverify fermé, action/hostname/date contrôlés et IP issue du proxy seulement',async()=>{
+  const env=settings as TrialEnv;
+  let calls=0;const reply={success:true,hostname:'bienvu.test',action:'anonymous_trial',challenge_ts:new Date().toISOString()};
+  const fetcher=(body:unknown)=>(async(target,init)=>{calls++;assert.equal(target,'https://challenges.cloudflare.com/turnstile/v0/siteverify');const data=JSON.parse(String(init?.body));assert.equal(data.secret,'fixture-private');assert.equal('remoteip' in data,false);assert.match(data.idempotency_key,/^[a-f0-9-]{36}$/);return Response.json(body);}) as typeof fetch;
+  for(const change of [{success:false},{hostname:'attacker.test'},{action:'wrong'},{challenge_ts:new Date(Date.now()-301_000).toISOString()}, {challenge_ts:'bad'}])
+    await assert.rejects(verifyTrialBot(env,'token','same-intent',fetcher({...reply,...change})),/BOT_VERIFICATION_FAILED/);
+  assert.match(await verifyTrialBot(env,'token','same-intent',fetcher(reply)),/^[a-f0-9]{64}$/);
+  const request=new Request(base,{headers:{'cf-connecting-ip':'203.0.113.5','x-forwarded-for':'127.0.0.1'}});
+  await assert.rejects(ipFingerprint(request,env,false),/ANONYMOUS_UNAVAILABLE/);
+  const hash=await ipFingerprint(request,env,true);assert.equal(hash.length,64);assert.notEqual(hash,await ipFingerprint(request,{...env,TRIAL_IP_HMAC_SECRET:'c'.repeat(32)},true));assert.equal(calls,6);
+});
+test('API anonyme : cookie sécurisé, prévisualisation isolée, master protégé, replay sans anti-bot ni lancement',async t=>{
+  const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:'export default {fetch(){return new Response("fixture")}}',compatibilityDate:'2026-09-27',d1Databases:['DB'],r2Buckets:['MEDIA']}));t.after(()=>mf.dispose());
+  const bindings=await mf.getBindings<{DB:D1Database;MEDIA:R2Bucket}>(),env={...settings,...bindings} as TrialEnv,DB=env.DB;
+  await migrateNarrationProbe(DB);await DB.exec('UPDATE trial_policy SET enabled=1,free_enabled=1; UPDATE generation_control SET enabled=1');
+  await DB.prepare('INSERT INTO hosted_import_budget VALUES(?,0,2500,0)').bind(new Date().toISOString().slice(0,7)).run();
+  const response=await trialSessionResponse(new Request(base+'/api/trial'),env),cookie=response.headers.get('set-cookie')!;
+  assert.match(cookie,/__Host-bienvu-trial=/);for(const part of ['HttpOnly','Secure','SameSite=Lax','Path=/','Max-Age=2592000'])assert.ok(cookie.includes(part));
+  const headers={Cookie:cookie.split(';')[0],Origin:base,'Content-Type':'application/json','Idempotency-Key':'trial-api-idempotency-key','cf-connecting-ip':'203.0.113.5'};
+  let verifications=0;const verify:typeof verifyTrialBot=async()=>{verifications++;return 'c'.repeat(64);};
+  const request=()=>new Request(base+'/api/trial',{method:'POST',headers,body:JSON.stringify({url,turnstileToken:'fixture-token'})});
+  await assert.rejects(startTrial(new Request(base+'/api/trial',{method:'POST',headers:{...headers,Origin:'https://attacker.test'},body:JSON.stringify({url})}),env,true,verify),/FORBIDDEN/);
+  const first=await (await startTrial(request(),env,true,verify)).json() as {id:string};
+  await startTrial(request(),env,true,verify);assert.equal(verifications,1);
+  const session=(await anonymousSession(DB,headers.Cookie.split('=')[1]))!,row=(await findGeneration(DB,session.scopeId,first.id))!;
+  assert.equal(generationView(row,Date.now(),'anonymous').downloadUrl,null);
+  const f=await videoFixture('anonymous'),master=new Uint8Array([1,2,3,4]),preview=new Uint8Array([5,6,7,8,9]);
+  const report=videoReport('d'.repeat(64),f.manifest,master),previewReport={...videoReport('d'.repeat(64),f.manifest,preview),watermarked:true};
+  const key=`agencies/${session.scopeId}/jobs/${row.jobId}/video/master.mp4`,previewKey=key.replace('master','preview'),at=new Date().toISOString();
+  await env.MEDIA.put(key,master,{customMetadata:{sha256:report.sha256}});await env.MEDIA.put(previewKey,preview,{customMetadata:{sha256:previewReport.sha256}});
+  await DB.batch([DB.prepare('INSERT INTO generation_artifacts VALUES(?,?,?,?)').bind(row.jobId,key,JSON.stringify(report),at),DB.prepare('INSERT INTO generation_previews VALUES(?,?,?,?)').bind(row.jobId,previewKey,JSON.stringify(previewReport),at),DB.prepare("UPDATE jobs SET status='ready',lease_until=NULL,updated_at=? WHERE id=?").bind(at,row.jobId)]);
+  const read=await trialPreview(new Request(base+'?variant=master&download=1',{headers:{...headers,Range:'bytes=1-3'}}),env,row.jobId);
+  assert.equal(read.status,206);assert.deepEqual(new Uint8Array(await read.arrayBuffer()),preview.slice(1,4));assert.match(read.headers.get('cache-control')!,/no-store/);assert.match(read.headers.get('content-disposition')!,/^inline/);
+  const head=await trialPreview(new Request(base,{method:'HEAD',headers}),env,row.jobId);assert.equal(head.status,200);assert.equal(head.headers.get('Content-Length'),String(preview.length));assert.equal((await head.arrayBuffer()).byteLength,0);
+  const invalidRange=await trialPreview(new Request(base,{headers:{...headers,Range:'bytes=999-1000'}}),env,row.jobId);assert.equal(invalidRange.status,416);assert.match(invalidRange.headers.get('Cache-Control')!,/no-store/);
+  await assert.rejects(trialPreview(new Request(base),env,row.jobId),/NOT_FOUND/);
+  const other=await createAnonymousSession(DB);await assert.rejects(trialPreview(new Request(base,{headers:{Cookie:`__Host-bienvu-trial=${other.proof}`}}),env,row.jobId),/NOT_FOUND/);
+  await assert.rejects(generationVideo(new Request(base),env,session.scopeId,row.jobId),/NOT_FOUND/);
+  await trialLoginIntent(new Request(base,{method:'POST',headers}),env,row.jobId);
+  assert.equal((await DB.prepare('SELECT claim_job_id AS id FROM anonymous_sessions WHERE id=?').bind(session.id).first<{id:string}>())!.id,row.jobId);
+  const user={id:'api-owner',email:'owner@example.com'};await DB.prepare('INSERT INTO auth_user VALUES(?,?,?,1,NULL,?,?)').bind(user.id,'Owner',user.email,Date.now()-1000,Date.now()).run();const agency=await ensureAgency(DB,user);
+  const owned=await claimTrial(DB,session,agency.id,row.jobId);assert.equal(owned.creditStatus,'consumed');assert.equal((await creditGrant(DB,agency.id))!.remaining,2);
+  for(let i=0;i<2;i++){const downloaded=await generationVideo(new Request(base+'?download=1'),env,agency.id,row.jobId);assert.deepEqual(new Uint8Array(await downloaded.arrayBuffer()),master);}
+  assert.equal((await creditGrant(DB,agency.id))!.remaining,2);assert.equal((await generationPreview(new Request(base),env,agency.id,row.jobId)).status,200);
+  await assert.rejects(trialPreview(new Request(base,{headers}),env,row.jobId),/NOT_FOUND/);
+  await assert.rejects(generationVideo(new Request(base),env,'another-user',row.jobId),/NOT_FOUND/);
+  // A new anonymous session cannot bypass a depleted account's actual credit.
+  const grant=(await creditGrant(DB,agency.id))!;await DB.prepare('UPDATE allocations SET consumed=quota_limit WHERE id=?').bind(grant.id).run();
+  const second=await admitAnonymous(DB,other.session,'locked-trial-api-key',{url},{ipHmac:'f'.repeat(64),turnstileHash:'e'.repeat(64)},'true');
+  const secondKey=`agencies/${other.session.scopeId}/jobs/${second.jobId}/video/master.mp4`,secondPreview=secondKey.replace('master','preview');
+  await env.MEDIA.put(secondKey,master,{customMetadata:{sha256:report.sha256}});await env.MEDIA.put(secondPreview,preview,{customMetadata:{sha256:previewReport.sha256}});
+  await DB.batch([DB.prepare('INSERT INTO generation_artifacts VALUES(?,?,?,?)').bind(second.jobId,secondKey,JSON.stringify(report),at),DB.prepare('INSERT INTO generation_previews VALUES(?,?,?,?)').bind(second.jobId,secondPreview,JSON.stringify(previewReport),at),DB.prepare("UPDATE jobs SET status='ready',lease_until=NULL,updated_at=? WHERE id=?").bind(new Date().toISOString(),second.jobId)]);
+  const locked=await claimTrial(DB,other.session,agency.id,second.jobId);assert.equal(locked.creditStatus,'unfunded');assert.ok(locked.expiresAt>grant.renewalAt);
+  for(const method of ['GET','HEAD'])await assert.rejects(generationVideo(new Request(base+'?download=1&variant=master',{method,headers:{Range:'bytes=0-1'}}),env,agency.id,second.jobId),/QUOTA_EXHAUSTED/);
+  assert.deepEqual(new Uint8Array(await (await generationPreview(new Request(base),env,agency.id,second.jobId)).arrayBuffer()),preview);
+  assert.equal((await DB.prepare('SELECT count(*) AS n FROM generation_shares').first<{n:number}>())!.n,0);
+});

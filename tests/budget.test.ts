@@ -30,3 +30,12 @@ test('hausse explicite à 40 € : historique préservé, coupure 35 € et marg
   assert.throws(()=>reserve({...raised,ceilingCents:3501},now),/BUDGET_CONFIG_INVALID/);
   assert.throws(()=>reserve({...raised,envelopeCents:3500},now),/BUDGET_CONFIG_INVALID/);
 });
+test('hausse explicite à 50 € : la coupure 45 € garde 5 € de marge',()=>{
+  const old={...fresh(),fixedAndOtherCents:3475,committedCents:25,attempts:1,days:{'2026-09-27':1}};
+  assert.throws(()=>reserve({...old,ceilingCents:3500,envelopeCents:4000},now),/BUDGET_LIMIT/);
+  const raised=reserve({...old,ceilingCents:4500,envelopeCents:5000},now);
+  assert.equal(raised.fixedAndOtherCents,old.fixedAndOtherCents);
+  assert.equal(summary(raised).remainingEnvelopeCents,1450);
+  assert.throws(()=>reserve({...raised,ceilingCents:4501},now),/BUDGET_CONFIG_INVALID/);
+  assert.throws(()=>reserve({...raised,envelopeCents:5001},now),/BUDGET_CONFIG_INVALID/);
+});

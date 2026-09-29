@@ -23,10 +23,13 @@ export function handleAuthRequest(request: Request, env: AuthEnvironment, waitUn
       if (path === '/api/auth/sign-out') body = {};
       else if (path === '/api/auth/sign-in/social') {
         const input = await boundedJson(request);
-        if (!input || typeof input !== 'object' || Object.keys(input).length !== 1 || !('provider' in input) || input.provider !== 'google')
+        const continueListing = input && typeof input === 'object' && 'continueListing' in input && input.continueListing === true;
+        const continueTrial = input && typeof input === 'object' && 'continueTrial' in input && input.continueTrial === true;
+        if (!input || typeof input !== 'object' || Object.keys(input).length !== (continueListing || continueTrial ? 2 : 1) ||
+          !('provider' in input) || input.provider !== 'google')
           throw new RequestFailure('VALIDATION_ERROR');
         if (!googleConfigured(env)) throw new RequestFailure('AUTH_UNAVAILABLE');
-        body = {provider: 'google', callbackURL: '/agence', errorCallbackURL: '/connexion?error=oauth', disableRedirect: true};
+        body = {provider: 'google', callbackURL: continueTrial ? '/essai/recuperer' : continueListing ? '/' : '/agence', errorCallbackURL: continueTrial ? '/connexion?error=oauth&trial=1' : '/connexion?error=oauth', disableRedirect: true};
       } else {
         const schema = ({'/api/auth/sign-up/email': EmailSignUp, '/api/auth/sign-in/email': EmailSignIn,
           '/api/auth/request-password-reset': EmailRequest, '/api/auth/send-verification-email': EmailRequest,
@@ -68,7 +71,7 @@ export function handleAuthRequest(request: Request, env: AuthEnvironment, waitUn
       const redirect = new URL(location, origin);
       if (redirect.origin !== origin) throw new RequestFailure('AUTH_FAILED');
       const headers = new Headers(response.headers);
-      if (redirect.searchParams.has('error')) headers.set('location', `${origin}/connexion?error=${path === '/api/auth/verify-email' ? 'verification' : 'oauth'}`);
+      if (redirect.searchParams.has('error')) headers.set('location', `${origin}/connexion?error=${path === '/api/auth/verify-email' ? 'verification' : 'oauth'}${redirect.searchParams.get('trial')==='1'?'&trial=1':''}`);
       return new Response(null, {status: response.status, headers});
     }
     // Les cookies passent ; ni jeton de session, ni profil synthétique ne sortent dans le JSON.

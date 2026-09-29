@@ -18,7 +18,9 @@
     "AUTH_EMAIL_MODE": "local",
     "AUTH_EMAIL_FROM": "connexion@bienvu.example",
     "AUTH_EMAIL_VERIFICATION_BYPASS": "false",
-    "IMPORT_MODE": "disabled"
+    "IMPORT_MODE": "disabled",
+    "ANONYMOUS_TRIALS_ENABLED": "false",
+    "TURNSTILE_SITE_KEY": ""
   },
   "send_email": [
     {

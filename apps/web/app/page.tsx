@@ -2,7 +2,7 @@ import {LandingPage} from '../components/landing-page';
 import './landing.css';
 
 export const metadata = {
-  title: 'BienVu — Une annonce. Et ça tourne.',
-  description: 'Préparez vos vidéos immobilières avec voix off, aux couleurs de votre agence. Un lien ou vos photos : BienVu donne une autre dimension à vos annonces.',
+  title: 'BienVu — Une annonce. Une vidéo qui donne envie.',
+  description: 'Votre studio de vidéos immobilières. Un lien ou vos photos, une voix française et les couleurs de votre agence.',
 };
 export default function Page() {return <LandingPage/>;}

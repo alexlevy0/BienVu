@@ -1,5 +1,5 @@
 import {EntityId,VideoReport,publicErrors,type PublicErrorCode} from '@bienvu/contracts';
-import {findGeneration,GenerationFailure,listGenerations} from '@bienvu/db';
+import {findOwnedGeneration,generationEvent,GenerationFailure,listGenerations,type GenerationRow} from '@bienvu/db';
 import {RequestFailure} from './http';
 export async function callGeneration(env:CloudflareEnv&{GENERATION_SERVICE?:Fetcher;GENERATION_TOKEN?:string},agencyId:string,path:string,body:unknown,key=''){
   if(!env.GENERATION_SERVICE||!env.GENERATION_TOKEN)throw new RequestFailure('GENERATIONS_PAUSED');
@@ -11,18 +11,33 @@ export async function callGeneration(env:CloudflareEnv&{GENERATION_SERVICE?:Fetc
 }
 export async function ownGeneration(env:Pick<CloudflareEnv,'DB'>,agencyId:string,id:string){
   if(!EntityId.safeParse(id).success)throw new RequestFailure('NOT_FOUND');
-  const row=await findGeneration(env.DB,agencyId,id);if(!row)throw new RequestFailure('NOT_FOUND');return row;
+  const row=await findOwnedGeneration(env.DB,agencyId,id);if(!row)throw new RequestFailure('NOT_FOUND');return row;
 }
-export async function generationHistory(env:Pick<CloudflareEnv,'DB'>,agencyId:string,cursor?:string){
+export async function generationHistory(env:Pick<CloudflareEnv,'DB'>,agencyId:string,cursor?:string,
+  filters:{query?:string;status?:'all'|'ready'|'active';sort?:'newest'|'oldest'}={}){
   if(cursor&&cursor.length>512)throw new RequestFailure('VALIDATION_ERROR');
-  try{return await listGenerations(env.DB,agencyId,cursor);}catch(error){if(error instanceof GenerationFailure)throw new RequestFailure(error.code);throw error;}
+  if((filters.query?.length??0)>80||!['all','ready','active'].includes(filters.status??'all')||
+    !['newest','oldest'].includes(filters.sort??'newest'))throw new RequestFailure('VALIDATION_ERROR');
+  try{return await listGenerations(env.DB,agencyId,cursor,filters);}catch(error){if(error instanceof GenerationFailure)throw new RequestFailure(error.code);throw error;}
 }
 export async function generationVideo(request:Request,env:Pick<CloudflareEnv,'DB'|'MEDIA'>,agencyId:string,id:string){
   const row=await ownGeneration(env,agencyId,id);
-  if(row.status!=='ready'||!row.objectKey||!row.report||row.expiresAt<=new Date().toISOString())throw new RequestFailure('NOT_FOUND');
-  const reservation=await env.DB.prepare("SELECT id FROM reservations WHERE job_id=? AND agency_id=? AND status='consumed'").bind(id,agencyId).first();
-  if(!reservation||!row.objectKey.startsWith(`agencies/${agencyId}/jobs/${id}/`))throw new RequestFailure('NOT_FOUND');
-  const report=VideoReport.parse(JSON.parse(row.report)),head=await env.MEDIA.head(row.objectKey);
+  if(row.status!=='ready'||row.retention!=='available'||row.expiresAt<=new Date().toISOString())throw new RequestFailure('NOT_FOUND');
+  if(row.creditStatus!=='consumed')throw new RequestFailure('QUOTA_EXHAUSTED');
+  const response=await streamGenerationMedia(request,env,row,'master');
+  if(new URL(request.url).searchParams.get('download')==='1'&&response.ok)await generationEvent(env.DB,id,'download');
+  return response;
+}
+export async function generationPreview(request:Request,env:Pick<CloudflareEnv,'DB'|'MEDIA'>,agencyId:string,id:string){
+  return streamGenerationMedia(request,env,await ownGeneration(env,agencyId,id),'preview');
+}
+export async function streamGenerationMedia(request:Request,env:Pick<CloudflareEnv,'MEDIA'>,row:GenerationRow,variant:'master'|'preview') {
+  const id=row.jobId,key=variant==='preview'?row.previewKey:row.objectKey,raw=variant==='preview'?row.previewReport:row.report;
+  if(row.status!=='ready'||row.retention!=='available'||!key||!raw||row.expiresAt<=new Date().toISOString())throw new RequestFailure('NOT_FOUND');
+  if(variant==='master'&&(!row.ownerAgencyId||row.creditStatus!=='consumed'))throw new RequestFailure('NOT_FOUND');
+  if(!key.startsWith(`agencies/${row.agencyId}/jobs/${id}/`))throw new RequestFailure('NOT_FOUND');
+  const report=VideoReport.parse(JSON.parse(raw)),head=await env.MEDIA.head(key);
+  if(variant==='preview'&&!report.watermarked)throw new RequestFailure('NOT_FOUND');
   if(!head||head.size!==report.sizeBytes||head.customMetadata?.sha256!==report.sha256)throw new RequestFailure('NOT_FOUND');
   const range=request.headers.get('range');let offset=0,length=head.size;
   if(range){const match=/^bytes=(\d*)-(\d*)$/.exec(range);let end=head.size-1;
@@ -30,13 +45,13 @@ export async function generationVideo(request:Request,env:Pick<CloudflareEnv,'DB
       else offset=Math.max(0,head.size-Number(match[2]));length=end-offset+1;
     }else length=0;
     if(!Number.isSafeInteger(offset)||!Number.isSafeInteger(length)||offset<0||offset>=head.size||length<=0)
-      return new Response(null,{status:416,headers:{'Content-Range':`bytes */${head.size}`}});
+      return new Response(null,{status:416,headers:{'Content-Range':`bytes */${head.size}`,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
   }
   const headers={'Content-Type':'video/mp4','Content-Length':String(length),'Accept-Ranges':'bytes',
     'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff',
-    'Content-Disposition':`${new URL(request.url).searchParams.get('download')==='1'?'attachment':'inline'}; filename="bienvu-${id}.mp4"`,
+    'Content-Disposition':`${variant==='master'&&new URL(request.url).searchParams.get('download')==='1'?'attachment':'inline'}; filename="bienvu-${id}.mp4"`,
     ...(range?{'Content-Range':`bytes ${offset}-${offset+length-1}/${head.size}`}:{})};
   if(request.method==='HEAD')return new Response(null,{status:range?206:200,headers});
-  const object=await env.MEDIA.get(row.objectKey,range?{range:{offset,length}}:undefined);
+  const object=await env.MEDIA.get(key,range?{range:{offset,length}}:undefined);
   if(!object)throw new RequestFailure('NOT_FOUND');return new Response(object.body,{status:range?206:200,headers});
 }

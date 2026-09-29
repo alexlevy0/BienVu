@@ -59,7 +59,7 @@ export class VideoService {
         catch(error){if((error as NodeJS.ErrnoException).code!=='EEXIST')throw error;}
         json(res,await this.load(input.id),202);return true;
       }
-      const match=url.pathname.match(/^\/videos\/([a-f0-9]{64})(?:\/(file|start|cancel|assets\/([a-zA-Z0-9_-]{1,64})))?$/);
+      const match=url.pathname.match(/^\/videos\/([a-f0-9]{64})(?:\/(file|preview|start|cancel|assets\/([a-zA-Z0-9_-]{1,64})))?$/);
       if(!match){json(res,{error:'NOT_FOUND'},404);return true;}
       const id=match[1],state=await this.load(id);if(!state){json(res,{error:'NOT_FOUND'},404);return true;}
       const directory=this.dir(id),manifest=VideoManifest.parse(JSON.parse(await readFile(path.join(directory,'manifest.json'),'utf8')));
@@ -90,7 +90,7 @@ export class VideoService {
         try{await this.save({id,status:'rendering',startedAt:new Date().toISOString()});}
         catch(error){this.running.delete(id);this.options.release(id);throw error;}
         void (this.options.run??renderVideoInProcess)(directory,id,signal).then(async report=>{
-          if(report.id!==id||report.watermarked!==manifest.rights.watermarked)throw new Error('VIDEO_REPORT_INVALID');
+          if(report.id!==id||report.watermarked!==manifest.rights.watermarked||manifest.rights.kind==='anonymous'&&!report.preview?.watermarked)throw new Error('VIDEO_REPORT_INVALID');
           await this.save({id,status:'ready',report});
         }).catch(async(error:unknown)=>{
           const code=error instanceof Error&&/^[A-Z_]{3,64}$/.test(error.message)?error.message:'VIDEO_RENDER_FAILED';
@@ -105,10 +105,12 @@ export class VideoService {
         if(this.running.has(id)){json(res,{error:'RENDER_BUSY'},409);return true;}
         await this.cleanup(id);json(res,{ok:true});return true;
       }
-      if(match[2]==='file'&&['GET','HEAD'].includes(req.method??'')) {
+      if(['file','preview'].includes(match[2])&&['GET','HEAD'].includes(req.method??'')) {
         if(state.status!=='ready'||!state.report){json(res,{error:'VIDEO_NOT_READY'},409);return true;}
-        const file=path.join(directory,'video.mp4'),size=(await stat(file)).size;
-        if(size!==state.report.sizeBytes)throw new Error('VIDEO_ARTIFACT_INVALID');
+        const variant=match[2]==='preview'?state.report.preview:state.report;
+        if(!variant){json(res,{error:'NOT_FOUND'},404);return true;}
+        const file=path.join(directory,match[2]==='preview'?'preview.mp4':'video.mp4'),size=(await stat(file)).size;
+        if(size!==variant.sizeBytes)throw new Error('VIDEO_ARTIFACT_INVALID');
         const range=parseRange(req.headers.range,size);
         if(range===false){res.writeHead(416,{'Content-Range':`bytes */${size}`});res.end();return true;}
         res.writeHead(range?206:200,{'Content-Type':'video/mp4','Accept-Ranges':'bytes','Cache-Control':'no-store',

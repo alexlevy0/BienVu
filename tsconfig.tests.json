@@ -31,6 +31,8 @@
     "fixtures/video-worker.ts",
     "fixtures/generation-worker.ts",
     "scripts/video-fixtures.ts",
-    "scripts/prepare-video-fixtures.ts"
+    "scripts/prepare-video-fixtures.ts",
+    "scripts/probe-anonymous-video.ts",
+    "scripts/probe-trial-media.ts"
   ]
 }

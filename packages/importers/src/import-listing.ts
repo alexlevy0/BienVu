@@ -1,4 +1,4 @@
-import {EntityId, GeneratableListing, ImportFailure, type ImportFailureReason, type NormalizedListing} from '@bienvu/contracts';
+import {EntityId, GeneratableListing, NormalizedListing, ImportFailure, type ImportFailureReason} from '@bienvu/contracts';
 import {extractListingHtml} from './listing';
 import {IMPORT_LIMITS, publicUrl, scopedUrl, sourcePolicy, type ImportTransport} from './network';
 import {assertListingDestination, selectAdapter} from './registry';
@@ -17,7 +17,7 @@ export async function importListing(url: string, context: {agencyId: string; imp
   transport: ImportTransport;
   store(photo: NormalizedListing['photos'][number], bytes: Uint8Array<ArrayBuffer>, signal: AbortSignal): Promise<void>;
   browserHtml?: (url: string, signal: AbortSignal) => Promise<string>;
-}, options: {signal?: AbortSignal; maxPhotos?: number; mode?: 'local' | 'cloudflare'} = {}) {
+}, options: {signal?: AbortSignal; maxPhotos?: number; mode?: 'local' | 'cloudflare'; allowPartial?: boolean} = {}) {
   const start = Date.now(), timeout = AbortSignal.timeout(IMPORT_LIMITS.durationMs);
   const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
   const agencyId = EntityId.parse(context.agencyId), id = EntityId.parse(context.importId), source = publicUrl(url).href;
@@ -49,10 +49,12 @@ export async function importListing(url: string, context: {agencyId: string; imp
     const page = await load(source, 'page');
     assertListingDestination(source, page.url);
     let extracted;
-    try {extracted = extractListingHtml(new TextDecoder('utf-8', {fatal: true}).decode(page.bytes), page.url);} catch (error) {
+    try {extracted = extractListingHtml(new TextDecoder('utf-8', {fatal: true}).decode(page.bytes), page.url,
+      {allowPartial: options.allowPartial});} catch (error) {
       if (!(error instanceof ImportFailure) || error.code !== 'NOT_A_LISTING' || error.reason === 'not_listing' || !ports.browserHtml) throw error;
       diagnostics.browserUsed = true;
-      extracted = extractListingHtml(await abortable(ports.browserHtml(page.url, signal), signal), page.url);
+      extracted = extractListingHtml(await abortable(ports.browserHtml(page.url, signal), signal), page.url,
+        {allowPartial: options.allowPartial});
     }
     // Validation de TOUTE la galerie avant récupération ; une URL privée ne passe
     // pas simplement en warning parce que trois autres images fonctionnent.
@@ -83,10 +85,10 @@ export async function importListing(url: string, context: {agencyId: string; imp
       await abortable(ports.store(photo, resource.bytes, signal), signal);
       signal.throwIfAborted(); photos.push(photo); diagnostics.storedBytes += resource.bytes.length;
     }
-    if (photos.length < 3) throw new ImportFailure('INSUFFICIENT_PHOTOS', 'Moins de trois photos distinctes et décodées.');
+    if (photos.length < 3 && !options.allowPartial) throw new ImportFailure('INSUFFICIENT_PHOTOS', 'Moins de trois photos distinctes et décodées.');
     const {photoUrls: _sourceCandidates, ...data} = extracted;
-    const listing = GeneratableListing.parse({...data, id, agencyId, sourceUrl: source, sourceHost: new URL(source).hostname,
-      fetchedAt: new Date().toISOString(), photos});
+    const listing = (options.allowPartial ? NormalizedListing : GeneratableListing).parse({...data, id, agencyId, sourceUrl: source,
+      sourceHost: new URL(source).hostname, fetchedAt: new Date().toISOString(), photos});
     diagnostics.durationMs = Date.now() - start;
     return {listing, diagnostics};
   } catch (error) {

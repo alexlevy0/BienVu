@@ -1,11 +1,13 @@
 import {WorkflowEntrypoint,type WorkflowEvent,type WorkflowStep} from 'cloudflare:workers';
-import {EntityId,GenerationRequest,VideoReport,publicErrors,videoObjectKey} from '@bienvu/contracts';
+import {EntityId,GenerationRequest,VideoReport,publicErrors,videoObjectKey,videoPreviewKey} from '@bienvu/contracts';
 import {admitGeneration,findGeneration,generationView,GenerationFailure,failGeneration,setGenerationStage,type GenerationRow} from '@bienvu/db';
 import {authorized,json} from './auth';
 import {VideoRenderer} from './video-worker';
 import {getJobVideo,prepareJobVideo} from './video-manifest';
 import {prepareJobNarration} from './narration';
 import {realProviders} from './narration-worker';
+import {cleanupAnonymousTrials} from './trial-cleanup';
+import {extractDescription,EXTRACTION_TEXT_MAX} from '@bienvu/narration';
 import {loadGenerationListing} from './generation-import';
 export {VideoRenderer};
 export type GenerationEnv=VideoEnv&Pick<NarrationEnv,'GOOGLE_SERVICE_ACCOUNT_JSON'|'GOOGLE_CLOUD_PROJECT'|'GOOGLE_TTS_VOICE'|'OPENAI_API_KEY'|'SCRIPT_MODEL'>&{
@@ -19,7 +21,7 @@ const safeCode=(error:unknown)=>{const code=diagnosticCode(error);return code in
 const controller=(env:GenerationEnv)=>env.RENDERER.getByName('generation-single-slot-v1');
 async function active(env:GenerationEnv,agencyId:string,jobId:string){
   const row=await findGeneration(env.DB,agencyId,jobId);
-  if(!row||['ready','failed'].includes(row.status))throw new Error('GENERATION_TERMINAL');
+  if(!row||row.retention!=='available'||['ready','failed'].includes(row.status))throw new Error('GENERATION_TERMINAL');
   if(row.deadline<=new Date().toISOString())throw new Error('GENERATION_TIMEOUT');
   const gate=await env.DB.prepare("SELECT enabled FROM generation_control WHERE id='generations'").first<{enabled:number}>();
   if(env.GENERATIONS_ENABLED!=='true'||gate?.enabled!==1)throw new GenerationFailure('GENERATIONS_PAUSED');
@@ -33,14 +35,22 @@ export async function launchGeneration(env:GenerationEnv,row:GenerationRow){
     .bind(new Date().toISOString(),row.jobId).run();
 }
 async function settleVideo(env:GenerationEnv,row:GenerationRow,result:unknown){
+  if(row.retention!=='available')return false;
   const data=result as {status?:string;report?:unknown;objectKey?:string};if(data?.status!=='ready')return false;
   const frozen=await getJobVideo(env.DB,row.agencyId,row.jobId);if(!frozen)throw new Error('VIDEO_NOT_PREPARED');
   const report=VideoReport.parse(data.report),key=videoObjectKey(frozen.manifest,frozen.hash);
   if(data.objectKey!==key||report.id!==frozen.hash||report.manifestHash!==frozen.hash||report.watermarked!==frozen.manifest.rights.watermarked)throw new Error('VIDEO_REPORT_INVALID');
   const head=await env.MEDIA.head(key);if(!head||head.size!==report.sizeBytes||head.customMetadata?.sha256!==report.sha256||head.customMetadata?.manifestHash!==frozen.hash)throw new Error('VIDEO_ARTIFACT_INVALID');
+  const previewKey=videoPreviewKey(frozen.manifest,frozen.hash);
+  if(row.anonymousSessionId){
+    if(!report.preview?.watermarked||report.watermarked)throw new Error('VIDEO_PREVIEW_INVALID');
+    const preview=await env.MEDIA.head(previewKey);
+    if(!preview||preview.size!==report.preview.sizeBytes||preview.customMetadata?.sha256!==report.preview.sha256||preview.customMetadata?.manifestHash!==frozen.hash)throw new Error('VIDEO_PREVIEW_INVALID');
+  }
   const at=new Date().toISOString();
   // L'artefact et la consommation de crédit sont publiés dans une transaction D1.
   await env.DB.batch([
+    ...(row.anonymousSessionId?[env.DB.prepare(`INSERT INTO generation_previews(job_id,object_key,report_json,created_at) VALUES(?,?,?,?) ON CONFLICT(job_id) DO NOTHING`).bind(row.jobId,previewKey,JSON.stringify(report.preview),at)]:[]),
     env.DB.prepare(`INSERT INTO generation_artifacts(job_id,object_key,report_json,created_at)
       SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM jobs WHERE id=? AND status NOT IN ('failed')) ON CONFLICT(job_id) DO NOTHING`)
       .bind(row.jobId,key,JSON.stringify(report),at,row.jobId),
@@ -128,6 +138,20 @@ export default {
         await env.DB.prepare("UPDATE generation_control SET enabled=0,updated_at=? WHERE id='generations'").bind(new Date().toISOString()).run();return json({paused:true});
       }
       if(path==='/operator/reconcile'&&request.method==='POST'){await reconcileBatch(env);return json({reconciled:true});}
+      if(path==='/extract'&&request.method==='POST'){
+        const limit=EXTRACTION_TEXT_MAX*4+200,reader=request.body?.getReader();
+        if(!reader||Number(request.headers.get('content-length'))>limit)return json({error:'VALIDATION_ERROR'},422);
+        const chunks:Uint8Array[]=[],size={value:0};try{for(;;){const part=await reader.read();if(part.done)break;
+          size.value+=part.value.byteLength;if(size.value>limit)return json({error:'VALIDATION_ERROR'},422);chunks.push(part.value);}}
+        finally{await reader.cancel().catch(()=>{});reader.releaseLock();}
+        const bytes=new Uint8Array(size.value);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}
+        const body=new TextDecoder('utf-8',{fatal:true}).decode(bytes);
+        const input=JSON.parse(body) as {text?:unknown};
+        if(!input||typeof input.text!=='string'||input.text.length<15||input.text.length>EXTRACTION_TEXT_MAX)
+          return json({error:'VALIDATION_ERROR'},422);
+        try{return json(await extractDescription(input.text,env.OPENAI_API_KEY,env.SCRIPT_MODEL));}
+        catch{return json({error:'SOURCE_UNAVAILABLE'},502);}
+      }
       if(path==='/generations'&&request.method==='POST'){
         const body=await request.text();if(body.length>4096)return json({error:'VALIDATION_ERROR'},422);
         const input=GenerationRequest.safeParse(JSON.parse(body));if(!input.success)return json({error:'VALIDATION_ERROR'},422);
@@ -146,5 +170,5 @@ export default {
       return json({error:'NOT_FOUND'},404);
     }catch(error){const code=error instanceof GenerationFailure?error.code:'INTERNAL_ERROR';return json({error:code},publicErrors[code][0]);}
   },
-  scheduled(_event:ScheduledController,env:GenerationEnv,ctx:ExecutionContext){ctx.waitUntil(reconcileBatch(env));},
+  scheduled(_event:ScheduledController,env:GenerationEnv,ctx:ExecutionContext){ctx.waitUntil(reconcileBatch(env).then(()=>cleanupAnonymousTrials(env)));},
 };

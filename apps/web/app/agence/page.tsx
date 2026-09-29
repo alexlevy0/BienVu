@@ -1,6 +1,12 @@
-import {Shell} from '../../components/shell';
 import {AgencyForm} from '../../components/agency-form';
+import {StudioFrame} from '../../components/studio-frame';
+import '../landing.css';
+import './agency.css';
+
 export const metadata = {title: 'Mon agence'};
 export default function Page() {
-  return <Shell><div className="page-heading"><div><p className="eyebrow">VOTRE SIGNATURE, PARTOUT</p><h1>À l’image de<br/><em>votre agence.</em></h1><p className="page-intro">Une identité à renseigner une fois, pour toutes vos futures vidéos.</p></div></div><AgencyForm/></Shell>;
+  return <StudioFrame active="agency"><div className="agency-studio">
+    <header className="agency-studio-heading"><h1>Mon agence</h1><p>Votre identité, sur chaque vidéo.</p></header>
+    <AgencyForm/>
+  </div></StudioFrame>;
 }

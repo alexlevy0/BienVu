@@ -15,3 +15,10 @@ IMPORT_MODE=local
 
 # Secret partagé web/service privé (généré séparément pour le staging).
 IMPORT_TOKEN=
+
+# Essai anonyme : désactivé par défaut. Aucun secret dans NEXT_PUBLIC_*.
+ANONYMOUS_TRIALS_ENABLED=false
+TURNSTILE_SITE_KEY=
+TURNSTILE_SECRET_KEY=
+TRIAL_IP_HMAC_SECRET=
+# Au moins 32 caractères aléatoires, distincts du secret Better Auth.

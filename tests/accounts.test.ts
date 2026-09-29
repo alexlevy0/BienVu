@@ -4,6 +4,7 @@ import {readFile, readdir} from 'node:fs/promises';
 import {randomBytes, createHmac} from 'node:crypto';
 import {Miniflare, convertV4MiniflareOptions} from 'miniflare';
 import {createAuth, authOrigin} from '../apps/web/lib/auth';
+import {handleAuthRequest} from '../apps/web/lib/auth-handler';
 import {AgencyUpdate} from '../packages/contracts/src/agency';
 import {ensureAgency, agencyForUser, updateAgency, allowAgencyWrite} from '../packages/db/src/agency';
 import {assertSameOrigin, boundedBytes, RequestFailure} from '../apps/web/lib/http';
@@ -50,11 +51,13 @@ test('comptes : Better Auth avec D1 local, identités synthétiques sans Google'
   await t.test('marque persistante et propriétaire déduit côté serveur', async () => {
     const before = await ensureAgency(db, other);
     const input = {name: 'Agence A enregistrée', primaryColor: '#234567', secondaryColor: '#ffffff', phone: null,
-      email: 'contact-a@example.com', website: null};
+      email: 'contact-a@example.com', website: null, city: 'Lyon'};
     assert.equal(AgencyUpdate.safeParse({...input, agencyId: before.id}).success, false);
     await updateAgency(db, user.id, input);
     assert.equal((await agencyForUser(db, user.id))?.name, input.name);
+    assert.equal((await agencyForUser(db, user.id))?.city, input.city);
     assert.deepEqual(await agencyForUser(db, other.id), before);
+    assert.equal(AgencyUpdate.safeParse({...input, city: 'x'.repeat(101)}).success, false);
     assert.equal(AgencyUpdate.safeParse({...input, email: null}).success, false);
     assert.equal(AgencyUpdate.safeParse({...input, phone: '......', email: null}).success, false);
     assert.equal(AgencyUpdate.safeParse({...input, primaryColor: 'red; background:url(x)'}).success, false);
@@ -105,6 +108,22 @@ test('comptes : Better Auth avec D1 local, identités synthétiques sans Google'
     assert.match(start.headers.get('set-cookie') ?? '', /HttpOnly/i);
     const invalid = await configured.handler(new Request(`${env.BETTER_AUTH_URL}/api/auth/callback/google?state=forged&code=fixture`));
     assert.equal(invalid.status, 302); assert.match(invalid.headers.get('location') ?? '', /error/);
+  });
+  await t.test('reprise de l’annonce après Google : seul le drapeau fixe est accepté', async () => {
+    const configured = {...env, GOOGLE_CLIENT_ID: 'fixture-id', GOOGLE_CLIENT_SECRET: 'fixture-secret'};
+    const start = (body: unknown) => handleAuthRequest(new Request(`${env.BETTER_AUTH_URL}/api/auth/sign-in/social`, {
+      method: 'POST', headers: {'content-type': 'application/json', origin: env.BETTER_AUTH_URL}, body: JSON.stringify(body),
+    }), configured);
+    const continued = await start({provider: 'google', continueListing: true});
+    assert.equal(continued.status, 200);
+    assert.equal(new URL((await continued.json() as {url: string}).url).origin, 'https://accounts.google.com');
+    const trial = await start({provider:'google',continueTrial:true});
+    assert.equal(trial.status,200);
+    const states=await db.prepare('SELECT value FROM auth_verification').all<{value:string}>();
+    assert.ok(states.results.some((row:{value:string})=>row.value.includes('/essai/recuperer')));
+    for (const body of [{provider:'google',continueTrial:true,continueListing:true},{provider:'google',continueTrial:'https://evil.example.com'}, {provider: 'google', callbackURL: 'https://evil.example.com'},
+      {provider: 'google', continueListing: '/'}, {provider: 'google', continueListing: true, callbackURL: 'https://evil.example.com'}])
+      assert.equal((await start(body)).status, 422);
   });
   await t.test('déconnexion invalide immédiatement le cookie en base', async () => {
     const response = await auth.handler(new Request(`${env.BETTER_AUTH_URL}/api/auth/sign-out`, {method: 'POST',

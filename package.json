@@ -43,7 +43,10 @@
     "render:video": "node scripts/renderer-native.mjs video",
     "probe:video:cloudflare": "node --import tsx scripts/probe-video-cloudflare.mjs",
     "probe:video:container": "node --import tsx scripts/probe-video-container.mjs",
-    "preview:video": "node scripts/preview-video.mjs"
+    "preview:video": "node scripts/preview-video.mjs",
+    "probe:trial:video": "tsx scripts/probe-anonymous-video.ts",
+    "probe:trial:media": "tsx scripts/probe-trial-media.ts",
+    "probe:trial:ui": "node scripts/probe-trial-ui.mjs"
   },
   "devDependencies": {
     "@types/node": "24.10.1",

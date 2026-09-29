@@ -10,16 +10,18 @@ export const AgencyUpdate = z.object({
     .refine(v => v.replace(/\D/g, '').length >= 6, 'Vérifiez le numéro de téléphone.')),
   email: optional(z.email('Vérifiez l’adresse e-mail.').max(254)),
   website: optional(ListingUrl),
+  city: optional(z.string().trim().min(1).max(100, 'La ville est limitée à 100 caractères.')).optional(),
 }).strict().refine(v => Boolean(v.phone || v.email || v.website), {
   path: ['email'], message: 'Ajoutez au moins un contact : e-mail, téléphone ou site internet.',
 });
 export type AgencyUpdate = z.infer<typeof AgencyUpdate>;
-export const AgencyProfile = AgencyBrand.safeExtend({updatedAt: Timestamp, brandVersion: z.number().int().nonnegative()});
+export const AgencyProfile = AgencyBrand.safeExtend({city: z.string().trim().min(1).max(100).nullable().optional(),
+  updatedAt: Timestamp, brandVersion: z.number().int().nonnegative()});
 export type AgencyProfile = z.infer<typeof AgencyProfile>;
 export const Me = z.object({
   user: z.object({id: EntityId, name: z.string(), email: z.email()}).strict(),
   agency: AgencyProfile,
-  rights: z.object({generationEnabled: z.boolean(), developmentRemaining: z.number().int().nonnegative().default(0), importRetryAt: Timestamp.nullable().default(null), trial: z.enum(['eligible', 'used']), watermarked: z.literal(true)}).strict(),
+  rights: z.object({renewalAt: Timestamp.nullable().default(null), creditKind: z.enum(['trial','paid','free']).nullable().default(null), generationEnabled: z.boolean(), developmentRemaining: z.number().int().nonnegative().default(0), importRetryAt: Timestamp.nullable().default(null), trial: z.enum(['eligible', 'used']), watermarked: z.boolean()}).strict(),
 }).strict();
 export type Me = z.infer<typeof Me>;
 export const LOGO_MAX_BYTES = 2 * 1024 * 1024;

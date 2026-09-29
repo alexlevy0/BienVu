@@ -122,3 +122,13 @@ La publication persistée dans R2 avec checksum fait autorité avant le nettoyag
 ## Parcours durable livré au sprint 07
 
 Le web transmet l’agence authentifiée au service privé de génération. La migration 0014 lie allocation de développement, réservation, job et intention de lancement atomiquement. Un Cloudflare Workflow orchestre les imports, les checkpoints texte/voix et le rendu idempotent ; le cron réconcilie les interruptions. L’historique sert le MP4 R2 privé avec Range après consommation atomique du quota. Aucun droit public n’est créé à la migration. [Détails, limites et commandes](GENERATIONS.md).
+
+## Extension locale du 29/09 : essai anonyme
+
+[Essai anonyme](ESSAI-ANONYME.md) : mêmes jobs, outbox/Workflows, ledger, Better Auth et buckets privés. `agency_id` demeure le périmètre technique des ressources ; `owner_agency_id` change atomiquement au claim. Session opaque HttpOnly, Turnstile vérifié serveur, quota gratuit mensuel à l’anniversaire UTC. Master propre unique et dérivée filigranée FFmpeg ; accès au master seulement après consommation d’un crédit. La purge conditionnelle arbitre face au claim et garde les coûts. Migrations 0017/0018 et drapeaux désactivés ; aucun déploiement de cette extension.
+
+## Extension locale du 29/09 : création avec reprise et extraction
+
+La migration 0019 ajoute un brouillon versionné à l'import privé existant. Un import partiel suspend son traitement en `needs_input` sans garder navigateur ni conteneur actif ; il conserve le même identifiant et ses photos D1/R2. La validation finale publie l'annonce, puis l'admission existante crée le job, réserve un crédit et une intention durable. Le rendu lit son propre snapshot ; modifier un autre brouillon n'altère pas le job.
+
+Le web authentifié ou anonyme appelle le même adaptateur d'extraction sur le Worker de génération via Service Binding. OpenAI ne reçoit qu'un texte borné, sans outil. D1 suit chaque tentative et une provision de 0,05 €, même si la réponse est invalide ; une réponse ancienne ne peut mettre à jour une nouvelle version du brouillon. Les invites anonymes exigent session et Turnstile. Les états des jobs sont regroupés dans le fournisseur React global, avec polling conditionnel et notification d'une transition observée ; Workflows et cron restent propriétaires du traitement. Les signalements utilisent la table privée `generation_reports`. [Contrats](CONTRATS.md) · [guide d'exploitation](GENERATIONS.md) · [vérification locale](preuves/accueil/WORKFLOW-IMPROVEMENTS.md).

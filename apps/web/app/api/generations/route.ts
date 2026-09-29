@@ -11,5 +11,8 @@ export async function POST(request:Request){return respond(async()=>{
 });}
 export async function GET(request:Request){return respond(async()=>{
   const {env,agency}=await requireOwner(request);
-  return Response.json(await generationHistory(env,agency.id,new URL(request.url).searchParams.get('cursor')??undefined));
+  const params=new URL(request.url).searchParams;
+  return Response.json(await generationHistory(env,agency.id,params.get('cursor')??undefined,
+    {query:params.get('q')??'',status:(params.get('status')??'all') as 'all'|'ready'|'active',
+      sort:(params.get('sort')??'newest') as 'newest'|'oldest'}));
 });}

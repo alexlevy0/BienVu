@@ -14,6 +14,7 @@ export class FixtureVideo extends DurableObject<Env> {
       }
       if(path.includes('/assets/')){await new Response(init?.body).arrayBuffer();return Response.json({ok:true});}
       if(path.endsWith('/start')){await this.ctx.storage.put('starts',(await this.ctx.storage.get<number>('starts')??0)+1);return Response.json({status:'rendering'});}
+      if(path.endsWith('/preview'))return new Response(new Uint8Array([3,2,1]));
       if(path.endsWith('/file'))return new Response(new Uint8Array([1,2,3]));
       if(init?.method==='DELETE'){await this.ctx.storage.put('cleaned',true);return Response.json({ok:true});}
       return Response.json({id:await this.ctx.storage.get('id'),status:await this.ctx.storage.get('hold')?'rendering':'ready',report:await this.ctx.storage.get('report')});

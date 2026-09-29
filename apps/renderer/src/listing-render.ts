@@ -82,6 +82,55 @@ export async function withVideoAssets<T>(input: unknown, directory: string, use:
     return await use({manifest,media,logoBackground,fontUrl:base+'font.woff2'});
   }finally{server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));}
 }
+export async function verifyVideoArtifact(file:string,id:string,frames:number,watermarked:boolean,startedAt:string,start:number) {
+    const {stdout}=await exec(binary('ffprobe'),['-v','error','-show_format','-show_streams','-of','json',file],{cwd:cwd(binary('ffprobe')),timeout:20_000,maxBuffer:128_000});
+    const metadata=JSON.parse(stdout) as {format:{duration:string};streams:{codec_type:string;codec_name:string;width?:number;height?:number;avg_frame_rate?:string;nb_frames?:string}[]};
+    const video=metadata.streams.find(s=>s.codec_type==='video'), audio=metadata.streams.find(s=>s.codec_type==='audio');
+    if(metadata.streams.length!==2 || video?.codec_name!=='h264' || video.width!==1080 || video.height!==1920
+      || video.avg_frame_rate!=='30/1' || Number(video.nb_frames)!==frames || audio?.codec_name!=='aac'
+      || Math.abs(Number(metadata.format.duration)-frames/30)>.12)throw new Error('VIDEO_MP4_INVALID');
+    const {stdout:wav}=await exec(binary('ffmpeg'),['-v','error','-i',file,'-map','0:a:0','-ar','16000','-ac','1','-f','wav','-c:a','pcm_s16le','pipe:1'],
+      {cwd:cwd(binary('ffmpeg')),encoding:'buffer',timeout:30_000,maxBuffer:2_000_000});
+    if(wav.toString('ascii',0,4)!=='RIFF'||wav.toString('ascii',8,12)!=='WAVE')throw new Error('VIDEO_AUDIO_INVALID');
+    let pcm:Buffer|undefined;
+    for(let offset=12;offset+8<=wav.length;) {
+      const length=wav.readUInt32LE(offset+4);
+      // Une sortie WAV sur pipe utilise 0xffffffff comme longueur inconnue.
+      if(wav.toString('ascii',offset,offset+4)==='data'){pcm=wav.subarray(offset+8,Math.min(wav.length,offset+8+length));break;}
+      offset+=8+length+length%2;
+    }
+    if(!pcm?.length||pcm.length%2)throw new Error('VIDEO_AUDIO_INVALID');
+    let sum=0;for(let i=0;i+2<=pcm.length;i+=2)sum+=(pcm.readInt16LE(i)/32768)**2;
+    const meanVolumeDb=10*Math.log10(sum/(pcm.length/2));
+    if(!Number.isFinite(meanVolumeDb)||meanVolumeDb < -50)throw new Error('VIDEO_AUDIO_SILENT');
+    const bytes=await readFile(file);
+    if(!isFastStart(bytes))throw new Error('VIDEO_NOT_STREAMABLE');
+    const report=VideoReport.parse({id,manifestHash:id,sha256:sha(bytes),sizeBytes:bytes.length,width:1080,height:1920,fps:30,
+      codec:'h264',audioCodec:'aac',durationFrames:frames,durationSeconds:Number(metadata.format.duration),fastStart:true,
+      watermarked,meanVolumeDb,startedAt,endedAt:new Date().toISOString(),renderAndVerifySeconds:(performance.now()-start)/1000});
+    return report;
+}
+// One bounded derivative from the finished master. The AAC stream is copied;
+// neither Remotion, narration nor the importer runs a second time.
+export async function createWatermarkedPreview(master:string,directory:string,id:string,frames:number) {
+  const start=performance.now(),startedAt=new Date().toISOString(),watermark=path.join(directory,'trial-watermark.png');
+  const output=path.join(directory,'preview.mp4');
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="660" height="112" viewBox="0 0 660 112">
+    <rect x="1" y="1" width="658" height="110" rx="18" fill="#171714" fill-opacity=".72" stroke="#fff" stroke-opacity=".7"/>
+    <g fill="none" stroke="#fff" stroke-width="4"><path d="M25 48V27H46 M77 27H98V48 M25 66V87H46 M77 87H98V66"/></g>
+    <text x="122" y="58" font-family="sans-serif" font-weight="700" font-size="40" fill="#fff">bienvu · aperçu</text>
+    <text x="124" y="88" font-family="sans-serif" font-size="22" fill="#fff">bienvu.online</text></svg>`;
+  await sharp(Buffer.from(svg)).png().toFile(watermark);
+  try {
+    await exec(binary('ffmpeg'),['-v','error','-i',master,'-i',watermark,'-filter_complex','[0:v][1:v]overlay=(W-w)/2:690:format=auto[v]',
+      '-map','[v]','-map','0:a:0','-c:v','libx264','-preset','veryfast','-crf','21','-pix_fmt','yuv420p','-threads','1','-c:a','copy','-movflags','+faststart','-y',output],
+      {cwd:cwd(binary('ffmpeg')),timeout:120_000,maxBuffer:128_000});
+    if((await stat(output)).size>50*1024*1024)throw new Error('VIDEO_TOO_LARGE');
+    const report=await verifyVideoArtifact(output,id,frames,true,startedAt,start);
+    await chmod(output,0o600);return report;
+  }finally{await rm(watermark,{force:true});}
+}
+
 export async function renderListingVideo(input: unknown, directory: string): Promise<VideoReport> {
   directory=path.resolve(directory);
   const manifest=VideoManifest.parse(input), id=await videoManifestHash(manifest);
@@ -97,32 +146,10 @@ export async function renderListingVideo(input: unknown, directory: string): Pro
     if((await stat(raw)).size>50*1024*1024)throw new Error('VIDEO_TOO_LARGE');
     if(isFastStart(await readFile(raw)))await rename(raw,partial);
     else await exec(binary('ffmpeg'),['-v','error','-i',raw,'-map','0','-c','copy','-movflags','+faststart','-y',partial],{cwd:cwd(binary('ffmpeg')),timeout:60_000});
-    const {stdout}=await exec(binary('ffprobe'),['-v','error','-show_format','-show_streams','-of','json',partial],{cwd:cwd(binary('ffprobe')),timeout:20_000,maxBuffer:128_000});
-    const metadata=JSON.parse(stdout) as {format:{duration:string};streams:{codec_type:string;codec_name:string;width?:number;height?:number;avg_frame_rate?:string;nb_frames?:string}[]};
-    const video=metadata.streams.find(s=>s.codec_type==='video'), audio=metadata.streams.find(s=>s.codec_type==='audio');
-    if(metadata.streams.length!==2 || video?.codec_name!=='h264' || video.width!==1080 || video.height!==1920
-      || video.avg_frame_rate!=='30/1' || Number(video.nb_frames)!==frames || audio?.codec_name!=='aac'
-      || Math.abs(Number(metadata.format.duration)-frames/30)>.12)throw new Error('VIDEO_MP4_INVALID');
-    const {stdout:wav}=await exec(binary('ffmpeg'),['-v','error','-i',partial,'-map','0:a:0','-ar','16000','-ac','1','-f','wav','-c:a','pcm_s16le','pipe:1'],
-      {cwd:cwd(binary('ffmpeg')),encoding:'buffer',timeout:30_000,maxBuffer:2_000_000});
-    if(wav.toString('ascii',0,4)!=='RIFF'||wav.toString('ascii',8,12)!=='WAVE')throw new Error('VIDEO_AUDIO_INVALID');
-    let pcm:Buffer|undefined;
-    for(let offset=12;offset+8<=wav.length;) {
-      const length=wav.readUInt32LE(offset+4);
-      // Une sortie WAV sur pipe utilise 0xffffffff comme longueur inconnue.
-      if(wav.toString('ascii',offset,offset+4)==='data'){pcm=wav.subarray(offset+8,Math.min(wav.length,offset+8+length));break;}
-      offset+=8+length+length%2;
-    }
-    if(!pcm?.length||pcm.length%2)throw new Error('VIDEO_AUDIO_INVALID');
-    let sum=0;for(let i=0;i+2<=pcm.length;i+=2)sum+=(pcm.readInt16LE(i)/32768)**2;
-    const meanVolumeDb=10*Math.log10(sum/(pcm.length/2));
-    if(!Number.isFinite(meanVolumeDb)||meanVolumeDb < -50)throw new Error('VIDEO_AUDIO_SILENT');
-    const bytes=await readFile(partial);
-    if(!isFastStart(bytes))throw new Error('VIDEO_NOT_STREAMABLE');
-    const report=VideoReport.parse({id,manifestHash:id,sha256:sha(bytes),sizeBytes:bytes.length,width:1080,height:1920,fps:30,
-      codec:'h264',audioCodec:'aac',durationFrames:frames,durationSeconds:Number(metadata.format.duration),fastStart:true,
-      watermarked:manifest.rights.watermarked,meanVolumeDb,startedAt,endedAt:new Date().toISOString(),renderAndVerifySeconds:(performance.now()-start)/1000});
-    await rename(partial,output);await chmod(output,0o600);await writeFile(path.join(directory,'report.json'),JSON.stringify(report,null,2)+'\n',{mode:0o600});
+    const report=await verifyVideoArtifact(partial,id,frames,manifest.rights.watermarked,startedAt,start);
+    await rename(partial,output);await chmod(output,0o600);
+    if(manifest.rights.kind==='anonymous')report.preview=await createWatermarkedPreview(output,directory,id,frames);
+    await writeFile(path.join(directory,'report.json'),JSON.stringify(report,null,2)+'\n',{mode:0o600});
     return report;
   }finally{await Promise.all([raw,partial].map(file=>rm(file,{force:true})));}
 }

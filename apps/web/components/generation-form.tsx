@@ -1,17 +1,19 @@
 'use client';
 import Link from 'next/link';
 import {useCallback, useEffect, useRef, useState, type FormEvent} from 'react';
-import {ImportUrl, publicErrors, type NormalizedListing, type PublicErrorCode} from '@bienvu/contracts';
+import {ImportUrl, publicErrors, type CreationDraftView, type NormalizedListing, type PublicErrorCode} from '@bienvu/contracts';
 import {Icon} from './icon';
 import {useAccount} from './account';
 import {ManualListingForm} from './manual-listing-form';
 import {readListingDraft, clearListingDraft} from '../lib/listing-draft';
 import {GenerationProgress,generationActive,useGenerationProgress} from './generation-progress';
-import type {GenerationRequest,GenerationView} from '@bienvu/contracts';
+import type {GenerationRequest} from '@bienvu/contracts';
 import {ImportCoverage} from './import-coverage';
+import {requestGeneration} from '../lib/generation-client';
 
-export type ImportView = {id: string; sourceKind: 'url' | 'manual'; sourceUrl: string | null; status: 'importing' | 'ready' | 'failed'; errorCode: PublicErrorCode | null;
-  createdAt: string; expiresAt: string; listing: NormalizedListing | null; title?: string | null; transaction?: 'sale' | 'rent' | null};
+export type ImportView = {id: string; sourceKind: 'url' | 'manual'; sourceUrl: string | null; status: 'importing' | 'needs_input' | 'ready' | 'failed'; errorCode: PublicErrorCode | null;
+  createdAt: string; expiresAt: string; listing: NormalizedListing | null; draft?:CreationDraftView|null;
+  title?: string | null; transaction?: 'sale' | 'rent' | null};
 const message = (code?: PublicErrorCode | null) => code && code in publicErrors ? publicErrors[code][1] : 'L’import n’a pas abouti. Réessayez.';
 export function GenerationForm() {
   const {me, loading} = useAccount();
@@ -39,15 +41,7 @@ export function GenerationForm() {
     } catch (error) {setFeedback(error instanceof Error ? error.message : message());}
   }
   async function generate(input:GenerationRequest) {
-    const body=JSON.stringify(input),storageKey=`bienvu:generation:${me!.agency.id}`;
-    let previous:{body:string;key:string}|null=null;
-    try{previous=JSON.parse(sessionStorage.getItem(storageKey)??'null');}catch{}
-    const attempt=previous?.body===body?previous:{body,key:crypto.randomUUID()};
-    try{sessionStorage.setItem(storageKey,JSON.stringify(attempt));}catch{}
-    const response=await fetch('/api/generations',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':attempt.key},body});
-    const value=await response.json() as GenerationView&{error?:{code?:PublicErrorCode}};
-    if(!response.ok)throw new Error(message(value.error?.code));
-    setJob(value);clearListingDraft();try{sessionStorage.removeItem(storageKey);}catch{}
+    setJob(await requestGeneration(me!.agency.id,input));
   }
   async function generateSaved(id:string){if(working)return;setBusy(true);setFeedback('');try{await generate({listingId:id});}catch(error){setFeedback(error instanceof Error?error.message:message());}finally{setBusy(false);}}
   async function submit(event: FormEvent) {
@@ -57,13 +51,13 @@ export function GenerationForm() {
     setBusy(true); setFeedback(''); setResult(null);
     if (!pending.current || pending.current.url !== parsed.data) pending.current = {url: parsed.data, key: crypto.randomUUID()};
     try {
-      if(me?.rights.generationEnabled){await generate({url:parsed.data});return;}
       const response = await fetch('/api/imports', {method: 'POST', headers: {'Content-Type': 'application/json', 'Idempotency-Key': pending.current.key},
         body: JSON.stringify({url: parsed.data}), signal: AbortSignal.timeout(75_000)});
       const value = await response.json() as ImportView & {error?: {code?: PublicErrorCode}};
       if (!response.ok) throw new Error(message(value.error?.code));
-      setResult(value); if (value.status !== 'importing') pending.current = null;
+      setResult(value); if (value.status === 'ready'||value.status==='failed') pending.current = null;
       if (value.status === 'ready') clearListingDraft();
+      if(value.status==='ready'&&me?.rights.generationEnabled)await generate({listingId:value.id});
       await refresh();
     } catch (error) {setFeedback(error instanceof Error && error.name !== 'TimeoutError' ? error.message : 'La réponse tarde. Consultez vos imports avant de réessayer.'); await refresh();}
     finally {setBusy(false);}
@@ -72,7 +66,8 @@ export function GenerationForm() {
   if (!me) return <div className="information-note"><p>Connectez-vous pour importer une annonce dans votre espace privé.</p><Link className="button primary" href="/connexion">Se connecter <Icon name="arrow" size={16}/></Link></div>;
   const listing = result?.listing, facts = listing?.facts;
   return <>
-    <p className="field-help">{me.rights.generationEnabled?`Accès de développement · ${me.rights.developmentRemaining} vidéo(s) disponible(s).`:'La génération est momentanément fermée. Vous pouvez préparer vos annonces.'}</p>
+    <p className="field-help">{me.rights.generationEnabled?`${me.rights.creditKind==='free'?'Compte gratuit':'Votre quota'} · ${me.rights.developmentRemaining} vidéo(s) disponible(s).`:'La génération est momentanément fermée. Vous pouvez préparer vos annonces.'}</p>
+    {me.rights.renewalAt&&<p className="field-help">Renouvellement le {new Date(me.rights.renewalAt).toLocaleDateString('fr-FR')}.</p>}
     {me.rights.importRetryAt&&<p className="information-note" role="status">La limite des imports de test est atteinte. Les nouvelles annonces seront disponibles à partir du {new Date(me.rights.importRetryAt).toLocaleString('fr-FR')}. Vos annonces déjà enregistrées restent utilisables.</p>}
     {job&&<GenerationProgress job={job} unavailable={unavailable}/>}
     <form className="generation-form" onSubmit={submit} noValidate>
@@ -98,6 +93,8 @@ export function GenerationForm() {
     {result && <section className="import-result" aria-live="polite">
       {result.status === 'failed' && <><h3>Cette annonce n’a pas pu être enregistrée.</h3><p className="form-feedback error">{message(result.errorCode)}</p><p className="field-help">Essayez un autre lien du même bien ou utilisez la saisie manuelle ci-dessus.</p></>}
       {result.status === 'importing' && <><p>{result.sourceKind === 'manual' ? 'Cette saisie est inachevée. Terminez l’envoi dans le formulaire ouvert, ou recommencez une saisie.' : 'Votre import est en cours.'}</p><button className="text-button" onClick={() => void show(result.id)}>Actualiser son état</button></>}
+      {result.status==='needs_input'&&<><h3>Annonce à compléter</h3><p>Les informations et les photos valides sont conservées. Complétez seulement ce qui manque avant de créer la vidéo.</p>
+        <Link className="button primary" href={`/?draft=${encodeURIComponent(result.id)}`}>Continuer mon annonce <Icon name="arrow" size={18}/></Link></>}
       {listing && facts && <><span className="section-kicker">{listing.sourceKind === 'manual' ? 'ANNONCE SAISIE · PRIVÉ' : 'ANNONCE IMPORTÉE · PRIVÉ'}</span>
         <h3>{facts.title.value ?? 'Annonce enregistrée'}</h3>
         {listing.sourceKind === 'manual' && <p className="field-help">Informations et photos fournies par votre agence.</p>}
@@ -119,6 +116,6 @@ export function GenerationForm() {
       </>}
     </section>}
     {imports.length > 0 && <section className="recent-imports"><h3>Vos dernières annonces</h3><ul>{imports.slice(0, 10).map(item => <li key={item.id}><button type="button" disabled={working} onClick={() => void show(item.id)}>
-      <span>{item.title ? `${item.transaction === 'rent' ? 'Location' : 'Vente'} · ${item.title}` : item.sourceUrl ? new URL(item.sourceUrl).hostname : 'Saisie manuelle'}</span><span>{item.status === 'ready' ? 'Enregistrée' : item.status === 'failed' ? 'Échec' : 'En cours'}</span></button></li>)}</ul></section>}
+      <span>{item.title ? `${item.transaction === 'rent' ? 'Location' : 'Vente'} · ${item.title}` : item.sourceUrl ? new URL(item.sourceUrl).hostname : 'Saisie manuelle'}</span><span>{item.status === 'ready' ? 'Enregistrée' : item.status === 'failed' ? 'Échec' : item.status==='needs_input'?'À compléter':'En cours'}</span></button></li>)}</ul></section>}
   </>;
 }

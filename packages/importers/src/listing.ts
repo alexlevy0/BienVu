@@ -53,7 +53,8 @@ function structured(documents: unknown[], url: string, canonicalUrl: string): Ex
   const home = homes[0]; identity(home, url); identity(wrapper, url);
   const property = unique(types(home).map(t => homeTypes[t]).filter(Boolean), 'Types de bien contradictoires.');
   const title = clean(home.name ?? wrapper.name), locality = clean(resolve(home.address).addressLocality);
-  if (!property || title.length < 3 || !locality) throw new ImportFailure('INCOMPLETE_LISTING', 'Titre, type ou localisation absent.');
+  // A uniquely identified listing can still be useful as a private draft when
+  // one of these fields is absent. GeneratableListing remains the final gate.
   const offers = [...list(home.offers), ...list(wrapper.offers)].map(resolve);
   const functions = offers.map(o => String(o.businessFunction ?? '')).filter(Boolean);
   const transaction = unique(functions.map(f => /[#/]Sell$|^Sell$/.test(f) ? 'sale' as const : /[#/]LeaseOut$|^LeaseOut$/.test(f) ? 'rent' as const : null).filter(v => v !== null), 'Vente et location contradictoires.');
@@ -87,8 +88,9 @@ function structured(documents: unknown[], url: string, canonicalUrl: string): Ex
   const description = descriptionFromString(home.description, `${homePath}.description`)
     ?? descriptionFromString(wrapper.description, 'JSON-LD.RealEstateListing.description');
   return {canonicalUrl, sourceListingId: clean(home.identifier ?? wrapper.identifier) || null, adapterVersion: 'structured/3.2', transaction, description,
-    facts: {title: verified(title, 'text', 'JSON-LD.mainEntity.name'), propertyType: verified(property, 'category', 'JSON-LD.mainEntity.@type'),
-      locality: verified(locality, 'text', 'JSON-LD.mainEntity.address.addressLocality'), price,
+    facts: {title: title.length >= 3 ? verified(title, 'text', 'JSON-LD.mainEntity.name') : missing('text'),
+      propertyType: property ? verified(property, 'category', 'JSON-LD.mainEntity.@type') : missing('category'),
+      locality: locality ? verified(locality, 'text', 'JSON-LD.mainEntity.address.addressLocality') : missing('text'), price,
       area: area === undefined ? missing('m2') : verified(area, 'm2', 'JSON-LD.mainEntity.floorSize'),
       rooms: rooms === undefined || !Number.isInteger(rooms) ? missing('rooms') : verified(rooms, 'rooms', 'JSON-LD.mainEntity.numberOfRooms')},
     photoUrls: photoUrls.slice(0, IMPORT_LIMITS.candidates), warnings};
@@ -141,7 +143,7 @@ function espaces(nodes: HtmlNode[], url: string, canonicalUrl: string): Extracte
     photoUrls: [...new Set(photoUrls)].slice(0, IMPORT_LIMITS.candidates), warnings: ['Surface omise : les surfaces Carrez, au sol et pondérées ne sont pas assimilées.']};
 }
 
-function domAgency(nodes: HtmlNode[], url: string, canonicalUrl: string): ExtractedListing | undefined {
+function domAgency(nodes: HtmlNode[], url: string, canonicalUrl: string, allowPartial = false): ExtractedListing | undefined {
   const u = new URL(url), adapter = selectAdapter(url), century = adapter.id === 'century21', orpi = adapter.id === 'orpi';
   if (!century && !orpi) return undefined;
   const id = century ? u.pathname.match(/^\/trouver_logement\/detail\/(\d+)\/$/)?.[1]
@@ -164,7 +166,8 @@ function domAgency(nodes: HtmlNode[], url: string, canonicalUrl: string): Extrac
     : tag(n) === 'strong' && hasClass(n, 'h2') && hasClass(n, 'text-primary')).map(n => text(n));
   const amount = unique(prices.map(p => p.match(/^([\d\s.,]+)\s*€$/)?.[1]).filter((v): v is string => Boolean(v)).map(numeric).filter(v => v !== null), 'Prix affichés contradictoires.');
   const roots = nodes.filter(n => hasClass(n, century ? 'c-the-detail-images-no-js-carousel' : 'js-swiper-estate-media'));
-  if (roots.length !== 1) throw new ImportFailure('INSUFFICIENT_PHOTOS', 'Galerie du bien non identifiée.');
+  if (roots.length !== 1 && !(allowPartial && roots.length === 0))
+    throw new ImportFailure('INSUFFICIENT_PHOTOS', 'Galerie du bien non identifiée.');
   const photoUrls = descendants(roots[0]).filter(n => tag(n) === 'img').map(n => imageCandidate(n, url)).filter((v): v is string => v !== null);
   if (orpi && photoUrls.some(v => !decodeURIComponent(new URL(v).pathname).includes(id)))
     throw new ImportFailure('CONFLICTING_FACTS', 'Image étrangère à la référence Orpi.');
@@ -190,7 +193,7 @@ function domAgency(nodes: HtmlNode[], url: string, canonicalUrl: string): Extrac
     photoUrls: [...new Set(photoUrls)].slice(0, IMPORT_LIMITS.candidates), warnings: []};
 }
 
-export function extractListingHtml(html: string, url: string): ExtractedListing {
+export function extractListingHtml(html: string, url: string, options: {allowPartial?: boolean} = {}): ExtractedListing {
   const adapter = selectAdapter(url);
   const {nodes} = htmlDocument(html), canonicalUrl = canonical(nodes, url);
   const scripts = nodes.filter(n => tag(n) === 'script' && attr(n, 'type') === 'application/ld+json');
@@ -239,7 +242,8 @@ export function extractListingHtml(html: string, url: string): ExtractedListing 
     agency.description ??= output?.description ?? null;
     output = agency;
   }
-  const dom = adapter.id === 'bienici' ? extractBienici(nodes, documents, url, canonicalUrl, adapter.listingId!) : domAgency(nodes, url, canonicalUrl);
+  const dom = adapter.id === 'bienici' ? extractBienici(nodes, documents, url, canonicalUrl, adapter.listingId!)
+    : domAgency(nodes, url, canonicalUrl, options.allowPartial);
   if (dom) {
     if (output) for (const field of ['price', 'propertyType', 'locality', 'area'] as const) {
       const a = output.facts[field], b = dom.facts[field];
@@ -251,6 +255,7 @@ export function extractListingHtml(html: string, url: string): ExtractedListing 
   if (!output) throw new ImportFailure('NOT_A_LISTING', 'Aucune annonce structurée exploitable.', 'structure_changed');
   // Les URLs douteuses de la galerie sont refusées avant tout téléchargement.
   output.photoUrls = output.photoUrls.filter(v => !/(?:logo|avatar|floor.?plan|plan[-_]|dpe|ges)(?:[-_.\/]|$)/i.test(new URL(v).pathname));
-  if (output.photoUrls.length < 3) throw new ImportFailure('INSUFFICIENT_PHOTOS', 'La galerie liée au bien est insuffisante.');
+  if (output.photoUrls.length < 3 && !options.allowPartial)
+    throw new ImportFailure('INSUFFICIENT_PHOTOS', 'La galerie liée au bien est insuffisante.');
   return output;
 }

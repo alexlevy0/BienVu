@@ -6,6 +6,8 @@ SaaS immobilier en construction : un lien d’annonce ou une saisie avec photos 
 
 [Site de développement](https://bienvu.online) · [Importer ou saisir une annonce](https://bienvu.online/generer) · [Connexion](https://bienvu.online/connexion). Plafonds de recette : dix imports par jour UTC et trente par mois, toutes agences confondues, et budget suivi. Le parcours vidéo durable est validé sur Cloudflare et déployé sous accès de développement (un crédit pour Alex). Les paiements et l’essai public restent au sprint 08. Les dix imports du 28/09 UTC sont consommés : reprise le 29/09 à 02:00 Paris. [Parcours, budget et limites](docs/GENERATIONS.md). Le MP4 technique du sprint 00 est validé, son renderer reste en pause ; facture à rapprocher.
 
+**Essai anonyme — implémentation locale du 29/09, non déployée.** Aperçu avec filigrane incrusté, récupération du même job après connexion, trois crédits gratuits par mois, accès au master protégé, limites et purge persistantes. Activation fermée par défaut. [Configuration et recette restante](docs/ESSAI-ANONYME.md) · [Tests et rendu réel local](docs/preuves/essai-anonyme/RAPPORT.md).
+
 ## Démarrer localement
 
 Prérequis : Node **24.17.0**, pnpm **10.33.2**. Aucun Docker ni secret Cloudflare/OpenAI nécessaire aux fondations. Docker sert aux recettes Linux du renderer et du transport d’import ; les tests unitaires et le rendu natif local restent utilisables séparément.

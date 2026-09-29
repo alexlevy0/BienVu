@@ -1,6 +1,8 @@
 # BienVu — budget des tests et hypothèses commerciales
 
-**Contrainte confirmée : maximum 40 € par mois avant les premiers clients, hébergement et API compris.** Alex augmente l’enveloppe de 10 € le 28/09/2026 ; la coupure préventive passe de 25 à **35 €**, avec 5 € de marge. Les relevés datés ci-dessous conservent l’ancienne enveloppe de 30 € pour leur contexte. Les montants en euros ci-dessous sont des enveloppes de travail, pas des devis. Les tarifs fournisseurs sont en dollars ; prévoir conversion et taxes effectives.
+**Plafond actuel du pilote, autorisé par Alex le 29/09/2026 : 50 € par mois, hébergement et API compris ; coupure préventive à 45 €.** La marge de 5 € protège des écarts entre provisions et facture, sans garantir le montant facturé. Les relevés datés ci-dessous conservent les anciennes enveloppes de 30 € et 40 € pour leur contexte. Les montants en euros sont des enveloppes de travail, pas des devis ; prévoir conversion et taxes effectives.
+
+Le dernier total connu avant publication est **29,85 € de provisions dans D1** et **0,05 € provisionnés hors D1** pour un appel OpenAI local, soit **29,90 € prudemment engagés**. Il reste **15,10 € avant la coupure de 45 €**, sous réserve du rapprochement des factures. La migration `0020_budget_envelope_50.sql` relève seulement le mois actif de 35 à 45 € et la politique d'essai de 25 à 45 €, sans effacer les engagements, tentatives, quotas ni pauses existants. Les variables du Worker de rendu passent à 45 €/50 €. Chaque essai URL réserve 2 € ; chaque extraction de description réserve 0,05 €, sans double comptage des sous-journaux. Le lancement de nouvelles dépenses reste bloqué si le mois n'est pas explicitement ouvert ou si la coupure est atteinte.
 
 **28/09/2026 : Alex déclare avoir activé Workers Paid pour 5 €.** Ce montant remplace la dépense initiale déclarée de 0 €, sans constituer une facture consultée. La recette Containers conserve une provision fixe de 8 € (dont 3 € de marge de rapprochement) et réserve 0,50 € par tentative ; trois rendus prévus, cinq au maximum en comptant les échecs. La consultation API de la facture est refusée avec les droits OAuth actuels ; les métriques Containers sont accessibles séparément.
 
@@ -12,15 +14,25 @@
 
 **Sprint 07 — 28/09 : provision supplémentaire de 3,50 € avant la recette complète.** Deux générations contrôlées (texte/voix 1,40 €, rendu 1 €, un import 0,50 €, marge infrastructure 0,60 €) dans une D1 isolée. Cumul prudent **29,85 €**, marge **10,15 € sur 40 €**, dont **5,15 € avant coupure à 35 €**. Les montants réservés dans les sous-journaux font partie de cette provision, ils ne sont pas ajoutés une seconde fois. Compteurs et coûts précédents conservés. Une allocation de développement d’une vidéo pour l’agence d’Alex réserve jusqu’à 1,70 € seulement à son utilisation ; aucun achat ni rechargement API nouveau. Facture/TTC restent à rapprocher. [Recette et limites](preuves/sprint-07/RAPPORT.md).
 
-## Répartition de travail après la hausse du 28/09
+## Historique : pilote anonyme initialement demandé le 29/09 à 30 €
+
+La nouvelle demande fixe 30 € pour l’ensemble du service. Dernier total connu : **29,85 € de provisions**, soit **0,15 € théorique** avant rapprochement des factures, et aucune marge sous une coupure prudente à 25 €. Les anciennes écritures et seuils distants 40 €/35 € ne sont pas réinitialisés par cette tâche. **Aucun test payant, achat ou déploiement** pour l’implémentation anonyme ; portes fermées par défaut.
+
+La migration locale `0018_anonymous_budget_ceiling.sql` impose `trial_policy.budget_ceiling_cents=2500` sur le même registre de coûts, avec un plafond effectif au plus égal au plafond global. Elle inclut les 0,50 € du futur import dans le contrôle d’admission, sans les réserver deux fois. Un ancien plafond global de 35 € ne peut donc pas autoriser un essai anonyme au-delà de 25 €. Migration non appliquée à distance.
+
+Une nouvelle tentative URL provisionne 1,20 € de génération + **0,30 € de dérivée** + 0,50 € d’import, soit **2 €**, échecs compris. Renderer/voix gardent leurs sous-enveloppes incluses dans ce total. Le vrai post-traitement local est mesuré dans le [rapport](preuves/essai-anonyme/RAPPORT.md), sans assimilation au coût Containers. Les limites 5/jour, 30/mois ne garantissent pas une facture de 30 €. Rapprocher la consommation et obtenir une marge suffisante avant activation. [Configuration et budget détaillés](ESSAI-ANONYME.md).
+
+**Workflow descriptif — 29/09, local :** un appel OpenAI Responses réel sur une annonce fictive avec crédits API préexistants, 382 tokens d'entrée et 101 de sortie. Facturation effective inconnue ; provision prudente **0,05 €**, ajoutée une seule fois au cumul historique de 29,85 €, soit **29,90 € provisionnés**. Aucun rendu ni TTS supplémentaires. Les appels hébergés vérifient le plus bas des plafonds D1 ; après la hausse autorisée, le mois actif et le pilote sont bornés à 45 €. [Preuve et travaux restants](preuves/accueil/WORKFLOW-IMPROVEMENTS.md).
+
+## Répartition de travail après la hausse du 29/09
 
 | Poste | Enveloppe de travail mensuelle |
 |---|---:|
 | Workers Paid, conversion et taxes estimées | 8 € |
 | Consommation Cloudflare supplémentaire : navigateur, conteneurs, D1/R2, Workflows, logs | 7 € |
 | API texte et voix pour les tests | 5 € |
-| Marge pour écarts, opérations non anticipées ou prépaiement minimal | 20 € |
-| Total maximal visé | **40 €** |
+| Marge pour écarts, opérations non anticipées ou prépaiement minimal | 30 € |
+| Total maximal visé | **50 €** |
 
 Les adresses de développement fournies restent utilisables pour le site. Le domaine acheté par Alex pour l'expéditeur consomme désormais une partie de la marge ci-dessus ; son paiement réel doit remplacer la provision une fois le débit connu. Aucun abonnement de scraping, proxy payant, abonnement musical ou deuxième plateforme d'hébergement n'est prévu dans cette enveloppe. Un abonnement ChatGPT ne remplace pas les crédits API ; comptabiliser les crédits prépayés effectivement achetés ainsi que la consommation, sans les compter deux fois.
 
@@ -76,16 +88,16 @@ Le rapport sépare coût marginal estimé, coût après allocations disponibles 
 
 ## Limites applicatives proposées avant les premiers clients
 
-- **Imports : 10 tentatives par jour UTC**, modification demandée par Alex le 28/09/2026, et **30 par mois UTC**. La migration `0010` conserve l’historique. Ce garde-fou de test partagé entre agences est distinct du nombre de vidéos de l’abonnement et des limites du fournisseur Cloudflare. Les 0,50 € provisionnés par tentative hébergée restent conservés ; la hausse financière distincte du 28/09 porte désormais la coupure à 35 €.
+- **Imports : 10 tentatives par jour UTC**, modification demandée par Alex le 28/09/2026, et **30 par mois UTC**. La migration `0010` conserve l’historique. Ce garde-fou de test partagé entre agences est distinct du nombre de vidéos de l’abonnement et des limites du fournisseur Cloudflare. Les 0,50 € provisionnés par tentative hébergée restent conservés ; la hausse du 29/09 porte la coupure à 45 €.
 - 30 générations réelles maximum par mois de test et 5 par jour, hors fixtures locales ; commencer par 3 à 5 rendus au sprint 00.
 - Un seul rendu simultané ; fermer les sessions navigateur ; arrêter les conteneurs inutilisés rapidement après vérification de l'absence de rendu actif.
 - Réserver une estimation conservatrice avant chaque job. Valeur initiale proposée : 0,50 € par tentative complète, à remplacer par les mesures ; inclure les jobs déjà en cours dans le budget engagé.
-- Alerte à 20 € d'engagement estimé mensuel ; pause des nouvelles générations payantes en coûts à 35 € pour garder 5 € de marge. L'interface et les téléchargements existants restent disponibles.
+- Alerte à 20 € d'engagement estimé mensuel ; pause des nouvelles générations payantes en coûts à 45 € pour garder 5 € de marge. L'interface et les téléchargements existants restent disponibles.
 - Postes distincts pour frais fixes, dépenses réellement facturées, prépaiements et réservations ; aucun calcul de solde uniquement en mémoire.
 - Limiter taille des médias, tokens d'entrée/sortie, durée des jobs et nombre de retries. Les mocks sont le mode par défaut de la CI.
 - Ajouter une commande ou un contrôle opérateur permettant de couper immédiatement nouvelles sessions navigateur, voix et rendus.
 
-**Ces contrôles ne constituent pas une garantie de plafond de facture fournisseur.** Une consommation déjà engagée, des données de facturation retardées ou du trafic extérieur peuvent dépasser les estimations. Le plafond de 40 € impose aussi le suivi des comptes, les limites réellement disponibles chez les fournisseurs et l'arrêt des tests à temps. Ne pas confondre alerte budgétaire et coupure automatique.
+**Ces contrôles ne constituent pas une garantie de plafond de facture fournisseur.** Une consommation déjà engagée, des données de facturation retardées ou du trafic extérieur peuvent dépasser les estimations. Le plafond de 50 € impose aussi le suivi des comptes, les limites réellement disponibles chez les fournisseurs et l'arrêt des tests à temps. Ne pas confondre alerte budgétaire et coupure automatique.
 
 **Sprint 03, portage Cloudflare du 28/09/2026 :** cinq imports réels du parcours hébergé (trois annonces d'agences, une page JS et une saisie synthétiques), plus deux groupes opérateur bornés, provisionnés 7 × 0,50 € = **3,50 €** en D1 avant exécution. Six sessions Browser Run fermées, conteneur `basic` endormi, aucune voix/rendu IA ni nouvelle vidéo. Le sixième import est refusé 429 ; les cinq tentatives du jour restent après purge. Un dossier synthétique antidaté pour vérifier la purge ajoute séparément une tentative au jour précédent, sans lancement de transport.
 
@@ -105,7 +117,7 @@ Le troisième e-mail réel valide le domaine actuel, réception et parcours conf
 | `agence` | Agence | 59 € | 30 |
 | `volume` | Volume | 99 € | 60 |
 
-Chaque palier conserve la même qualité vidéo et l'identité d'agence. Un seul essai à vie après inscription, avec filigrane, hors abonnement. Pas d'offre annuelle, de dépassement automatique, de report de crédits ou de packs supplémentaires dans cette version.
+Chaque palier conserve la même qualité vidéo et l'identité d'agence. Depuis le 29/09, un essai anonyme abouti par session avec aperçu filigrané ; trois vidéos par mois sur le compte gratuit, dont l’essai récupéré. Un crédit et la connexion débloquent le master existant, sans nouvel export. Les anciens essais `trial` conservent leurs fichiers et droits historiques. Pas d'offre annuelle, de dépassement automatique, de report de crédits ou de packs supplémentaires dans cette version.
 
 Cette grille sert aux fixtures Stripe et à l'implémentation configurable. Ne pas activer ces prix en production comme s'ils avaient déjà été acceptés. Au moment de préparer la vente, présenter la grille, les mesures de coût, les prix TTC applicables et les textes contractuels comme éléments concrets à finaliser.
 

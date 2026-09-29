@@ -1,6 +1,6 @@
 # Génération durable — accès de développement
 
-Sprint 07 : URL ou annonce manuelle sauvegardée → import → texte → voix → rendu → vidéo privée. L'essai public et Stripe restent au sprint 08. Aucun éditeur vidéo n'est ajouté.
+Sprint 07 : URL ou annonce manuelle sauvegardée → import → texte → voix → rendu → vidéo privée. Stripe reste au sprint 08. Le [parcours anonyme](ESSAI-ANONYME.md) est implémenté localement le 29/09, désactivé et sans nouvelle recette distante. Aucun éditeur vidéo n'est ajouté.
 
 ## Admission et droits
 
@@ -20,7 +20,13 @@ Le cron peut publier un MP4 déjà terminé sans reprendre le calcul. À l'expir
 
 ## Interface et médias
 
-`/generer` propose l'URL et le formulaire manuel dépliable, affiche les étapes réelles, retrouve le dernier job et permet de fermer la page. Le bouton de saisie manuelle annonce explicitement la création de la vidéo lorsque l'agence est autorisée. Les annonces sauvegardées restent utilisables.
+L'accueil `/` possède désormais, **localement avant publication de la dernière extension**, un champ unique et une conversation de création. Une URL complète va directement vers `POST /api/generations` ; une description ou un import partiel ouvrent le brouillon commun `needs_input` puis la validation en cinq sections. L'analyse de description ne réserve aucun crédit vidéo. Les photos d'un compte connecté sont envoyées à R2 privé dès leur sélection et retrouvées après rafraîchissement ; un invité garde ses fichiers en IndexedDB pendant une heure, puis les transfère à son brouillon après connexion. L'interface consulte `GenerationView` pour les étapes et le résultat, sans pourcentage estimé ; `sourceKind` adapte les libellés. Le fond de l'aperçu demande, avec le contrôle d'accès du job, le premier cliché validé de l'import ; en son absence, un squelette neutre s'affiche. Voir la [recette locale précédente](preuves/accueil/CONVERSATION.md) et la [nouvelle vérification](preuves/accueil/WORKFLOW-IMPROVEMENTS.md).
+
+`/generer` conserve son entrée URL et formulaire classique ; son URL passe désormais par l'import privé afin qu'un résultat partiel renvoie vers le brouillon du studio. Les annonces sauvegardées restent utilisables.
+
+Le fournisseur `GenerationStoreProvider` centralise les jobs et brouillons privés pour Récentes, Mes vidéos et la conversation. Le polling des jobs actifs s'arrête hors visibilité et reprend au retour ; les brouillons sont relus moins souvent. Une transition connue « en cours → prête » affiche une seule notification dans l'application. La première lecture d'une vidéo déjà prête n'en affiche pas. Le changement de propriétaire vide immédiatement ce suivi. Le Workflow et son intention D1, indépendants du composant React, poursuivent le rendu pendant la navigation.
+
+La carte de résultat garde le lecteur et le téléchargement en tête : aperçu filigrané pour l'anonyme, connexion/claim puis master après crédit, lien privé directement pour un propriétaire autorisé. Un signalement peut être envoyé depuis la carte, le détail ou Mes vidéos ; il reste en D1 privé après accusé de stockage. Aucune connexion, lecture ou téléchargement ne publie dans Explorer.
 
 `/historique` utilise une pagination par date/id (20 résultats), affiche les traitements en cours et lit le MP4 privé. `GET/HEAD /api/generations/:id/video` contrôle agence, statut prêt, crédit consommé, date d'expiration, taille et empreinte R2. Range simple/suffixe, 206 et 416 sont pris en charge. Le téléchargement sert exactement le même objet et ne déclenche aucun fournisseur. Disponibilité annoncée : sept jours ; voix synthétique explicitement indiquée. Le téléphone physique/Safari reste distinct de la recette Chromium mobile émulée.
 
@@ -29,7 +35,8 @@ Le cron peut publier un MP4 déjà terminé sans reprendre le calcul. À l'expir
 - `pnpm generations:pause` : D1 locale ; ajouter `--remote` pour mettre explicitement en pause les nouvelles étapes sur bienvu.online. Les vidéos prêtes restent lisibles.
 - `POST /operator/pause` et `/operator/reconcile` sur le service de génération nécessitent le secret interne. Le web ne relaie pas ces routes. `/operator/state` expose uniquement à l'opérateur le slot, le budget, l'état du conteneur et sa dernière durée.
 - Les tables `generation_runs`, `jobs`, `job_launch_intents`, `narration_calls`, `hosted_import_costs` et `generation_artifacts` rendent consultables entrée figée, étape, dates, erreur, réservations et mesures fournisseurs. Les journaux ne publient ni clé, ni prompt, ni coordonnées.
+- La migration 0019 est requise avant publication du web et du Worker modifiés. Elle ajoute brouillons, annulations d'uploads, comptage/provision d'extraction et `generation_reports`, sans remplacer les jobs anciens. L'opérateur peut consulter les signalements avec un accès D1 administratif, par exemple en exécutant `SELECT id,job_id,category,comment,status,created_at FROM generation_reports WHERE status='new' ORDER BY created_at;` ; ne pas rendre ce résultat public ni le joindre aux logs.
 - `pnpm probe:generations status` inspecte uniquement la campagne isolée décrite dans son fichier local ignoré. `scripts/deploy-generations-development.mjs` documente le déploiement contrôlé de septembre, sans recharger une allocation existante ; il refuse un autre mois.
-- Les configurations distantes, identifiants, comptes de recette et vidéos sont ignorés par Git. Les migrations et rapports expurgés sont versionnables. Les sprints 08/09 doivent encore gérer abonnement, essai unique public et exploitation commerciale.
+- Les configurations distantes, identifiants, comptes de recette et vidéos sont ignorés par Git. Les migrations et rapports expurgés sont versionnables. Les sprints 08/09 doivent encore gérer abonnement et exploitation commerciale ; la recette distante et l’activation de l’essai anonyme restent à réaliser.
 
 Sources officielles consultées le 28/09 : [règles de Workflows](https://developers.cloudflare.com/workflows/build/rules-of-workflows/), [API Workers](https://developers.cloudflare.com/workflows/build/workers-api/), [limites](https://developers.cloudflare.com/workflows/reference/limits/), [tarification](https://developers.cloudflare.com/workflows/reference/pricing/). Workflows n'est pas supposé gratuit : requêtes, CPU et stockage sont inclus dans les provisions de la campagne.

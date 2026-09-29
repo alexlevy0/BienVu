@@ -32,10 +32,10 @@ function PhotoScene({manifest: m, media, index}: {manifest: VideoManifest; media
         overflowWrap:'anywhere',whiteSpace:'pre-wrap'}}>{scene.captionText}</div>
     </div>}
     {last && <div style={{position:'absolute',top:865,left:safe.left,right:safe.right,color:dark}}>
-      <div style={{fontSize:25,letterSpacing:3,textTransform:'uppercase'}}>Parlons de votre projet.</div>
+      <div style={{fontSize:25,letterSpacing:3,textTransform:'uppercase'}}>{m.contact==='none'?'Découvrez le bien.':'Parlons de votre projet.'}</div>
       <div style={{marginTop:26,fontSize:fitFont(m.brand.name,safe.width,180,76,28),lineHeight:1.1,fontWeight:650,overflowWrap:'anywhere'}}>{m.brand.name}</div>
-      <div style={{marginTop:32,borderTop:`2px solid ${dark}30`,paddingTop:30,
-        fontSize:fitFont(m.brand[m.contact]!,safe.width,160,47,25),lineHeight:1.3,overflowWrap:'anywhere',fontWeight:550}}>{m.brand[m.contact]}</div>
+      {m.contact!=='none' && <div style={{marginTop:32,borderTop:`2px solid ${dark}30`,paddingTop:30,
+        fontSize:fitFont(m.brand[m.contact]!,safe.width,160,47,25),lineHeight:1.3,overflowWrap:'anywhere',fontWeight:550}}>{m.brand[m.contact]}</div>}
     </div>}
     <div style={{position:'absolute',left:safe.left,right:safe.right,bottom:390,background:dark,color:'#fff',
       padding:'22px 30px',borderRadius:16,fontSize:fitFont(current,safe.width-60,150,40,25),lineHeight:1.28,

@@ -1,42 +1,49 @@
-import {AgencyBrand, EntityId, Timestamp, GeneratableListing, GenerationRequest, GenerationView, publicErrors, type PublicErrorCode,type NormalizedListing} from '@bienvu/contracts';
+import {AgencyBrand, EntityId, Timestamp, GeneratableListing, GenerationRequest, GenerationView, VideoReport, publicErrors, type PublicErrorCode,type NormalizedListing} from '@bienvu/contracts';
 import type {Database} from './index';
+import {creditGrant} from './credits';
 import {findImport} from './imports';
 
 export class GenerationFailure extends Error {constructor(public code:PublicErrorCode){super(code);}}
-export type GenerationRow={jobId:string;agencyId:string;inputHash:string;input:string;brand:string;deadline:string;expiresAt:string;
-  status:GenerationView['status'];stage:GenerationView['stage'];attempt:number;errorCode:string|null;createdAt:string;updatedAt:string;
-  workflowId:string;listingId:string|null;objectKey:string|null;report:string|null;launchStatus:string;title:string};
-const columns=`g.job_id AS jobId,g.agency_id AS agencyId,g.input_hash AS inputHash,g.input_json AS input,g.brand_json AS brand,
+export type GenerationRow={ownerAgencyId:string|null;anonymousSessionId:string|null;retention:'available'|'expiring'|'expired';creditStatus:'unfunded'|'reserved'|'consumed'|'released';previewKey:string|null;previewReport:string|null;jobId:string;agencyId:string;inputHash:string;input:string;brand:string;deadline:string;expiresAt:string;
+  status:GenerationView['status'];stage:GenerationView['stage'];attempt:number;errorCode:string|null;createdAt:string;updatedAt:string;sourceKind:'url'|'manual'|null;
+  workflowId:string;listingId:string|null;objectKey:string|null;report:string|null;launchStatus:string;title:string;locality:string|null};
+const columns=`g.owner_agency_id AS ownerAgencyId,g.anonymous_session_id AS anonymousSessionId,g.retention,r.status AS creditStatus,p.object_key AS previewKey,p.report_json AS previewReport,g.job_id AS jobId,g.agency_id AS agencyId,g.input_hash AS inputHash,g.input_json AS input,g.brand_json AS brand,
   g.deadline,g.expires_at AS expiresAt,j.status,j.stage,j.attempt,j.error_code AS errorCode,j.created_at AS createdAt,j.updated_at AS updatedAt,
   j.workflow_id AS workflowId,j.listing_id AS listingId,a.object_key AS objectKey,a.report_json AS report,l.status AS launchStatus,
-  coalesce(json_extract(i.result_json,'$.facts.title.value'),'Votre annonce') AS title`;
+  coalesce(json_extract(i.result_json,'$.facts.title.value'),'Votre annonce') AS title,
+  json_extract(i.result_json,'$.facts.locality.value') AS locality,
+  CASE WHEN json_type(g.input_json,'$.url') IS NOT NULL THEN 'url' ELSE i.source_kind END AS sourceKind`;
 const joins=`FROM generation_runs g JOIN jobs j ON j.id=g.job_id JOIN job_launch_intents l ON l.job_id=j.id
-  LEFT JOIN generation_artifacts a ON a.job_id=j.id LEFT JOIN listing_imports i ON i.id=j.listing_id AND i.agency_id=j.agency_id`;
+  JOIN reservations r ON r.job_id=j.id LEFT JOIN generation_previews p ON p.job_id=j.id LEFT JOIN generation_artifacts a ON a.job_id=j.id LEFT JOIN listing_imports i ON i.id=j.listing_id AND i.agency_id=j.agency_id`;
 export async function findGeneration(db:Database,agencyId:string,jobId:string){
   EntityId.parse(agencyId);EntityId.parse(jobId);
   return db.prepare(`SELECT ${columns} ${joins} WHERE g.agency_id=? AND g.job_id=?`).bind(agencyId,jobId).first<GenerationRow>();
 }
-export function generationView(row:GenerationRow,now=Date.now()):GenerationView {
-  const available=row.status==='ready'&&Boolean(row.objectKey)&&row.expiresAt>new Date(now).toISOString();
-  return GenerationView.parse({id:row.jobId,status:row.status,stage:row.stage,attempt:row.attempt,
+export async function findOwnedGeneration(db:Database,agencyId:string,jobId:string){
+  EntityId.parse(agencyId);EntityId.parse(jobId);
+  return db.prepare(`SELECT ${columns} ${joins} WHERE g.owner_agency_id=? AND g.job_id=?`).bind(agencyId,jobId).first<GenerationRow>();
+}
+export function generationView(row:GenerationRow,now=Date.now(),audience:'owner'|'anonymous'='owner'):GenerationView {
+  const available=row.retention==='available'&&row.status==='ready'&&Boolean(row.objectKey)&&row.expiresAt>new Date(now).toISOString();
+  const unlocked=audience==='owner'&&!!row.ownerAgencyId&&row.creditStatus==='consumed';
+  const preview=available&&Boolean(row.previewKey);
+  return GenerationView.parse({ownership:row.ownerAgencyId?'owned':'anonymous',masterAccess:unlocked?'unlocked':row.creditStatus==='reserved'?'reserved':'locked',retention:row.retention,id:row.jobId,status:row.status,stage:row.stage,attempt:row.attempt,sourceKind:row.sourceKind,
     errorCode:row.errorCode&&row.errorCode in publicErrors?row.errorCode:row.errorCode?'GENERATION_FAILED':null,
-    createdAt:row.createdAt,updatedAt:row.updatedAt,expiresAt:row.expiresAt,title:row.title,
-    videoUrl:available?`/api/generations/${row.jobId}/video`:null,downloadUrl:available?`/api/generations/${row.jobId}/video?download=1`:null,
+    createdAt:row.createdAt,updatedAt:row.updatedAt,expiresAt:row.expiresAt,title:row.title,locality:row.locality,
+    videoUrl:available&&unlocked?`/api/generations/${row.jobId}/video`:preview?audience==='anonymous'?`/api/trial/${row.jobId}/preview`:`/api/generations/${row.jobId}/preview`:null,downloadUrl:available&&unlocked?`/api/generations/${row.jobId}/video?download=1`:null,
+    durationSeconds:row.report?VideoReport.parse(JSON.parse(row.report)).durationSeconds:null,
     syntheticVoice:true,retryAllowed:row.status==='queued'&&row.launchStatus==='pending'});
 }
 export async function generationRights(db:Database,agencyId:string,flag:string|undefined,now=Date.now()) {
   const at=new Date(now).toISOString();
-  const row=await db.prepare(`SELECT max(0,a.quota_limit-a.reserved-a.consumed) AS remaining,
-    (g.enabled=1 AND c.enabled=1 AND b.paused=0 AND a.valid_from<=? AND a.valid_until>?) AS enabled
-    FROM generation_access g JOIN allocations a ON a.id=g.allocation_id AND a.agency_id=g.agency_id
-    JOIN generation_control c ON c.id='generations' JOIN hosted_import_budget b ON b.month=? WHERE g.agency_id=?`)
-    .bind(at,at,at.slice(0,7),agencyId).first<{remaining:number;enabled:number}>();
+  const grant=await creditGrant(db,agencyId,now);
+  const gate=await db.prepare(`SELECT c.enabled FROM generation_control c JOIN hosted_import_budget b ON b.month=? WHERE c.id='generations' AND b.paused=0`).bind(at.slice(0,7)).first<{enabled:number}>();
   const usage=await db.prepare("SELECT coalesce(sum(attempts),0) AS month,coalesce(sum(IIF(day=?,attempts,0)),0) AS day FROM import_usage WHERE substr(day,1,7)=?")
     .bind(at.slice(0,10),at.slice(0,7)).first<{month:number;day:number}>();
   const nextDay=new Date(at.slice(0,10)+'T00:00:00Z').getTime()+86400_000;
   const nextMonth=Date.UTC(new Date(now).getUTCFullYear(),new Date(now).getUTCMonth()+1,1);
   const importRetryAt=usage&&usage.month>=30?new Date(nextMonth).toISOString():usage&&usage.day>=10?new Date(nextDay).toISOString():null;
-  return {generationEnabled:flag==='true'&&row?.enabled===1,developmentRemaining:row?.remaining??0,importRetryAt};
+  return {generationEnabled:flag==='true'&&grant?.enabled===1&&gate?.enabled===1,developmentRemaining:grant?.remaining??0,renewalAt:grant?.renewalAt??null,creditKind:grant?.kind??null,importRetryAt};
 }
 export async function admitGeneration(db:Database,agencyId:string,key:string,input:unknown,flag:string|undefined,now=Date.now(),verifyPhotos?:(listing:NormalizedListing)=>Promise<void>) {
   const parsed=GenerationRequest.safeParse(input);
@@ -54,7 +61,7 @@ export async function admitGeneration(db:Database,agencyId:string,key:string,inp
   const brandRow=await db.prepare(`SELECT id,owner_user_id AS ownerUserId,name,logo_asset_id AS logoAssetId,primary_color AS primaryColor,
     secondary_color AS secondaryColor,phone,email,website,created_at AS createdAt FROM agencies WHERE id=?`).bind(agencyId).first();
   const brand=AgencyBrand.safeParse(brandRow);if(!brand.success)throw new GenerationFailure('VALIDATION_ERROR');
-  const grant=await db.prepare('SELECT allocation_id AS id FROM generation_access WHERE agency_id=?').bind(agencyId).first<{id:string}>();
+  const grant=await creditGrant(db,agencyId,now);
   if(!grant)throw new GenerationFailure('QUOTA_EXHAUSTED');
   if(saved&&verifyPhotos)await verifyPhotos(saved);
   const id=crypto.randomUUID(),at=new Date(now).toISOString();
@@ -74,15 +81,22 @@ export async function admitGeneration(db:Database,agencyId:string,key:string,inp
   return (await findGeneration(db,agencyId,id))!;
 }
 // JSON aggregate keeps the portable DB port small; keyset pagination is tenant scoped.
-export async function listGenerations(db:Database,agencyId:string,before?:string){
-  let time='9999',id='~';
+export async function listGenerations(db:Database,agencyId:string,before?:string,
+  filters:{query?:string;status?:'all'|'ready'|'active';sort?:'newest'|'oldest'}={}){
+  const ascending=filters.sort==='oldest';
+  let time=ascending?'0000':'9999',id=ascending?'':'~';
   if(before){try{const parts=JSON.parse(atob(before));if(!Array.isArray(parts)||parts.length!==2||typeof parts[0]!=='string'||!/^\d{4}-/.test(parts[0]))throw 0;
     time=Timestamp.parse(parts[0]);id=EntityId.parse(parts[1]);}catch{throw new GenerationFailure('VALIDATION_ERROR');}}
+  const comparison=ascending?'>':'<',order=ascending?'ASC':'DESC';
+  const query=filters.query?.trim()??'',status=filters.status??'all';
+  const where=status==='ready'?" AND j.status='ready'":status==='active'?" AND j.status IN ('queued','importing','scripting','voicing','rendering','retry_wait')":'';
+  const search=query?" AND instr(lower(coalesce(json_extract(i.result_json,'$.facts.title.value'),'Votre annonce')),lower(?))>0":'';
   const result=await db.prepare(`SELECT json_group_array(json(record)) AS data FROM
-    (SELECT json_object('id',g.job_id) AS record ${joins} WHERE g.agency_id=? AND (j.created_at<? OR (j.created_at=? AND j.id<?))
-    ORDER BY j.created_at DESC,j.id DESC LIMIT 21)`).bind(agencyId,time,time,id).first<{data:string}>();
+    (SELECT json_object('id',g.job_id) AS record ${joins} WHERE g.owner_agency_id=?
+    AND (j.created_at${comparison}? OR (j.created_at=? AND j.id${comparison}?))${where}${search}
+    ORDER BY j.created_at ${order},j.id ${order} LIMIT 21)`).bind(agencyId,time,time,id,...(query?[query]:[])).first<{data:string}>();
   const refs=JSON.parse(result?.data??'[]') as {id:string}[], rows=[];
-  for(const ref of refs.slice(0,20))rows.push((await findGeneration(db,agencyId,ref.id))!);
+  for(const ref of refs.slice(0,20))rows.push((await findOwnedGeneration(db,agencyId,ref.id))!);
   const last=rows.at(-1);return {jobs:rows.map(row=>generationView(row)),nextCursor:refs.length>20&&last?btoa(JSON.stringify([last.createdAt,last.jobId])):null};
 }
 export async function setGenerationStage(db:Database,row:GenerationRow,stage:GenerationView['stage']){

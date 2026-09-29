@@ -1,5 +1,5 @@
 import {GeneratableListing, ImportFailure, type NormalizedListing} from '@bienvu/contracts';
-import {beginImport, completeImport, failImport, findImport, importObjectKeys, ImportStateFailure,
+import {beginImport, completeImport, failImport, findImport, importObjectKeys, ImportStateFailure, draftFromListing,startCreationDraft,viewCreationDraft,
   journalImportPhoto, markImportDeleting, removeImport, type Database} from '@bienvu/db';
 import {importListing, publicUrl, type ImportTransport} from '@bienvu/importers';
 import {RequestFailure} from './http';
@@ -21,8 +21,9 @@ export async function createPrivateImport(env: {DB: Database; MEDIA: ImportBucke
           await env.MEDIA.put(photo.objectKey, bytes, {httpMetadata: {contentType: photo.mime, cacheControl: 'private, no-store'},
             customMetadata: {importId: row.id, agencyId, sha256: photo.contentHash}});
           abort.throwIfAborted();
-        }}, {signal, mode: options.mode});
-      await completeImport(env.DB, listing, diagnostics);
+        }}, {signal, mode: options.mode, allowPartial:true});
+      if(GeneratableListing.safeParse(listing).success)await completeImport(env.DB, listing, diagnostics);
+      else await startCreationDraft(env.DB,agencyId,row.id,draftFromListing(listing));
     } catch (error) {
       const code = error instanceof ImportFailure ? error.code : 'SOURCE_UNAVAILABLE';
       await failImport(env.DB, agencyId, row.id, code,
@@ -41,14 +42,15 @@ export async function createPrivateImport(env: {DB: Database; MEDIA: ImportBucke
 }
 export function importResult(row: Awaited<ReturnType<typeof findImport>>) {
   if (!row || row.status === 'deleting' || row.expiresAt <= new Date().toISOString()) throw new RequestFailure('NOT_FOUND');
-  return {id: row.id, sourceKind: row.sourceKind, sourceUrl: row.sourceUrl, status: row.status, errorCode: row.errorCode, createdAt: row.createdAt,
-    expiresAt: row.expiresAt, listing: row.result ? GeneratableListing.parse(JSON.parse(row.result)) : null};
+  const draft=viewCreationDraft(row);
+  return {id: row.id, sourceKind: row.sourceKind, sourceUrl: row.sourceUrl, status: draft?'needs_input':row.status, errorCode: row.errorCode, createdAt: row.createdAt,
+    expiresAt: row.expiresAt, listing: row.result ? GeneratableListing.parse(JSON.parse(row.result)) : null,draft};
 }
 export async function privateImportPhoto(env: {DB: Database; MEDIA: ImportBucket}, agencyId: string, id: string, photoId: string) {
   const row = await findImport(env.DB, agencyId, id);
-  if (row?.status !== 'ready' || !row.result || row.expiresAt <= new Date().toISOString()) throw new RequestFailure('NOT_FOUND');
-  const listing: NormalizedListing = GeneratableListing.parse(JSON.parse(row.result));
-  const photo = listing.photos.find(p => p.id === photoId);
+  if (!row || row.expiresAt <= new Date().toISOString() || row.status!=='ready'&&!viewCreationDraft(row)) throw new RequestFailure('NOT_FOUND');
+  const listing: NormalizedListing|null = row.result?GeneratableListing.parse(JSON.parse(row.result)):null;
+  const photo = (listing?.photos??viewCreationDraft(row)?.photos??[]).find(p => p.id === photoId);
   if (!photo) throw new RequestFailure('NOT_FOUND');
   const object = await env.MEDIA.get(photo.objectKey);
   if (!object || object.size !== photo.sizeBytes || object.customMetadata?.sha256 !== photo.contentHash) throw new RequestFailure('NOT_FOUND');

@@ -2,6 +2,7 @@
 import {useEffect, useState, type FormEvent} from 'react';
 import Link from 'next/link';
 import {useAccount, SignOut} from './account';
+import {readListingDraft} from '../lib/listing-draft';
 
 type Mode = 'signin' | 'signup' | 'forgot' | 'verify' | 'reset';
 const titles: Record<Mode, string> = {signin: 'Heureux de vous retrouver.', signup: 'Créons votre compte.',
@@ -15,7 +16,11 @@ export function Login() {
   const [mode, setMode] = useState<Mode>('signin'), [busy, setBusy] = useState<'email' | 'google' | null>(null);
   const [email, setEmail] = useState(''), [password, setPassword] = useState(''), [confirmation, setConfirmation] = useState('');
   const [token, setToken] = useState(''), [failure, setFailure] = useState(''), [notice, setNotice] = useState('');
+  const [hasDraft, setHasDraft] = useState(false),[trial,setTrial]=useState(false);
   useEffect(() => {
+    setHasDraft(Boolean(readListingDraft()));
+    setTrial(new URL(window.location.href).searchParams.get('trial')==='1');
+    void fetch('/api/trial',{cache:'no-store'}).then(r=>r.json() as Promise<{hasIntent?:boolean}>).then(data=>{if(data.hasIntent)setTrial(true);}).catch(()=>{});
     void fetch('/api/auth/status', {cache: 'no-store'}).then(r => r.ok ? r.json() as Promise<{google: boolean; emailDelivery: boolean}> : null).then(setConfigured).catch(() => setConfigured(null));
     const url = new URL(window.location.href);
     if (url.searchParams.get('mode') === 'reset') {
@@ -34,7 +39,7 @@ export function Login() {
   async function connectGoogle() {
     setBusy('google'); setFailure('');
     try {
-      const response = await fetch('/api/auth/sign-in/social', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({provider: 'google'})});
+      const response = await fetch('/api/auth/sign-in/social', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({provider: 'google', ...(trial ? {continueTrial:true} : readListingDraft() ? {continueListing: true} : {})})});
       const data = await response.json() as {url: string; error?: {message?: string}};
       if (!response.ok) {setFailure(data.error?.message ?? 'La connexion a échoué.'); setBusy(null); return;}
       const url = new URL(data.url);
@@ -53,7 +58,7 @@ export function Login() {
       const data = await response.json() as {authenticated?: boolean; error?: {code?: string; message?: string}};
       if (!response.ok) {setFailure(data.error?.message ?? 'La demande a échoué. Réessayez.'); return;}
       setPassword(''); setConfirmation('');
-      if (mode === 'signin' || mode === 'signup' && data.authenticated === true) {window.location.assign('/agence'); return;}
+      if (mode === 'signin' || mode === 'signup' && data.authenticated === true) {window.location.assign(trial ? '/essai/recuperer' : readListingDraft() ? '/' : '/agence'); return;}
       if (mode === 'reset') {await refresh(); setToken(''); setMode('signin'); setNotice('Mot de passe enregistré. Connectez-vous avec votre nouveau mot de passe.');}
       else if (mode === 'signup') {setMode('verify'); setNotice('Consultez votre messagerie pour confirmer votre adresse. Si vous avez déjà un compte, connectez-vous ou utilisez « Mot de passe oublié ».');}
       else setNotice(mode === 'forgot' ? 'Si un compte correspond à cette adresse, vous recevrez un lien pour choisir votre mot de passe.'
@@ -62,10 +67,10 @@ export function Login() {
     finally {setBusy(null);}
   }
   if (loading) return <div className="login-box" role="status"><p>Ouverture de votre espace…</p></div>;
-  if (me && mode !== 'reset') return <div className="login-box"><h2>Vous êtes connecté</h2><p>{me.user.email}</p><Link className="button primary" href="/agence">Retrouver mon agence</Link><SignOut/></div>;
+  if (me && mode !== 'reset') return <div className="login-box"><h2>Vous êtes connecté</h2><p>{me.user.email}</p><Link className="button primary" href={trial ? '/essai/recuperer' : hasDraft ? '/' : '/agence'}>{trial ? 'Récupérer ma vidéo' : hasDraft ? 'Reprendre mon annonce' : 'Retrouver mon agence'}</Link><SignOut/></div>;
   const needsPassword = mode === 'signin' || mode === 'signup' || mode === 'reset';
   return <div className="login-box auth-box"><h2>{titles[mode]}</h2>
-    {(mode === 'signin' || mode === 'signup') && <><p>Votre agence vous attend. Choisissez votre mode de connexion.</p>
+    {(mode === 'signin' || mode === 'signup') && <><p>{trial?'Connectez-vous pour enregistrer votre vidéo et télécharger sans filigrane.':'Votre agence vous attend. Choisissez votre mode de connexion.'}</p>{trial&&<p className="field-help">Votre aperçu reste disponible. <Link href="/">Revenir à ma vidéo</Link></p>}
       <button type="button" className="button secondary google-button" disabled={!configured?.google || !!busy} onClick={connectGoogle}>
         <span aria-hidden="true" className="google-letter">G</span>{busy === 'google' ? 'Redirection…' : 'Continuer avec Google'}</button>
       {configured && !configured.google && <p className="field-help">Google sera disponible après configuration.</p>}
@@ -79,7 +84,7 @@ export function Login() {
       {mode === 'reset' && <label htmlFor="auth-confirmation">Confirmer le mot de passe<input id="auth-confirmation" name="confirmation" type="password" autoComplete="new-password" required minLength={12} maxLength={128} value={confirmation} disabled={!!busy} onChange={e => setConfirmation(e.target.value)}/></label>}
       {mode === 'signin' && <button type="button" className="text-button auth-forgot" disabled={!!busy} onClick={() => changeMode('forgot')}>Mot de passe oublié ?</button>}
       <p className="form-feedback error" role="alert">{failure}</p>
-      <p className="form-feedback success" role="status">{notice}</p>
+      <p className="form-feedback success" role="status">{notice}</p>{notice.includes('confirmée')&&<p className="field-help">Vous avez commencé un essai ? Connectez-vous depuis le navigateur où vous l’avez créé pour le récupérer.</p>}
       <button className="button primary" type="submit" disabled={!!busy || mode === 'reset' && !token}>{busy === 'email' ? 'Un instant…' : labels[mode]}</button>
     </form>
     <div className="auth-actions">

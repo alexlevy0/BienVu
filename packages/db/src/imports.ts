@@ -1,8 +1,15 @@
 import {EntityId, GeneratableListing, type NormalizedListing, type ImportErrorCode} from '@bienvu/contracts';
 import type {Database} from './index';
 export type ImportRow = {id: string; agencyId: string; sourceKind: 'url' | 'manual'; sourceUrl: string | null; input: string | null; inputHash: string | null; status: 'importing' | 'ready' | 'failed' | 'deleting';
+  draftPending:number; draftData:string|null; draftVersion:number|null; draftPhotos:string;
   errorCode: ImportErrorCode | null; result: string | null; createdAt: string; expiresAt: string; leaseUntil: string};
+export type ImportSummary={id:string;sourceKind:'url'|'manual';sourceUrl:string|null;status:'importing'|'needs_input'|'ready'|'failed';
+  errorCode:ImportErrorCode|null;createdAt:string;expiresAt:string;title:string|null;locality:string|null;
+  transaction:'sale'|'rent'|null;previewPhotoId:string|null};
 const columns = `id,agency_id AS agencyId,source_kind AS sourceKind,nullif(source_url,'') AS sourceUrl,input_json AS input,input_hash AS inputHash,status,error_code AS errorCode,result_json AS result,
+  draft_pending AS draftPending,(SELECT data_json FROM creation_drafts WHERE id=listing_imports.id) AS draftData,
+  (SELECT version FROM creation_drafts WHERE id=listing_imports.id) AS draftVersion,
+  (SELECT json_group_array(json(photo_json)) FROM import_objects WHERE import_id=listing_imports.id AND agency_id=listing_imports.agency_id) AS draftPhotos,
   created_at AS createdAt,expires_at AS expiresAt,lease_until AS leaseUntil`;
 export class ImportStateFailure extends Error {constructor(readonly code: 'CONFLICT' | 'IMPORT_LIMIT' | 'NOT_FOUND') {super(code);}}
 export async function findImport(db: Database, agencyId: string, id: string) {
@@ -57,11 +64,16 @@ export async function failImport(db: Database, agencyId: string, id: string, cod
 }
 export async function listImports(db: Database, agencyId: string) {
   // JSON agrégé borné : compatible avec le port D1 sans étendre toute l'API SQL.
-  const row = await db.prepare(`SELECT json_group_array(json_object('id',id,'sourceKind',source_kind,'sourceUrl',nullif(source_url,''),'status',status,'errorCode',error_code,'createdAt',created_at,'expiresAt',expires_at,
-    'title',json_extract(result_json,'$.facts.title.value'),'transaction',json_extract(result_json,'$.transaction'))) AS items
-    FROM (SELECT * FROM listing_imports WHERE agency_id=? AND status!='deleting' AND expires_at>? ORDER BY created_at DESC,id LIMIT 30)`)
+  const row = await db.prepare(`SELECT json_group_array(json_object('id',i.id,'sourceKind',i.source_kind,'sourceUrl',nullif(i.source_url,''),
+    'status',iif(i.draft_pending=1 AND i.status='importing','needs_input',i.status),'errorCode',i.error_code,'createdAt',i.created_at,'expiresAt',i.expires_at,
+    'title',coalesce(json_extract(i.result_json,'$.facts.title.value'),json_extract((SELECT data_json FROM creation_drafts WHERE id=i.id),'$.fields.title')),
+    'locality',coalesce(json_extract(i.result_json,'$.facts.locality.value'),json_extract((SELECT data_json FROM creation_drafts WHERE id=i.id),'$.fields.locality')),
+    'transaction',coalesce(json_extract(i.result_json,'$.transaction'),json_extract((SELECT data_json FROM creation_drafts WHERE id=i.id),'$.fields.transaction')),
+    'previewPhotoId',(SELECT o.id FROM import_objects o WHERE o.import_id=i.id AND o.agency_id=i.agency_id
+      ORDER BY json_extract(o.photo_json,'$.sourceOrder') LIMIT 1))) AS items
+    FROM (SELECT * FROM listing_imports WHERE agency_id=? AND status!='deleting' AND expires_at>? ORDER BY created_at DESC,id LIMIT 30) AS i`)
     .bind(agencyId, new Date().toISOString()).first<{items: string}>();
-  return JSON.parse(row?.items ?? '[]') as Array<Pick<ImportRow, 'id' | 'sourceKind' | 'sourceUrl' | 'status' | 'errorCode' | 'createdAt' | 'expiresAt'> & {title: string | null; transaction: 'sale' | 'rent' | null}>;
+  return JSON.parse(row?.items ?? '[]') as ImportSummary[];
 }
 
 export async function markImportDeleting(db: Database, agencyId: string, id: string, now = Date.now(), explicit = false) {

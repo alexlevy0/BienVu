@@ -12,7 +12,7 @@ if(action==='resume'){
 }
 if(action==='budget'){
  const [baseline,ceiling]=process.argv.slice(3).map(Number);
- assert.ok(Number.isSafeInteger(baseline)&&baseline>=0&&Number.isSafeInteger(ceiling)&&ceiling<=3500&&ceiling>=baseline);
+ assert.ok(Number.isSafeInteger(baseline)&&baseline>=0&&Number.isSafeInteger(ceiling)&&ceiling<=4500&&ceiling>=baseline);
  await remoteSql(`INSERT INTO hosted_import_budget(month,baseline_cents,ceiling_cents,paused) VALUES('${month}',${baseline},${ceiling},1)
  ON CONFLICT(month) DO UPDATE SET baseline_cents=excluded.baseline_cents,ceiling_cents=excluded.ceiling_cents,paused=1;`);
 }

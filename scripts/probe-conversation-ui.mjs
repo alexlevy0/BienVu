@@ -1,0 +1,171 @@
+// Local UI fixture: exercises the real React flows without calling a paid provider.
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+import {mkdir,writeFile} from 'node:fs/promises';
+import path from 'node:path';
+const base=process.env.BIENVU_CONVERSATION_URL??'http://localhost:8790';
+if(!['localhost','127.0.0.1'].includes(new URL(base).hostname))throw Error('LOCAL_FIXTURE_ONLY');
+const output=path.resolve('evidence/local/conversation-ui');await mkdir(output,{recursive:true});
+const require=createRequire(new URL('../apps/renderer/package.json',import.meta.url));
+const {openBrowser}=require('@remotion/renderer');
+const browser=await openBrowser('chrome',{logLevel:'error'});
+const at=new Date().toISOString(),expires=new Date(Date.now()+7*86400_000).toISOString();
+const account={user:{id:'ui-user',name:'Alex Recette',email:'fixture@example.com'},agency:{id:'ui-agency',ownerUserId:'ui-user',name:'Agence de recette',logoAssetId:null,primaryColor:'#E1E8D9',secondaryColor:'#171714',phone:null,email:'fixture@example.com',website:null,createdAt:at,updatedAt:at,brandVersion:0},rights:{generationEnabled:true,developmentRemaining:2,renewalAt:expires,creditKind:'free',importRetryAt:null,trial:'eligible',watermarked:true}};
+const code=`(()=>{const native=window.fetch.bind(window),account=${JSON.stringify(account)},at=${JSON.stringify(at)},expires=${JSON.stringify(expires)};
+  const key='bienvu:conversation-fixture';const load=()=>JSON.parse(sessionStorage.getItem(key)||'{"posts":[],"uploads":[],"jobs":{},"failNext":false,"blockUpload":false}');
+  const save=s=>sessionStorage.setItem(key,JSON.stringify(s));
+  const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json'}});
+  const view=(id,s)=>{const source=s.jobs[id];if(!source)return null;return {id,status:source.status,stage:source.status==='ready'?'rendering':source.status==='queued'?'importing':source.status,attempt:1,errorCode:null,createdAt:at,updatedAt:new Date().toISOString(),expiresAt:expires,title:source.title,sourceKind:source.sourceKind,videoUrl:source.status==='ready'?'/videos/studio-home/paris.mp4':null,downloadUrl:source.status==='ready'?'/videos/studio-home/paris.mp4':null,syntheticVoice:true,retryAllowed:false,ownership:'owned',masterAccess:'unlocked',retention:'available'};};
+  window.__fixture={load,save,setStatus(id,status){const s=load();s.jobs[id].status=status;save(s);},failNext(){const s=load();s.failNext=true;save(s);},blockUpload(value){const s=load();s.blockUpload=value;save(s);}};
+  window.fetch=async(input,options={})=>{const p=new URL(typeof input==='string'?input:input.url,location.href).pathname,s=load(),method=options.method??'GET';
+    if(p==='/api/me')return json(account);
+    if(p==='/api/generations'&&method==='POST'){const inputData=JSON.parse(options.body),id=inputData.url?'ui-url-job':'ui-manual-job';s.posts.push({id,body:inputData,key:options.headers['Idempotency-Key']});
+      if(!s.jobs[id])s.jobs[id]={status:'queued',title:inputData.url?'Appartement à Lyon':'Maison à Bordeaux',sourceKind:inputData.url?'url':'manual'};const failed=s.failNext;s.failNext=false;save(s);await new Promise(r=>setTimeout(r,120));if(failed)throw new TypeError('Réponse interrompue — fixture');return json(view(id,load()),202);}
+    if(p==='/api/generations')return json({jobs:Object.keys(s.jobs).reverse().map(id=>view(id,s)),nextCursor:null});
+    if(p.startsWith('/api/generations/'))return json(view(p.split('/')[3],s)??{error:{code:'NOT_FOUND'}},s.jobs[p.split('/')[3]]?200:404);
+    if(p==='/api/imports/manual'&&method==='POST')return json({id:'ui-manual-import',sourceKind:'manual',sourceUrl:null,status:'importing',errorCode:null,createdAt:at,expiresAt:expires,listing:null});
+    if(p.startsWith('/api/imports/ui-manual-import/uploads/')){if(s.blockUpload)return json({error:{code:'INVALID_PHOTO'}},422);s.uploads.push(p);save(s);return json({ok:true});}
+    if(p==='/api/imports/ui-manual-import/complete')return json({id:'ui-manual-import',sourceKind:'manual',sourceUrl:null,status:'ready',errorCode:null,createdAt:at,expiresAt:expires,listing:null});
+    if(p.startsWith('/api/'))return json({error:{code:'NOT_FOUND'}},404);
+    return native(input,options);};})();`;
+const report=[];
+try{
+ for(const width of [1536,390]){
+  const page=await browser.newPage({context:()=>null,logLevel:'error',indent:false,pageIndex:width,onBrowserLog:null,onLog:()=>{}}),cdp=page._client();
+  await page.setViewport({width,height:width===1536?980:844,deviceScaleFactor:1});
+  cdp.on('Fetch.requestPaused',event=>{void cdp.send('Fetch.fulfillRequest',{requestId:event.requestId,responseCode:404,body:btoa('fixture sans photo source')});});
+  await cdp.send('Fetch.enable',{patterns:[{urlPattern:'*source-photo*',requestStage:'Request'}]});
+  await cdp.send('Page.addScriptToEvaluateOnNewDocument',{source:code});
+  const evaluate=async expression=>{const result=await cdp.send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true,userGesture:true});assert.ok(!result.value.exceptionDetails,JSON.stringify(result.value.exceptionDetails));return result.value.result.value;};
+  const wait=async expression=>{for(let i=0;i<160;i++){if(await evaluate(`Boolean(${expression})`))return;await new Promise(r=>setTimeout(r,100));}throw Error(`WAIT ${expression}: ${await evaluate('document.body.innerText.slice(0,1200)')}`);};
+  const fill=async(selector,value)=>evaluate(`(()=>{const n=document.querySelector(${JSON.stringify(selector)});n.focus();Object.getOwnPropertyDescriptor(n instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:HTMLInputElement.prototype,'value').set.call(n,${JSON.stringify(value)});n.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+  const click=async selector=>evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
+  const shot=async name=>{await evaluate('document.fonts.ready');await new Promise(r=>setTimeout(r,400));const image=await cdp.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});await writeFile(path.join(output,`${name}-${width}.png`),Buffer.from(image.value.data,'base64'));};
+  const noOverflow=async()=>assert.equal(await evaluate('document.documentElement.scrollWidth>innerWidth'),false);
+  await page.goto({url:base,timeout:60000,options:{waitUntil:'load'}});
+  await wait("document.querySelector('.home-account')&&document.querySelector('.home-example-grid')");await shot('accueil');await noOverflow();
+  if(width===1536){
+    await fill('#home-listing-url','https://');await evaluate("document.querySelector('.home-composer').requestSubmit()");await wait("document.querySelector('#home-url-error')");
+    assert.equal(await evaluate('window.__fixture.load().posts.length'),0);
+    await fill('#home-listing-url','https://agence.example.com/annonce/lyon');await evaluate('window.__fixture.failNext()');await evaluate("document.querySelector('.home-composer').requestSubmit()");
+    await wait("document.querySelector('.home-form-feedback')?.textContent.includes('interrompue')");
+    assert.equal(await evaluate("document.querySelector('#home-listing-url').value"),'https://agence.example.com/annonce/lyon');
+    await evaluate("document.querySelector('.home-composer').requestSubmit();document.querySelector('.home-composer').requestSubmit()");
+    await wait("document.querySelector('.home-conversation-job')&&window.__fixture.load().posts.length===2");
+    await wait("!document.querySelector('.home-discover')");await shot('generation');await noOverflow();
+    const first=await evaluate('window.__fixture.load().posts');assert.equal(first.length,2);assert.equal(first[0].key,first[1].key);
+    assert.equal(await evaluate("document.querySelector('.home-conversation-lead')?.textContent"),'Nous préparons votre visite en vidéo.');
+    await evaluate("window.__fixture.setStatus('ui-url-job','ready')");await page.goto({url:base,timeout:60000,options:{waitUntil:'load'}});
+    await wait("document.querySelector('.home-conversation-media video')?.readyState>=1");await shot('resultat');await noOverflow();
+    assert.equal(await evaluate('window.__fixture.load().posts.length'),2);
+    await click('.home-navigation .home-nav-item:first-child');await wait("document.querySelector('.home-hero-intro:not(.home-hero-intro-leaving)')");
+    await fill('#home-listing-url','Duplex lumineux avec une terrasse');await evaluate("document.querySelector('.home-composer').requestSubmit()");
+    await wait("document.querySelector('.manual-guided-form')");await shot('manuel-bien');await noOverflow();
+    assert.deepEqual(await evaluate("[...document.querySelector('.home-format-tags').children].map(n=>n.textContent.trim())"),['Vertical 9:16','Voix française','Saisie manuelle']);
+    assert.equal(await evaluate("document.querySelector('.manual-guided-form textarea[name=description]').value"),'Duplex lumineux avec une terrasse');
+    await click('.manual-step-actions .home-primary-button');await wait("document.querySelector('.manual-step-header').textContent.includes('2 SUR 5')");
+    await click('.manual-step-actions .home-primary-button');await wait("document.querySelector('#manual-title-error')");
+    await fill('#manual-title','Maison avec jardin');await fill('#manual-locality','Bordeaux');
+    await click('.manual-step-actions .home-primary-button');await wait("document.querySelector('.manual-step-header').textContent.includes('3 SUR 5')");await shot('manuel-details');
+    await new Promise(r=>setTimeout(r,950));await page.goto({url:base,timeout:60000,options:{waitUntil:'load'}});
+    await wait("document.querySelector('.manual-step-header')?.textContent.includes('3 SUR 5')");
+    assert.equal(await evaluate("document.querySelector('#manual-title').value"),'Maison avec jardin');
+    assert.equal(await evaluate("document.querySelector('#manual-locality').value"),'Bordeaux');
+    assert.equal(await evaluate("document.querySelector('#manual-description').value"),'Duplex lumineux avec une terrasse');
+    await click('.manual-step-actions .home-primary-button');await wait("document.querySelector('.manual-step-header').textContent.includes('4 SUR 5')");await shot('manuel-photos');
+    await click('.manual-step-actions .home-primary-button');await wait("document.querySelector('#manual-photo-feedback')?.textContent.includes('3 photos')");
+    assert.equal(await evaluate('window.__fixture.load().posts.length'),2);
+    await evaluate(`(async()=>{const canvas=document.createElement('canvas');canvas.width=20;canvas.height=20;const blob=await new Promise(r=>canvas.toBlob(r));const transfer=new DataTransfer();transfer.items.add(new File([blob],'trop-petite.png',{type:'image/png'}));const input=document.querySelector('#manual-photos');input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+    await wait("document.querySelector('#manual-photo-feedback')?.textContent.includes('640')");
+    await evaluate(`(async()=>{const transfer=new DataTransfer();for(const id of ['paris','sud','lyon']){const bytes=await (await fetch('/images/studio-home/'+id+'.webp')).blob();transfer.items.add(new File([bytes],id+'.webp',{type:'image/webp'}));}const input=document.querySelector('#manual-photos');input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+    await wait("document.querySelectorAll('.manual-photos li').length===3&&!document.querySelector('.manual-guided-form [role=status]')");
+    await click('.manual-step-actions .home-primary-button');await wait("document.querySelector('.manual-step-header').textContent.includes('5 SUR 5')");await shot('manuel-validation');await noOverflow();
+    await evaluate("[...document.querySelectorAll('.manual-recap button')].find(b=>b.parentElement.previousElementSibling?.textContent==='Présentation')?.click()");
+    await wait("document.querySelector('.manual-step-header').textContent.includes('2 SUR 5')");
+    assert.equal(await evaluate("document.querySelector('#manual-title').value"),'Maison avec jardin');
+    await evaluate("[...document.querySelectorAll('.manual-step-nav button')].find(b=>b.textContent==='Validation').click()");
+    await wait("document.querySelector('.manual-step-header').textContent.includes('5 SUR 5')");
+    await evaluate('window.__fixture.blockUpload(true)');await evaluate("document.querySelector('.home-composer').requestSubmit()");
+    await wait("document.querySelector('.manual-guided-form [role=alert]')?.textContent.includes('Photo invalide')");
+    assert.equal(await evaluate("window.__fixture.load().posts.length"),2);
+    await evaluate('window.__fixture.blockUpload(false)');await evaluate("document.querySelector('.home-composer').requestSubmit()");
+    await wait("document.querySelector('.home-conversation-job')&&window.__fixture.load().posts.length===3");
+    assert.equal(await evaluate("window.__fixture.load().uploads.length"),3);
+    assert.deepEqual(await evaluate("window.__fixture.load().posts.at(-1).body"),{listingId:'ui-manual-import'});
+    await evaluate("window.__fixture.setStatus('ui-manual-job','rendering')");await page.goto({url:base,timeout:60000,options:{waitUntil:'load'}});
+    await wait("document.querySelector('.home-conversation-job')&&document.querySelector('.home-request-bubble')?.textContent.includes('manuellement')");
+    assert.equal(await evaluate('window.__fixture.load().posts.length'),3);await shot('manuel-generation');await noOverflow();
+    report.push({width,urlAttempts:2,sameIdempotencyKey:true,manualUploads:3,manualJobs:1,refreshNoRepost:true,providerCalls:0});
+  }else{
+    await click('.home-mode-pill');await wait("document.querySelector('.manual-guided-form')");await shot('manuel-bien');await noOverflow();
+    await evaluate("document.querySelector('.manual-step-actions .home-primary-button').scrollIntoView({block:'end'})");
+    assert.equal(await evaluate("(()=>{const button=document.querySelector('.manual-step-actions .home-primary-button'),r=button.getBoundingClientRect(),s=document.querySelector('.home-conversation-scroll').getBoundingClientRect(),c=document.querySelector('.home-composer-dock').getBoundingClientRect();return r.bottom<=s.bottom+2&&r.bottom<=c.top+2&&document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)===button;})()"),true);
+    await click('.manual-step-actions .home-primary-button');await wait("document.querySelector('.manual-step-header').textContent.includes('2 SUR 5')");await shot('manuel-presentation');await noOverflow();
+    await click('.home-mobile-header button');await wait("document.querySelector('.home-sidebar-open')");await shot('menu');
+    await click('.home-navigation .home-nav-item:first-child');await wait("document.querySelector('.home-hero-intro:not(.home-hero-intro-leaving)')");
+    await click('.home-mode-pill');await wait("document.querySelector('.manual-step-header')?.textContent.includes('2 SUR 5')");
+    report.push({width,manualMobile:true,newVideoKeepsDraft:true,noHorizontalOverflow:true,providerCalls:0});
+  }
+  await page.close();
+ }
+ await new Promise(r=>setTimeout(r,750));
+ const guestPage=await browser.newPage({context:()=>null,logLevel:'error',indent:false,pageIndex:999,onBrowserLog:null,onLog:()=>{}}),guestCdp=guestPage._client();
+ await guestPage.setViewport({width:390,height:844,deviceScaleFactor:1});
+ const guestJob={id:'ui-anon-job',status:'rendering',stage:'rendering',attempt:1,errorCode:null,createdAt:at,updatedAt:at,expiresAt:expires,title:'Appartement à Lyon',sourceKind:'url',videoUrl:null,downloadUrl:null,syntheticVoice:true,retryAllowed:false,ownership:'anonymous',masterAccess:'locked',retention:'available'};
+ const guestRun=String(Date.now());
+ const guestCode=`(()=>{const native=window.fetch.bind(window),key='bienvu:guest-conversation-fixture',job=${JSON.stringify(guestJob)};
+   if(sessionStorage.getItem('bienvu:guest-fixture-started')!==${JSON.stringify(guestRun)}){sessionStorage.removeItem(key);sessionStorage.removeItem('bienvu:listing-draft');sessionStorage.removeItem('bienvu:home-conversation');localStorage.removeItem('bienvu:manual-draft');sessionStorage.setItem('bienvu:guest-fixture-started',${JSON.stringify(guestRun)});}
+   const load=()=>JSON.parse(sessionStorage.getItem(key)||'{"posts":0,"login":0,"imports":0,"status":"rendering"}'),save=s=>sessionStorage.setItem(key,JSON.stringify(s));
+   const view=s=>({...job,status:s.status,stage:s.status==='ready'?'rendering':s.status,videoUrl:s.status==='ready'?'/videos/studio-home/paris.mp4':null});
+   const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
+   window.__guestFixture={load,setStatus(status){const s=load();s.status=status;save(s);}};
+   window.turnstile={render:(element,options)=>{element.textContent='Vérification locale';setTimeout(()=>options.callback('fixture-token'),40);return 'fixture';},remove:()=>{},reset:()=>{}};
+   window.fetch=async(input,options={})=>{const path=new URL(typeof input==='string'?input:input.url,location.href).pathname,s=load();
+     if(path==='/api/me')return json({},401);
+     if(path==='/api/trial'&&options.method==='POST'){s.posts++;save(s);return json(view(s),202);}
+     if(path==='/api/trial'){window.__guestTrialRead=true;return json({enabled:true,siteKey:'fixture-key',used:false,job:s.posts?view(s):null});}
+     if(path==='/api/trial/ui-anon-job/login'){s.login++;save(s);return json({ok:true});}
+     if(path.startsWith('/api/imports')){s.imports++;save(s);return json({error:{code:'UNAUTHORIZED'}},401);}
+     if(path.startsWith('/api/'))return json({error:{code:'NOT_FOUND'}},404);
+     return native(input,options);};})();`;
+ await guestCdp.send('Page.addScriptToEvaluateOnNewDocument',{source:guestCode});
+ guestCdp.on('Fetch.requestPaused',event=>{void guestCdp.send('Fetch.fulfillRequest',{requestId:event.requestId,responseCode:404});});
+ await guestCdp.send('Fetch.enable',{patterns:[{urlPattern:'*source-photo*',requestStage:'Request'}]});
+ const ge=async expression=>{const result=await guestCdp.send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true,userGesture:true});assert.ok(!result.value.exceptionDetails,JSON.stringify(result.value.exceptionDetails));return result.value.result.value;};
+ const gw=async expression=>{for(let i=0;i<120;i++){if(await ge(`Boolean(${expression})`))return;await new Promise(r=>setTimeout(r,100));}throw Error(`GUEST WAIT ${expression}: ${await ge('document.body.innerText.slice(0,1200)')}`);};
+ await guestPage.goto({url:base,timeout:60000,options:{waitUntil:'load'}});
+ await gw("document.querySelector('.home-guest-account')&&window.__guestTrialRead&&!document.querySelector('.home-primary-button').disabled");
+ await ge(`(()=>{const input=document.querySelector('#home-listing-url');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'https://agence.example.com/annonce/lyon');input.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('.home-composer').requestSubmit();})()`);
+ await gw("document.querySelector('.trial-challenge')&&window.__guestFixture.load().posts===0");
+ await gw("document.querySelector('.trial-challenge')&&!document.querySelector('.home-primary-button').disabled");
+ await new Promise(r=>setTimeout(r,100));await ge("document.querySelector('.home-composer').requestSubmit()");
+ await gw("document.querySelector('.home-conversation-job')&&window.__guestFixture.load().posts===1");
+ await guestPage.goto({url:base,timeout:60000,options:{waitUntil:'load'}});
+ await gw("document.querySelector('.home-conversation-job')");
+ assert.equal(await ge('window.__guestFixture.load().posts'),1);
+ await ge("window.__guestFixture.setStatus('ready')");await guestPage.goto({url:base,timeout:60000,options:{waitUntil:'load'}});
+ await gw("document.querySelector('.home-conversation-media video')?.readyState>=1");
+ assert.equal(await ge("Boolean(document.querySelector('.home-conversation-status a[download]'))"),false);
+ const guestShot=await guestCdp.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});await writeFile(path.join(output,'essai-anonyme-390.png'),Buffer.from(guestShot.value.data,'base64'));
+ await ge("[...document.querySelectorAll('.home-conversation-status button')].find(b=>b.textContent.includes('Télécharger sans')).click()");
+ await gw("window.__guestFixture.load().login===1");
+ await guestPage.goto({url:base,timeout:60000,options:{waitUntil:'load'}});
+ await gw("document.querySelector('.home-conversation-job')");
+ await ge("document.querySelector('.home-mode-pill').click()");await gw("document.querySelector('.manual-guided-form')");
+ await ge("document.querySelector('.manual-step-actions .home-primary-button').click()");await gw("document.querySelector('.manual-step-header').textContent.includes('2 SUR 5')");
+ await ge(`(()=>{for(const [selector,value] of [['#manual-title','Appartement invité'],['#manual-locality','Lyon']]){const n=document.querySelector(selector);Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(n,value);n.dispatchEvent(new Event('input',{bubbles:true}));}})()`);
+ await ge("document.querySelector('.manual-step-actions .home-primary-button').click()");await gw("document.querySelector('.manual-step-header').textContent.includes('3 SUR 5')");
+ await ge("document.querySelector('.manual-step-actions .home-primary-button').click()");await gw("document.querySelector('.manual-step-header').textContent.includes('4 SUR 5')");
+ await ge(`(async()=>{const transfer=new DataTransfer();for(const id of ['paris','sud','lyon']){const bytes=await (await fetch('/images/studio-home/'+id+'.webp')).blob();transfer.items.add(new File([bytes],id+'.webp',{type:'image/webp'}));}const input=document.querySelector('#manual-photos');input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+ await gw("document.querySelectorAll('.manual-photos li').length===3");
+ await ge("document.querySelector('.manual-step-actions .home-primary-button').click()");await gw("document.querySelector('.manual-step-header').textContent.includes('5 SUR 5')");
+ assert.equal(await ge('window.__guestFixture.load().imports'),0);
+ await ge("document.querySelector('.home-composer').requestSubmit()");
+ let guestHandoff=false;for(let i=0;i<120;i++){try{guestHandoff=await ge("location.pathname==='/connexion'&&location.search==='?mode=signup'");if(guestHandoff)break;}catch{}await new Promise(r=>setTimeout(r,100));}
+ assert.equal(guestHandoff,true);
+ assert.equal(await ge("JSON.parse(sessionStorage.getItem('bienvu:listing-draft')).kind"),'manual');
+ assert.equal(await ge('window.__guestFixture.load().imports'),0);
+ report.push({guest:true,trialPosts:1,refreshNoRepost:true,previewWithoutDownload:true,loginIntent:true,manualGuestDraft:true,anonymousImportPosts:0,providerCalls:0});
+ await writeFile(path.join(output,'report.json'),JSON.stringify({base,at:new Date().toISOString(),fixtures:true,physicalDevice:false,report},null,2));
+ console.log(JSON.stringify({passed:true,report}));
+}finally{await browser.close({silent:true});}
