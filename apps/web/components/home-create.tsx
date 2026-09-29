@@ -296,7 +296,6 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
       }} onError={trial.setFailure}/>}
     {!me && trial.failure && screen.kind !== 'error' && <p className="home-form-feedback" role="alert">{trial.failure} <Link href="/connexion">Se connecter</Link></p>}
     {importPaused && <p className="home-form-note" role="status">La limite d’imports est atteinte. Vous pourrez ajouter une annonce à partir du {new Date(me!.rights.importRetryAt!).toLocaleString('fr-FR')}.</p>}
-    {noCredits && <p className="home-form-note">Vos crédits vidéo sont utilisés. <Link href="/historique">Retrouvez vos vidéos</Link>.</p>}
     {activeOtherJob && <p className="home-form-note">Une vidéo est déjà en cours de création. <Link href="/historique">Suivez-la dans Mes vidéos</Link>.</p>}
     <p className="home-create-note" id="home-create-note">{manual ? 'Votre brouillon reste sur cet appareil pendant une heure.' : screen.kind === 'job' && generationActive(selectedJob) ? 'Votre création sera enregistrée dans Mes vidéos.' : contextNote}</p>
     {me?.rights.renewalAt && screen.kind==='landing'&&<p className="field-help">Renouvellement le {new Date(me.rights.renewalAt).toLocaleDateString('fr-FR')}.</p>}
