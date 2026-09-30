@@ -51,6 +51,10 @@
 .login-studio-footer {padding-top:15px;border-top:1px solid var(--login-line);color:#898d85;font-size:12px}
 .login-studio-footer a {color:#313b2f;text-decoration:underline;text-underline-offset:4px}
 .login-studio-footer a span {margin-left:5px}
+.login-studio-footer {flex-wrap:wrap;gap:12px}
+.login-studio-footer nav {display:flex;gap:12px 18px;flex-wrap:wrap}
+.login-studio .login-box p.auth-google-privacy {margin:10px 0 0;font-size:12px;line-height:1.5}
+.login-studio .login-box .auth-google-privacy a {display:inline;margin:0;font-size:inherit;text-decoration:underline;text-underline-offset:3px}
 
 .login-studio-showcase {position:sticky;top:0;min-width:0;height:100svh;min-height:690px;padding:31px clamp(28px,4vw,64px) 24px;display:flex;flex-direction:column;background:radial-gradient(circle at 50% 43%,#f2f4eb 0,#e7eddf 46%,#dbe5d2 100%);overflow:hidden}
 .login-studio-showcase-top {display:flex;justify-content:space-between;gap:18px;color:#596b55;font-size:11px;letter-spacing:1.6px;font-weight:700}

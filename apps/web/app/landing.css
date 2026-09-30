@@ -160,7 +160,7 @@
 .home-agency-seal svg {width:100%;height:100%;display:block}
 .home-studio .home-demo-note {font-size:11px;color:#8b8c84;margin:13px 0 0;line-height:1.5}
 .home-footer {max-width:1660px;margin:25px auto 0;padding:17px 27px 22px;display:flex;align-items:center;justify-content:space-between;gap:20px;font-size:11px;color:#888b82}
-.home-footer nav {display:flex;gap:18px;align-items:center}
+.home-footer nav {display:flex;gap:18px;align-items:center;flex-wrap:wrap}
 .home-footer button {padding:0;border:0;background:transparent;font-size:inherit}
 .home-dialog {width:calc(100% - 36px);max-width:600px;max-height:calc(100svh - 50px);padding:38px;border:1px solid #dadfd1;border-radius:18px;background:var(--home-paper);color:var(--home-ink);box-shadow:0 25px 100px #09160835;overflow:auto;font-family:'Inter Tight',Arial,sans-serif}
 .home-dialog::backdrop {background:#1b261d70;backdrop-filter:blur(5px)}

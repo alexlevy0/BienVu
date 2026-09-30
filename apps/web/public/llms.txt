@@ -20,6 +20,8 @@ Explorer présente des vidéos partagées volontairement et des démonstrations 
 - [Offres et quotas](https://bienvu.online/abonnement): Tarifs affichés, nombre de vidéos par offre et disponibilité des abonnements.
 - [Sources testées](https://bienvu.online/sources): Compatibilité des sites d'annonces, limites connues et alternatives à l'import par lien.
 - [Connexion](https://bienvu.online/connexion): Accès au compte par Google ou par e-mail et mot de passe.
+- [Conditions d’utilisation](https://bienvu.online/conditions): Règles du service, essai, crédits, contenus autorisés et partage public.
+- [Politique de confidentialité](https://bienvu.online/confidentialite): Données utilisées, connexion Google, prestataires, conservation et droits des personnes.
 
 ## Optional
 

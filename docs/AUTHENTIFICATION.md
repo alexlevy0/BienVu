@@ -78,6 +78,8 @@ Ouvrir `http://localhost:8790/` dans la minute. Le serveur opérateur, lié seul
 
 ## Brancher Google pour la vérification réelle
 
+Les documents publics en français sont désormais [la politique de confidentialité](https://bienvu.online/confidentialite) et [les conditions d'utilisation](https://bienvu.online/conditions). Dans Google Auth Platform → Branding, renseigner ces deux URL dans les champs Privacy policy / Terms of service et conserver `https://bienvu.online/` pour l'accueil. [Contenu, limites et préparation commerciale](PAGES-INFORMATIONS.md).
+
 Créer/configurer dans la console Google un client OAuth de type **application Web** réservé au développement. Configurer l’écran de consentement et ses utilisateurs de test. BienVu ne demande que l’identité, l’adresse e-mail et le profil, sans accès à Drive ou Gmail. Google documente la création du client et les URI locales dans son [guide OAuth serveur](https://developers.google.com/identity/protocols/oauth2/web-server).
 
 Pour la recette workerd locale, utiliser exactement :

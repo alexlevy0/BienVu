@@ -52,6 +52,7 @@
 .home-studio .offers-faq details p {color:#606772;font-size:13px;margin:0;padding:2px 19px 14px;max-width:850px}
 .offers-footer {display:flex;align-items:center;justify-content:space-between;gap:15px;color:#838895;font-size:11px;margin-top:11px}
 .offers-footer a {text-decoration:underline;text-underline-offset:3px}
+.offers-footer nav {display:flex;gap:14px;flex-wrap:wrap}
 .home-studio .home-plan .home-plan-link-active {display:flex;justify-content:space-between;align-items:center;border:0;background:#e7eddf;border-radius:9px;padding:11px 12px;font-weight:550}
 @media(max-width:1100px) {
   .offers-page {padding-top:20px}

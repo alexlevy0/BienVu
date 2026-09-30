@@ -20,7 +20,7 @@ export default function Page() {
         <p className="login-studio-intro">Connectez-vous pour retrouver votre agence, vos créations et vos prochaines idées.</p>
         <Login/>
       </div>
-      <footer className="login-studio-footer"><span>© BienVu</span><Link href="/explorer">Explorer les vidéos <span aria-hidden="true">↗</span></Link></footer>
+      <footer className="login-studio-footer"><span>© BienVu</span><nav aria-label="Informations"><Link href="/confidentialite">Confidentialité</Link><Link href="/conditions">Conditions d’utilisation</Link><Link href="/explorer">Explorer <span aria-hidden="true">↗</span></Link></nav></footer>
     </section>
     <LoginDemo/>
   </main>;

@@ -74,6 +74,7 @@ export function Login() {
       <button type="button" className="button secondary google-button" disabled={!configured?.google || !!busy} onClick={connectGoogle}>
         <span aria-hidden="true" className="google-letter">G</span>{busy === 'google' ? 'Redirection…' : 'Continuer avec Google'}</button>
       {configured && !configured.google && <p className="field-help">Google sera disponible après configuration.</p>}
+      <p className="auth-google-privacy">Google partage votre identité et votre e-mail pour vous connecter. <Link href="/confidentialite#google">Comment BienVu utilise ces données</Link>.</p>
       <div className="auth-divider"><span>ou avec votre e-mail</span></div></>}
     {mode === 'forgot' && <p>Recevez un lien pour réinitialiser votre mot de passe ou en définir un pour votre compte Google.</p>}
     {error && <p className="form-feedback error" role="alert">{error} <button type="button" className="text-button" onClick={() => void refresh()}>Réessayer</button></p>}

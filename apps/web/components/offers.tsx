@@ -69,6 +69,6 @@ export function Offers() {
       <details><summary>Que se passe-t-il si j’atteins mon quota ?</summary><p>Vous pouvez toujours consulter vos vidéos. Les nouvelles créations attendent le renouvellement de votre quota ; une création échouée ne consomme pas de crédit.</p></details>
       <details><summary>Puis-je changer ou arrêter mon abonnement ?</summary><p>La souscription payante n’est pas encore ouverte. Ses modalités de changement et de résiliation seront présentées avant tout paiement.</p></details>
     </section>
-    <footer className="offers-footer"><a href="mailto:contact@bienvu.online">Nous contacter</a><span>Abonnements payants en préparation</span></footer>
+    <footer className="offers-footer"><nav aria-label="Informations"><Link href="/conditions">Conditions</Link><Link href="/confidentialite">Confidentialité</Link><a href="mailto:contact@bienvu.online">Nous contacter</a></nav><span>Abonnements payants en préparation</span></footer>
   </div>;
 }
