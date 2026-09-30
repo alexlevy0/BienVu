@@ -48,3 +48,5 @@ export async function recordCost(db: Database, input: CostEvent): Promise<void> 
 
 export * from './credits';
 export * from './anonymous';
+export * from './admin';
+export * from './traffic';

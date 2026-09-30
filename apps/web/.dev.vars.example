@@ -1,4 +1,9 @@
 PROBE_TOKEN=
+# Accès administratif : une seule adresse exacte, vérifiée par Better Auth.
+# Vide = aucun administrateur. Ne pas utiliser NEXT_PUBLIC_*.
+SUPER_ADMIN_EMAIL=
+# Compteurs de pages/pays agrégés, sans IP ni identifiant. Désactivé en local.
+TRAFFIC_ENABLED=false
 BETTER_AUTH_SECRET=
 GOOGLE_CLIENT_SECRET=
 # Facultatif pour une connexion Google réelle. Ne pas remplacer le secret aléatoire.

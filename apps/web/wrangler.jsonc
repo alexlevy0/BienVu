@@ -11,6 +11,8 @@
     "binding": "ASSETS"
   },
   "vars": {
+    "TRAFFIC_ENABLED": "false",
+    "SUPER_ADMIN_EMAIL": "",
     "PROBE_MODE": "local",
     "GENERATIONS_ENABLED": "false",
     "BETTER_AUTH_URL": "http://localhost:8787",
@@ -55,6 +57,7 @@
       "head_sampling_rate": 0.01
     }
   },
+  "triggers": {"crons": ["23 3 * * *"]},
   "services": [
     {
       "binding": "IMPORT_SERVICE",

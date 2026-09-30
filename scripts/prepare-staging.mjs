@@ -29,6 +29,8 @@ for(const [file,target,name] of [
     }
     c.vars.GOOGLE_CLIENT_ID = process.env.BIENVU_GOOGLE_CLIENT_ID ?? '';
     c.vars.AUTH_EMAIL_VERIFICATION_BYPASS = 'false';
+    c.vars.SUPER_ADMIN_EMAIL = process.env.BIENVU_SUPER_ADMIN_EMAIL ?? '';
+    c.vars.TRAFFIC_ENABLED = process.env.BIENVU_TRAFFIC_ENABLED === 'true' ? 'true' : 'false';
     const importsEnabled = process.env.BIENVU_IMPORTS_ENABLED === 'true';
     if (importsEnabled && plan !== 'paid') throw new Error('Les imports hébergés exigent Workers Paid.');
     c.vars.IMPORT_MODE = importsEnabled ? 'cloudflare' : 'disabled';

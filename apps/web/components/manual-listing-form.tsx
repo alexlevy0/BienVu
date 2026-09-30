@@ -5,6 +5,7 @@ import {DESCRIPTION_MAX_CHARACTERS, ManualListingInput, MANUAL_PHOTO_LIMITS, pub
 import {HomeIcon} from './home-icons';
 import type {ImportView} from './generation-form';
 import {manualDraftFields, readManualListingDraft, saveManualListingDraft, type ManualDraft, type ManualDraftFields} from '../lib/listing-draft';
+import {inspectManualPhotos} from '../lib/manual-photos';
 
 type SelectedPhoto = {id: string; file: File|null; preview: string; remote?:NormalizedListing['photos'][number]; state:'ready'|'sending'|'error'; slot:number};
 type Guided={step:number;setStep(step:number):void;description:string;setDescription(value:string):void;onCancel():void;
@@ -14,7 +15,8 @@ export type ManualListingFormHandle = {cancel():Promise<void>;isDraft(id:string)
 class FormFailure extends Error {}
 const labels: Record<string, string> = {title: 'titre', locality: 'localisation', propertyType: 'type de bien', description: 'description',
   priceCents: 'prix', charges: 'charges', area: 'surface', rooms: 'nombre de pièces', photos: 'photos'};
-type Props = {busy: boolean; generate?: boolean; setBusy(value: boolean): void;guided?:Guided;ref?:Ref<ManualListingFormHandle>} & (
+type Props = {busy: boolean; generate?: boolean; setBusy(value: boolean): void;guided?:Guided;ref?:Ref<ManualListingFormHandle>;
+  incomingPhotos?:{id:string;files:File[]}|null;onPhotosReceived?(id:string,result:{accepted:File[];issues:string[]}):void} & (
   {prepareGuest: true; onPrepared(): void; onCreated?: never} |
   {prepareGuest?: false; onCreated(value: ImportView): Promise<void>; onPrepared?: never}
 );
@@ -32,6 +34,8 @@ export function ManualListingForm(props: Props) {
   const history=useRef<number[]>([]);
   const selected = useRef(photos), pending = useRef<{fingerprint: string; key: string} | null>(null),formRef=useRef<HTMLFormElement>(null),submitLock=useRef(false);
   const removedIds=useRef<Set<string>>(new Set());
+  const receivedBatches=useRef(new Set<string>()),photoLock=useRef(false),mounted=useRef(true);
+  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
   useImperativeHandle(props.ref,()=>({cancel:cancelGuided,isDraft:id=>serverRef.current?.id===id}));
   selected.current = photos;
   function finalInput(){
@@ -148,32 +152,30 @@ export function ManualListingForm(props: Props) {
     return()=>clearTimeout(timer);
   // FormData captures the latest DOM values after each field edit.
   },[hydrated,photos,transaction,propertyType,revision,props.guided?.description,props.guided?.step,serverDraft?.version]);
-  async function addPhotos(files: FileList | null) {
-    if (!files) return;
-    const added = Array.from(files), all = [...photos.flatMap(p=>p.file?[p.file]:[]), ...added];
-    const failure = photos.length+added.length > MANUAL_PHOTO_LIMITS.maximum ? 'Choisissez 12 photos maximum.'
-      : added.some(f => !['image/jpeg', 'image/png', 'image/webp'].includes(f.type)) ? 'Utilisez des photos JPEG, PNG ou WebP.'
-      : added.some(f => !f.size || f.size > MANUAL_PHOTO_LIMITS.fileBytes) ? 'Chaque photo doit peser moins de 10 Mo.'
-      : all.reduce((sum, f) => sum + f.size, photos.reduce((sum,p)=>sum+(p.file?0:p.remote?.sizeBytes??0),0)) > MANUAL_PHOTO_LIMITS.totalBytes
-        ? 'Les photos dépassent 50 Mo au total.' : '';
-    setErrors(previous => ({...previous, photos: failure}));setPhotoIssues([]);setFeedback('');
-    if(failure)return;
-    setPhotoChecking(true);
-    const accepted:File[]=[],issues:string[]=[];
-    try {for(const file of added){
-      try {const bitmap=await createImageBitmap(file);const {width,height}=bitmap;bitmap.close();
-        if(width<640||height<360||width*height>16_000_000)issues.push(`${file.name} : 640 × 360 pixels minimum, 16 millions de pixels maximum.`);
-        else accepted.push(file);
-      }catch{issues.push(`${file.name} : cette image ne peut pas être lue.`);}
-    }}finally{setPhotoChecking(false);}
+  useEffect(()=>{
+    const batch=props.incomingPhotos;
+    if(!hydrated||photoChecking||!batch||receivedBatches.current.has(batch.id))return;
+    receivedBatches.current.add(batch.id);
+    void addPhotos(batch.files).then(result=>{if(mounted.current&&result)props.onPhotosReceived?.(batch.id,result);});
+  },[hydrated,photoChecking,props.incomingPhotos?.id]);
+  async function addPhotos(files: FileList | readonly File[] | null) {
+    if (!files||photoLock.current) return;
+    photoLock.current=true;setPhotoChecking(true);setPhotoIssues([]);setFeedback('');
+    let result;
+    try{result=await inspectManualPhotos(Array.from(files),selected.current.map(p=>p.file?.size??p.remote?.sizeBytes??0));}
+    finally{photoLock.current=false;if(mounted.current)setPhotoChecking(false);}
+    if(!mounted.current)return;
+    const {accepted,issues}=result;
+    setErrors(previous=>({...previous,photos:''}));
     if(issues.length)setPhotoIssues(issues);
     if(accepted.length){
-      const used=new Set(photos.map(p=>p.slot));
+      const used=new Set(selected.current.map(p=>p.slot));
       const additions=accepted.map(file=>{let slot=0;while(used.has(slot))slot++;used.add(slot);
         return {id:crypto.randomUUID(),file,preview:URL.createObjectURL(file),state:props.guided?.agencyId?'sending' as const:'ready' as const,slot};});
-      setPhotos(current=>[...current,...additions]);
+      selected.current=[...selected.current,...additions];setPhotos(selected.current);
       if(props.guided?.agencyId)for(const photo of additions)void uploadSelected(photo);
     }
+    return result;
   }
   async function uploadSelected(photo:SelectedPhoto){
     if(!photo.file)return;
@@ -227,6 +229,7 @@ export function ManualListingForm(props: Props) {
       serverRef.current?.id,serverRef.current?.version);
   }
   async function cancelGuided(){if(!props.guided)return;
+    if(photoLock.current||props.incomingPhotos){setFeedback('Patientez pendant l’ajout de vos photos.');return;}
     if(!hydrated){setFeedback('Chargement du brouillon en cours. Réessayez dans un instant.');return;}
     if(!await saveManualListingDraft(draftFields(),props.guided.agencyId?[]:photos.flatMap(p=>p.file?[p.file]:[]),
       props.guided.step,props.guided.agencyId,serverRef.current?.id,serverRef.current?.version)){
@@ -389,7 +392,7 @@ export function ManualListingForm(props: Props) {
       <div className="manual-step-fields" hidden={Boolean(props.guided&&props.guided.step!==3)}><div className="manual-wide"><label htmlFor="manual-photos">Photos du bien</label>
         <p id="manual-photos-help" className="field-help">3 à 12 photos différentes, JPEG, PNG ou WebP. 10 Mo par photo, 50 Mo au total. Minimum 640 × 360 pixels, maximum 16 millions de pixels.</p>
         <div className="manual-upload"><span aria-hidden="true">Ajouter des photos</span>
-          <input id="manual-photos" type="file" multiple disabled={photoChecking} accept="image/jpeg,image/png,image/webp" aria-invalid={Boolean(errors.photos||photoIssues.length)} aria-describedby="manual-photos-help manual-photo-feedback"
+          <input id="manual-photos" type="file" multiple disabled={!hydrated||photoChecking||Boolean(props.incomingPhotos)} accept="image/jpeg,image/png,image/webp" aria-invalid={Boolean(errors.photos||photoIssues.length)} aria-describedby="manual-photos-help manual-photo-feedback"
             onChange={e => {void addPhotos(e.target.files); e.target.value = '';}}/>
         </div>
         {photoChecking&&<p role="status" className="field-help">Vérification des images…</p>}

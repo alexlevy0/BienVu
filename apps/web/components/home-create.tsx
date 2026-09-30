@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import {useEffect, useLayoutEffect, useRef, useState, type FormEvent} from 'react';
+import {useEffect, useLayoutEffect, useRef, useState, type DragEvent, type FormEvent} from 'react';
 import {ImportUrl, GenerationView, type CreationDraftData, type CreationDraftView, type GenerationRequest} from '@bienvu/contracts';
 import {useAnonymousTrial, TrialChallenge} from './anonymous-trial';
 import {useAccount} from './account';
@@ -11,8 +11,10 @@ import {generationActive, useGenerationProgress} from './generation-progress';
 import {ConversationGeneration} from './conversation-generation';
 import {requestGeneration} from '../lib/generation-client';
 import {clearListingDraft, readListingDraft, saveListingDraft} from '../lib/listing-draft';
+import {inspectManualPhotos} from '../lib/manual-photos';
 
 type RequestMessage = {kind: 'url' | 'manual'; text: string};
+type ComposerPhoto={id:string;file:File;preview:string};
 type Screen = {kind: 'landing'} | {kind: 'manual'} | {kind:'extracting';text:string} | {kind: 'sending'; request: RequestMessage} |
   {kind: 'job'; id: string; request: RequestMessage} | {kind: 'error'; request: RequestMessage; message: string};
 const viewKey = 'bienvu:home-conversation';
@@ -37,6 +39,9 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   const [screen, setScreen] = useState<Screen>({kind: 'landing'});
   const [url, setUrl] = useState(''), [description, setDescription] = useState(''), [step, setStep] = useState(0);
   const [feedback, setFeedback] = useState(''), [manualBusy, setManualBusy] = useState(false);
+  const [composerPhotos,setComposerPhotos]=useState<ComposerPhoto[]>([]),[photoChecking,setPhotoChecking]=useState(false),
+    [dropActive,setDropActive]=useState(false),[incomingPhotos,setIncomingPhotos]=useState<{id:string;files:File[]}|null>(null);
+  const stagedPhotos=useRef<ComposerPhoto[]>([]),dropDepth=useRef(0),photoLock=useRef(false),photoVersion=useRef(0);
   const [importDraft,setImportDraft]=useState<CreationDraftView|null>(null),[manualReady,setManualReady]=useState(false),
     [manualReason,setManualReason]=useState('Terminez les sections puis vérifiez votre annonce.'),
     [guestExtraction,setGuestExtraction]=useState<CreationDraftData|null>(null);
@@ -60,10 +65,56 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   const importPaused = Boolean(me?.rights.importRetryAt);
   const manual = screen.kind === 'manual';
   const inConversation = screen.kind !== 'landing' && screen.kind !== 'error';
+  const canDropPhotos=!loading&&!busy&&!incomingPhotos&&!photoChecking&&
+    !(screen.kind==='job'&&generationActive(selectedJob));
+  function clearComposerPhotos(){
+    photoVersion.current++;stagedPhotos.current.forEach(p=>URL.revokeObjectURL(p.preview));
+    stagedPhotos.current=[];setComposerPhotos([]);setIncomingPhotos(null);setDropActive(false);dropDepth.current=0;
+  }
+  useEffect(()=>()=>{photoVersion.current++;stagedPhotos.current.forEach(p=>URL.revokeObjectURL(p.preview));},[]);
+  useEffect(()=>{
+    const reset=()=>{dropDepth.current=0;setDropActive(false);};
+    window.addEventListener('dragend',reset);window.addEventListener('blur',reset);
+    return()=>{window.removeEventListener('dragend',reset);window.removeEventListener('blur',reset);};
+  },[]);
+  function draggingFiles(event:DragEvent){return Array.from(event.dataTransfer.types).includes('Files');}
+  async function dropPhotos(event:DragEvent<HTMLFormElement>){
+    if(!draggingFiles(event))return;
+    event.preventDefault();dropDepth.current=0;setDropActive(false);
+    if(!canDropPhotos||photoLock.current)return;
+    const files=Array.from(event.dataTransfer.files);if(!files.length)return;
+    const version=photoVersion.current;photoLock.current=true;setPhotoChecking(true);setFeedback('');
+    try{const {accepted,issues}=await inspectManualPhotos(files,stagedPhotos.current.map(p=>p.file.size));
+      if(version!==photoVersion.current)return;
+      const additions=accepted.map(file=>({id:crypto.randomUUID(),file,preview:URL.createObjectURL(file)}));
+      stagedPhotos.current=[...stagedPhotos.current,...additions];setComposerPhotos(stagedPhotos.current);
+      if(issues.length)setFeedback(issues.join(' '));
+      if(additions.length)document.getElementById('home-listing-url')?.focus();
+    }finally{photoLock.current=false;setPhotoChecking(false);}
+  }
+  function removeComposerPhoto(id:string){
+    const photo=stagedPhotos.current.find(p=>p.id===id);if(photo)URL.revokeObjectURL(photo.preview);
+    stagedPhotos.current=stagedPhotos.current.filter(p=>p.id!==id);setComposerPhotos(stagedPhotos.current);setFeedback('');
+  }
+  function receivePhotos(id:string,result:{accepted:File[];issues:string[]}){
+    if(incomingPhotos?.id!==id)return;
+    stagedPhotos.current=stagedPhotos.current.filter(photo=>{
+      if(!result.accepted.includes(photo.file))return true;
+      URL.revokeObjectURL(photo.preview);return false;
+    });
+    setComposerPhotos(stagedPhotos.current);setIncomingPhotos(null);
+    if(result.issues.length)setFeedback(result.issues.join(' '));
+  }
+  function openWithPhotos(){
+    if(!stagedPhotos.current.length||photoLock.current||incomingPhotos||busy)return;
+    setIncomingPhotos({id:crypto.randomUUID(),files:stagedPhotos.current.map(p=>p.file)});
+    if(!manual)openManual(ImportUrl.safeParse(url.trim()).success?'':url.trim());
+  }
 
   useEffect(()=>{
     if(loading)return;const owner=me?.agency.id??'guest';
     if(lastOwner.current&&lastOwner.current!=='guest'&&lastOwner.current!==owner){
+      clearComposerPhotos();
       interactionVersion.current++;
       forget();guestPending.current=null;setScreen({kind:'landing'});setUrl('');setDescription('');setStep(0);
       setImportDraft(null);setGuestExtraction(null);setFeedback('');
@@ -204,6 +255,8 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if(loading||photoChecking||incomingPhotos)return;
+    if(composerPhotos.length){openWithPhotos();return;}
     if (manual) {
       if (step === 4 && !manualBusy && !noCredits && !importPaused && !activeOtherJob)
         (document.getElementById('manual-guided-form') as HTMLFormElement | null)?.requestSubmit();
@@ -282,7 +335,8 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   }
   const statusRequest = screen.kind === 'sending' || screen.kind === 'job' ? screen.request : null;
   const resultReady = screen.kind === 'job' && selectedJob?.status === 'ready';
-  const composerDisabled = loading || busy || (manual
+  const composerDisabled = loading || busy || photoChecking || Boolean(incomingPhotos) || (composerPhotos.length
+    ? screen.kind==='job'&&generationActive(selectedJob) : manual
     ? !manualReady||Boolean(noCredits)||Boolean(importPaused)||activeOtherJob
     : Boolean(noCredits)||Boolean(importPaused)||activeOtherJob||screen.kind==='job'&&
       (generationActive(selectedJob)||resultReady&&!url.trim()));
@@ -295,9 +349,9 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
       <strong>{importDraft?.sourceUrl??importDraft?.data.originalText??guestExtraction?.originalText??(description.trim()||'Je souhaite ajouter mon annonce manuellement.')}</strong></div>
       <p className="home-conversation-lead">Décrivons votre bien, étape par étape.</p>
       <div className="home-manual-panel">
-        {!me ? <ManualListingForm ref={manualForm} key="guest" prepareGuest guided={{step,setStep,description,setDescription,initialData:guestExtraction,onCancel:()=>{previousComposer.current=composerDock.current?.getBoundingClientRect()??null;setScreen({kind:'landing'});},
+        {!me ? <ManualListingForm ref={manualForm} key="guest" prepareGuest incomingPhotos={incomingPhotos} onPhotosReceived={receivePhotos} guided={{step,setStep,description,setDescription,initialData:guestExtraction,onCancel:()=>{previousComposer.current=composerDock.current?.getBoundingClientRect()??null;setScreen({kind:'landing'});},
           onReadyChange:(ready,reason)=>{setManualReady(ready);setManualReason(reason);}}} busy={manualBusy} setBusy={setManualBusy} onPrepared={() => window.location.assign('/connexion?mode=signup')}/>
-          : <ManualListingForm ref={manualForm} key={`agency:${me.agency.id}:${importDraft?.id??'manual'}`} generate={canGenerate} guided={{step,setStep,description,setDescription,agencyId:me.agency.id,initialDraft:importDraft,
+          : <ManualListingForm ref={manualForm} key={`agency:${me.agency.id}:${importDraft?.id??'manual'}`} incomingPhotos={incomingPhotos} onPhotosReceived={receivePhotos} generate={canGenerate} guided={{step,setStep,description,setDescription,agencyId:me.agency.id,initialDraft:importDraft,
             onReadyChange:(ready,reason)=>{setManualReady(ready);setManualReason(reason);},onDraftChange:()=>void refreshDrafts(),
             onCancel:()=>{previousComposer.current=composerDock.current?.getBoundingClientRect()??null;setScreen({kind:'landing'});}}} busy={manualBusy} setBusy={setManualBusy} onCreated={async value => {
             void refreshDrafts();
@@ -313,17 +367,26 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     {screen.kind==='extracting'&&<div className="home-conversation-manual"><div className="home-request-bubble"><HomeIcon name="pencil" size={21}/><strong>{screen.text}</strong></div>
       <p className="home-conversation-lead" role="status">Nous préparons les informations de votre bien…</p></div>}
     </div>
-    <div ref={composerDock} className="home-composer-dock"><form className={`home-composer${feedback || screen.kind === 'error' ? ' home-composer-invalid' : ''}`} onSubmit={submit} noValidate aria-label="Créer une vidéo depuis une annonce">
+    <div ref={composerDock} className="home-composer-dock"><form className={`home-composer${feedback || screen.kind === 'error' ? ' home-composer-invalid' : ''}${dropActive?' home-composer-dropping':''}`} onSubmit={submit} noValidate aria-label="Créer une vidéo depuis une annonce"
+      onDragEnter={event=>{if(draggingFiles(event)&&canDropPhotos){event.preventDefault();dropDepth.current++;setDropActive(true);}}}
+      onDragOver={event=>{if(draggingFiles(event)){event.preventDefault();event.dataTransfer.dropEffect=canDropPhotos?'copy':'none';}}}
+      onDragLeave={event=>{if(draggingFiles(event)){dropDepth.current=Math.max(0,dropDepth.current-1);if(!dropDepth.current)setDropActive(false);}}}
+      onDrop={event=>void dropPhotos(event)}>
+      {dropActive&&<div className="home-drop-overlay" aria-hidden="true"><HomeIcon name="upload" size={30}/><strong>Déposez vos photos ici</strong><span>JPEG, PNG ou WebP · Jusqu’à 12 photos</span></div>}
       <div className="home-url-row"><HomeIcon name="link" size={28}/><label htmlFor="home-listing-url" className="sr-only">{manual?'Précisions sur votre bien':'Lien ou description de votre annonce'}</label>
-        <input id="home-listing-url" name="url" type="text" autoComplete="off" spellCheck={false} placeholder={manual?'Ajoutez des précisions sur votre bien…':resultReady?'Collez le lien d’une autre annonce…':'Collez un lien ou décrivez votre bien…'}
+        <input id="home-listing-url" name="url" type="text" autoComplete="off" spellCheck={false} placeholder={composerPhotos.length?'Décrivez votre bien, ou appuyez sur Entrée…':manual?'Ajoutez des précisions sur votre bien…':resultReady?'Collez le lien d’une autre annonce…':'Collez un lien ou décrivez votre bien…'}
           value={manual?description:screen.kind==='sending'?'':url} onChange={event=>{if(manual)setDescription(event.target.value);
             else {if(screen.kind==='extracting'){interactionVersion.current++;lock.current=false;guestPending.current=null;
               trial.setToken('');trial.setChallenge(false);trial.setWidgetVersion(n=>n+1);setScreen({kind:'landing'});}setUrl(event.target.value);}
             setFeedback('');}} disabled={screen.kind==='sending'} aria-invalid={Boolean(feedback || screen.kind==='error')} aria-describedby="home-url-error home-create-note"/></div>
+      {composerPhotos.length>0&&<div className="home-composer-attachments"><ol aria-label="Photos à ajouter à votre annonce">{composerPhotos.map((photo,index)=><li key={photo.id}>
+        <img src={photo.preview} alt={`Photo ${index+1} : ${photo.file.name}`}/><button type="button" disabled={photoChecking||Boolean(incomingPhotos)} aria-label={`Retirer ${photo.file.name}`} onClick={()=>removeComposerPhoto(photo.id)}><HomeIcon name="close" size={14}/></button>
+      </li>)}</ol><p role="status">{composerPhotos.length} photo{composerPhotos.length>1?'s':''} · Appuyez sur Entrée pour compléter votre annonce.</p></div>}
+      {photoChecking&&<p className="home-photo-status" role="status">Vérification des photos…</p>}
       <div className="home-composer-bottom"><div className="home-format-tags"><span><HomeIcon name="phone" size={21}/>Vertical 9:16</span><span><HomeIcon name="microphone" size={21}/>Voix française</span>
-        <button type="button" className={manual?'home-mode-pill is-active':'home-mode-pill'} aria-pressed={manual} disabled={busy || screen.kind==='job' && generationActive(selectedJob)} onClick={()=>{if(manual)void manualForm.current?.cancel();else openManual();}}><HomeIcon name="pencil" size={20}/>Saisie manuelle</button></div>
+        <button type="button" className={manual?'home-mode-pill is-active':'home-mode-pill'} aria-pressed={manual} disabled={busy || photoChecking || Boolean(incomingPhotos) || screen.kind==='job' && generationActive(selectedJob)} onClick={()=>{if(manual)void manualForm.current?.cancel();else if(composerPhotos.length)openWithPhotos();else openManual();}}><HomeIcon name="pencil" size={20}/>Saisie manuelle</button></div>
         <button type="submit" className="home-primary-button" disabled={composerDisabled} aria-describedby={manual&&!manualReady?'home-manual-action-note':undefined}>
-          {screen.kind==='sending'||manualBusy?'Envoi en cours':screen.kind==='job'&&generationActive(selectedJob)?'Génération en cours':manual&&me&&!canGenerate?'Enregistrer mon annonce':'Créer ma vidéo'}<HomeIcon name="arrow" size={20}/></button></div>
+          {incomingPhotos?'Ajout des photos…':composerPhotos.length?'Compléter mon annonce':screen.kind==='sending'||manualBusy?'Envoi en cours':screen.kind==='job'&&generationActive(selectedJob)?'Génération en cours':manual&&me&&!canGenerate?'Enregistrer mon annonce':'Créer ma vidéo'}<HomeIcon name="arrow" size={20}/></button></div>
     </form>
     {manual&&!manualReady&&<p id="home-manual-action-note" className="home-form-note" role="status">{manualReason}</p>}
     {screen.kind==='error'&&<p className="home-form-feedback" role="alert">{screen.message} Votre saisie est conservée pour réessayer.</p>}

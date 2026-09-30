@@ -11,6 +11,7 @@ const shapes = {
   microphone: <><rect x="9" y="2" width="6" height="13" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2m-7 9v3m-4 0h8"/></>,
   phone: <><rect x="6" y="1.5" width="12" height="21" rx="2"/><path d="M10 4h4m-3 16h2"/></>,
   arrow: <path d="M4 12h16m-6-6 6 6-6 6"/>,
+  refresh: <><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6 7a7 7 0 0 1 12-1l2 6M4 12l2 6a7 7 0 0 0 12-1"/></>,
   external: <path d="M6 18 18 6M6 6h12v12"/>,
   chevron: <path d="m6 9 6 6 6-6"/>,
   close: <path d="m5 5 14 14M5 19 19 5"/>,

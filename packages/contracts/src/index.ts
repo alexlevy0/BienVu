@@ -54,3 +54,4 @@ export const VideoFixture = z.object({
 });
 export type VideoFixture = z.infer<typeof VideoFixture>;
 export * from './auth';
+export * from './admin';
