@@ -111,16 +111,18 @@ Le troisième e-mail réel valide le domaine actuel, réception et parcours conf
 
 **Sprint 04, recette du 28/09/2026 :** quatre imports hébergés supplémentaires, tous en échec, réservés avant exécution : **2 €**. Cumul prudent à cet instant **22 €**, marge **8 €** sur l’enveloppe de 30 €, coupure toujours à 25 €. Une session Browser Run de 2,066 s fermée normalement ; conteneur endormi, dernier cycle observé 56,829 s (pas un cumul ni une facture). Compteur journalier conservé à 9/10 et mensuel à 10/30 après nettoyage. Aucun nouvel abonnement, envoi d’e-mail ou appel IA/TTS/rendu pendant cette recette. L'instantané de 18:06 UTC, avant la campagne texte/voix, est de **10/10 imports ce jour et 11/30 ce mois**, avec **22,65 €** provisionnés, campagne vocale comprise. [Rapport et mesures](preuves/sprint-04/RAPPORT.md#recette-cloudflare).
 
-## Offres proposées, non validées par Alex
+## Offres confirmées pour la présentation, vente non ouverte
 
-| Code | Nom provisoire | Prix mensuel proposé HT | Vidéos par période |
+Alex a confirmé le 30/09/2026 les prix et quotas de la maquette « Découvrir les offres ». L'ancienne hypothèse Découverte 29 €/10, Agence 59 €/30 et Volume 99 €/60 est remplacée pour la présentation commerciale. Les prix payants ci-dessous sont mensuels HT ; la facturation réelle reste à implémenter et à valider avant toute souscription.
+
+| Code | Offre | Prix mensuel | Vidéos par période |
 |---|---|---:|---:|
-| `decouverte` | Découverte | 29 € | 10 |
-| `agence` | Agence | 59 € | 30 |
-| `volume` | Volume | 99 € | 60 |
+| `gratuit` | Gratuit | 0 € | 3 |
+| `plus` | Plus | 19 € HT | 20 |
+| `pro` | Pro | 49 € HT | 60 |
 
 Chaque palier conserve la même qualité vidéo et l'identité d'agence. Depuis le 29/09, un essai anonyme abouti par session avec aperçu filigrané ; trois vidéos par mois sur le compte gratuit, dont l’essai récupéré. Un crédit et la connexion débloquent le master existant, sans nouvel export. Les anciens essais `trial` conservent leurs fichiers et droits historiques. Pas d'offre annuelle, de dépassement automatique, de report de crédits ou de packs supplémentaires dans cette version.
 
-Cette grille sert aux fixtures Stripe et à l'implémentation configurable. Ne pas activer ces prix en production comme s'ils avaient déjà été acceptés. Au moment de préparer la vente, présenter la grille, les mesures de coût, les prix TTC applicables et les textes contractuels comme éléments concrets à finaliser.
+La page publique présente cette grille confirmée, mais ses CTA payants restent inactifs : il n'existe encore ni Checkout ni achat. Les identifiants et quotas des futures allocations serveur, les prix TTC applicables et les textes contractuels doivent être préparés au sprint 08 avant l'ouverture des paiements. Les anciennes fixtures Stripe ne deviennent pas des offres de production du seul fait de cette maquette.
 
 Pour vérifier la viabilité, chiffrer au quota entièrement utilisé : revenu net après taxes et paiement, moins frais fixes alloués, générations réussies et ratées, essais gratuits, stockage et support. Ne pas déduire une marge garantie à partir du seul prix du TTS.

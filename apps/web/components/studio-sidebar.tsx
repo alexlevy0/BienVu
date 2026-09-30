@@ -5,7 +5,7 @@ import {SignOut, useAccount} from './account';
 import {HomeIcon, HomeWordmark} from './home-icons';
 import {useGenerationStore} from './generation-store';
 
-export function StudioSidebar({active}: {active: 'create' | 'videos' | 'explore' | 'agency'}) {
+export function StudioSidebar({active}: {active: 'create' | 'videos' | 'explore' | 'agency' | 'offers'}) {
   const {me, loading} = useAccount();
   const [menuOpen, setMenuOpen] = useState(false);
   const store=useGenerationStore();
@@ -61,7 +61,7 @@ export function StudioSidebar({active}: {active: 'create' | 'videos' | 'explore'
           </Link>)}
         {!recent.length && <p className="home-recents-empty">{loading ? 'Chargement de votre espace…' : store.unavailable ? 'Vos créations sont disponibles dans Mes vidéos.' : me ? 'Vos prochaines créations apparaîtront ici.' : 'Connectez-vous pour retrouver vos créations.'}</p>}
       </section>
-      <div className="home-sidebar-bottom"><div className="home-plan"><span>{me?.rights.creditKind === 'free' ? `${me.rights.developmentRemaining} crédits gratuits` : me?.rights.creditKind === 'paid' ? 'Votre abonnement' : me?.rights.generationEnabled ? 'Accès de développement' : 'Accès anticipé'}</span><Link href="/abonnement">Découvrir les offres <HomeIcon name="arrow" size={17}/></Link></div>
+      <div className="home-sidebar-bottom"><div className="home-plan"><span>{active === 'offers' ? 'Votre abonnement' : me?.rights.creditKind === 'free' ? `${me.rights.developmentRemaining} crédits gratuits` : me?.rights.creditKind === 'paid' ? 'Votre abonnement' : me?.rights.generationEnabled ? 'Accès de développement' : 'Accès anticipé'}</span><Link href="/abonnement" className={active === 'offers' ? 'home-plan-link-active' : undefined} aria-current={active === 'offers' ? 'page' : undefined}>Découvrir les offres <HomeIcon name="arrow" size={17}/></Link></div>
         {me ? <details className="home-account"><summary><span className="home-avatar">{initials}</span><span>{accountName}</span><HomeIcon name="chevron" size={17}/></summary><div className="home-account-menu"><span>{me.agency.name}</span><Link href="/agence">Mon agence</Link><Link href="/abonnement">Mon abonnement</Link><SignOut/></div></details> : <Link className="home-guest-account" href="/connexion"><span className="home-avatar"><HomeIcon name="user" size={20}/></span><span>Se connecter</span><HomeIcon name="arrow" size={17}/></Link>}
       </div>
     </aside>

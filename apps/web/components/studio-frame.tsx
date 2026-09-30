@@ -3,14 +3,14 @@ import Link from 'next/link';
 import type {ReactNode} from 'react';
 import {StudioSidebar} from './studio-sidebar';
 
-export function StudioFrame({active, children}: {active: 'videos' | 'explore' | 'agency'; children: ReactNode}) {
+export function StudioFrame({active, children, showFooter=true}: {active: 'videos' | 'explore' | 'agency' | 'offers'; children: ReactNode; showFooter?: boolean}) {
   return <div className="home-studio">
     <a className="home-skip" href="#home-content">Aller au contenu</a>
     <StudioSidebar active={active}/>
     <div className="home-workspace">
       <header className="home-topbar"><span>Votre studio immobilier</span><a href="mailto:contact@bienvu.online">Aide</a></header>
       <main className="home-content" id="home-content" tabIndex={-1}>{children}</main>
-      <footer className="home-footer"><span>BienVu · L’immobilier, en mouvement.</span><nav aria-label="Informations"><Link href="/">Accueil</Link><a href="mailto:contact@bienvu.online">Contact</a></nav></footer>
+      {showFooter && <footer className="home-footer"><span>BienVu · L’immobilier, en mouvement.</span><nav aria-label="Informations"><Link href="/">Accueil</Link><a href="mailto:contact@bienvu.online">Contact</a></nav></footer>}
     </div>
   </div>;
 }

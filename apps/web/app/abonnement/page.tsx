@@ -1,7 +1,10 @@
-import Link from 'next/link';
-import {Shell} from '../../components/shell';
-import {Icon} from '../../components/icon';
-export const metadata = {title: 'Mon abonnement'};
+import {StudioFrame} from '../../components/studio-frame';
+import {Offers} from '../../components/offers';
+import '../landing.css';
+import './offers.css';
+
+export const metadata = {title: 'Découvrir les offres'};
+
 export default function Page() {
-  return <Shell><div className="page-heading"><div><p className="eyebrow">À VOTRE RYTHME</p><h1>Un format simple.<br/><em>Un quota clair.</em></h1><p className="page-intro">Découvrez le principe des futurs abonnements BienVu.</p></div></div><div className="plans-grid"><section className="panel trial-plan"><span className="pill">POUR DÉCOUVRIR</span><h2>Essayez avant<br/>de vous inscrire.</h2><p>Préparez un essai sans compte lorsqu’il est disponible. Regardez l’aperçu filigrané, puis connectez-vous pour télécharger la même vidéo sans filigrane avec un crédit.</p><ul className="check-list"><li><Icon name="check"/>Un essai abouti par session anonyme</li><li><Icon name="check"/>Trois vidéos par mois sur le compte gratuit</li><li><Icon name="check"/>L’essai récupéré utilise un crédit</li></ul><Link className="button primary" href="/">Créer ma vidéo</Link></section><section className="panel"><span className="section-kicker">POUR VOTRE ACTIVITÉ</span><h2>Un abonnement adapté<br/>à votre volume.</h2><p>Les abonnements donneront accès à un quota de vidéos par période, sans filigrane BienVu.</p><ul className="check-list"><li><Icon name="check"/>Un crédit par vidéo aboutie</li><li><Icon name="check"/>Aucun crédit consommé en cas d’échec</li><li><Icon name="check"/>Téléchargements sans crédit supplémentaire</li></ul><div className="information-note compact"><strong>Les offres sont en préparation</strong><p>Les tarifs et quotas ne sont pas encore publiés. Aucun abonnement ni paiement n’est disponible.</p></div></section></div></Shell>;
+  return <StudioFrame active="offers" showFooter={false}><Offers/></StudioFrame>;
 }
