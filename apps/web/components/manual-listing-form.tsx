@@ -1,5 +1,5 @@
 'use client';
-import {useEffect, useRef, useState, type ChangeEvent, type FormEvent} from 'react';
+import {useEffect, useImperativeHandle, useRef, useState, type ChangeEvent, type FormEvent, type Ref} from 'react';
 import {DESCRIPTION_MAX_CHARACTERS, ManualListingInput, MANUAL_PHOTO_LIMITS, publicErrors, type PublicErrorCode,
   type CreationDraftData, type CreationDraftView, type NormalizedListing} from '@bienvu/contracts';
 import {HomeIcon} from './home-icons';
@@ -10,10 +10,11 @@ type SelectedPhoto = {id: string; file: File|null; preview: string; remote?:Norm
 type Guided={step:number;setStep(step:number):void;description:string;setDescription(value:string):void;onCancel():void;
   agencyId?:string;initialDraft?:CreationDraftView|null;initialData?:CreationDraftData|null;
   onReadyChange?(ready:boolean,reason:string):void;onDraftChange?():void};
+export type ManualListingFormHandle = {cancel():Promise<void>};
 class FormFailure extends Error {}
 const labels: Record<string, string> = {title: 'titre', locality: 'localisation', propertyType: 'type de bien', description: 'description',
   priceCents: 'prix', charges: 'charges', area: 'surface', rooms: 'nombre de pièces', photos: 'photos'};
-type Props = {busy: boolean; generate?: boolean; setBusy(value: boolean): void;guided?:Guided} & (
+type Props = {busy: boolean; generate?: boolean; setBusy(value: boolean): void;guided?:Guided;ref?:Ref<ManualListingFormHandle>} & (
   {prepareGuest: true; onPrepared(): void; onCreated?: never} |
   {prepareGuest?: false; onCreated(value: ImportView): Promise<void>; onPrepared?: never}
 );
@@ -31,6 +32,7 @@ export function ManualListingForm(props: Props) {
   const history=useRef<number[]>([]);
   const selected = useRef(photos), pending = useRef<{fingerprint: string; key: string} | null>(null),formRef=useRef<HTMLFormElement>(null),submitLock=useRef(false);
   const removedIds=useRef<Set<string>>(new Set());
+  useImperativeHandle(props.ref,()=>({cancel:cancelGuided}));
   selected.current = photos;
   function finalInput(){
     if(!formRef.current)return null;

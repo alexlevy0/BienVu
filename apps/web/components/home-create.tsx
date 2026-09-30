@@ -6,7 +6,7 @@ import {ImportUrl, GenerationView, type CreationDraftData, type CreationDraftVie
 import {useAnonymousTrial, TrialChallenge} from './anonymous-trial';
 import {useAccount} from './account';
 import {HomeIcon} from './home-icons';
-import {ManualListingForm} from './manual-listing-form';
+import {ManualListingForm, type ManualListingFormHandle} from './manual-listing-form';
 import {generationActive, useGenerationProgress} from './generation-progress';
 import {ConversationGeneration} from './conversation-generation';
 import {requestGeneration} from '../lib/generation-client';
@@ -42,6 +42,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     [guestExtraction,setGuestExtraction]=useState<CreationDraftData|null>(null);
   const lock = useRef(false), startFresh = useRef(false), interactionVersion=useRef(0),
     scrollRegion = useRef<HTMLDivElement>(null);
+  const manualForm=useRef<ManualListingFormHandle>(null);
   const pendingImport=useRef<{url:string;key:string}|null>(null);
   const guestPending=useRef<{text:string;key:string}|null>(null);
   const lastOwner=useRef<string|null>(null);
@@ -254,9 +255,9 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
       <strong>{importDraft?.sourceUrl??(description.trim()||'Je souhaite ajouter mon annonce manuellement.')}</strong></div>
       <p className="home-conversation-lead">Décrivons votre bien, étape par étape.</p>
       <div className="home-manual-panel">
-        {!me ? <ManualListingForm key="guest" prepareGuest guided={{step,setStep,description,setDescription,initialData:guestExtraction,onCancel:()=>setScreen({kind:'landing'}),
+        {!me ? <ManualListingForm ref={manualForm} key="guest" prepareGuest guided={{step,setStep,description,setDescription,initialData:guestExtraction,onCancel:()=>setScreen({kind:'landing'}),
           onReadyChange:(ready,reason)=>{setManualReady(ready);setManualReason(reason);}}} busy={manualBusy} setBusy={setManualBusy} onPrepared={() => window.location.assign('/connexion?mode=signup')}/>
-          : <ManualListingForm key={`agency:${me.agency.id}:${importDraft?.id??'manual'}`} generate={canGenerate} guided={{step,setStep,description,setDescription,agencyId:me.agency.id,initialDraft:importDraft,
+          : <ManualListingForm ref={manualForm} key={`agency:${me.agency.id}:${importDraft?.id??'manual'}`} generate={canGenerate} guided={{step,setStep,description,setDescription,agencyId:me.agency.id,initialDraft:importDraft,
             onReadyChange:(ready,reason)=>{setManualReady(ready);setManualReason(reason);},onDraftChange:()=>void refreshDrafts(),
             onCancel:()=>setScreen({kind:'landing'})}} busy={manualBusy} setBusy={setManualBusy} onCreated={async value => {
             void refreshDrafts();
@@ -280,7 +281,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
               trial.setToken('');trial.setChallenge(false);trial.setWidgetVersion(n=>n+1);setScreen({kind:'landing'});}setUrl(event.target.value);}
             setFeedback('');}} disabled={screen.kind==='sending'} aria-invalid={Boolean(feedback || screen.kind==='error')} aria-describedby="home-url-error home-create-note"/></div>
       <div className="home-composer-bottom"><div className="home-format-tags"><span><HomeIcon name="phone" size={21}/>Vertical 9:16</span><span><HomeIcon name="microphone" size={21}/>Voix française</span>
-        <button type="button" className={manual?'home-mode-pill is-active':'home-mode-pill'} aria-pressed={manual} disabled={busy || screen.kind==='job' && generationActive(selectedJob)} onClick={()=>{if(!manual)openManual();}}><HomeIcon name="pencil" size={20}/>Saisie manuelle</button></div>
+        <button type="button" className={manual?'home-mode-pill is-active':'home-mode-pill'} aria-pressed={manual} disabled={busy || screen.kind==='job' && generationActive(selectedJob)} onClick={()=>{if(manual)void manualForm.current?.cancel();else openManual();}}><HomeIcon name="pencil" size={20}/>Saisie manuelle</button></div>
         <button type="submit" className="home-primary-button" disabled={composerDisabled} aria-describedby={manual&&!manualReady?'home-manual-action-note':undefined}>
           {screen.kind==='sending'||manualBusy?'Envoi en cours':screen.kind==='job'&&generationActive(selectedJob)?'Génération en cours':manual&&me&&!canGenerate?'Enregistrer mon annonce':'Créer ma vidéo'}<HomeIcon name="arrow" size={20}/></button></div>
     </form>
