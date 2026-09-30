@@ -1,0 +1,38 @@
+# Liste récente, favicon et indexation — 30 septembre 2026
+
+## Changements
+
+- `apps/web/components/studio-sidebar.tsx` : suppression de la limite à deux activités. Vidéos et brouillons restent triés du plus récent au plus ancien ; le menu de suppression des brouillons reste disponible. Les photos miniatures sont chargées progressivement. Chaque vidéo ouvre sa page individuelle, y compris au-delà de la première page de « Mes vidéos ».
+- `apps/web/app/landing.css` : liste récente défilante dans l'espace disponible de la barre latérale, avec navigation, quota et compte accessibles. Même fonctionnement sur mobile.
+- `apps/web/components/generation-store.tsx`, `apps/web/lib/recent-pages.ts` : suppression des coupures locales à 20/30 entrées, lecture successive des pages de l'agence/session courante, dédoublonnage, refus des curseurs répétés et verrou contre les rafraîchissements concurrents. Une réponse provenant d'une ancienne agence est ignorée. Un nouveau brouillon créé pendant la lecture déclenche une relecture à sa fin ; un job admis depuis moins d'une minute reste visible si la première lecture avait commencé avant son admission.
+- `packages/db/src/imports.ts`, `apps/web/app/api/imports/route.ts` : liste paginée, curseur stable date/identifiant, réponses de 30 éléments et `nextCursor`. `?drafts=1` sélectionne les brouillons avant la pagination afin que des imports déjà finalisés ne les masquent pas. Les lectures restent filtrées par l'agence authentifiée et excluent les imports supprimés/expirés. L'ancienne fonction interne `listImports` garde son retour tableau de première page pour les appelants existants.
+- `packages/db/src/anonymous.ts`, `apps/web/lib/trials.ts` : pagination équivalente pour les essais du navigateur, sans modifier leur propriété, leur accès ou leur durée de conservation. Les créations déjà rattachées sont exclues et le propriétaire est contrôlé de nouveau après les lectures.
+- `apps/web/app/icon.svg`, `favicon.ico` : carré à quatre coins du logo existant, sur fond clair. SVG 128 × 128 et ICO contenant 16/32/48/96 pixels, sans asset ou service externe.
+- `apps/web/app/layout.tsx` et métadonnées des pages publiques : retrait du blocage global `noindex, nofollow`, base d'URL `https://bienvu.online`, pages publiques `index, follow`, URL canonique de l'accueil, Explorer, offres et sources. Les vues personnelles agence/historique/récupération gardent uniquement `noindex, follow` ; l'authentification reste le contrôle d'accès.
+- `apps/web/app/robots.ts` : `/robots.txt` autorise les pages publiques et les assets ; exclut les routes personnelles et les API privées, autorise l'API publique Explorer nécessaire à ses contenus, référence le sitemap.
+- `apps/web/app/sitemap.ts` : `/sitemap.xml` avec accueil, Explorer, abonnements et sources. Aucun identifiant privé, brouillon, jeton ou média d'essai ; aucun faux horodatage de mise à jour.
+
+Aucune migration SQL, modification des quotas, appel fournisseur ni génération vidéo n'est nécessaire. « Liste complète » désigne les créations encore présentes dans l'agence ou la session du navigateur ; cela ne restaure pas les données déjà purgées.
+
+## Vérifications locales et fixtures
+
+- `pnpm exec tsx --test --test-concurrency=1 tests/recent-pages.test.ts tests/anonymous-trials.test.ts tests/draft-delete.test.ts tests/import-storage.test.ts` : **22 tests réussis**. Pages avec 65 entrées et doublons, arrêt lors d'un changement d'agence, erreur HTTP et curseur répété ; D1/workerd locaux avec 37 brouillons sur plusieurs pages, dates identiques, refus d'un curseur invalide, isolation entre agences et exclusion des dossiers expirés/supprimés. Fixtures historiques à expiration étendue pour dépasser une page ; déclencheurs d'admission et plafonds conservés. Les tests existants vérifient aussi l'accès aux essais et le nettoyage des brouillons. Aucun crédit, job ou appel fournisseur créé par les nouveaux tests de lecture.
+- `pnpm typecheck` : tous les packages/apps et types des tests réussis.
+- `pnpm check:boundaries` : **166 fichiers**, réussi.
+- `pnpm build:web` et dry-run Wrangler `--keep-vars --strict` : réussis sur la version finale. Avertissement de bundling déjà présent dans la dépendance `fast-png` du traitement des logos, sans erreur de compilation.
+- `node scripts/probe-recents-seo.mjs` : **2 parcours navigateur sur fixtures**, 1 536/390 px, **82 activités** (45 vidéos et 37 brouillons), lecture de 3 pages de vidéos et 2 de brouillons. Liste défilante, quota/compte visibles, absence de débordement horizontal, menu du dernier brouillon accessible au clavier et ouverture directe de la vidéo la plus ancienne. HTTP local réel : 5 pages publiques `index, follow`, 4 URL canoniques, SVG/ICO, robots.txt et sitemap.xml servis avec succès. Captures inspectées.
+- `node scripts/probe-workflow-ui.mjs --draft-actions-only` : **8 régressions navigateur sur fixtures** réussies : animation descendante/reduced motion invité et connecté, suppression du brouillon ouvert ou d'un autre brouillon, refus puis reprise, double clic et persistance après rechargement. Le test attend désormais la visibilité et la fin de l'animation du volet mobile avant de cliquer sur son menu ; l'ancien clic programmatique pendant le volet masqué ne pouvait pas lui donner le focus. Aucun comportement produit modifié pour contourner ce test.
+
+Les fixtures navigateur simulent le compte, 45 vidéos et 37 brouillons ; aucun compte réel ni vidéo réelle n'est créé. Les métadonnées et fichiers SEO sont contrôlés séparément par HTTP sur le build local.
+
+## Publication et limites
+
+Worker web `bienvu-web-probe-staging`, version **`9c6e3e8b-6bea-40e2-924e-2f339d52eff5`**, publié à **100 %** sur `bienvu.online` le 30/09/2026. Variables, secrets et bindings existants conservés et comparés au relevé avant publication ; aucun Worker de génération ou image de renderer redéployé.
+
+Contrôles HTTP réels sur le domaine à **15:51 UTC** : accueil, Explorer, abonnements, sources et connexion répondent **200**, avec `index, follow` et sans en-tête `X-Robots-Tag` bloquant. Les quatre URL canoniques publiques sont correctes ; favicon SVG/ICO, robots.txt et sitemap.xml répondent **200**, contenus relus. `GET /api/imports?drafts=1` sans session répond **401**, avec cache privé et sans nouveau cookie. La lecture complète d'une bibliothèque connectée en production n'est pas rejouée avec le compte d'Alex ; ses contrôles de contenu restent une recette sur fixtures.
+
+Aucun rendu, import, appel de rédaction/TTS ou e-mail déclenché par cette recette. Le relevé D1 est passé de **43,75 €** avant publication à **44,30 €** au contrôle final : base **30,80 €**, imports **13,50 €**, coupure **45 €**, non en pause. Cette évolution du registre pendant la maintenance n'est pas attribuée à ses tests de lecture. Avec **0,05 €** historiques hors D1, cumul prudent **44,35 €/50 €**, marge **0,65 € avant coupure**, **5,65 € avant l'enveloppe** ; facture non rapprochée. Plafonds, compteurs et provisions conservés. Serveur local de recette arrêté, port 8790 libéré.
+
+Ces changements rendent le site explorable/indexable ; ils ne prouvent pas son apparition effective dans Google. [Google : rôle et limites du robots.txt](https://developers.google.com/search/docs/crawling-indexing/robots/intro), [favicon dans les résultats](https://developers.google.com/search/docs/appearance/favicon-in-search). L'indexation et la sélection du favicon dépendent du prochain passage du moteur.
+
+Preuves brutes, journaux et captures ignorés : `evidence/local/recents-seo/`. Fichier favicon versionné car il est utilisé par le site ; aucune donnée d'authentification versionnée.

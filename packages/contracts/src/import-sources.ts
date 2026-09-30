@@ -7,7 +7,7 @@ export const importSources: readonly ImportSource[] = [
   {id: 'espaces-atypiques', name: 'Espaces Atypiques', hosts: ['www.espaces-atypiques.com', 'espaces-atypiques.com'],
     paths: [/^\/ventes\/[^/]+-([a-zA-Z0-9]+)\/$/], mediaHosts: ['www.espaces-atypiques.com']},
   {id: 'orpi', name: 'Orpi', hosts: ['www.orpi.com', 'orpi.com'],
-    paths: [/^\/annonce-vente-[^/]+-([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})\/$/], mediaHosts: ['www.orpi.com', 'cutjhqvjma.cloudimg.io']},
+    paths: [/^\/annonce-(?:vente|location)-[^/]+-([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})\/?$/], mediaHosts: ['www.orpi.com', 'cutjhqvjma.cloudimg.io']},
   {id: 'century21', name: 'Century 21', hosts: ['www.century21.fr', 'century21.fr'],
     paths: [/^\/trouver_logement\/detail\/(\d+)\/$/], mediaHosts: ['www.century21.fr', 'images.century21.fr']},
   {id: 'figaro', name: 'Le Figaro Immobilier', hosts: ['immobilier.lefigaro.fr'],

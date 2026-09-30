@@ -3,6 +3,7 @@ import {useCallback,useEffect,useRef,useState} from 'react';
 import Link from 'next/link';
 import {GenerationView,publicErrors,type PublicErrorCode} from '@bienvu/contracts';
 import {generationActive} from './generation-progress';
+import {anonymousGenerationScope,useGenerationStore} from './generation-store';
 // The token lives only in memory. The HttpOnly session is the ownership proof.
 type Turnstile={render:(container:HTMLElement,options:Record<string,unknown>)=>string;remove:(id:string)=>void;reset:(id:string)=>void};
 declare global {interface Window {turnstile?:Turnstile}}
@@ -15,11 +16,13 @@ function loadTurnstile(){return scriptLoading??=(new Promise<void>((resolve,reje
 type TrialReply={error?:{message?:string};enabled:boolean;siteKey:string|null;used:boolean;job:unknown};
 async function value(response:Response){const body=await response.json() as TrialReply;if(!response.ok)throw new Error(body.error?.message??'La demande a été interrompue. Réessayez.');return body;}
 export function useAnonymousTrial(enabled:boolean) {
+  const {setJob:storeJob}=useGenerationStore();
   const [job,setJob]=useState<GenerationView|null>(null),[siteKey,setSiteKey]=useState<string|null>(null),[available,setAvailable]=useState(false),[used,setUsed]=useState(false),[failure,setFailure]=useState(''),[loaded,setLoaded]=useState(false);
   const [token,setToken]=useState(''),[challenge,setChallenge]=useState(false),[widgetVersion,setWidgetVersion]=useState(0);
   const lock=useRef(false),intent=useRef<{url:string;key:string}|null>(null);
   const refresh=useCallback(async()=>{try{const data=await value(await fetch('/api/trial',{cache:'no-store'}));setAvailable(data.enabled);setSiteKey(data.siteKey);setUsed(data.used);setJob(data.job?GenerationView.parse(data.job):null);setLoaded(true);setFailure('');}catch{setFailure('Impossible de retrouver votre essai. Réessayez.');setLoaded(true);}},[]);
   useEffect(()=>{if(enabled)void refresh();},[enabled,refresh]);
+  useEffect(()=>{if(enabled&&job?.ownership==='anonymous')storeJob(job,anonymousGenerationScope);},[enabled,job,storeJob]);
   useEffect(()=>{if(!enabled||!job||!generationActive(job)||job.ownership==='owned')return;const timer=setInterval(()=>void refresh(),4000);return()=>clearInterval(timer);},[enabled,job?.id,job?.status,job?.ownership,refresh]);
   async function start(url:string,verifiedToken?:string) {
     if(lock.current)return;setFailure('');

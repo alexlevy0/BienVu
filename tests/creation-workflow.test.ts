@@ -45,6 +45,47 @@ test('extraction structurée : faits sourcés, absent et contradiction sans inve
     (async()=>Response.json({status:'completed',output:[{type:'message',role:'assistant',status:'completed',content:[{type:'output_text',text:'{}'}]}]})) as typeof fetch));
 });
 
+test('prix abrégés : conversion exacte, omission récupérée et demande reformulée sans perdre les détails',()=>{
+  const supplied=(evidence:string,priceCents:number|null=20_000_000)=>({
+    fields:{...extracted.fields,locality:'Lyon',priceCents,area:null,rooms:null},
+    evidence:{...extracted.evidence,transaction:'vendre',locality:'Lyon',priceCents:evidence,area:null,rooms:null},ambiguous:[]});
+  for(const [amount,cents] of [['200k€',20_000_000],['200K',20_000_000],['200 K euros',20_000_000],
+    ['200,5k€',20_050_000],['1,2 M€',120_000_000],['200 000 €',20_000_000],['200000 EUR',20_000_000]] as const){
+    const text=`Je voudrais vendre un appartement a Lyon a ${amount}`;
+    const data=validateExtraction(text,supplied(amount,cents));
+    assert.equal(data.fields.priceCents,cents,amount);assert.equal(data.originalText,text);
+    assert.equal(data.fields.area,null);assert.equal(data.fields.rooms,null);
+    assert.ok(data.fields.description?.startsWith('Découvrez cet appartement à vendre à Lyon, au prix de '));
+    assert.equal(data.fields.description?.includes(amount),false,amount);
+  }
+  const text='Je voudrais vendre un appartement à Lyon à 200k€ avec un balcon et une cave.';
+  const data=validateExtraction(text,supplied('200k€',null));
+  assert.equal(data.fields.priceCents,20_000_000);assert.equal(data.provenance.priceCents?.evidence,'200k€');
+  assert.equal(data.fields.description?.replace(/\s/g,' '),'Découvrez cet appartement à vendre à Lyon, au prix de 200 000 € avec un balcon et une cave.');
+  assert.equal(data.fields.description?.includes('lumineux'),false);assert.equal(data.originalText,text);
+  assert.equal(data.provenance.description?.source,'ai');
+});
+
+test('prix abrégés : devises, unités, montant ambigu et loyer non mensuel ne deviennent pas un prix certain',()=>{
+  const supplied=(priceCents:number|null,evidence:string,ambiguous:string[]=[])=>({
+    fields:{...extracted.fields,locality:'Lyon',priceCents,area:null,rooms:null},
+    evidence:{...extracted.evidence,transaction:'vendre',locality:'Lyon',priceCents:evidence,area:null,rooms:null},ambiguous});
+  for(const amount of ['200k USD','200k$','200k GBP','200k CHF','200 kcal','-200k€','200000 dollars']){
+    const text=`Je voudrais vendre un appartement à Lyon à ${amount}`;
+    assert.equal(validateExtraction(text,supplied(20_000_000,'200k')).fields.priceCents,null,amount);
+  }
+  const followers='Je voudrais vendre un appartement à Lyon, mon compte a 200k abonnés.';
+  assert.equal(validateExtraction(followers,supplied(null,'200k')).fields.priceCents,null);
+  const several='Je voudrais vendre un appartement à Lyon à 200k€ ou 220 000 €.';
+  assert.equal(validateExtraction(several,supplied(null,'200k€')).fields.priceCents,null);
+  const ambiguous=validateExtraction(several,supplied(20_000_000,'200k€',['priceCents']));
+  assert.equal(ambiguous.provenance.priceCents?.confirm,true);assert.equal(ambiguous.provenance.description?.confirm,true);
+  assert.ok(ambiguous.fields.description?.includes('200k€ ou 220 000 €'));
+  const rent='Je voudrais louer un appartement à Lyon à 200k€ pour l’année.';
+  const rental=supplied(null,'200k€');rental.fields.transaction='rent';rental.evidence.transaction='louer';
+  assert.equal(validateExtraction(rent,rental).fields.priceCents,null);
+});
+
 test('brouillon partagé : imports incomplets, uploads immédiats, reprise, isolation et signalements persistés',async t=>{
   const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:'export default {fetch(){return new Response("test")}}',
     compatibilityDate:'2026-09-27',d1Databases:['DB'],r2Buckets:['MEDIA']}));

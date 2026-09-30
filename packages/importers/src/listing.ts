@@ -1,4 +1,4 @@
-import {ImportFailure, sameSourceHost, type NormalizedListing} from '@bienvu/contracts';
+import {ImportFailure, sameSourceHost, sourceForHost, sourceListingId, type NormalizedListing} from '@bienvu/contracts';
 import {absolute, attr, children, descendants, hasClass, htmlDocument, imageCandidate, rawText, tag, text, type HtmlNode} from './html';
 import {descriptionFromNodes, descriptionFromString} from './description';
 import {IMPORT_LIMITS, publicUrl} from './network';
@@ -17,8 +17,11 @@ function canonical(nodes: HtmlNode[], url: string) {
   const found = nodes.filter(n => tag(n) === 'link' && attr(n, 'rel').split(/\s+/).includes('canonical')).map(n => absolute(attr(n, 'href'), url));
   const value = unique(found, 'Plusieurs URL canoniques.') ?? url;
   const a = publicUrl(value), b = publicUrl(url);
+  const source = sourceForHost(b.hostname);
+  const samePath = a.pathname === b.pathname || source?.id === 'orpi' && sourceListingId(source, b.pathname) &&
+    a.pathname.replace(/\/$/, '') === b.pathname.replace(/\/$/, '');
   // Le canonique peut enlever la query de suivi, jamais changer de bien.
-  if (!sameSourceHost(a.hostname, b.hostname) || a.pathname !== b.pathname || a.search && a.search !== b.search)
+  if (!sameSourceHost(a.hostname, b.hostname) || !samePath || a.search && a.search !== b.search)
     throw new ImportFailure('CONFLICTING_FACTS', 'Le canonique désigne une autre annonce.');
   return a.href;
 }
@@ -144,16 +147,16 @@ function espaces(nodes: HtmlNode[], url: string, canonicalUrl: string): Extracte
 }
 
 function domAgency(nodes: HtmlNode[], url: string, canonicalUrl: string, allowPartial = false): ExtractedListing | undefined {
-  const u = new URL(url), adapter = selectAdapter(url), century = adapter.id === 'century21', orpi = adapter.id === 'orpi';
+  const adapter = selectAdapter(url), century = adapter.id === 'century21', orpi = adapter.id === 'orpi';
   if (!century && !orpi) return undefined;
-  const id = century ? u.pathname.match(/^\/trouver_logement\/detail\/(\d+)\/$/)?.[1]
-    : u.pathname.match(/^\/annonce-vente-.*-([a-f0-9]{8}-[a-f0-9-]{27})\/$/)?.[1];
+  const id = adapter.listingId;
   if (!id) throw new ImportFailure('NOT_A_LISTING', 'Route d’annonce non reconnue.');
   const heads = nodes.filter(n => tag(n) === 'h1');
   if (heads.length !== 1) throw new ImportFailure('CONFLICTING_FACTS', 'Titre d’annonce ambigu.');
   const title = text(heads[0]);
+  const transaction = orpi && new URL(url).pathname.startsWith('/annonce-location-') ? 'rent' : 'sale';
   const match = century ? title.match(/^(Appartement|Maison)(?:\s+\S+)? à vendre\s+(\d+) pièces?\s*-\s*([\d.,]+) m[²2]\s+(.+?)\s*-\s*\d{5}$/i)
-    : title.match(/^(Appartement|Maison) à vendre\s+(\d+) pièces?\s*•\s*([\d.,]+) m[²2]\s+(.+)$/i);
+    : title.match(new RegExp(`^(Appartement|Maison) à ${transaction === 'rent' ? 'louer' : 'vendre'}\\s+(\\d+) pièces?\\s*•\\s*([\\d.,]+) m[²2]\\s+(.+)$`, 'i'));
   if (!match) throw new ImportFailure('INCOMPLETE_LISTING', 'Type, surface ou localisation non établis.');
   const [, kind, roomsText, areaText, locality] = match;
   const parent = 'parentNode' in heads[0] ? heads[0].parentNode : null;
@@ -162,9 +165,21 @@ function domAgency(nodes: HtmlNode[], url: string, canonicalUrl: string, allowPa
   if (orpi && unique(nodes.map(n => attr(n, 'data-estate-reference')).filter(Boolean), 'Plusieurs références Orpi.') !== id)
     throw new ImportFailure('CONFLICTING_FACTS', 'Référence Orpi différente de l’URL.');
   if (century && !nodes.some(n => attr(n, 'data-property-uid') === id)) throw new ImportFailure('CONFLICTING_FACTS', 'Référence Century 21 absente.');
-  const prices = (century ? nodes : descendants(header)).filter(n => century ? hasClass(n, 'c-the-property-abstract__price')
-    : tag(n) === 'strong' && hasClass(n, 'h2') && hasClass(n, 'text-primary')).map(n => text(n));
+  const headerNodes = descendants(header);
+  const priceNodes = (century ? nodes : headerNodes).filter(n => century ? hasClass(n, 'c-the-property-abstract__price')
+    : tag(n) === 'strong' && hasClass(n, 'h2') && hasClass(n, 'text-primary'));
+  const prices = priceNodes.map(n => text(n));
   const amount = unique(prices.map(p => p.match(/^([\d\s.,]+)\s*€$/)?.[1]).filter((v): v is string => Boolean(v)).map(numeric).filter(v => v !== null), 'Prix affichés contradictoires.');
+  const monthly = priceNodes.length > 0 && priceNodes.every(n => 'parentNode' in n && /^([\d\s.,]+)\s*€\s+par mois$/i.test(text(n.parentNode ?? undefined)));
+  const chargeTexts = headerNodes.filter(n => tag(n) === 'p').map(text).filter(v => /^(?:charges comprises|charges incluses|hors charges|charges non comprises)$/i.test(v));
+  const charges = unique(chargeTexts.map(v => /^(?:charges comprises|charges incluses)$/i.test(v) ? 'included' as const : 'excluded' as const), 'Charges locatives contradictoires.');
+  const price = amount !== undefined && (transaction === 'sale' || monthly && charges)
+    ? verified({amountCents: Math.round(amount * 100), currency: 'EUR' as const,
+      period: transaction === 'rent' ? 'month' as const : 'total' as const,
+      charges: transaction === 'rent' ? charges! : 'not_applicable' as const}, 'EUR_cent',
+      century ? '.c-the-property-abstract__price' : 'header strong.h2.text-primary',
+      transaction === 'rent' ? `${prices.join(' | ')} par mois ; ${chargeTexts.join(' | ')}` : prices.join(' | '))
+    : missing('EUR_cent');
   const roots = nodes.filter(n => hasClass(n, century ? 'c-the-detail-images-no-js-carousel' : 'js-swiper-estate-media'));
   if (roots.length !== 1 && !(allowPartial && roots.length === 0))
     throw new ImportFailure('INSUFFICIENT_PHOTOS', 'Galerie du bien non identifiée.');
@@ -185,12 +200,13 @@ function domAgency(nodes: HtmlNode[], url: string, canonicalUrl: string, allowPa
         "h2[L'avis de l'agent] + div .s-cms");
     }
   }
-  return {canonicalUrl, sourceListingId: id, adapterVersion: century ? 'century21-dom/3.2' : 'orpi-dom/3.2', transaction: 'sale', description,
+  return {canonicalUrl, sourceListingId: id, adapterVersion: century ? 'century21-dom/3.2' : 'orpi-dom/4.1', transaction, description,
     facts: {title: verified(title, 'text', 'h1'), propertyType: verified(kind.toLowerCase() === 'maison' ? 'house' : 'apartment', 'category', 'h1', kind),
       locality: verified(locality, 'text', 'h1.locality'), area: verified(numeric(areaText)!, 'm2', 'h1.area', areaText),
       rooms: verified(Number(roomsText), 'rooms', 'h1.rooms', roomsText),
-      price: amount === undefined ? missing('EUR_cent') : verified({amountCents: Math.round(amount * 100), currency: 'EUR', period: 'total', charges: 'not_applicable'}, 'EUR_cent', century ? '.c-the-property-abstract__price' : 'header strong.h2.text-primary', prices.join(' | '))},
-    photoUrls: [...new Set(photoUrls)].slice(0, IMPORT_LIMITS.candidates), warnings: []};
+      price},
+    photoUrls: [...new Set(photoUrls)].slice(0, IMPORT_LIMITS.candidates), warnings: price.status === 'missing'
+      ? ['Prix omis : montant, période ou charges non vérifiables.'] : []};
 }
 
 export function extractListingHtml(html: string, url: string, options: {allowPartial?: boolean} = {}): ExtractedListing {

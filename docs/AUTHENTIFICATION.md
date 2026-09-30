@@ -124,7 +124,7 @@ Le précontrôle sans domaine (`docs/preuves/sprint-02/email-remote-preflight.js
 
 Le Worker existant `bienvu-web-probe-staging` héberge le parcours de comptes, désormais sur [bienvu.online](https://bienvu.online/connexion). Version utilisée pour la recette e-mail historique sur workers.dev : `84a0f420-90bc-4c34-89fc-fc72b3ebc1bf`, remplacée ensuite par les versions Google puis domaine décrites ci-dessus. D1 `bienvu-s00-staging` et R2 privé `bienvu-s00-private` sont conservés. Les migrations `0001` à `0008` sont appliquées ; les imports et les générations restent désactivés. Le rattachement web à `bienvu.online` est postérieur à cette recette d'envoi.
 
-Le binding d'envoi est restreint à **un expéditeur et au seul destinataire confirmé**. Cette configuration de test ne permet pas l'ouverture des inscriptions au public. `AUTH_EMAIL_VERIFICATION_BYPASS=false` est imposé en staging ; le bypass local demandé par Alex reste actif uniquement sur le poste. Un secret Better Auth distinct du local a été créé, stocké avec les droits 0600 hors Git et transmis avec le déploiement. Les adresses personnelles, mots de passe, cookies et liens reçus restent hors des preuves versionnées.
+Lors de cette recette du 28/09, le binding d'envoi était restreint à **un expéditeur et au seul destinataire confirmé**. Cette configuration ne permettait pas les inscriptions publiques ; le correctif du 30/09 ci-dessous la remplace sur bienvu.online. `AUTH_EMAIL_VERIFICATION_BYPASS=false` est imposé en staging ; le bypass local demandé par Alex reste actif uniquement sur le poste. Un secret Better Auth distinct du local a été créé, stocké avec les droits 0600 hors Git et transmis avec le déploiement. Les adresses personnelles, mots de passe, cookies et liens reçus restent hors des preuves versionnées.
 
 Les deux messages ont été reçus **en boîte principale**, avec clic de confirmation et changement de mot de passe effectués par Alex. Cloudflare rapporte deux événements `delivered` et deux messages consommés. La connexion, les cookies sécurisés, le refus de l'ancien mot de passe et de l'ancienne session, ainsi que la conservation de l'agence sont validés. [Rapport de la recette réelle](preuves/sprint-02/EMAIL-CLOUDFLARE.md).
 
@@ -140,11 +140,12 @@ BIENVU_WEB_ORIGIN=https://bienvu.online \
 BIENVU_WEB_CUSTOM_DOMAIN=bienvu.online \
 BIENVU_GOOGLE_CLIENT_ID='<identifiant du client Google existant>' \
 BIENVU_AUTH_EMAIL_FROM=connexion@bienvu.online \
+BIENVU_AUTH_EMAIL_AUDIENCE=test \
 BIENVU_AUTH_EMAIL_TO='<adresse autorisée>' \
 node scripts/prepare-staging.mjs
 ```
 
-Remplacer le destinataire par l'adresse confirmée, sans l'enregistrer dans Git, et fournir l'identifiant Google actuel. `BIENVU_AUTH_EMAIL_TO` est optionnel pour une configuration future ouverte, mais obligatoire pour la sonde distante bornée. Sans expéditeur, le script désactive les mails ; sans origine HTTPS exacte, l'authentification reste fermée. Omettre `BIENVU_WEB_CUSTOM_DOMAIN` uniquement pour revenir volontairement à workers.dev avec l'origine correspondante. Le mode Paid et l'adresse d'expéditeur sont validés. `send_email.remote` n'est pas copié dans le déploiement.
+Remplacer le destinataire par l'adresse confirmée, sans l'enregistrer dans Git, et fournir l'identifiant Google actuel. Le mode `BIENVU_AUTH_EMAIL_AUDIENCE=test` (par défaut) exige un destinataire de recette ; pour le site public, utiliser `BIENVU_AUTH_EMAIL_AUDIENCE=public` et vider `BIENVU_AUTH_EMAIL_TO`. Le script refuse une liste de destinataires de test en mode public. Sans expéditeur, le script désactive les mails ; sans origine HTTPS exacte, l'authentification reste fermée. Omettre `BIENVU_WEB_CUSTOM_DOMAIN` uniquement pour revenir volontairement à workers.dev avec l'origine correspondante. Le mode Paid et l'adresse d'expéditeur sont validés. `send_email.remote` n'est pas copié dans le déploiement.
 
 ```sh
 pnpm build:web
@@ -179,7 +180,7 @@ L'état privé est `evidence/remote/auth-email/credentials.json` (0600, ignoré)
 
 ### Limites qui restent distinctes de l'envoi e-mail
 
-La recette distante complémentaire est terminée : e-mail sur bienvu.online, mot de passe et Google avec même agence confirmés par Alex ; deux comptes synthétiques isolés, marque et logos réels dans Workers/R2, déconnexion/révocation et rechargement mobile. Expiration/rejeu du reset utilisent des jetons synthétiques dans le vrai service, sans altérer le compte d'Alex. [Rapport de clôture](preuves/sprint-02/RECETTE-DISTANTE.md). Le destinataire e-mail reste restreint : les inscriptions publiques ne sont pas encore ouvertes.
+La recette distante complémentaire est terminée : e-mail sur bienvu.online, mot de passe et Google avec même agence confirmés par Alex ; deux comptes synthétiques isolés, marque et logos réels dans Workers/R2, déconnexion/révocation et rechargement mobile. Expiration/rejeu du reset utilisent des jetons synthétiques dans le vrai service, sans altérer le compte d'Alex. [Rapport de clôture](preuves/sprint-02/RECETTE-DISTANTE.md). Au moment de cette recette, le destinataire e-mail était encore restreint ; voir le correctif du 30/09 pour la configuration publique actuelle.
 
 Plafonds applicatifs : 50 messages/jour pour le service, 3 par adresse sur une fenêtre de 10 minutes, compteurs D1 atomiques et clés d'adresse HMACées. Ils s'ajoutent aux limites IP de Better Auth (5 connexions/mot de passe par minute, 3 inscriptions ou demandes de mail par minute). Les erreurs de livraison en arrière-plan ne divulguent pas l'existence du compte. Aucun renvoi automatique n'est mis en place. Les 3 000 e-mails mensuels inclus sont partagés au compte ; quota fournisseur constaté avant le test : 1 000/jour, zéro consommé. [Tarifs Cloudflare](https://developers.cloudflare.com/email-service/platform/pricing/) · [Budget du mois, domaine inclus](BUDGET-ET-OFFRES.md).
 
@@ -196,3 +197,14 @@ Plafonds applicatifs : 50 messages/jour pour le service, 3 par adresse sur une f
 - Mutations limitées par utilisateur : 30 sauvegardes et 6 tentatives de logo par minute. Réservation de stockage en D1 avant upload : au plus 64 versions / 32 Mio par agence, contrôlés atomiquement. Un crash laisse une réservation comptée et identifiable, jamais une suppression aveugle. Une procédure de rapprochement/purge tenant compte des manifestes devra être ajoutée avant une exploitation durable ; aucune purge n’a été simulée comme réalisée.
 
 Les réglages de bibliothèque ont été confrontés aux [options Better Auth](https://better-auth.com/docs/reference/options), à sa [gestion de sessions](https://better-auth.com/docs/concepts/session-management) et surtout aux types/code **1.7.6** installés. Les garanties de cette section décrivent le code et la recette locale ; elles ne remplacent pas la recette OAuth distante.
+
+
+## Inscriptions publiques — correctif du 30 septembre 2026
+
+Le compte créé pendant l'essai utilisateur était bien présent en D1 mais non vérifié. L'inspection du Worker publié a retrouvé `allowed_destination_addresses` limité à la boîte du testeur initial : les autres inscriptions ne pouvaient pas recevoir leur confirmation. Le domaine d'envoi était activé ; cette restriction ne provenait pas des DNS.
+
+Le binding public conserve `allowed_sender_addresses: ["connexion@bienvu.online"]` et ne comporte plus de filtre de destinataires. Pour préparer à nouveau le web public : reprendre la commande ci-dessus avec `BIENVU_AUTH_EMAIL_AUDIENCE=public` et `BIENVU_AUTH_EMAIL_TO=''`. Préparer la configuration ne préserve pas les réglages de génération du pilote : contrôler les bindings/variables du déploiement courant avant de publier. La correction du 30/09 modifie uniquement le binding de la configuration existante, avec `--keep-vars` et secrets conservés.
+
+Les plafonds restent 50 messages/jour et 3/adresse/10 minutes. Les événements `auth_email_submitted`, `auth_email_failed` et `auth_email_limited` indiquent l'acceptation du transport, un code fournisseur sur liste blanche ou le plafond local. Aucun destinataire, corps, jeton, lien ni message d'erreur brut n'est journalisé. Une inscription HTTP 200 ou un événement `submitted` ne garantit pas la réception : l'envoi utilise les tâches de fond Better Auth.
+
+Un compte déjà créé reste récupérable : sur `/connexion`, tenter la connexion par e-mail puis utiliser « Renvoyer le lien » lorsque l'adresse n'est pas vérifiée. Aucun compte existant ni mot de passe n'est réinitialisé par le correctif. La réception du nouveau lien dans la boîte concernée reste à confirmer par l'utilisateur.

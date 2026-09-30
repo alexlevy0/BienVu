@@ -25,14 +25,9 @@ function ExampleCard({example, onPlay}: {example: Example; onPlay(example: Examp
 export function LandingPage() {
   const [dialog, setDialog] = useState<Dialog>(null);
   const [selected, setSelected] = useState<Example>(examples[0]), [category, setCategory] = useState('Tous');
-  const [conversationActive, setConversationActive] = useState(false), [galleryVisible, setGalleryVisible] = useState(true);
+  const [conversationActive, setConversationActive] = useState(false);
   const modal = useRef<HTMLDialogElement>(null);
   const modalOpen = dialog !== null;
-  useEffect(() => {
-    if (!conversationActive) {setGalleryVisible(true); return;}
-    const timer = window.setTimeout(() => setGalleryVisible(false), 340);
-    return () => window.clearTimeout(timer);
-  }, [conversationActive]);
   useEffect(() => {
     if (!modalOpen) return;
     const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -47,7 +42,7 @@ export function LandingPage() {
     <div className="home-workspace"><header className="home-topbar"><span>Votre studio immobilier</span><button type="button" onClick={() => setDialog('help')}>Aide</button></header>
       <main className={`home-content${conversationActive ? ' home-content-conversation' : ''}`} id="home-content" tabIndex={-1}>
         <section className="home-hero" aria-label={conversationActive?'Créer votre vidéo':undefined} aria-labelledby={conversationActive?undefined:'home-title'}><div className={`home-hero-intro${conversationActive?' home-hero-intro-leaving':''}`} inert={conversationActive}><h1 id="home-title">Une annonce.<br/>Une vidéo qui <em>donne envie.</em></h1><p className="home-intro">Collez le lien de votre annonce. BienVu s’occupe du reste.</p></div><HomeCreate onLayoutChange={setConversationActive}/></section>
-        {galleryVisible && <section id="explorer" className={`home-discover${conversationActive ? ' home-discover-leaving' : ''}`} aria-labelledby="home-discover-title" inert={conversationActive}><div className="home-discover-heading"><div><h2 id="home-discover-title">À découvrir sur BienVu</h2><p>Des inspirations pour donner une autre dimension à vos biens.</p></div><button type="button" className="home-explore-link" onClick={() => {setCategory('Tous'); setDialog('explore');}}>Tout explorer <HomeIcon name="external" size={17}/></button></div><div className="home-example-grid">{examples.map(example => <ExampleCard key={example.id} example={example} onPlay={play}/>)}</div><p className="home-demo-note">Démonstrations visuelles sans son · Biens et agences fictifs · Images générées</p></section>}
+        {!conversationActive && <section id="explorer" className="home-discover" aria-labelledby="home-discover-title"><div className="home-discover-heading"><div><h2 id="home-discover-title">À découvrir sur BienVu</h2><p>Des inspirations pour donner une autre dimension à vos biens.</p></div><button type="button" className="home-explore-link" onClick={() => {setCategory('Tous'); setDialog('explore');}}>Tout explorer <HomeIcon name="external" size={17}/></button></div><div className="home-example-grid">{examples.map(example => <ExampleCard key={example.id} example={example} onPlay={play}/>)}</div><p className="home-demo-note">Démonstrations visuelles sans son · Biens et agences fictifs · Images générées</p></section>}
       </main>
       <footer className="home-footer"><span>BienVu · L’immobilier, en mouvement.</span><nav aria-label="Informations"><a href="mailto:contact@bienvu.online">Contact</a><button type="button" onClick={() => setDialog('privacy')}>Confidentialité</button><button type="button" onClick={() => setDialog('terms')}>Conditions</button></nav></footer>
     </div>

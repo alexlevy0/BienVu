@@ -5,7 +5,7 @@ import {randomBytes} from 'node:crypto';
 import {Miniflare, convertV4MiniflareOptions} from 'miniflare';
 import {createAuth, emailVerificationBypassed, type AuthEnvironment} from '../apps/web/lib/auth';
 import {handleAuthRequest} from '../apps/web/lib/auth-handler';
-import {emailConfigured, reserveAuthEmail} from '../apps/web/lib/auth-email';
+import {emailConfigured, reserveAuthEmail, sendAuthEmail} from '../apps/web/lib/auth-email';
 
 test('e-mail/mot de passe : routes réelles et D1, envoi capturé en mémoire', async t => {
   const mf = new Miniflare(convertV4MiniflareOptions({modules: true, script: 'export default {fetch(){return new Response("test")}}',
@@ -169,6 +169,26 @@ test('e-mail/mot de passe : routes réelles et D1, envoi capturé en mémoire', 
     assert.equal(accidentallyDeployed.status, 403);
     assert.equal((await post('sign-up/email', {email: 'forged-bypass@example.com', password, AUTH_EMAIL_VERIFICATION_BYPASS: true})).status, 422);
     assert.equal((await post('sign-up/email', {email: 'csrf-bypass@example.com', password}, {origin: 'https://foreign.example'}, local)).status, 403);
+  });
+  await t.test('transport mail : échec identifiable sans adresse ni lien, renvoi possible et plafond conservé', async t => {
+    const logs: string[] = [];
+    t.mock.method(console, 'log', (value: string) => logs.push(value));
+    t.mock.method(console, 'error', (value: string) => logs.push(value));
+    const address = 'delivery-test@example.com', privateUrl = 'http://localhost:8787/secret-token';
+    const failing = {...env, AUTH_EMAIL: {send: async () => {
+      throw Object.assign(new Error(`${address} ${privateUrl}`), {code: 'E_RECIPIENT_NOT_ALLOWED'});
+    }}};
+    await assert.rejects(sendAuthEmail(failing, address, 'verify', privateUrl), /^Error: EMAIL_DELIVERY_FAILED$/);
+    assert.deepEqual(JSON.parse(logs[0]), {event: 'auth_email_failed', purpose: 'verify', code: 'E_RECIPIENT_NOT_ALLOWED'});
+    const unknown = {...env, AUTH_EMAIL: {send: async () => {throw {code: privateUrl, message: address};}}};
+    await assert.rejects(sendAuthEmail(unknown, address, 'verify', privateUrl), /EMAIL_DELIVERY_FAILED/);
+    assert.equal(JSON.parse(logs[1]).code, 'EMAIL_DELIVERY_FAILED');
+    const before = messages.length;
+    await sendAuthEmail(env, address, 'verify', privateUrl);
+    await sendAuthEmail(env, address, 'verify', privateUrl);
+    assert.equal(messages.length, before + 1);
+    assert.deepEqual(logs.slice(2).map(v => JSON.parse(v).event), ['auth_email_submitted', 'auth_email_limited']);
+    assert.ok(logs.every(v => !v.includes(address) && !v.includes(privateUrl)));
   });
   await t.test('limites HTTP et budget d’envoi atomique ; mode local impossible sur une origine publique', async () => {
     const headers = {'cf-connecting-ip': '198.51.100.1'};

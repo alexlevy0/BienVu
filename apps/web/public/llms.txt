@@ -1,0 +1,27 @@
+# BienVu
+
+> BienVu est un studio de vidéos immobilières en français, destiné aux agences et aux professionnels de l'immobilier. Il transforme les informations et les photos d'un bien en une vidéo verticale avec voix off et identité d'agence.
+
+Site officiel : https://bienvu.online/
+Contact public : contact@bienvu.online
+
+La création commence par un lien d'annonce, une description du bien ou une saisie manuelle avec photos. L'import dépend de la compatibilité du site source ; la saisie manuelle permet de présenter un bien lorsque son lien ne peut pas être importé. Les informations du brouillon peuvent être vérifiées avant la génération.
+
+Les vidéos utilisent un format vertical 9:16, une voix off française et les photos du bien. Le logo, les couleurs et les coordonnées de l'agence sont enregistrés pour ses prochaines créations. Le parcours comprend génération, aperçu et téléchargement, sans éditeur vidéo.
+
+Un essai anonyme permet de regarder un aperçu avec filigrane. La connexion et un crédit vidéo permettent de récupérer le téléchargement sans filigrane. La connexion est proposée avec Google ou avec une adresse e-mail et un mot de passe. Les créations sont soumises à des quotas ; les abonnements payants affichés ne sont pas encore ouverts à la souscription.
+
+Explorer présente des vidéos partagées volontairement et des démonstrations identifiées comme telles. Les démonstrations ne sont pas des annonces réelles importées. Les vidéos non publiées et les brouillons appartiennent à l'espace privé de leur utilisateur.
+
+## Pages publiques
+
+- [Studio BienVu](https://bienvu.online/): Présentation du produit et démarrage de la création d'une vidéo.
+- [Explorer](https://bienvu.online/explorer): Vidéos partagées et exemples de rendu.
+- [Offres et quotas](https://bienvu.online/abonnement): Tarifs affichés, nombre de vidéos par offre et disponibilité des abonnements.
+- [Sources testées](https://bienvu.online/sources): Compatibilité des sites d'annonces, limites connues et alternatives à l'import par lien.
+- [Connexion](https://bienvu.online/connexion): Accès au compte par Google ou par e-mail et mot de passe.
+
+## Optional
+
+- [Sitemap](https://bienvu.online/sitemap.xml): Liste des principales pages publiques indexables.
+- [Robots](https://bienvu.online/robots.txt): Règles d'exploration du site.

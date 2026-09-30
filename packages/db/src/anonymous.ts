@@ -1,4 +1,4 @@
-import {AgencyBrand,GenerationRequest,sourceForHost,sourceListingId,publicErrors,type PublicErrorCode} from '@bienvu/contracts';
+import {AgencyBrand,EntityId,Timestamp,GenerationRequest,sourceForHost,sourceListingId,publicErrors,type PublicErrorCode} from '@bienvu/contracts';
 import type {Database} from './index';
 import {creditGrant} from './credits';
 import {findGeneration,findOwnedGeneration,GenerationFailure,type GenerationRow} from './generation';
@@ -22,12 +22,31 @@ export async function trialForSession(db:Database,session:AnonymousSession,id?:s
     .bind(session.id,...(id?[id]:[])).first<{id:string}>();
   return ref?findGeneration(db,session.scopeId,ref.id):null;
 }
+export async function listAnonymousGenerations(db:Database,session:AnonymousSession) {
+  return (await listAnonymousGenerationPage(db,session)).rows;
+}
+export async function listAnonymousGenerationPage(db:Database,session:AnonymousSession,cursor?:string){
+  let time='9999',id='~';
+  if(cursor){try{if(cursor.length>512)throw 0;const parts=JSON.parse(atob(cursor));
+    if(!Array.isArray(parts)||parts.length!==2)throw 0;time=Timestamp.parse(parts[0]);id=EntityId.parse(parts[1]);
+  }catch{throw new GenerationFailure('VALIDATION_ERROR');}}
+  const refs=await db.prepare(`SELECT json_group_array(json_object('id',job_id,'at',created_at)) AS ids FROM
+    (SELECT job_id,created_at FROM generation_runs WHERE anonymous_session_id=? AND agency_id=? AND owner_agency_id IS NULL
+      AND (created_at<? OR (created_at=? AND job_id<?)) ORDER BY created_at DESC,job_id DESC LIMIT 31)`)
+    .bind(session.id,session.scopeId,time,time,id).first<{ids:string}>();
+  const data=JSON.parse(refs?.ids??'[]') as {id:string;at:string}[],page=data.slice(0,30),last=page.at(-1);
+  const rows=await Promise.all(page.map(ref=>findGeneration(db,session.scopeId,ref.id)));
+  // Recheck ownership in case a claim completed between the list and the reads.
+  return {rows:rows.filter((row):row is GenerationRow=>Boolean(row&&row.anonymousSessionId===session.id&&!row.ownerAgencyId)),
+    nextCursor:data.length>30&&last?btoa(JSON.stringify([last.at,last.id])):null};
+}
 export function trialInput(input:unknown) {
   const parsed=GenerationRequest.safeParse(input);
   if(!parsed.success||!('url' in parsed.data))throw new GenerationFailure('INVALID_URL');
   const url=new URL(parsed.data.url),source=sourceForHost(url.hostname);
   // The anonymous pilot never falls back to a generic arbitrary-host importer.
-  if(!source||!['espaces-atypiques','orpi','century21'].includes(source.id)||!sourceListingId(source,url.pathname))throw new GenerationFailure('TRIAL_SOURCE_UNSUPPORTED');
+  if(!source||!['espaces-atypiques','orpi','century21'].includes(source.id))throw new GenerationFailure('TRIAL_SOURCE_UNSUPPORTED');
+  if(!sourceListingId(source,url.pathname))throw new GenerationFailure('NOT_A_LISTING');
   return parsed.data;
 }
 export async function priorTrial(db:Database,session:AnonymousSession,key:string,input:unknown) {

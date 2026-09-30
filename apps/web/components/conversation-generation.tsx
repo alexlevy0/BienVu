@@ -59,7 +59,7 @@ export function ConversationGeneration({job,request,sending,anonymous,unavailabl
         {ready&&job?.ownership==='owned'&&anonymous&&<Link href="/essai/recuperer">Retrouver ma vidéo dans mon compte</Link>}
         {ready&&<p className="home-stage-note">Disponible jusqu’au {new Date(job.expiresAt).toLocaleString('fr-FR')}.</p>}
         {ready&&!job.videoUrl&&<p className="home-stage-error" role="status">Cette vidéo n’est plus disponible dans votre espace. Consultez Mes vidéos pour connaître son état.</p>}
-        {(active||sending)&&<p className="home-stage-note">Vous pouvez revenir plus tard. La création restera dans <Link href="/historique">Mes vidéos</Link> après connexion.</p>}
+        {(active||sending)&&<p className="home-stage-note">Vous pouvez revenir plus tard. Retrouvez votre création dans <Link href="/historique">Mes vidéos</Link>{anonymous?' depuis ce navigateur':''}.</p>}
         {job&&['ready','failed'].includes(job.status)&&<ProblemReport key={job.id} jobId={job.id} anonymous={anonymous&&job.ownership==='anonymous'}/>}
         {feedback&&<p className="home-stage-error" role="alert">{feedback}</p>}
       </div></div>

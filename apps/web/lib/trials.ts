@@ -1,4 +1,4 @@
-import {admitAnonymous,anonymousSession,createAnonymousSession,generationEvent,generationView,GenerationFailure,opaqueHash,priorTrial,trialForSession,trialPolicy,type AnonymousSession} from '@bienvu/db';
+import {admitAnonymous,anonymousSession,createAnonymousSession,generationEvent,generationView,GenerationFailure,listAnonymousGenerationPage,opaqueHash,priorTrial,trialForSession,trialPolicy,type AnonymousSession} from '@bienvu/db';
 import {authOrigin} from './auth';
 import {assertSameOrigin,boundedJson,RequestFailure} from './http';
 import {callGeneration,streamGenerationMedia} from './generations';
@@ -9,6 +9,13 @@ export const sessionFromRequest=(request:Request,env:TrialEnv)=>anonymousSession
 export async function requireTrial(request:Request,env:TrialEnv){const session=await sessionFromRequest(request,env);if(!session)throw new RequestFailure('NOT_FOUND');return session;}
 export async function trialResponse(action:()=>Promise<Response>){try{return await action();}catch(e){if(e instanceof GenerationFailure)throw new RequestFailure(e.code);throw e;}}
 function configured(env:TrialEnv){return env.ANONYMOUS_TRIALS_ENABLED==='true'&&env.GENERATIONS_ENABLED==='true'&&Boolean(env.TURNSTILE_SITE_KEY&&env.TURNSTILE_SECRET_KEY&&(env.TRIAL_IP_HMAC_SECRET?.length??0)>=32);}
+export async function trialHistoryResponse(request:Request,env:TrialEnv) {
+  if(new URL(request.url).origin!==authOrigin(env)||request.headers.get('sec-fetch-site')==='cross-site')throw new RequestFailure('FORBIDDEN');
+  const session=await sessionFromRequest(request,env);
+  // Reading history creates neither a session nor a generation, even when admissions are paused.
+  const page=session?await listAnonymousGenerationPage(env.DB,session,new URL(request.url).searchParams.get('cursor')??undefined):{rows:[],nextCursor:null};
+  return Response.json({jobs:page.rows.map(row=>generationView(row,Date.now(),'anonymous')),nextCursor:page.nextCursor});
+}
 export async function trialSessionResponse(request:Request,env:TrialEnv) {
   if(new URL(request.url).origin!==authOrigin(env)||request.headers.get('sec-fetch-site')==='cross-site')throw new RequestFailure('FORBIDDEN');
   let session=await sessionFromRequest(request,env),cookie:string|undefined;const policy=await trialPolicy(env.DB);

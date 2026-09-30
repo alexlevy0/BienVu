@@ -1,9 +1,10 @@
 import {CreationDraftData, CreationFields, GeneratableListing, ManualListingInput, NormalizedListing, PhotoAsset,
   type CreationFieldName, type CreationDraftView, type NormalizedListing as Listing} from '@bienvu/contracts';
-import {beginManualImport, completeImport, findImport, findCreationDraft, startCreationDraft, blankCreationDraft,
+import {beginManualImport, completeImport, findImport, findCreationDraft, startCreationDraft, blankCreationDraft,markCreationDraftDeleting,importObjectKeys,
   updateCreationDraft, ImportStateFailure, type ImportRow, type Database} from '@bienvu/db';
 import {contentHash, type PhotoNormalizer} from './manual-listings';
 import {RequestFailure} from './http';
+import {logDiagnostic,requestContext} from '@bienvu/observability';
 
 type Env={DB:Database;MEDIA:Pick<R2Bucket,'put'|'head'|'delete'>};
 function required(row:ImportRow|null):CreationDraftView {
@@ -45,6 +46,16 @@ export async function patchCreationDraft(db:Database,agencyId:string,id:string,b
   if(await updateCreationDraft(db,agencyId,id,before.version,data)===null)throw new RequestFailure('CONFLICT');
   return required(await findImport(db,agencyId,id));
 }
+export async function deleteCreationDraft(env:Env,agencyId:string,id:string,now=Date.now()){
+  if(!await findImport(env.DB,agencyId,id))throw new RequestFailure('NOT_FOUND');
+  if(!await markCreationDraftDeleting(env.DB,agencyId,id,now))throw new RequestFailure('CONFLICT');
+  const keys=await importObjectKeys(env.DB,agencyId,id);
+  if(keys.some(key=>!key.startsWith(`agencies/${agencyId}/imports/${id}/`)))throw new Error('IMPORT_KEY_SCOPE');
+  try{if(keys.length)await env.MEDIA.delete(keys);}
+  catch{logDiagnostic(requestContext(),{event:'request_failed',status:503,code:'INTERNAL_ERROR'});}
+  // Logical deletion is committed. The cron retries cleanup after in-flight puts
+  // have stopped, including when the immediate R2 deletion was unavailable.
+}
 function photoList(row:ImportRow){return PhotoAsset.array().parse(JSON.parse(row.draftPhotos??'[]')).sort((a,b)=>a.sourceOrder-b.sourceOrder);}
 export async function uploadCreationPhoto(env:Env,agencyId:string,id:string,index:number,uploadId:string,
   bytes:Uint8Array<ArrayBuffer>,mime:string,normalize:PhotoNormalizer,signal:AbortSignal){
@@ -77,7 +88,9 @@ export async function uploadCreationPhoto(env:Env,agencyId:string,id:string,inde
     customMetadata:{agencyId,importId:id,sha256:hash}});
   const cancelled=await env.DB.prepare('SELECT id FROM creation_upload_cancellations WHERE id=? AND agency_id=? AND import_id=?')
     .bind(uploadId,agencyId,id).first();
-  if(cancelled){await env.MEDIA.delete(photo.objectKey);throw new RequestFailure('CONFLICT');}
+  const afterPut=await findImport(env.DB,agencyId,id);
+  if(cancelled||afterPut?.status!=='importing'||!afterPut.draftPending){
+    await env.MEDIA.delete(photo.objectKey);throw new RequestFailure('CONFLICT');}
   return photo;
 }
 export async function removeCreationPhoto(env:Env,agencyId:string,id:string,uploadId:string){

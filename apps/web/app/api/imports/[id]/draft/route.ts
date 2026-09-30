@@ -1,7 +1,7 @@
 import {findCreationDraft} from '@bienvu/db';
 import {requireOwner} from '../../../../../lib/owner';
 import {assertSameOrigin,boundedJson,RequestFailure,respond} from '../../../../../lib/http';
-import {patchCreationDraft} from '../../../../../lib/creation-drafts';
+import {patchCreationDraft,deleteCreationDraft} from '../../../../../lib/creation-drafts';
 export const dynamic='force-dynamic';
 type Context={params:Promise<{id:string}>};
 export async function GET(request:Request,context:Context){return respond(async()=>{
@@ -11,4 +11,9 @@ export async function GET(request:Request,context:Context){return respond(async(
 export async function PATCH(request:Request,context:Context){return respond(async()=>{
   const {env,agency}=await requireOwner(request);assertSameOrigin(request,env);
   return Response.json(await patchCreationDraft(env.DB,agency.id,(await context.params).id,await boundedJson(request,32_000)));
+});}
+export async function DELETE(request:Request,context:Context){return respond(async()=>{
+  const {env,agency}=await requireOwner(request);assertSameOrigin(request,env);
+  await deleteCreationDraft(env,agency.id,(await context.params).id);
+  return Response.json({ok:true});
 });}

@@ -1,4 +1,4 @@
-import {EntityId, GeneratableListing, type NormalizedListing, type ImportErrorCode} from '@bienvu/contracts';
+import {EntityId, Timestamp, GeneratableListing, type NormalizedListing, type ImportErrorCode} from '@bienvu/contracts';
 import type {Database} from './index';
 export type ImportRow = {id: string; agencyId: string; sourceKind: 'url' | 'manual'; sourceUrl: string | null; input: string | null; inputHash: string | null; status: 'importing' | 'ready' | 'failed' | 'deleting';
   draftPending:number; draftData:string|null; draftVersion:number|null; draftPhotos:string;
@@ -11,7 +11,7 @@ const columns = `id,agency_id AS agencyId,source_kind AS sourceKind,nullif(sourc
   (SELECT version FROM creation_drafts WHERE id=listing_imports.id) AS draftVersion,
   (SELECT json_group_array(json(photo_json)) FROM import_objects WHERE import_id=listing_imports.id AND agency_id=listing_imports.agency_id) AS draftPhotos,
   created_at AS createdAt,expires_at AS expiresAt,lease_until AS leaseUntil`;
-export class ImportStateFailure extends Error {constructor(readonly code: 'CONFLICT' | 'IMPORT_LIMIT' | 'NOT_FOUND') {super(code);}}
+export class ImportStateFailure extends Error {constructor(readonly code: 'CONFLICT' | 'IMPORT_LIMIT' | 'NOT_FOUND' | 'VALIDATION_ERROR') {super(code);}}
 export async function findImport(db: Database, agencyId: string, id: string) {
   if (!EntityId.safeParse(id).success) return null;
   return db.prepare(`SELECT ${columns} FROM listing_imports WHERE agency_id=? AND id=?`).bind(agencyId, id).first<ImportRow>();
@@ -63,6 +63,15 @@ export async function failImport(db: Database, agencyId: string, id: string, cod
     WHERE agency_id=? AND id=? AND status='importing'`).bind(code, JSON.stringify(diagnostics), agencyId, id).run();
 }
 export async function listImports(db: Database, agencyId: string) {
+  return (await listImportPage(db,agencyId)).imports;
+}
+export async function listImportPage(db:Database,agencyId:string,cursor?:string,draftsOnly=false){
+  let time='9999',id='~';
+  if(cursor){try{if(cursor.length>512)throw 0;const parts=JSON.parse(atob(cursor));
+    if(!Array.isArray(parts)||parts.length!==2)throw 0;
+    time=Timestamp.parse(parts[0]);id=EntityId.parse(parts[1]);
+  }catch{throw new ImportStateFailure('VALIDATION_ERROR');}}
+  const draftFilter=draftsOnly?" AND status='importing' AND draft_pending=1":'';
   // JSON agrégé borné : compatible avec le port D1 sans étendre toute l'API SQL.
   const row = await db.prepare(`SELECT json_group_array(json_object('id',i.id,'sourceKind',i.source_kind,'sourceUrl',nullif(i.source_url,''),
     'status',iif(i.draft_pending=1 AND i.status='importing','needs_input',i.status),'errorCode',i.error_code,'createdAt',i.created_at,'expiresAt',i.expires_at,
@@ -71,9 +80,11 @@ export async function listImports(db: Database, agencyId: string) {
     'transaction',coalesce(json_extract(i.result_json,'$.transaction'),json_extract((SELECT data_json FROM creation_drafts WHERE id=i.id),'$.fields.transaction')),
     'previewPhotoId',(SELECT o.id FROM import_objects o WHERE o.import_id=i.id AND o.agency_id=i.agency_id
       ORDER BY json_extract(o.photo_json,'$.sourceOrder') LIMIT 1))) AS items
-    FROM (SELECT * FROM listing_imports WHERE agency_id=? AND status!='deleting' AND expires_at>? ORDER BY created_at DESC,id LIMIT 30) AS i`)
-    .bind(agencyId, new Date().toISOString()).first<{items: string}>();
-  return JSON.parse(row?.items ?? '[]') as ImportSummary[];
+    FROM (SELECT * FROM listing_imports WHERE agency_id=? AND status!='deleting' AND expires_at>?${draftFilter}
+      AND (created_at<? OR (created_at=? AND id<?)) ORDER BY created_at DESC,id DESC LIMIT 31) AS i`)
+    .bind(agencyId,new Date().toISOString(),time,time,id).first<{items:string}>();
+  const rows=JSON.parse(row?.items??'[]') as ImportSummary[],imports=rows.slice(0,30),last=imports.at(-1);
+  return {imports,nextCursor:rows.length>30&&last?btoa(JSON.stringify([last.createdAt,last.id])):null};
 }
 
 export async function markImportDeleting(db: Database, agencyId: string, id: string, now = Date.now(), explicit = false) {

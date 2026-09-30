@@ -3,7 +3,7 @@ import {coverageLabels, importSources, sourceCoverage} from '@bienvu/contracts';
 import {Shell} from '../../components/shell';
 import './sources.css';
 
-export const metadata = {title: 'Sources testées', description: 'Les sites testés par BienVu, les limites constatées et les alternatives pour préparer votre annonce.'};
+export const metadata = {title: 'Sources testées', description: 'Les sites testés par BienVu, les limites constatées et les alternatives pour préparer votre annonce.',alternates:{canonical:'/sources'}};
 export default function SourcesPage() {
   return <Shell><div className="page-heading"><div><p className="eyebrow">IMPORTER VOTRE ANNONCE</p><h1>Les sources,<br/><em>en toute clarté.</em></h1>
     <p className="page-intro">Un site testé n’est pas une garantie pour toutes ses annonces.<br/>Voici ce que nos essais ont réellement permis.</p></div></div>

@@ -10,7 +10,7 @@ type SelectedPhoto = {id: string; file: File|null; preview: string; remote?:Norm
 type Guided={step:number;setStep(step:number):void;description:string;setDescription(value:string):void;onCancel():void;
   agencyId?:string;initialDraft?:CreationDraftView|null;initialData?:CreationDraftData|null;
   onReadyChange?(ready:boolean,reason:string):void;onDraftChange?():void};
-export type ManualListingFormHandle = {cancel():Promise<void>};
+export type ManualListingFormHandle = {cancel():Promise<void>;isDraft(id:string):boolean};
 class FormFailure extends Error {}
 const labels: Record<string, string> = {title: 'titre', locality: 'localisation', propertyType: 'type de bien', description: 'description',
   priceCents: 'prix', charges: 'charges', area: 'surface', rooms: 'nombre de pièces', photos: 'photos'};
@@ -32,7 +32,7 @@ export function ManualListingForm(props: Props) {
   const history=useRef<number[]>([]);
   const selected = useRef(photos), pending = useRef<{fingerprint: string; key: string} | null>(null),formRef=useRef<HTMLFormElement>(null),submitLock=useRef(false);
   const removedIds=useRef<Set<string>>(new Set());
-  useImperativeHandle(props.ref,()=>({cancel:cancelGuided}));
+  useImperativeHandle(props.ref,()=>({cancel:cancelGuided,isDraft:id=>serverRef.current?.id===id}));
   selected.current = photos;
   function finalInput(){
     if(!formRef.current)return null;
@@ -112,7 +112,7 @@ export function ManualListingForm(props: Props) {
       if(!active)return;
       const fromGuest=Boolean(remote&&draft&&!draft.agencyId&&!draft.serverDraftId&&remote.sourceKind==='manual'&&
         !remote.data.fields.title&&remote.photos.length===0);
-      const sameRemoteVersion=Boolean(draft?.serverDraftId===remote?.id&&draft?.serverDraftVersion===remote?.version);
+      const sameRemoteVersion=Boolean(remote&&draft&&draft.serverDraftId===remote.id&&draft.serverDraftVersion===remote.version);
       if(remote&&draft?.serverDraftId===remote.id&&!sameRemoteVersion)
         setFeedback('Le brouillon enregistré sur le serveur a changé. Ses dernières informations ont été rechargées.');
       const restoredDraft=remote ? {fields:sameRemoteVersion||fromGuest?draft!.fields:fieldsFromData(remote.data),

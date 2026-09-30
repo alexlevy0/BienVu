@@ -30,6 +30,8 @@ const injection=`(()=>{
     if(p==='/api/trial/describe'&&options.method==='POST'){s.descriptions=(s.descriptions??0)+1;save(s);return json({extraction:'unavailable',data:null});}
     if(p==='/api/trial'&&options.method==='POST'){if(s.forceError)return json({error:{code:'TRIAL_LIMIT',message:'La limite des essais est atteinte. Réessayez plus tard ou connectez-vous.'}},429);if(!s.job){s.job=fresh;s.starts++;save(s);}return json(view(s));}
     if(p==='/api/trial'){window.__trialRead=true;return json({enabled:true,siteKey:'fixture-site-key',used:s.job?.status==='ready',hasIntent:!!s.intent,job:view(s)});}
+    if(p==='/api/trial/history')return json({jobs:s.job&&!s.owned?[view(s)]:[],nextCursor:null});
+    if(p==='/api/trial/ui-anonymous-fixture')return json(view(s));
     if(p.endsWith('/login')){s.intent=true;save(s);return json({url:'/connexion?trial=1'});}
     if(p==='/api/trial/claim'){if(!s.job)return json({error:{code:'NOT_FOUND'}},404);s.owned=true;save(s);return json(view(s));}
     if(p==='/api/generations/shares')return json({shares:[]});
@@ -44,6 +46,11 @@ try {
  for(const width of [1536,390]){
   const page=await browser.newPage({context:()=>null,logLevel:'error',indent:false,pageIndex:width,onBrowserLog:null,onLog:()=>{}}),cdp=page._client();
   await page.setViewport({width,height:width===1536?1024:844,deviceScaleFactor:1});await cdp.send('Page.addScriptToEvaluateOnNewDocument',{source:injection});
+  const poster=await readFile(path.join(mediaRoot,'preview-0.png'));
+  await cdp.send('Fetch.enable',{patterns:[{urlPattern:'*/api/trial/ui-anonymous-fixture/source-photo'},
+    {urlPattern:'*/api/generations/ui-anonymous-fixture/poster'},{urlPattern:'*/api/generations/ui-anonymous-fixture/source-photo'}]});
+  cdp.on('Fetch.requestPaused',event=>{void cdp.send('Fetch.fulfillRequest',{requestId:event.requestId,responseCode:200,
+    responseHeaders:[{name:'Content-Type',value:'image/png'}],body:poster.toString('base64')});});
   const evaluate=async expression=>{const r=await cdp.send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true,userGesture:true});assert.ok(!r.value.exceptionDetails,JSON.stringify(r.value.exceptionDetails));return r.value.result.value;};
   const wait=async expression=>{let last;for(let i=0;i<300;i++){try{if(await evaluate(`!!(${expression})`))return;}catch(error){last=error;}await new Promise(r=>setTimeout(r,100));}console.log(await evaluate('document.body.innerText'));throw Error(`WAIT: ${expression}; ${last??''}`);};
   const play=async()=>{await wait("document.querySelector('.home-conversation-job video, video.generated-video')?.readyState>=2");await evaluate("(async()=>{const v=document.querySelector('.home-conversation-job video, video.generated-video');v.muted=true;await v.play();})()");await wait("document.querySelector('.home-conversation-job video, video.generated-video').currentTime>.2");await evaluate("document.querySelector('.home-conversation-job video, video.generated-video').pause()");};
@@ -67,11 +74,37 @@ try {
   await shot('progress');
   assert.equal(await evaluate("document.querySelector('.trial-challenge')"),null,'Le défi se masque après validation');
   assert.equal(await evaluate("JSON.parse(localStorage.getItem('bienvu-trial-ui-fixture')).starts"),1);
-  await evaluate("(()=>{const s=JSON.parse(localStorage.getItem('bienvu-trial-ui-fixture'));s.job.status='ready';localStorage.setItem('bienvu-trial-ui-fixture',JSON.stringify(s));})()");await go(base);
+  await go(base+'/historique');await wait("document.querySelector('#video-ui-anonymous-fixture')?.textContent.includes('Création en cours')");
+  assert.equal(await evaluate("document.querySelector('.home-recent-link')?.textContent.includes('Appartement de recette')"),true);
+  assert.equal(await evaluate("document.querySelector('.video-library-share-link')"),null);
+  await shot('anonymous-history-progress');
+  await evaluate("(()=>{const s=JSON.parse(localStorage.getItem('bienvu-trial-ui-fixture'));s.job.status='ready';localStorage.setItem('bienvu-trial-ui-fixture',JSON.stringify(s));})()");
+  await wait("document.querySelector('#video-ui-anonymous-fixture .video-library-play')");await go(base);
   await wait("document.querySelector('.home-conversation-job video')?.readyState>=1");await play();await evaluate("document.querySelector('.home-conversation-job').scrollIntoView()");await shot('preview');
   assert.equal(await evaluate("document.querySelector('.home-conversation-job a[download]')"),null);
   assert.equal(await evaluate('document.documentElement.scrollWidth>innerWidth'),false);
-  await evaluate("[...document.querySelectorAll('.home-conversation-job button')].find(b=>b.textContent.includes('Télécharger sans')).click()");
+  // Leave creation, reopen the anonymous library, and reload the same browser.
+  await go(base+'/explorer');await go(base+'/historique');await go(base+'/historique');
+  await wait("document.querySelector('#video-ui-anonymous-fixture .video-library-play')");
+  assert.equal(await evaluate("document.querySelectorAll('.video-library-card').length"),1);
+  assert.equal(await evaluate("document.querySelector('.video-library-card a[download]')"),null);
+  await evaluate("[...document.querySelectorAll('.video-library-tabs button')].find(b=>b.textContent==='En cours').click()");
+  await wait("document.querySelector('.video-library-empty')?.textContent.includes('Aucune vidéo')");
+  await evaluate("[...document.querySelectorAll('.video-library-tabs button')].find(b=>b.textContent==='Terminées').click()");
+  await wait("document.querySelector('.video-library-play')");
+  await evaluate("(()=>{const n=document.querySelector('.video-library-search input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(n,'introuvable');n.dispatchEvent(new Event('input',{bubbles:true}));})()");
+  await wait("document.querySelector('.video-library-empty')?.textContent.includes('Aucune vidéo')");
+  await evaluate("(()=>{const n=document.querySelector('.video-library-search input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(n,'Lyon');n.dispatchEvent(new Event('input',{bubbles:true}));})()");
+  await wait("document.querySelector('.video-library-play')");
+  assert.equal(await evaluate('document.documentElement.scrollWidth>innerWidth'),false);await shot('anonymous-history');
+  await evaluate("document.querySelector('.video-library-play').click()");
+  await wait("document.querySelector('.video-library-dialog[open] video')?.readyState>=2");
+  await evaluate("(async()=>{const v=document.querySelector('.video-library-dialog video');v.muted=true;await v.play();})()");
+  await wait("document.querySelector('.video-library-dialog video').currentTime>.2");await shot('anonymous-history-preview');
+  await evaluate("document.querySelector('.video-library-close').click()");
+  await go(base+'/historique/ui-anonymous-fixture');await play();await go(base+'/historique');
+  await wait("document.querySelector('.video-library-download')");
+  await evaluate("document.querySelector('.video-library-download').click()");
   await wait("location.pathname==='/connexion'&&document.querySelector('.auth-form')");await shot('login');
   // Cancellation returns to the same preview; no new generation.
   await go(base+'/connexion?error=oauth&trial=1');await wait("document.querySelector('.auth-box')");await evaluate("[...document.querySelectorAll('.auth-box a')].find(a=>a.textContent.includes('Revenir à ma vidéo')).click()");await wait("location.pathname==='/'&&document.querySelector('.home-conversation-job video')");
@@ -81,7 +114,13 @@ try {
   let connected=false;for(let i=0;i<300;i++){try{connected=await evaluate("location.pathname==='/historique/ui-anonymous-fixture'&&!!document.querySelector('a[download]')");if(connected)break;}catch{}await new Promise(r=>setTimeout(r,100));}assert.ok(connected);
   await play();await evaluate("document.querySelector('a[download]').scrollIntoView({block:'center'})");await shot('claimed');assert.equal(await evaluate('document.documentElement.scrollWidth>innerWidth'),false);
   assert.equal(await evaluate("JSON.parse(localStorage.getItem('bienvu-trial-ui-fixture')).starts"),1);
+  await go(base+'/historique');await wait("document.querySelector('.video-library-card a[download]')");
+  assert.equal(await evaluate("document.querySelectorAll('.video-library-card').length"),1);
+  assert.equal(await evaluate("document.querySelector('.video-library-status')?.textContent.includes('essais')??false"),false);
   await evaluate("localStorage.setItem('bienvu-trial-ui-fixture',JSON.stringify({signed:true,starts:0}))");await go(base+'/essai/recuperer');await wait("document.body.textContent.includes('navigateur dans lequel')");await shot('other-browser');
+  await evaluate("localStorage.setItem('bienvu-trial-ui-fixture',JSON.stringify({starts:0}))");await go(base+'/historique');
+  await wait("document.querySelector('.video-library-empty')?.textContent.includes('première vidéo')");
+  assert.equal(await evaluate("document.querySelectorAll('.video-library-card').length"),0);
   await evaluate("localStorage.setItem('bienvu-trial-ui-fixture',JSON.stringify({starts:0}))");await go(base);
   await wait("window.__trialRead&&!document.querySelector('.home-primary-button').disabled");
   await evaluate(`(()=>{const n=document.querySelector('#home-listing-url');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(n,'Appartement lumineux avec terrasse à Lyon et vue dégagée');n.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('.home-composer').requestSubmit();})()`);
@@ -92,7 +131,8 @@ try {
   await evaluate("localStorage.setItem('bienvu-trial-ui-fixture',JSON.stringify({starts:0,forceError:true}))");await go(base);
   await wait("window.__trialRead&&!document.querySelector('.home-primary-button').disabled");await new Promise(r=>setTimeout(r,300));await evaluate(`(()=>{const n=document.querySelector('#home-listing-url');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(n,'https://www.century21.fr/trouver_logement/detail/123456/');n.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('.home-composer').requestSubmit();})()`);await wait("document.querySelector('.trial-challenge')&&window.__trialChallengeReady&&!document.querySelector('.home-primary-button').disabled");await evaluate("window.__trialWidget.complete('fixture-token')");await wait("document.querySelector('.home-form-feedback')?.textContent.includes('limite des essais')");await shot('limit');
   reports.push({width,fixtureApis:true,fixtureTurnstile:true,autoStartAfterVerification:true,descriptionChallengeAutoDismiss:true,measuredProgress:true,
-    realMediaPlayback:true,keyboardSubmit:true,noHorizontalOverflow:true,refreshSameJob:true,authCancelPreservesPreview:true,emailReturn:true,missingProofMessage:true,limitMessage:true,paidCalls:0});
+    realMediaPlayback:true,anonymousLibrary:true,anonymousDetail:true,anonymousHistoryReload:true,anonymousHistorySearchAndFilters:true,
+    ownedHistoryWithoutDuplicate:true,historyWithoutProofEmpty:true,keyboardSubmit:true,noHorizontalOverflow:true,refreshSameJob:true,authCancelPreservesPreview:true,emailReturn:true,missingProofMessage:true,limitMessage:true,paidCalls:0});
  }
  await writeFile(path.join(directory,'browser-report.json'),JSON.stringify({at:new Date().toISOString(),base,physicalDevice:false,reports},null,2));console.log(JSON.stringify({passed:true,reports}));
 }finally{await browser.close({silent:true});await new Promise(resolve=>media.close(resolve));}

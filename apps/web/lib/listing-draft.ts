@@ -1,12 +1,13 @@
 import {ListingUrl} from '@bienvu/contracts';
 
-type ListingDraft = {kind: 'url'; url: string; savedAt: number} | {kind: 'manual'; savedAt: number};
+type ListingDraft = {kind: 'url'; url: string; savedAt: number} | {kind: 'manual'; savedAt: number;agencyId?:string;serverDraftId?:string};
 const key = 'bienvu:listing-draft';
 const manualKey = 'bienvu:manual-draft';
 const lifetime = 60 * 60 * 1000;
 const databaseName = 'bienvu-local-drafts';
 const storeName = 'drafts';
 const recordKey = 'manual';
+const discardedServerDrafts=new Set<string>();
 
 export const manualDraftFields = ['title', 'propertyType', 'transaction', 'locality', 'priceCents', 'charges', 'area', 'rooms', 'description'] as const;
 export type ManualDraftFields = Record<typeof manualDraftFields[number], string>;
@@ -76,14 +77,41 @@ export function saveListingDraft(value: {kind: 'url'; url: string} | {kind: 'man
 
 export async function saveManualListingDraft(fields: ManualDraftFields, photos: File[], step = 0, agencyId?:string, serverDraftId?:string,
   serverDraftVersion?:number) {
+  if(serverDraftId&&discardedServerDrafts.has(`${agencyId}:${serverDraftId}`))return false;
   try {
     const savedAt = Date.now();
     await manualRecord('write', {fields, photos: photos.map(file => ({name: file.name, type: file.type, lastModified: file.lastModified, blob: file})), savedAt,
       step: Number.isInteger(step) && step >= 0 && step <= 4 ? step : 0,agencyId,serverDraftId,serverDraftVersion});
-    if (!saveListingDraft({kind: 'manual'})) {await manualRecord('delete'); return false;}
-    try {localStorage.setItem(manualKey, JSON.stringify({kind: 'manual', savedAt}));} catch { /* Reprise possible dans cet onglet uniquement. */ }
+    if(serverDraftId&&discardedServerDrafts.has(`${agencyId}:${serverDraftId}`)){
+      await discardManualListingDraft(agencyId!,serverDraftId);return false;}
+    const marker=JSON.stringify({kind:'manual',savedAt,agencyId,serverDraftId});
+    try{sessionStorage.setItem(key,marker);}catch{await manualRecord('delete');return false;}
+    try {localStorage.setItem(manualKey, marker);} catch { /* Reprise possible dans cet onglet uniquement. */ }
     return true;
   } catch {return false;}
+}
+
+export async function discardManualListingDraft(agencyId:string,id:string){
+  discardedServerDrafts.add(`${agencyId}:${id}`);
+  try{
+    const database=await openManualDatabase();
+    const removed=await new Promise<StoredManualDraft|undefined>((resolve,reject)=>{
+      const transaction=database.transaction(storeName,'readwrite'),store=transaction.objectStore(storeName),request=store.get(recordKey);
+      let matched:StoredManualDraft|undefined;
+      request.onsuccess=()=>{const record=request.result as StoredManualDraft|undefined;
+        if(record?.agencyId===agencyId&&record.serverDraftId===id){matched=record;store.delete(recordKey);}};
+      transaction.oncomplete=()=>{database.close();resolve(matched);};
+      transaction.onerror=transaction.onabort=()=>{database.close();reject(transaction.error);};
+    });
+    if(!removed)return;
+    const session=parseDraft(sessionStorage.getItem(key));
+    // Old session markers had their own timestamp and no server ID. The matched
+    // IndexedDB record identifies that legacy manual marker; URL drafts stay intact.
+    if(session?.kind==='manual'&&(!session.serverDraftId||
+      session.agencyId===agencyId&&session.serverDraftId===id))sessionStorage.removeItem(key);
+    if(parseDraft(localStorage.getItem(manualKey))?.savedAt===removed.savedAt)localStorage.removeItem(manualKey);
+    sessionStorage.removeItem(`bienvu:manual-start:${agencyId}`);
+  }catch{/* Server deletion still succeeds if optional browser storage is unavailable. */}
 }
 
 export async function readManualListingDraft(agencyId?:string): Promise<ManualDraft | null> {

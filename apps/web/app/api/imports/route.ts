@@ -1,12 +1,15 @@
 import {ImportInput} from '@bienvu/contracts';
-import {listImports} from '@bienvu/db';
+import {listImportPage,ImportStateFailure} from '@bienvu/db';
 import {requireOwner} from '../../../lib/owner';
 import {assertSameOrigin, boundedJson, RequestFailure, respond} from '../../../lib/http';
 import {createPrivateImport, importResult} from '../../../lib/imports';
 import {importPorts} from '../../../lib/import-transport';
 export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
-  return respond(async () => {const {env, agency} = await requireOwner(request); return Response.json({imports: await listImports(env.DB, agency.id)});});
+  return respond(async () => {const {env,agency}=await requireOwner(request),params=new URL(request.url).searchParams;
+    try{return Response.json(await listImportPage(env.DB,agency.id,params.get('cursor')??undefined,params.get('drafts')==='1'));}
+    catch(error){if(error instanceof ImportStateFailure)throw new RequestFailure(error.code);throw error;}
+  });
 }
 export async function POST(request: Request) {
   return respond(async () => {

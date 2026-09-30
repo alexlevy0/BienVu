@@ -45,3 +45,15 @@ export async function updateCreationDraft(db:Database,agencyId:string,id:string,
     .bind(JSON.stringify(CreationDraftData.parse(data)),new Date().toISOString(),id,agencyId,version,id,agencyId,new Date().toISOString())
     .first<{version:number}>();return row?.version??null;
 }
+
+export async function markCreationDraftDeleting(db:Database,agencyId:string,id:string,now=Date.now()){
+  // A draft has no transport lease to wait for. Keep its journal for the existing
+  // five-minute reconciliation window so an interrupted R2 put can still be purged.
+  const row=await db.prepare(`UPDATE listing_imports SET status='deleting',
+    lease_until=CASE WHEN status='importing' THEN ? ELSE lease_until END
+    WHERE agency_id=? AND id=? AND draft_pending=1 AND status IN ('importing','deleting')
+    AND EXISTS(SELECT 1 FROM creation_drafts WHERE id=? AND agency_id=? AND state='needs_input')
+    AND NOT EXISTS(SELECT 1 FROM jobs WHERE agency_id=? AND listing_id=?) RETURNING id`)
+    .bind(new Date(now).toISOString(),agencyId,id,id,agencyId,agencyId,id).first();
+  return Boolean(row);
+}

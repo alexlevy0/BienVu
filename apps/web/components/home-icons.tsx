@@ -15,6 +15,8 @@ const shapes = {
   chevron: <path d="m6 9 6 6 6-6"/>,
   close: <path d="m5 5 14 14M5 19 19 5"/>,
   menu: <path d="M3 5h18M3 12h18M3 19h18"/>,
+  more: <><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></>,
+  trash: <><path d="M3 6h18M9 6V3h6v3M5 6l1 16h12l1-16M10 10v8m4-8v8"/></>,
   user: <><circle cx="12" cy="8" r="4"/><path d="M4 22v-2a8 8 0 0 1 16 0v2"/></>,
   link: <><path d="m9 15 6-6m-5-3 1-1a5 5 0 0 1 7 7l-3 3a5 5 0 0 1-7 0m6 3-1 1a5 5 0 0 1-7-7l3-3a5 5 0 0 1 7 0"/></>,
   search: <><circle cx="10.5" cy="10.5" r="7.5"/><path d="m16 16 5 5"/></>,

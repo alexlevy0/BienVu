@@ -54,6 +54,41 @@ test('lien SeLoger copié : fragment de suivi connu retiré, validations conserv
     'https://www.seloger.com/recherche#ln=foo']) assert.equal(ImportUrl.safeParse(value).success, false, value);
 });
 
+test('Orpi : fiche avec ou sans slash final, même référence et contrôles des photos conservés', async () => {
+  const url = 'https://www.orpi.com/annonce-vente-appartement-test-12345678-1234-1234-1234-123456789012/';
+  const withoutSlash = url.slice(0, -1), html = await fixture('orpi');
+  assert.deepEqual(selectAdapter(withoutSlash), selectAdapter(url));
+  assert.doesNotThrow(() => assertListingDestination(withoutSlash, url));
+  assert.doesNotThrow(() => assertListingDestination(url, withoutSlash));
+  assert.deepEqual(extractListingHtml(html, withoutSlash), extractListingHtml(html, url));
+  const changed = url.replace('12345678-', '87654321-');
+  assert.throws(() => assertListingDestination(withoutSlash, changed), fails('SOURCE_UNAVAILABLE', 'listing_redirect'));
+  assert.throws(() => extractListingHtml(html.replace(url, changed), changed), fails('CONFLICTING_FACTS'));
+  for (const invalid of [url + 'autre', withoutSlash + '/autre', 'https://www.orpi.com/annonces-immobilieres/',
+    'https://www.orpi.com/annonce-vente-appartement-test-not-a-uuid/'])
+    assert.throws(() => selectAdapter(invalid), fails('NOT_A_LISTING'));
+});
+
+test('Orpi location : loyer mensuel et charges de l’en-tête, jamais dépôt, honoraires ou bien voisin', async () => {
+  const url = 'https://www.orpi.com/annonce-location-appartement-test-12345678-1234-1234-1234-123456789012/';
+  const html = await fixture('orpi-rent'), result = extractListingHtml(html, url);
+  assert.equal(result.transaction, 'rent');
+  assert.deepEqual(result.facts.price.value, {amountCents: 117800, currency: 'EUR', period: 'month', charges: 'included'});
+  assert.equal(result.facts.area.value, 37.23); assert.equal(result.facts.rooms?.value, 2);
+  assert.equal(result.photoUrls.length, 3);
+  assert.deepEqual(extractListingHtml(html, url.slice(0, -1)), result);
+  const excluded = extractListingHtml(html.replace('<p>Charges comprises</p>', '<p>Hors charges</p>'), url);
+  assert.equal(excluded.facts.price.value?.charges, 'excluded');
+  for (const changed of [html.replace('<p>Charges comprises</p>', ''), html.replace('par mois', 'par semaine'),
+    html.replace('1 178 €', 'À consulter')]) {
+    const value = extractListingHtml(changed, url);
+    assert.equal(value.facts.price.status, 'missing'); assert.ok(value.warnings.length);
+  }
+  assert.throws(() => extractListingHtml(html.replace('<p>Charges comprises</p>', '<p>Charges comprises</p><p>Hors charges</p>'), url), fails('CONFLICTING_FACTS'));
+  assert.throws(() => extractListingHtml(html.replace('à louer', 'à vendre'), url), fails('INCOMPLETE_LISTING'));
+  assert.throws(() => assertListingDestination(url, url.replace('annonce-location-', 'annonce-vente-')), fails('SOURCE_UNAVAILABLE'));
+});
+
 test('recherche connue refusée avant réseau ; redirection de fiche vers recherche/autre bien refusée', async () => {
   let calls = 0, browser = 0;
   const ports = {transport: {load: async () => {calls++; throw new Error('NON_APPELE');}}, store: async () => {}, browserHtml: async () => {browser++; return '';}};

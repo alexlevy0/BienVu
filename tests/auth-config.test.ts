@@ -20,7 +20,7 @@ test('la préparation staging désactive le bypass même si la configuration loc
   await promisify(execFile)(process.execPath, [fileURLToPath(new URL('../scripts/prepare-staging.mjs', import.meta.url))], {
     cwd: folder, env: {...process.env, BIENVU_D1_ID: '00000000-0000-4000-8000-000000000001',
       BIENVU_WEB_ORIGIN: 'https://staging.example.com', BIENVU_WORKERS_PLAN: 'free', BIENVU_AUTH_EMAIL_FROM: '',
-      BIENVU_AUTH_EMAIL_TO: '', BIENVU_STAGING_TARGET: 'all', BIENVU_WEB_CUSTOM_DOMAIN: ''},
+      BIENVU_AUTH_EMAIL_TO: '', BIENVU_AUTH_EMAIL_AUDIENCE: 'test', BIENVU_STAGING_TARGET: 'all', BIENVU_WEB_CUSTOM_DOMAIN: ''},
   });
   const config = JSON.parse(await readFile(join(folder, 'apps/web/wrangler.staging.jsonc'), 'utf8'));
   assert.equal(config.vars.PROBE_MODE, 'remote');
@@ -41,7 +41,7 @@ test('une recette mail prépare seulement le web et restreint le destinataire sa
   await writeFile(renderer, 'renderer en pause : configuration à préserver');
   const env = {...process.env, BIENVU_D1_ID: '00000000-0000-4000-8000-000000000001',
     BIENVU_WEB_ORIGIN: 'https://staging.example.com', BIENVU_WEB_CUSTOM_DOMAIN: 'staging.example.com', BIENVU_WORKERS_PLAN: 'paid',
-    BIENVU_AUTH_EMAIL_FROM: 'connexion@bienvu.online', BIENVU_AUTH_EMAIL_TO: 'tester@example.com', BIENVU_STAGING_TARGET: 'web'};
+    BIENVU_AUTH_EMAIL_FROM: 'connexion@bienvu.online', BIENVU_AUTH_EMAIL_TO: 'tester@example.com', BIENVU_AUTH_EMAIL_AUDIENCE: 'test', BIENVU_STAGING_TARGET: 'web'};
   const run = (overrides = {}) => promisify(execFile)(process.execPath,
     [fileURLToPath(new URL('../scripts/prepare-staging.mjs', import.meta.url))], {cwd: folder, env: {...env, ...overrides}});
   await run();
@@ -59,7 +59,17 @@ test('une recette mail prépare seulement le web et restreint le destinataire sa
   await assert.rejects(run({BIENVU_WORKERS_PLAN: 'free'}));
   await assert.rejects(run({BIENVU_AUTH_EMAIL_TO: 'invalid'}));
   await assert.rejects(run({BIENVU_AUTH_EMAIL_FROM: ''}));
+  await assert.rejects(run({BIENVU_AUTH_EMAIL_TO: ''}));
+  await assert.rejects(run({BIENVU_AUTH_EMAIL_AUDIENCE: 'unknown'}));
+  await assert.rejects(run({BIENVU_AUTH_EMAIL_AUDIENCE: 'public'}));
   await assert.rejects(run({BIENVU_WEB_CUSTOM_DOMAIN: 'other.example.com'}));
   await assert.rejects(run({BIENVU_WEB_CUSTOM_DOMAIN: 'https://staging.example.com'}));
   await assert.rejects(run({BIENVU_WEB_CUSTOM_DOMAIN: '', BIENVU_WEB_ORIGIN: 'http://staging.example.com'}));
+  // Le site public conserve l'expéditeur vérifié, sans filtrer les nouveaux inscrits.
+  await run({BIENVU_AUTH_EMAIL_AUDIENCE: 'public', BIENVU_AUTH_EMAIL_TO: '',
+    BIENVU_WEB_ORIGIN: 'https://bienvu.online', BIENVU_WEB_CUSTOM_DOMAIN: 'bienvu.online'});
+  const publicConfig = JSON.parse(await readFile(join(folder, 'apps/web/wrangler.staging.jsonc'), 'utf8'));
+  assert.deepEqual(publicConfig.send_email, [{name: 'AUTH_EMAIL', allowed_sender_addresses: ['connexion@bienvu.online']}]);
+  assert.equal(publicConfig.vars.AUTH_EMAIL_VERIFICATION_BYPASS, 'false');
+  assert.equal(await readFile(renderer, 'utf8'), 'renderer en pause : configuration à préserver');
 });

@@ -29,9 +29,24 @@ export async function reserveAuthEmail(env: MailEnvironment, email: string, now 
 
 export async function sendAuthEmail(env: MailEnvironment, to: string, purpose: 'verify' | 'reset', url: string) {
   if (!emailConfigured(env)) throw new Error('EMAIL_UNAVAILABLE');
-  if (!await reserveAuthEmail(env, to)) return;
+  if (!await reserveAuthEmail(env, to)) {
+    console.log(JSON.stringify({event: 'auth_email_limited', purpose}));
+    return;
+  }
   const subject = purpose === 'verify' ? 'Confirmez votre adresse e-mail — BienVu' : 'Votre mot de passe — BienVu';
   const instruction = purpose === 'verify' ? 'Confirmez votre adresse pour accéder à votre agence.' : 'Choisissez un nouveau mot de passe pour votre compte.';
-  await env.AUTH_EMAIL!.send({from: env.AUTH_EMAIL_FROM!, to, subject,
-    text: `${instruction}\n\n${url}\n\nCe lien expire dans ${purpose === 'verify' ? '60' : '30'} minutes.\nSi vous n’êtes pas à l’origine de cette demande, ignorez ce message.\n\nBienVu`});
+  try {
+    await env.AUTH_EMAIL!.send({from: env.AUTH_EMAIL_FROM!, to, subject,
+      text: `${instruction}\n\n${url}\n\nCe lien expire dans ${purpose === 'verify' ? '60' : '30'} minutes.\nSi vous n’êtes pas à l’origine de cette demande, ignorez ce message.\n\nBienVu`});
+    // Accepté par le transport, sans garantir la réception dans la messagerie.
+    console.log(JSON.stringify({event: 'auth_email_submitted', purpose}));
+  } catch (error) {
+    const code = error && typeof error === 'object' ? Reflect.get(error, 'code') : undefined;
+    const knownCodes = ['E_RECIPIENT_NOT_ALLOWED', 'E_RECIPIENT_SUPPRESSED', 'E_SENDER_NOT_VERIFIED',
+      'E_SENDER_DOMAIN_NOT_AVAILABLE', 'E_DELIVERY_FAILED', 'E_RATE_LIMIT_EXCEEDED', 'E_DAILY_LIMIT_EXCEEDED', 'E_INTERNAL_SERVER_ERROR'];
+    // Liste blanche seulement : les messages du fournisseur peuvent contenir une adresse ou un jeton.
+    console.error(JSON.stringify({event: 'auth_email_failed', purpose,
+      code: knownCodes.includes(code) ? code : 'EMAIL_DELIVERY_FAILED'}));
+    throw new Error('EMAIL_DELIVERY_FAILED');
+  }
 }

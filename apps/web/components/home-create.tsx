@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import {useEffect, useRef, useState, type FormEvent} from 'react';
+import {useEffect, useLayoutEffect, useRef, useState, type FormEvent} from 'react';
 import {ImportUrl, GenerationView, type CreationDraftData, type CreationDraftView, type GenerationRequest} from '@bienvu/contracts';
 import {useAnonymousTrial, TrialChallenge} from './anonymous-trial';
 import {useAccount} from './account';
@@ -41,7 +41,8 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     [manualReason,setManualReason]=useState('Terminez les sections puis vérifiez votre annonce.'),
     [guestExtraction,setGuestExtraction]=useState<CreationDraftData|null>(null);
   const lock = useRef(false), startFresh = useRef(false), interactionVersion=useRef(0),
-    scrollRegion = useRef<HTMLDivElement>(null);
+    scrollRegion = useRef<HTMLDivElement>(null),composerDock=useRef<HTMLDivElement>(null),
+    composerAnimation=useRef<Animation|null>(null),previousComposer=useRef<DOMRect|null>(null),previousLayout=useRef(false);
   const manualForm=useRef<ManualListingFormHandle>(null);
   const pendingImport=useRef<{url:string;key:string}|null>(null);
   const guestPending=useRef<{text:string;key:string}|null>(null);
@@ -88,7 +89,44 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     }).catch(()=>{});
     return()=>controller.abort();
   },[me?.agency.id]);
-  useEffect(() => {onLayoutChange(inConversation);}, [inConversation, onLayoutChange]);
+  useLayoutEffect(() => {onLayoutChange(inConversation);}, [inConversation, onLayoutChange]);
+  useLayoutEffect(()=>{
+    const dock=composerDock.current;if(!dock)return;
+    // Wait for the parent layout commit. The final position is measured before
+    // paint, then animated from the previous position without a height collapse.
+    if(Boolean(dock.closest('.home-content-conversation'))!==inConversation)return;
+    if(previousLayout.current!==inConversation)composerAnimation.current?.cancel();
+    const target=dock.getBoundingClientRect();
+    if(previousLayout.current!==inConversation){
+      const from=previousComposer.current;
+      if(from&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+        const delta=from.top-target.top;
+        // Entering conversation only moves down; there is no upward overshoot.
+        const offset=inConversation?Math.min(0,delta):delta;
+        if(Math.abs(offset)>1)composerAnimation.current=dock.animate(
+          [{transform:`translateY(${offset}px)`},{transform:'translateY(0)'}],
+          {duration:460,easing:'cubic-bezier(.22,.68,.3,1)'});
+      }
+      previousLayout.current=inConversation;
+    }
+    previousComposer.current=target;
+  });
+  useEffect(()=>()=>composerAnimation.current?.cancel(),[]);
+  useEffect(()=>{
+    const deleted=(event:Event)=>{
+      const {id,agencyId}=(event as CustomEvent<{id:string;agencyId:string}>).detail;
+      if(agencyId!==currentOwner.current)return;
+      const location=new URL(window.location.href);
+      if(importDraft?.id!==id&&!manualForm.current?.isDraft(id)&&location.searchParams.get('draft')!==id)return;
+      previousComposer.current=composerDock.current?.getBoundingClientRect()??null;
+      interactionVersion.current++;lock.current=false;startFresh.current=true;forget();
+      setScreen({kind:'landing'});setImportDraft(null);setGuestExtraction(null);setUrl('');setDescription('');setStep(0);setFeedback('');setManualBusy(false);
+      try{sessionStorage.removeItem(`bienvu:manual-start:${agencyId}`);}catch{/* Optional storage. */}
+      if(location.searchParams.get('draft')===id){location.searchParams.delete('draft');
+        window.history.replaceState(window.history.state,'',location.pathname+location.search+location.hash);}
+    };
+    window.addEventListener('bienvu:draft-deleted',deleted);return()=>window.removeEventListener('bienvu:draft-deleted',deleted);
+  },[importDraft?.id]);
   useEffect(() => {if(manual)scrollRegion.current?.scrollTo({top:0,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});}, [manual,step]);
   useEffect(()=>{if(manual&&step===4)setFeedback(current=>
     current.startsWith('Les informations du bien ont été récupérées.')||
@@ -143,6 +181,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   }
   function openManual(fromText = '',initialData:CreationDraftData|null=null) {
     if (manualBusy||screen.kind==='sending'||(screen.kind === 'job' && generationActive(selectedJob))) return;
+    previousComposer.current=composerDock.current?.getBoundingClientRect()??null;
     interactionVersion.current++;lock.current=false;startFresh.current = true;forget();
     if (fromText) setDescription(fromText);
     setImportDraft(null);setGuestExtraction(initialData);guestPending.current=null;trial.setToken('');trial.setChallenge(false);
@@ -171,6 +210,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
       return;
     }
     if (loading || busy || lock.current || noCredits || importPaused || activeOtherJob || screen.kind === 'job' && generationActive(selectedJob)) return;
+    previousComposer.current=composerDock.current?.getBoundingClientRect()??null;
     const value = url.trim();
     const parsed = ImportUrl.safeParse(value);
     if (!parsed.success) {
@@ -247,19 +287,19 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     : Boolean(noCredits)||Boolean(importPaused)||activeOtherJob||screen.kind==='job'&&
       (generationActive(selectedJob)||resultReady&&!url.trim()));
   const contextNote = !me ? 'Essayez gratuitement. Connectez-vous pour télécharger sans filigrane.' : canGenerate
-    ? `${me.rights.creditKind === 'free' ? 'Compte gratuit' : 'Vidéos'} · ${me.rights.developmentRemaining} vidéo${me.rights.developmentRemaining > 1 ? 's' : ''} disponible${me.rights.developmentRemaining > 1 ? 's' : ''}`
+    ? ''
     : 'Accès anticipé · Préparez votre annonce';
   return <div className={`home-create${inConversation ? ' home-create-conversation' : ''}`}>
     <div ref={scrollRegion} className="home-conversation-scroll">
     {manual && <div className="home-conversation-manual"><div className="home-request-bubble"><HomeIcon name={importDraft?.sourceUrl?'link':'pencil'} size={21}/>
-      <strong>{importDraft?.sourceUrl??(description.trim()||'Je souhaite ajouter mon annonce manuellement.')}</strong></div>
+      <strong>{importDraft?.sourceUrl??importDraft?.data.originalText??guestExtraction?.originalText??(description.trim()||'Je souhaite ajouter mon annonce manuellement.')}</strong></div>
       <p className="home-conversation-lead">Décrivons votre bien, étape par étape.</p>
       <div className="home-manual-panel">
-        {!me ? <ManualListingForm ref={manualForm} key="guest" prepareGuest guided={{step,setStep,description,setDescription,initialData:guestExtraction,onCancel:()=>setScreen({kind:'landing'}),
+        {!me ? <ManualListingForm ref={manualForm} key="guest" prepareGuest guided={{step,setStep,description,setDescription,initialData:guestExtraction,onCancel:()=>{previousComposer.current=composerDock.current?.getBoundingClientRect()??null;setScreen({kind:'landing'});},
           onReadyChange:(ready,reason)=>{setManualReady(ready);setManualReason(reason);}}} busy={manualBusy} setBusy={setManualBusy} onPrepared={() => window.location.assign('/connexion?mode=signup')}/>
           : <ManualListingForm ref={manualForm} key={`agency:${me.agency.id}:${importDraft?.id??'manual'}`} generate={canGenerate} guided={{step,setStep,description,setDescription,agencyId:me.agency.id,initialDraft:importDraft,
             onReadyChange:(ready,reason)=>{setManualReady(ready);setManualReason(reason);},onDraftChange:()=>void refreshDrafts(),
-            onCancel:()=>setScreen({kind:'landing'})}} busy={manualBusy} setBusy={setManualBusy} onCreated={async value => {
+            onCancel:()=>{previousComposer.current=composerDock.current?.getBoundingClientRect()??null;setScreen({kind:'landing'});}}} busy={manualBusy} setBusy={setManualBusy} onCreated={async value => {
             void refreshDrafts();
             if (!canGenerate) {setFeedback('Votre annonce est enregistrée dans votre espace.');setScreen({kind:'landing'});clearListingDraft();return;}
             const request:RequestMessage={kind:'manual',text:'Je souhaite ajouter mon annonce manuellement.'};
@@ -273,7 +313,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     {screen.kind==='extracting'&&<div className="home-conversation-manual"><div className="home-request-bubble"><HomeIcon name="pencil" size={21}/><strong>{screen.text}</strong></div>
       <p className="home-conversation-lead" role="status">Nous préparons les informations de votre bien…</p></div>}
     </div>
-    <div className="home-composer-dock"><form className={`home-composer${feedback || screen.kind === 'error' ? ' home-composer-invalid' : ''}`} onSubmit={submit} noValidate aria-label="Créer une vidéo depuis une annonce">
+    <div ref={composerDock} className="home-composer-dock"><form className={`home-composer${feedback || screen.kind === 'error' ? ' home-composer-invalid' : ''}`} onSubmit={submit} noValidate aria-label="Créer une vidéo depuis une annonce">
       <div className="home-url-row"><HomeIcon name="link" size={28}/><label htmlFor="home-listing-url" className="sr-only">{manual?'Précisions sur votre bien':'Lien ou description de votre annonce'}</label>
         <input id="home-listing-url" name="url" type="text" autoComplete="off" spellCheck={false} placeholder={manual?'Ajoutez des précisions sur votre bien…':resultReady?'Collez le lien d’une autre annonce…':'Collez un lien ou décrivez votre bien…'}
           value={manual?description:screen.kind==='sending'?'':url} onChange={event=>{if(manual)setDescription(event.target.value);
@@ -298,8 +338,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     {!me && trial.failure && screen.kind !== 'error' && <p className="home-form-feedback" role="alert">{trial.failure} <Link href="/connexion">Se connecter</Link></p>}
     {importPaused && <p className="home-form-note" role="status">La limite d’imports est atteinte. Vous pourrez ajouter une annonce à partir du {new Date(me!.rights.importRetryAt!).toLocaleString('fr-FR')}.</p>}
     {activeOtherJob && <p className="home-form-note">Une vidéo est déjà en cours de création. <Link href="/historique">Suivez-la dans Mes vidéos</Link>.</p>}
-    <p className="home-create-note" id="home-create-note">{manual ? 'Votre brouillon reste sur cet appareil pendant une heure.' : screen.kind === 'job' && generationActive(selectedJob) ? 'Votre création sera enregistrée dans Mes vidéos.' : contextNote}</p>
-    {me?.rights.renewalAt && screen.kind==='landing'&&<p className="field-help">Renouvellement le {new Date(me.rights.renewalAt).toLocaleDateString('fr-FR')}.</p>}
+    <p className="home-create-note" id="home-create-note" hidden={!manual&&!(screen.kind==='job'&&generationActive(selectedJob))&&!contextNote}>{manual ? 'Votre brouillon reste sur cet appareil pendant une heure.' : screen.kind === 'job' && generationActive(selectedJob) ? 'Votre création sera enregistrée dans Mes vidéos.' : contextNote}</p>
     </div>
   </div>;
 }

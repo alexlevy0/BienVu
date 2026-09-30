@@ -3,7 +3,43 @@ import Link from 'next/link';
 import {useEffect, useRef, useState} from 'react';
 import {SignOut, useAccount} from './account';
 import {HomeIcon, HomeWordmark} from './home-icons';
-import {useGenerationStore} from './generation-store';
+import {useGenerationStore,type RecentDraft} from './generation-store';
+import {discardManualListingDraft} from '../lib/listing-draft';
+
+function DraftActions({draft,agencyId}:{draft:RecentDraft;agencyId:string}){
+  const {forgetDraft,refreshDrafts}=useGenerationStore();
+  const [open,setOpen]=useState(false),[busy,setBusy]=useState(false),[failure,setFailure]=useState('');
+  const container=useRef<HTMLDivElement>(null),trigger=useRef<HTMLButtonElement>(null),action=useRef<HTMLButtonElement>(null),owner=useRef(agencyId),requestPending=useRef(false);
+  owner.current=agencyId;
+  useEffect(()=>{if(!open)return;action.current?.focus();
+    const outside=(event:PointerEvent)=>{if(!container.current?.contains(event.target as Node))setOpen(false);};
+    document.addEventListener('pointerdown',outside);return()=>document.removeEventListener('pointerdown',outside);
+  },[open]);
+  async function remove(){
+    if(busy||requestPending.current)return;requestPending.current=true;setBusy(true);setFailure('');
+    try{
+      const response=await fetch(`/api/imports/${encodeURIComponent(draft.id)}/draft`,{method:'DELETE'});
+      if(owner.current!==agencyId)return;
+      if(!response.ok&&response.status!==404)throw new Error(response.status===409?'Ce brouillon a déjà été enregistré. Actualisez la page.':
+        response.status===401?'Reconnectez-vous pour supprimer ce brouillon.':'Suppression interrompue. Réessayez.');
+      window.dispatchEvent(new CustomEvent('bienvu:draft-deleted',{detail:{id:draft.id,agencyId}}));
+      forgetDraft(draft.id,agencyId);await discardManualListingDraft(agencyId,draft.id);
+      if(owner.current!==agencyId)return;await refreshDrafts();
+      document.querySelector<HTMLElement>('.home-recents a, .home-nav-active')?.focus();
+    }catch(error){if(owner.current===agencyId)setFailure(error instanceof Error?error.message:'Suppression interrompue. Réessayez.');}
+    finally{requestPending.current=false;if(owner.current===agencyId)setBusy(false);}
+  }
+  return <div ref={container} className="home-draft-actions" onKeyDown={event=>{
+    if(event.key==='Escape'){event.preventDefault();event.stopPropagation();setOpen(false);trigger.current?.focus();}
+    if(event.key==='Tab')setOpen(false);
+    if(event.key==='ArrowDown'&&!open){event.preventDefault();setOpen(true);}
+  }}>
+    <button ref={trigger} type="button" className="home-draft-more" aria-label={`Actions du brouillon ${draft.title||'Votre annonce'}`}
+      aria-haspopup="menu" aria-expanded={open} onClick={()=>setOpen(value=>!value)}><HomeIcon name="more" size={20}/></button>
+    {open&&<div className="home-draft-dropdown"><div role="menu" aria-label="Actions du brouillon"><button ref={action} type="button" role="menuitem" aria-disabled={busy} onClick={()=>void remove()}>
+      <HomeIcon name="trash" size={17}/>{busy?'Suppression…':'Supprimer'}</button></div>{failure&&<p role="alert">{failure}</p>}</div>}
+  </div>;
+}
 
 export function StudioSidebar({active}: {active: 'create' | 'videos' | 'explore' | 'agency' | 'offers'}) {
   const {me, loading} = useAccount();
@@ -11,7 +47,7 @@ export function StudioSidebar({active}: {active: 'create' | 'videos' | 'explore'
   const store=useGenerationStore();
   const recent=[...store.jobs.map(job=>({kind:'job' as const,createdAt:job.createdAt,job})),
     ...store.drafts.map(draft=>({kind:'draft' as const,createdAt:draft.createdAt,draft}))]
-    .sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,2);
+    .sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
   const sidebar = useRef<HTMLElement>(null), menuButton = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!menuOpen) return;
@@ -50,18 +86,18 @@ export function StudioSidebar({active}: {active: 'create' | 'videos' | 'explore'
       </nav>
       <section className="home-recents" aria-labelledby="home-recents-title"><h2 id="home-recents-title">RÉCENTES</h2>
         {recent.map(item => item.kind==='job'?<Link className="home-recent-link" key={`job:${item.job.id}`}
-          href={`/historique#video-${item.job.id}`} onClick={closeMenu}>
-          <img src={`/api/generations/${item.job.id}/source-photo`} alt="" onError={event=>{event.currentTarget.style.display='none';}}/>
+          href={`/historique/${encodeURIComponent(item.job.id)}`} onClick={closeMenu}>
+          <img src={`/api/${item.job.ownership==='anonymous'?'trial':'generations'}/${item.job.id}/source-photo`} alt="" loading="lazy" decoding="async" onError={event=>{event.currentTarget.style.display='none';}}/>
           <span>{item.job.title||'Votre annonce'}<small>{item.job.status==='ready'?'Prête':item.job.status==='failed'?'Échec':'En cours'}
             {item.job.locality?` · ${item.job.locality}`:''}</small></span></Link>
-          :<Link className="home-recent-link" key={`draft:${item.draft.id}`} href={`/?draft=${encodeURIComponent(item.draft.id)}`} onClick={closeMenu}>
-            {item.draft.previewPhotoId?<img src={`/api/imports/${item.draft.id}/photos/${item.draft.previewPhotoId}`} alt=""
+          :<div className="home-recent-row" key={`draft:${item.draft.id}`}><Link className="home-recent-link" href={`/?draft=${encodeURIComponent(item.draft.id)}`} onClick={closeMenu}>
+            {item.draft.previewPhotoId?<img src={`/api/imports/${item.draft.id}/photos/${item.draft.previewPhotoId}`} alt="" loading="lazy" decoding="async"
               onError={event=>{event.currentTarget.style.display='none';}}/>:<span className="home-recent-placeholder"><HomeIcon name="pencil" size={20}/></span>}
             <span>{item.draft.title||'Votre annonce'}<small>À compléter{item.draft.locality?` · ${item.draft.locality}`:''}</small></span>
-          </Link>)}
-        {!recent.length && <p className="home-recents-empty">{loading ? 'Chargement de votre espace…' : store.unavailable ? 'Vos créations sont disponibles dans Mes vidéos.' : me ? 'Vos prochaines créations apparaîtront ici.' : 'Connectez-vous pour retrouver vos créations.'}</p>}
+          </Link>{me&&<DraftActions draft={item.draft} agencyId={me.agency.id}/>}</div>)}
+        {!recent.length && <p className="home-recents-empty">{loading||store.loading ? 'Chargement de votre espace…' : store.unavailable ? 'Vos créations sont disponibles dans Mes vidéos.' : me ? 'Vos prochaines créations apparaîtront ici.' : 'Vos essais apparaîtront ici.'}</p>}
       </section>
-      <div className="home-sidebar-bottom"><div className="home-plan"><span>{active === 'offers' ? 'Votre abonnement' : me?.rights.creditKind === 'free' ? `${me.rights.developmentRemaining} crédits gratuits` : me?.rights.creditKind === 'paid' ? 'Votre abonnement' : me?.rights.generationEnabled ? 'Accès de développement' : 'Accès anticipé'}</span><Link href="/abonnement" className={active === 'offers' ? 'home-plan-link-active' : undefined} aria-current={active === 'offers' ? 'page' : undefined}>Découvrir les offres <HomeIcon name="arrow" size={17}/></Link></div>
+      <div className="home-sidebar-bottom"><div className="home-plan"><span aria-live="polite">{loading?'Chargement de votre quota…':me?`${me.rights.developmentRemaining} vidéo${me.rights.developmentRemaining>1?'s':''} disponible${me.rights.developmentRemaining>1?'s':''}`:'Accès anticipé'}</span><Link href="/abonnement" className={active === 'offers' ? 'home-plan-link-active' : undefined} aria-current={active === 'offers' ? 'page' : undefined}>Découvrir les offres <HomeIcon name="arrow" size={17}/></Link></div>
         {me ? <details className="home-account"><summary><span className="home-avatar">{initials}</span><span>{accountName}</span><HomeIcon name="chevron" size={17}/></summary><div className="home-account-menu"><span>{me.agency.name}</span><Link href="/agence">Mon agence</Link><Link href="/abonnement">Mon abonnement</Link><SignOut/></div></details> : <Link className="home-guest-account" href="/connexion"><span className="home-avatar"><HomeIcon name="user" size={20}/></span><span>Se connecter</span><HomeIcon name="arrow" size={17}/></Link>}
       </div>
     </aside>

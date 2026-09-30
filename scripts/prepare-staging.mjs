@@ -39,6 +39,12 @@ for(const [file,target,name] of [
     const recipient = process.env.BIENVU_AUTH_EMAIL_TO ?? '';
     if (recipient && (!sender || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)))
       throw new Error('BIENVU_AUTH_EMAIL_TO exige un destinataire valide et un expéditeur configuré.');
+    const audience = process.env.BIENVU_AUTH_EMAIL_AUDIENCE ?? 'test';
+    if (!['test', 'public'].includes(audience)) throw new Error('BIENVU_AUTH_EMAIL_AUDIENCE doit être test ou public.');
+    if (sender && audience === 'test' && !recipient)
+      throw new Error('La recette e-mail exige BIENVU_AUTH_EMAIL_TO ; utiliser BIENVU_AUTH_EMAIL_AUDIENCE=public pour les inscriptions publiques.');
+    if (audience === 'public' && recipient)
+      throw new Error('Les inscriptions publiques ne doivent pas restreindre BIENVU_AUTH_EMAIL_TO à une adresse de test.');
     c.vars.AUTH_EMAIL_MODE = sender ? 'cloudflare' : 'disabled';
     c.vars.AUTH_EMAIL_FROM = sender;
     if (sender) c.send_email = [{name: 'AUTH_EMAIL', allowed_sender_addresses: [sender],
