@@ -12,7 +12,7 @@ const pages = new Map([
   ['/generer', /UNE ANNONCE, UNE HISTOIRE/],
   ['/agence', /Votre identité, sur chaque vidéo\./],
   ['/historique', /Toutes vos créations, au même endroit\./],
-  ['/abonnement', /Les offres sont en préparation/],
+  ['/abonnement', /Des vidéos à/],
   ['/connexion', /Votre studio immobilier/],
   ['/laboratoire', /Cette interface est en développement/],
 ]);
