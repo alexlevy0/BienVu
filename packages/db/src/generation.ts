@@ -1,4 +1,4 @@
-import {AgencyBrand, EntityId, Timestamp, GeneratableListing, GenerationRequest, GenerationView, VideoReport, publicErrors, type PublicErrorCode,type NormalizedListing} from '@bienvu/contracts';
+import {AgencyBrand, EntityId, Timestamp, GeneratableListing, GenerationRequest, GenerationView, VideoReport, publicErrors,customizedListing, type PublicErrorCode,type NormalizedListing} from '@bienvu/contracts';
 import type {Database} from './index';
 import {creditGrant} from './credits';
 import {findImport} from './imports';
@@ -57,7 +57,8 @@ export async function admitGeneration(db:Database,agencyId:string,key:string,inp
   let saved:NormalizedListing|undefined;
   if('listingId' in parsed.data){const row=await findImport(db,agencyId,parsed.data.listingId);
     if(!row||row.status!=='ready'||row.expiresAt<=new Date(now+600_000).toISOString()||!row.result)throw new GenerationFailure('NOT_FOUND');
-    saved=GeneratableListing.parse(JSON.parse(row.result));if(saved.agencyId!==agencyId||saved.id!==parsed.data.listingId)throw new GenerationFailure('NOT_FOUND');}
+    saved=GeneratableListing.parse(JSON.parse(row.result));if(saved.agencyId!==agencyId||saved.id!==parsed.data.listingId)throw new GenerationFailure('NOT_FOUND');
+    try{saved=customizedListing(saved,parsed.data.customization);}catch{throw new GenerationFailure('VALIDATION_ERROR');}}
   const brandRow=await db.prepare(`SELECT id,owner_user_id AS ownerUserId,name,logo_asset_id AS logoAssetId,primary_color AS primaryColor,
     secondary_color AS secondaryColor,phone,email,website,created_at AS createdAt FROM agencies WHERE id=?`).bind(agencyId).first();
   const brand=AgencyBrand.safeParse(brandRow);if(!brand.success)throw new GenerationFailure('VALIDATION_ERROR');

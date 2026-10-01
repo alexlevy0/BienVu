@@ -35,12 +35,12 @@ async function authorized(request: Request, expected?: string) {
   return crypto.subtle.verify('HMAC', key, signature, expectedHash);
 }
 
-export async function realProviders(env: Pick<Env,'GOOGLE_SERVICE_ACCOUNT_JSON'|'GOOGLE_CLOUD_PROJECT'|'GOOGLE_TTS_VOICE'|'OPENAI_API_KEY'|'SCRIPT_MODEL'>): Promise<NarrationProviders> {
+export async function realProviders(env: Pick<Env,'GOOGLE_SERVICE_ACCOUNT_JSON'|'GOOGLE_CLOUD_PROJECT'|'GOOGLE_TTS_VOICE'|'OPENAI_API_KEY'|'SCRIPT_MODEL'>,voiceName?:GoogleVoiceConfig['voice']): Promise<NarrationProviders> {
   const secret = env.GOOGLE_SERVICE_ACCOUNT_JSON;
   if (!secret || secret.length > 16_384) throw new NarrationFailure('SCRIPT_CONFIG_INVALID');
   let account: unknown;
   try {account = JSON.parse(secret);} catch {throw new NarrationFailure('SCRIPT_CONFIG_INVALID');}
-  const config = GoogleVoiceConfig.parse({projectId: env.GOOGLE_CLOUD_PROJECT, voice: env.GOOGLE_TTS_VOICE});
+  const config = GoogleVoiceConfig.parse({projectId: env.GOOGLE_CLOUD_PROJECT, voice: voiceName??env.GOOGLE_TTS_VOICE});
   const access = await googleServiceAccountAccess(account, config.projectId);
   const voice = googleTts(config, access);
   return {mode: 'real', script: openaiScripts(env.OPENAI_API_KEY ?? '', env.SCRIPT_MODEL), voice: {config, synthesize: voice.synthesize}};

@@ -65,11 +65,12 @@ function posterLabel(kind: VideoManifest['scenes'][number]['kind'], p: VideoPres
 function GalleryBackground({manifest:m,media}: {manifest:VideoManifest;media:Record<string,string>}) {
   const frame=useCurrentFrame(),current=photoAtFrame(m.photoTimeline!,frame);
   const previous=current.index>0?m.photoTimeline![current.index-1]:null;
-  const zoom=interpolate(current.frame,[0,current.photo.durationFrames],[1.01,1.055],{extrapolateRight:'clamp'});
-  const opacity=previous?interpolate(current.frame,[0,8],[0,1],{extrapolateRight:'clamp'}):1;
+  const zoom=m.photoMotion===false?1:interpolate(current.frame,[0,current.photo.durationFrames],[1.01,1.055],{extrapolateRight:'clamp'});
+  const fade=m.photoTransition!=='cut';
+  const opacity=previous&&fade?interpolate(current.frame,[0,8],[0,1],{extrapolateRight:'clamp'}):1;
   const style={position:'absolute' as const,width:'100%',height:'100%',objectFit:'cover' as const,objectPosition:'center'};
   return <AbsoluteFill style={{overflow:'hidden'}}>
-    {previous&&current.frame<8&&<Img src={media[previous.photoAssetId]} style={{...style,transform:'scale(1.055)'}}/>}
+    {previous&&fade&&current.frame<8&&<Img src={media[previous.photoAssetId]} style={{...style,transform:m.photoMotion===false?'none':'scale(1.055)'}}/>}
     <Img src={media[current.photo.photoAssetId]} style={{...style,opacity,transform:`scale(${zoom})`}}/>
   </AbsoluteFill>;
 }
@@ -84,7 +85,7 @@ function EditorialPhotoScene({manifest:m,media,index}: {manifest:VideoManifest;m
   const subtitle=groups.find(g=>{threshold+=g.length/totalChars*voiceFrames;return f<threshold;})??groups.at(-1)!;
   const opacity=interpolate(f,[0,7],[index?0:1,1],{extrapolateRight:'clamp'});
   const accent=m.brand.primaryColor,ink=contrastInk(accent),width=safe.width;
-  const zoom=interpolate(f,[0,scene.durationFrames],[1.01,1.055],{extrapolateRight:'clamp'});
+  const zoom=m.photoMotion===false?1:interpolate(f,[0,scene.durationFrames],[1.01,1.055],{extrapolateRight:'clamp'});
   return <AbsoluteFill style={{opacity,background:m.photoTimeline?undefined:'#151b16',color:'#fff',overflow:'hidden'}}>
     {!m.photoTimeline&&<Img src={media[photo.id]} style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:'center',transform:`scale(${zoom})`}}/>}
     <AbsoluteFill style={{background:'linear-gradient(180deg,rgba(8,13,10,.30) 0%,rgba(8,13,10,.06) 36%,rgba(8,13,10,.15) 51%,rgba(8,13,10,.54) 70%,rgba(8,13,10,.78) 100%)'}}/>
@@ -123,6 +124,31 @@ function EditorialPhotoScene({manifest:m,media,index}: {manifest:VideoManifest;m
     <Audio src={media[audio.id]} volume={1}/>
   </AbsoluteFill>;
 }
+function StyledPhotoScene({manifest:m,media,index}:{manifest:VideoManifest;media:Record<string,string>;index:number}){
+  const frame=useCurrentFrame(),scene=m.scenes[index],p=m.presentation!,audio=m.audio.find(a=>a.id===scene.audioAssetId)!;
+  const cinema=m.visualStyle==='cinematic',contact=scene.kind==='contact',width=safe.width;
+  const heading=contact?m.brand.name:index===0?p.title:posterHeadline(scene.kind,p,m.contact!=='none');
+  const groups=subtitleGroups(scene.narrationText,68),length=groups.reduce((n,g)=>n+g.length,0);
+  const voiceFrames=Math.ceil(audio.durationMs!*30/1000);let threshold=0;
+  const subtitle=groups.find(g=>{threshold+=g.length/length*voiceFrames;return frame<threshold;})??groups.at(-1)!;
+  const panel=m.brand.secondaryColor,ink=contrastInk(panel),accent=m.brand.primaryColor;
+  return <AbsoluteFill data-bienvu-style={m.visualStyle} style={{color:'#fff'}}>
+    {!m.photoTimeline&&<Img src={media[scene.photoAssetId]} style={{width:'100%',height:'100%',objectFit:'cover'}}/>}
+    <AbsoluteFill style={{background:cinema?'linear-gradient(180deg,#0003 0%,transparent 38%,#000c 100%)':'linear-gradient(180deg,#0002 0%,transparent 50%,#0006 100%)'}}/>
+    <div style={{position:'absolute',top:210,left:safe.left,color:'#fff',fontSize:35,letterSpacing:cinema?5:2,textTransform:'uppercase',textShadow:'0 2px 12px #0008'}}>{p.locality}</div>
+    {m.subtitlesEnabled!==false&&<div data-bienvu-subtitle="true" style={{position:'absolute',left:safe.left,right:safe.right,bottom:780,
+      background:'#000a',padding:'18px 24px',fontSize:fitFont(subtitle,width-48,150,45,30),textAlign:cinema?'center':'left',lineHeight:1.2}}>{subtitle}</div>}
+    <div style={{position:'absolute',left:safe.left,right:safe.right,bottom:335,padding:cinema?'28px 0':'34px 38px',
+      background:cinema?undefined:panel,color:cinema?'#fff':ink,borderTop:cinema?undefined:`6px solid ${accent}`,textAlign:cinema?'center':'left'}}>
+      <div style={{color:cinema?accent:ink,fontSize:25,letterSpacing:4,textTransform:'uppercase',marginBottom:20}}>{posterLabel(scene.kind,p,m.contact!=='none')}</div>
+      <div style={{fontFamily:cinema?'Georgia, DejaVu Serif, serif':'BienVu Video, sans-serif',fontSize:fitFont(heading,width-76,260,cinema?92:65,30),
+        fontWeight:cinema?400:650,lineHeight:1.08,overflowWrap:'anywhere'}}>{heading}</div>
+      {contact&&m.contact!=='none'?<div style={{fontSize:fitFont(m.brand[m.contact]!,width-76,160,46,23),lineHeight:1.2,marginTop:25,overflowWrap:'anywhere'}}>{m.brand[m.contact]}</div>:
+        <><div style={{marginTop:24,fontSize:34}}>{[p.areaM2!==null?displayArea(p.areaM2):'',p.rooms!==null?displayRooms(p.rooms):''].filter(Boolean).join(' · ')}</div>
+        {p.priceCents!==null&&<div style={{fontSize:54,fontWeight:650,marginTop:12}}>{displayPrice(p.priceCents)}{p.transaction==='rent'?' / mois':''}</div>}</>}
+    </div><Audio src={media[audio.id]} volume={1}/>
+  </AbsoluteFill>;
+}
 export function ListingFilm(props: ListingVideoProps) {
   const m = VideoManifest.parse(props.manifest), f = useCurrentFrame();
   const [fontWait] = useState(() => delayRender('Chargement de la police locale'));
@@ -140,7 +166,7 @@ export function ListingFilm(props: ListingVideoProps) {
   return <AbsoluteFill style={{background:editorial?'#151b16':paper,fontFamily:'BienVu Video, DejaVu Sans, sans-serif',color:editorial?'#fff':dark}}>
     {m.photoTimeline&&<GalleryBackground manifest={m} media={props.media}/>}
     {scenes.map(({s,index,from}) => <Sequence key={s.id} from={from} durationInFrames={s.durationFrames}>
-      {editorial?<EditorialPhotoScene manifest={m} media={props.media} index={index}/>:<PhotoScene manifest={m} media={props.media} index={index}/>}
+      {editorial?m.visualStyle&&m.visualStyle!=='editorial'?<StyledPhotoScene manifest={m} media={props.media} index={index}/>:<EditorialPhotoScene manifest={m} media={props.media} index={index}/>:<PhotoScene manifest={m} media={props.media} index={index}/>}
     </Sequence>)}
     {!editorial&&<div style={{position:'absolute',left:safe.left,right:safe.right,top:190,minHeight:112,display:'flex',alignItems:'flex-start',gap:24}}>
       {m.logo && <div style={{width:112,height:112,flexShrink:0,borderRadius:18,background:props.logoBackground,padding:14,boxSizing:'border-box'}}>

@@ -1,7 +1,7 @@
 import {MANUAL_PHOTO_LIMITS} from '@bienvu/contracts';
 import {requireOwner} from '../../../../../../lib/owner';
 import {assertSameOrigin, boundedBytes, RequestFailure, respond} from '../../../../../../lib/http';
-import {photoNormalizer} from '../../../../../../lib/import-transport';
+import {photoNormalizer,assertImportMode,reserveCloudflareImport} from '../../../../../../lib/import-transport';
 import {manualDraft, uploadManualPhoto} from '../../../../../../lib/manual-listings';
 import {findImport} from '@bienvu/db';
 import {uploadCreationPhoto,removeCreationPhoto} from '../../../../../../lib/creation-drafts';
@@ -13,6 +13,7 @@ export async function PUT(request: Request, {params}: {params: Promise<{id: stri
     if (!/^(?:[0-9]|1[01])$/.test(index)) throw new RequestFailure('VALIDATION_ERROR');
     const row=await findImport(env.DB,agency.id,id);
     if(row?.draftPending){
+      if(assertImportMode(request,env)==='cloudflare')await reserveCloudflareImport(env,agency.id,id);
       const uploadId=request.headers.get('X-Upload-ID')??'';
       const bytes=await boundedBytes(request,MANUAL_PHOTO_LIMITS.fileBytes,'PHOTO_TOO_LARGE');
       return Response.json({photo:await uploadCreationPhoto(env,agency.id,id,Number(index),uploadId,bytes,

@@ -1,5 +1,6 @@
 import {LandingPage} from '../components/landing-page';
 import './landing.css';
+import './customizer.css';
 
 export const metadata = {
   title: 'BienVu — Une annonce. Une vidéo qui donne envie.',

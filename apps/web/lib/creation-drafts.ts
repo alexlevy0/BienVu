@@ -1,7 +1,7 @@
-import {CreationDraftData, CreationFields, GeneratableListing, ManualListingInput, NormalizedListing, PhotoAsset,
+import {VideoCustomization,CreationDraftData, CreationFields, GeneratableListing, ManualListingInput, NormalizedListing, PhotoAsset,
   type CreationFieldName, type CreationDraftView, type NormalizedListing as Listing} from '@bienvu/contracts';
 import {beginManualImport, completeImport, findImport, findCreationDraft, startCreationDraft, blankCreationDraft,markCreationDraftDeleting,importObjectKeys,
-  updateCreationDraft, ImportStateFailure, type ImportRow, type Database} from '@bienvu/db';
+  draftFromListing,updateCreationDraft, ImportStateFailure, type ImportRow, type Database} from '@bienvu/db';
 import {contentHash, type PhotoNormalizer} from './manual-listings';
 import {RequestFailure} from './http';
 import {logDiagnostic,requestContext} from '@bienvu/observability';
@@ -24,7 +24,7 @@ export async function startManualCreationDraft(db:Database,agencyId:string,key:s
 }
 export async function patchCreationDraft(db:Database,agencyId:string,id:string,body:unknown){
   if(!body||typeof body!=='object'||Array.isArray(body))throw new RequestFailure('VALIDATION_ERROR');
-  const input=body as {version?:unknown;changes?:unknown;confirm?:unknown};
+  const input=body as {version?:unknown;changes?:unknown;confirm?:unknown;videoCustomization?:unknown};
   if(!Number.isSafeInteger(input.version)||!input.changes||typeof input.changes!=='object'||Array.isArray(input.changes)||
     !Array.isArray(input.confirm))throw new RequestFailure('VALIDATION_ERROR');
   const before=required(await findImport(db,agencyId,id));
@@ -42,9 +42,39 @@ export async function patchCreationDraft(db:Database,agencyId:string,id:string,b
     // A sale price is never silently turned into monthly rent or vice versa.
     fields.data.priceCents=null;fields.data.charges=null;delete provenance.priceCents;delete provenance.charges;
   }
-  const data=CreationDraftData.parse({...before.data,fields:fields.data,provenance});
+  const settings=input.videoCustomization===undefined?undefined:VideoCustomization.safeParse(input.videoCustomization);
+  if(settings&&!settings.success)throw new RequestFailure('VALIDATION_ERROR');
+  const data=CreationDraftData.parse({...before.data,fields:fields.data,provenance,
+    ...(settings?.success?{videoCustomization:settings.data}:{})});
   if(await updateCreationDraft(db,agencyId,id,before.version,data)===null)throw new RequestFailure('CONFLICT');
   return required(await findImport(db,agencyId,id));
+}
+// A private editable copy retains the original import and any jobs referencing
+// it. Replay uses deterministic upload IDs; no scraping or video credit occurs.
+export async function customizeImportedListing(env:Env&{MEDIA:Env['MEDIA']&Pick<R2Bucket,'get'>},agencyId:string,id:string,key:string,signal:AbortSignal){
+  const source=await findImport(env.DB,agencyId,id);
+  if(source?.draftPending)return required(source);
+  if(!source||source.status!=='ready'||!source.result||source.expiresAt<=new Date().toISOString())throw new RequestFailure('NOT_FOUND');
+  const listing=GeneratableListing.parse(JSON.parse(source.result));
+  if(listing.agencyId!==agencyId||listing.id!==id)throw new RequestFailure('NOT_FOUND');
+  const input=JSON.stringify({customize:id}),hash=await contentHash(new TextEncoder().encode(input));
+  let row:ImportRow;
+  try{row=(await beginManualImport(env.DB,agencyId,key,input,hash)).row;}
+  catch(error){if(error instanceof ImportStateFailure)throw new RequestFailure(error.code);throw error;}
+  if(row.status==='ready')throw new RequestFailure('CONFLICT');
+  await startCreationDraft(env.DB,agencyId,row.id,draftFromListing(listing));
+  for(const photo of listing.photos){
+    signal.throwIfAborted();
+    if(!photo.objectKey.startsWith(`agencies/${agencyId}/imports/${id}/`))throw new RequestFailure('NOT_FOUND');
+    const object=await env.MEDIA.get(photo.objectKey);
+    if(!object||object.size!==photo.sizeBytes)throw new RequestFailure('INSUFFICIENT_PHOTOS');
+    const bytes=new Uint8Array(await object.arrayBuffer());
+    if(await contentHash(bytes)!==photo.contentHash)throw new RequestFailure('INSUFFICIENT_PHOTOS');
+    const uploadId=(await contentHash(new TextEncoder().encode(`${row.id}:${photo.id}`))).slice(0,32);
+    await uploadCreationPhoto(env,agencyId,row.id,photo.sourceOrder,uploadId,bytes,photo.mime,
+      async()=>({bytes,width:photo.width,height:photo.height,mime:photo.mime}),signal);
+  }
+  return required(await findImport(env.DB,agencyId,row.id));
 }
 export async function deleteCreationDraft(env:Env,agencyId:string,id:string,now=Date.now()){
   if(!await findImport(env.DB,agencyId,id))throw new RequestFailure('NOT_FOUND');
@@ -64,7 +94,7 @@ export async function uploadCreationPhoto(env:Env,agencyId:string,id:string,inde
   const row=await findImport(env.DB,agencyId,id);required(row);
   const saved=photoList(row!);const existing=saved.find(photo=>photo.id===uploadId);
   if(existing){const head=await env.MEDIA.head(existing.objectKey);if(head?.size===existing.sizeBytes&&head.customMetadata?.sha256===existing.contentHash)return existing;}
-  if(saved.some(photo=>photo.sourceOrder===index&&photo.id!==uploadId)||saved.length>=12)throw new RequestFailure('CONFLICT');
+  if(saved.some(photo=>photo.sourceOrder===index&&photo.id!==uploadId)||saved.length>=12&&!existing)throw new RequestFailure('CONFLICT');
   const normalized=await normalize(bytes,mime,signal);
   if(normalized.mime!=='image/jpeg'||normalized.width<640||normalized.height<360||normalized.width>2048||normalized.height>2048||
     normalized.bytes.length>10*1024*1024||normalized.bytes[0]!==255||normalized.bytes[1]!==216||normalized.bytes.at(-2)!==255||normalized.bytes.at(-1)!==217)
@@ -117,7 +147,12 @@ export async function finishCreationDraft(env:Env,agencyId:string,id:string,expe
   for(const [index,photo] of photos.entries()){const head=await env.MEDIA.head(photo.objectKey);
     if(!head||head.size!==photo.sizeBytes||head.customMetadata?.sha256!==photo.contentHash)
       throw new RequestFailure('INSUFFICIENT_PHOTOS',{photos:`La photo ${index+1} n’est plus disponible. Retirez-la puis ajoutez-la à nouveau.`});}
-  const source=(key:CreationFieldName)=>data.provenance[key];
+  const source=(key:CreationFieldName)=>{
+    const value=data.provenance[key];
+    // The copied import evidence stays visible in the draft. Its completed
+    // manual listing is confirmed by the user, as required by that contract.
+    return value&&row!.sourceKind==='manual'&&value.source==='import'?{...value,source:'user' as const}:value;
+  };
   const listing:Listing=NormalizedListing.parse({id,agencyId,sourceKind:row!.sourceKind,sourceUrl:row!.sourceUrl,
     canonicalUrl:row!.sourceUrl?data.canonicalUrl??row!.sourceUrl:null,sourceHost:row!.sourceUrl?new URL(row!.sourceUrl).hostname:null,
     sourceListingId:null,fetchedAt:row!.createdAt,adapterVersion:'creation-draft/1',transaction:input.data.transaction,

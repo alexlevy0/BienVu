@@ -1,21 +1,25 @@
 'use client';
 import {useEffect, useImperativeHandle, useRef, useState, type ChangeEvent, type FormEvent, type Ref} from 'react';
-import {DESCRIPTION_MAX_CHARACTERS, ManualListingInput, MANUAL_PHOTO_LIMITS, publicErrors, type PublicErrorCode,
+import {defaultVideoCustomization,VideoCustomization,GenerationCustomization,DESCRIPTION_MAX_CHARACTERS, ManualListingInput, MANUAL_PHOTO_LIMITS, publicErrors, type PublicErrorCode,
   type CreationDraftData, type CreationDraftView, type NormalizedListing} from '@bienvu/contracts';
 import {HomeIcon} from './home-icons';
 import type {ImportView} from './generation-form';
 import {manualDraftFields, readManualListingDraft, saveManualListingDraft, type ManualDraft, type ManualDraftFields} from '../lib/listing-draft';
 import {inspectManualPhotos} from '../lib/manual-photos';
+import {VideoCustomizer,suggestedNarration} from './video-customizer';
 
 type SelectedPhoto = {id: string; file: File|null; preview: string; remote?:NormalizedListing['photos'][number]; state:'ready'|'sending'|'error'; slot:number};
 type Guided={step:number;setStep(step:number):void;description:string;setDescription(value:string):void;onCancel():void;
   agencyId?:string;initialDraft?:CreationDraftView|null;initialData?:CreationDraftData|null;
   onReadyChange?(ready:boolean,reason:string):void;onDraftChange?():void};
-export type ManualListingFormHandle = {cancel():Promise<void>;isDraft(id:string):boolean};
+export type ManualListingFormHandle = {cancel():Promise<void>;isDraft(id:string):boolean;customization():VideoCustomization|undefined};
 class FormFailure extends Error {}
 const labels: Record<string, string> = {title: 'titre', locality: 'localisation', propertyType: 'type de bien', description: 'description',
   priceCents: 'prix', charges: 'charges', area: 'surface', rooms: 'nombre de pièces', photos: 'photos'};
 type Props = {busy: boolean; generate?: boolean; setBusy(value: boolean): void;guided?:Guided;ref?:Ref<ManualListingFormHandle>;
+  customizing?:boolean;onCloseCustomizer?():void;brand?:{name:string;primaryColor:string;secondaryColor:string};
+  initialCustomization?:VideoCustomization;
+  subtitlesEnabled?:boolean;onSubtitles?(value:boolean):void;
   incomingPhotos?:{id:string;files:File[]}|null;onPhotosReceived?(id:string,result:{accepted:File[];issues:string[]}):void} & (
   {prepareGuest: true; onPrepared(): void; onCreated?: never} |
   {prepareGuest?: false; onCreated(value: ImportView): Promise<void>; onPrepared?: never}
@@ -35,8 +39,11 @@ export function ManualListingForm(props: Props) {
   const selected = useRef(photos), pending = useRef<{fingerprint: string; key: string} | null>(null),formRef=useRef<HTMLFormElement>(null),submitLock=useRef(false);
   const removedIds=useRef<Set<string>>(new Set());
   const receivedBatches=useRef(new Set<string>()),photoLock=useRef(false),mounted=useRef(true);
+  const [customization,setCustomization]=useState<VideoCustomization|undefined>(),[settingsSaved,setSettingsSaved]=useState(false);
+  const customizationRef=useRef<VideoCustomization|undefined>(undefined),settingsVersion=useRef(0),customInitialized=useRef(false),settingsWrite=useRef<Promise<void>|null>(null);
+  customizationRef.current=customization;
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
-  useImperativeHandle(props.ref,()=>({cancel:cancelGuided,isDraft:id=>serverRef.current?.id===id}));
+  useImperativeHandle(props.ref,()=>({cancel:cancelGuided,isDraft:id=>serverRef.current?.id===id,customization:()=>customizationRef.current}));
   selected.current = photos;
   function finalInput(){
     if(!formRef.current)return null;
@@ -59,17 +66,19 @@ export function ManualListingForm(props: Props) {
   }):[];
   useEffect(()=>{if(!props.guided)return;
     const fieldsValid=finalInput()?.success===true;
-    const ready=completed||hydrated&&props.guided.step===4&&fieldsValid&&unresolved().length===0&&photos.filter(photo=>photo.state==='ready').length>=3&&
-      !photos.some(photo=>photo.state!=='ready')&&(!props.guided.agencyId||Boolean(serverDraft));
-    const reason=completed?'':!hydrated?'Chargement du brouillon en cours.':props.guided.step!==4?'Terminez les sections puis vérifiez votre annonce.':
+    const selectionValid=!customization||GenerationCustomization.safeParse(customization).success&&
+      (!customization.photoOrder||customization.photoOrder.every(slot=>photos.some(photo=>photo.slot===slot&&photo.state==='ready')));
+    const ready=(completed||hydrated&&(props.guided.step===4||props.customizing)&&fieldsValid&&unresolved().length===0&&photos.filter(photo=>photo.state==='ready').length>=3&&
+      !photos.some(photo=>photo.state!=='ready')&&(!props.guided.agencyId||Boolean(serverDraft)));
+    const reason=!selectionValid?'Vérifiez la narration et sélectionnez au moins trois photos.':completed?'':!hydrated?'Chargement du brouillon en cours.':props.guided.step!==4&&!props.customizing?'Terminez les sections puis vérifiez votre annonce.':
       unresolved().length?'Confirmez les informations signalées avant la création.':
       photos.some(photo=>photo.state==='sending')?'Envoi des photos en cours.':photos.some(photo=>photo.state==='error')?
       'Réessayez ou retirez les photos en erreur.':photos.length<3?'Ajoutez au moins trois photos.':!serverDraft&&props.guided.agencyId?
       'Préparation du brouillon privé en cours.':!fieldsValid?'Vérifiez les informations du bien dans les sections indiquées.':'';
-    props.guided.onReadyChange?.(ready,reason);
-  },[props.guided?.step,props.guided?.agencyId,props.guided?.description,hydrated,photos,serverDraft,revision,propertyType,transaction,completed,guestConfirmed]);
+    props.guided.onReadyChange?.(Boolean(ready&&selectionValid),reason);
+  },[props.guided?.step,props.guided?.agencyId,props.guided?.description,hydrated,photos,serverDraft,revision,propertyType,transaction,completed,guestConfirmed,customization,props.customizing]);
   async function confirmField(name:string){
-    const draft=serverRef.current;if(!draft){setGuestConfirmed(current=>new Set([...current,name]));return;}
+    await settingsWrite.current;const draft=serverRef.current;if(!draft){setGuestConfirmed(current=>new Set([...current,name]));return;}
     try{const response=await fetch(`/api/imports/${draft.id}/draft`,{method:'PATCH',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({version:draft.version,changes:{},confirm:[name]})});
       if(!response.ok)throw 0;const updated=await response.json() as CreationDraftView;serverRef.current=updated;setServerDraft(updated);
@@ -121,21 +130,24 @@ export function ManualListingForm(props: Props) {
         setFeedback('Le brouillon enregistré sur le serveur a changé. Ses dernières informations ont été rechargées.');
       const restoredDraft=remote ? {fields:sameRemoteVersion||fromGuest?draft!.fields:fieldsFromData(remote.data),
         photos:fromGuest?draft!.photos:[],savedAt:Date.now(),step:sameRemoteVersion||fromGuest?draft!.step:firstMissing(remote.data,remote.photos.length),
-        agencyId:props.guided?.agencyId,serverDraftId:remote.id,serverDraftVersion:remote.version}
+        agencyId:props.guided?.agencyId,serverDraftId:remote.id,serverDraftVersion:remote.version,
+        videoCustomization:fromGuest||sameRemoteVersion?draft?.videoCustomization:remote.data.videoCustomization,photoSlots:fromGuest?draft?.photoSlots:undefined}
         :props.guided?.initialData?{fields:fieldsFromData(props.guided.initialData),photos:[],savedAt:Date.now(),
           step:firstMissing(props.guided.initialData,0)}:draft;
       if(restoredDraft){
+        setCustomization(restoredDraft.videoCustomization??props.initialCustomization);customInitialized.current=Boolean(restoredDraft.videoCustomization);
         setRestored(restoredDraft); setTransaction(restoredDraft.fields.transaction||(!props.guided?'sale':''));
         setPropertyType(restoredDraft.fields.propertyType||(!props.guided?'apartment':''));
         const restoredPhotos=remote&&!fromGuest?remote.photos.map(photo=>({id:photo.id,file:null,preview:`/api/imports/${remote!.id}/photos/${photo.id}`,
           remote:photo,state:'ready' as const,slot:photo.sourceOrder})):restoredDraft.photos.map((file,index) => ({id: crypto.randomUUID(), file,
-          preview: URL.createObjectURL(file),state:fromGuest?'sending' as const:'ready' as const,slot:index}));
+          preview: URL.createObjectURL(file),state:fromGuest?'sending' as const:'ready' as const,slot:restoredDraft.photoSlots?.[index]??index}));
         selected.current=restoredPhotos;setPhotos(restoredPhotos);
         if(fromGuest)for(const photo of restoredPhotos)void uploadSelected(photo);
         if(props.guided){props.guided.setDescription(sameRemoteVersion||fromGuest
           ?props.guided.description.trim()||restoredDraft.fields.description:restoredDraft.fields.description);
           props.guided.setStep(restoredDraft.step);setReached(remote||props.guided.initialData?4:restoredDraft.step);}
       }
+      if(!restoredDraft&&props.initialCustomization)setCustomization(props.initialCustomization);
       setHydrated(true);
     })();
     return () => {active = false;};
@@ -148,16 +160,37 @@ export function ManualListingForm(props: Props) {
   useEffect(()=>{
     if(!props.guided||!hydrated||!formRef.current)return;
     const timer=setTimeout(()=>{void saveManualListingDraft(draftFields(),props.guided!.agencyId?[]:photos.flatMap(p=>p.file?[p.file]:[]),
-      props.guided!.step,props.guided!.agencyId,serverRef.current?.id,serverRef.current?.version);},650);
+      props.guided!.step,props.guided!.agencyId,serverRef.current?.id,serverRef.current?.version,customization,photos.map(p=>p.slot));},650);
     return()=>clearTimeout(timer);
   // FormData captures the latest DOM values after each field edit.
-  },[hydrated,photos,transaction,propertyType,revision,props.guided?.description,props.guided?.step,serverDraft?.version]);
+  },[hydrated,photos,transaction,propertyType,revision,props.guided?.description,props.guided?.step,serverDraft?.version,customization]);
   useEffect(()=>{
     const batch=props.incomingPhotos;
     if(!hydrated||photoChecking||!batch||receivedBatches.current.has(batch.id))return;
     receivedBatches.current.add(batch.id);
     void addPhotos(batch.files).then(result=>{if(mounted.current&&result)props.onPhotosReceived?.(batch.id,result);});
   },[hydrated,photoChecking,props.incomingPhotos?.id]);
+  useEffect(()=>{
+    if(!props.customizing||!hydrated||!formRef.current||customInitialized.current)return;
+    customInitialized.current=true;
+    setCustomization(current=>({...defaultVideoCustomization(props.brand),...current,photoOrder:current?.photoOrder??photos.map(p=>p.slot),
+      narration:current?.narration??suggestedNarration(draftFields(),props.brand?.name??'')}));
+  },[props.customizing,hydrated]);
+  useEffect(()=>{
+    if(!hydrated||!customization||!serverDraft||busy||!VideoCustomization.safeParse(customization).success)return;
+    if(JSON.stringify(serverDraft.data.videoCustomization)===JSON.stringify(customization)){setSettingsSaved(true);return;}
+    const version=settingsVersion.current;
+    const timer=setTimeout(()=>{const draft=serverRef.current;if(!draft||settingsWrite.current)return;
+      const write=fetch(`/api/imports/${draft.id}/draft`,{method:'PATCH',headers:{'Content-Type':'application/json'},signal:AbortSignal.timeout(30_000),
+        body:JSON.stringify({version:draft.version,changes:{},confirm:[],videoCustomization:customization})}).then(async response=>{
+          if(!response.ok)throw new Error('Vos réglages sont conservés ici. Enregistrement interrompu ; réessayez avant de quitter.');
+          const value=await response.json() as CreationDraftView;if(!mounted.current)return;
+          serverRef.current=value;setServerDraft(value);if(settingsVersion.current===version)setSettingsSaved(true);
+        }).catch(error=>{if(mounted.current)setFeedback(error instanceof Error?error.message:'Enregistrement interrompu.');}).finally(()=>{settingsWrite.current=null;});
+      settingsWrite.current=write;
+    },900);
+    return()=>clearTimeout(timer);
+  },[hydrated,customization,serverDraft?.version,busy]);
   async function addPhotos(files: FileList | readonly File[] | null) {
     if (!files||photoLock.current) return;
     photoLock.current=true;setPhotoChecking(true);setPhotoIssues([]);setFeedback('');
@@ -173,6 +206,7 @@ export function ManualListingForm(props: Props) {
       const additions=accepted.map(file=>{let slot=0;while(used.has(slot))slot++;used.add(slot);
         return {id:crypto.randomUUID(),file,preview:URL.createObjectURL(file),state:props.guided?.agencyId?'sending' as const:'ready' as const,slot};});
       selected.current=[...selected.current,...additions];setPhotos(selected.current);
+      setCustomization(current=>current?{...current,photoOrder:[...(current.photoOrder??[]),...additions.map(p=>p.slot)]}:current);
       if(props.guided?.agencyId)for(const photo of additions)void uploadSelected(photo);
     }
     return result;
@@ -197,7 +231,7 @@ export function ManualListingForm(props: Props) {
       if(!response.ok)throw 0;
     }catch{removedIds.current.delete(photo.id);setFeedback('Cette photo n’a pas pu être retirée du brouillon privé. Réessayez.');return;}}
     if(photo.file)URL.revokeObjectURL(photo.preview);
-    setPhotos(current=>current.filter(p=>p.id!==photo.id));setErrors(current=>({...current,photos:''}));
+    setPhotos(current=>current.filter(p=>p.id!==photo.id));setCustomization(current=>current?{...current,photoOrder:current.photoOrder?.filter(slot=>slot!==photo.slot)}:current);setErrors(current=>({...current,photos:''}));
   }
   function focusError(name:string){requestAnimationFrame(()=>formRef.current?.querySelector<HTMLElement>(name==='photos'?'#manual-photos':`[name="${name}"]`)?.focus());}
   async function nextStep(){
@@ -226,13 +260,13 @@ export function ManualListingForm(props: Props) {
       :step===1?photos.filter(p=>p.state==='ready').length>=3?4:3:step===2?photos.filter(p=>p.state==='ready').length>=3?4:3:Math.min(4,step+1);
     history.current.push(step);setReached(value=>Math.max(value,nextStep));props.guided.setStep(nextStep);
     void saveManualListingDraft(fields,props.guided.agencyId?[]:photos.flatMap(p=>p.file?[p.file]:[]),nextStep,props.guided.agencyId,
-      serverRef.current?.id,serverRef.current?.version);
+      serverRef.current?.id,serverRef.current?.version,customization,photos.map(p=>p.slot));
   }
   async function cancelGuided(){if(!props.guided)return;
     if(photoLock.current||props.incomingPhotos){setFeedback('Patientez pendant l’ajout de vos photos.');return;}
     if(!hydrated){setFeedback('Chargement du brouillon en cours. Réessayez dans un instant.');return;}
     if(!await saveManualListingDraft(draftFields(),props.guided.agencyId?[]:photos.flatMap(p=>p.file?[p.file]:[]),
-      props.guided.step,props.guided.agencyId,serverRef.current?.id,serverRef.current?.version)){
+      props.guided.step,props.guided.agencyId,serverRef.current?.id,serverRef.current?.version,customization,photos.map(p=>p.slot))){
       setFeedback('Impossible de conserver le brouillon sur cet appareil. Gardez ce formulaire ouvert et réessayez.');return;
     }
     props.guided.onCancel();
@@ -253,7 +287,8 @@ export function ManualListingForm(props: Props) {
     return value;
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); if (busy||photoChecking||submitLock.current||props.guided&&props.guided.step!==4) return;
+    event.preventDefault(); if (busy||photoChecking||submitLock.current||props.guided&&props.guided.step!==4&&!props.customizing) return;
+    if(customization&&!GenerationCustomization.safeParse(customization).success){setFeedback('Vérifiez la narration et choisissez au moins trois photos.');return;}
     const form = event.currentTarget, data = new FormData(form), validatedBefore=finalInput();
     const text = (name: string) => String(data.get(name) ?? '').trim();
     const number = (name: string) => {
@@ -262,6 +297,7 @@ export function ManualListingForm(props: Props) {
     };
     submitLock.current=true;setErrors({}); setFeedback(''); setBusy(true); setProgress('Préparation des photos…');
     try {
+      await settingsWrite.current;
       if(completedRef.current&&!props.prepareGuest){
         await props.onCreated(completedRef.current);completedRef.current=null;setCompleted(false);
         try{sessionStorage.removeItem(`bienvu:manual-start:${props.guided?.agencyId}`);}catch{}
@@ -280,7 +316,7 @@ export function ManualListingForm(props: Props) {
           priceCents:price===null?null:Math.round(price*100),charges:transaction==='rent'?text('charges')||null:null,
           area:number('area'),rooms:number('rooms')};
         const response=await fetch(`/api/imports/${draft.id}/draft`,{method:'PATCH',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({version:draft.version,changes,confirm:[]})});
+          body:JSON.stringify({version:draft.version,changes,confirm:[],...(customization?{videoCustomization:customization}:{})})});
         const updated=await response.json() as CreationDraftView&{error?:{message?:string};fields?:Record<string,string>};
         if(!response.ok){if(updated.fields)setErrors(updated.fields);throw new FormFailure(updated.error?.message??'Le brouillon a changé. Rechargez ses données et réessayez.');}
         serverRef.current=updated;setServerDraft(updated);
@@ -320,7 +356,7 @@ export function ManualListingForm(props: Props) {
         setProgress('Conservation de votre annonce dans ce navigateur…');
         const fields = Object.fromEntries(manualDraftFields.map(name => [name, name === 'transaction' ? transaction : name==='propertyType'&&props.guided?propertyType:
           name==='description'&&props.guided?props.guided.description:text(name)])) as Record<typeof manualDraftFields[number], string>;
-        if (!await saveManualListingDraft(fields, photos.flatMap(photo=>photo.file?[photo.file]:[]),props.guided?.step??0))
+        if (!await saveManualListingDraft(fields, photos.flatMap(photo=>photo.file?[photo.file]:[]),props.guided?.step??0,undefined,undefined,undefined,customization,photos.map(p=>p.slot)))
           throw new FormFailure('Impossible de conserver votre annonce sur cet appareil. Gardez cette page ouverte et réessayez.');
         props.onPrepared(); return;
       }
@@ -351,7 +387,12 @@ export function ManualListingForm(props: Props) {
   const sectionComplete=(index:number)=>index===0?Boolean(propertyType&&transaction):index===1?
     summaryValue('title').trim().length>=3&&summaryValue('locality').trim().length>=2:index===2?true:index===3?
     photos.filter(photo=>photo.state==='ready').length>=3&&!photos.some(photo=>photo.state!=='ready'):false;
-  return <form ref={formRef} id={props.guided?'manual-guided-form':undefined} className={`manual-listing-form${props.guided?' manual-guided-form':''}`} onSubmit={submit} noValidate
+  return <>{props.customizing&&hydrated&&<VideoCustomizer settings={customization??defaultVideoCustomization(props.brand)}
+    onChange={value=>{settingsVersion.current++;setSettingsSaved(false);setCustomization(value);}} photos={photos} fields={draftFields()}
+    agencyName={props.brand?.name??''} subtitlesEnabled={props.subtitlesEnabled!==false} onSubtitles={value=>props.onSubtitles?.(value)}
+    onBack={()=>props.onCloseCustomizer?.()} onAdd={files=>void addPhotos(files)} busy={busy||photoChecking}
+    ready={finalInput()?.success===true&&unresolved().length===0&&photos.filter(p=>p.state==='ready').length>=3}
+    onEdit={()=>props.onCloseCustomizer?.()} saved={settingsSaved}/>}<form ref={formRef} style={props.customizing?{display:'none'}:undefined} id={props.guided?'manual-guided-form':undefined} className={`manual-listing-form${props.guided?' manual-guided-form':''}`} onSubmit={submit} noValidate
     onKeyDown={event=>{if(props.guided&&event.key==='Enter'&&event.target instanceof HTMLInputElement&&event.target.type==='text'){
       event.preventDefault();if(props.guided.step<4)void nextStep();
     }}}
@@ -431,5 +472,5 @@ export function ManualListingForm(props: Props) {
         {props.guided.step===2&&<button type="button" className="text-button" disabled={busy} onClick={()=>{history.current.push(2);props.guided!.setStep(photos.filter(p=>p.state==='ready').length>=3?4:3);}}>Passer cette étape</button>}
         {props.guided.step<4&&<button type="button" className="home-primary-button" disabled={busy||photoChecking} onClick={()=>void nextStep()}>Continuer <span aria-hidden="true">→</span></button>}</div></div>
       :<button className="button primary" type="submit" disabled={busy}>{progress ? 'Préparation en cours…' : props.prepareGuest ? 'Continuer avec mon annonce' : generate ? 'Créer la vidéo de mon annonce' : 'Enregistrer mon annonce'}</button>}
-  </form>;
+  </form>{props.customizing&&feedback&&<p className="customizer-error" role="alert">{feedback}</p>}</>;
 }

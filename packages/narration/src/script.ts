@@ -1,18 +1,18 @@
 import {AgencyBrand, GeneratableListing, ListingScript, NarrationFailure, ScriptCopyVersion, ScriptPlan, SYNTHETIC_VOICE_DISCLOSURE,
-  type NormalizedListing, type SceneKind, type ScriptFactRef} from '@bienvu/contracts';
+  CustomNarration,type NormalizedListing, type SceneKind, type ScriptFactRef} from '@bienvu/contracts';
 import {displayEuros, displayNumber, frenchDecimal, frenchEuros, frenchInteger} from './french';
 
 export const PROMPT_VERSION = 'narration-fr/1' as const;
 export const COPY_VERSION = 'factual-copy/2' as const;
 export type Copy = {id: string; kind: SceneKind; narrationText: string; captionText: string; factRefs: ScriptFactRef[]};
 export type ScriptContext = {listing: NormalizedListing; brand: AgencyBrand; contact: 'phone' | 'email' | 'website' | 'none';
-  copyVersion: ScriptCopyVersion; copies: Copy[]; provenance: ListingScript['provenance']; inputHash: string};
+  copyVersion: ScriptCopyVersion; copies: Copy[]; provenance: ListingScript['provenance']; inputHash: string;customNarration?:string[]};
 export async function hashJson(value: unknown) {
   const bytes = new TextEncoder().encode(JSON.stringify(value)), hash = await crypto.subtle.digest('SHA-256', bytes);
   return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 export async function scriptContext(listingInput: unknown, brandInput: unknown, contact?: 'phone' | 'email' | 'website' | 'none',
-  copyVersionInput: ScriptCopyVersion = COPY_VERSION): Promise<ScriptContext> {
+  copyVersionInput: ScriptCopyVersion = COPY_VERSION,userNarration?:string[]): Promise<ScriptContext> {
   const versionResult = ScriptCopyVersion.safeParse(copyVersionInput);
   if (!versionResult.success) throw new NarrationFailure('SCRIPT_INPUT_INVALID');
   const copyVersion = versionResult.data;
@@ -90,7 +90,23 @@ export async function scriptContext(listingInput: unknown, brandInput: unknown, 
   // Ni description commerciale, ni titre libre, ni URL, ni secret envoyé au LLM.
   const inputHash = await hashJson({listingId: listing.id, agencyId: listing.agencyId, sourceKind: listing.sourceKind,
     copies, provenance, photos: listing.photos.map(p => ({id: p.id, contentHash: p.contentHash})), copyVersion});
+  if(userNarration){
+    const parsed=CustomNarration.safeParse(userNarration);if(!parsed.success)throw new NarrationFailure('SCRIPT_INPUT_INVALID');
+    const middle=copies.filter(copy=>copy.id.endsWith('/direct')&&!['intro','contact'].includes(copy.kind));
+    const kinds:SceneKind[]=['intro',...middle.slice(0,parsed.data.length-2).map(copy=>copy.kind),'contact'];
+    if(kinds.length!==parsed.data.length)throw new NarrationFailure('SCRIPT_INPUT_INVALID');
+    const customCopies=parsed.data.map((narrationText,index)=>({id:`${kinds[index]}/user`,kind:kinds[index],narrationText,
+      captionText:narrationText.slice(0,180),factRefs:['narration','photos'] as ScriptFactRef[]}));
+    return {listing,brand,contact:channel,copyVersion,copies:customCopies,customNarration:parsed.data,
+      provenance:[{ref:'narration',status:'user_provided',sourcePath:'customization.narration'},...provenance.filter(p=>p.ref==='photos')],
+      inputHash:await hashJson({inputHash,customNarration:parsed.data})};
+  }
   return {listing, brand, contact: channel, copyVersion, copies, provenance, inputHash};
+}
+export function customScript(context:ScriptContext):ListingScript {
+  if(!context.customNarration)throw new NarrationFailure('SCRIPT_INPUT_INVALID');
+  return compileScript(context,{scenes:context.copies.map((copy,index)=>({copyId:copy.id,
+    photoAssetId:context.listing.photos[index%context.listing.photos.length].id}))},'user-narration/1');
 }
 export function compileScript(context: ScriptContext, input: unknown, model: string, version: 1 | 2 = 1): ListingScript {
   const parsed = ScriptPlan.safeParse(input);

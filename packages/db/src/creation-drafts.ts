@@ -6,13 +6,13 @@ export function draftFromListing(listing:NormalizedListing):CreationDraftData {
   const fields=emptyCreationFields(),provenance:CreationDraftData['provenance']={};
   const put=(key:CreationFieldName,value:CreationDraftData['fields'][CreationFieldName],evidence:string|null)=>{
     if(value===null)return; (fields as Record<string,unknown>)[key]=value;
-    provenance[key]={source:'import',evidence,confirm:false};
+    provenance[key]={source:listing.sourceKind==='manual'?'user':'import',evidence,confirm:false};
   };
   put('transaction',listing.transaction,null);
   for(const key of ['title','propertyType','locality','area','rooms'] as const){const fact=listing.facts[key];
-    if(fact?.status==='verified')put(key,fact.value,fact.rawEvidence);
+    if(fact?.status==='verified'||fact?.status==='user_provided')put(key,fact.value,fact.rawEvidence);
   }
-  if(listing.facts.price.status==='verified'){
+  if(listing.facts.price.status==='verified'||listing.facts.price.status==='user_provided'){
     put('priceCents',listing.facts.price.value.amountCents,listing.facts.price.rawEvidence);
     if(listing.transaction==='rent')put('charges',listing.facts.price.value.charges==='not_applicable'?null:listing.facts.price.value.charges,listing.facts.price.rawEvidence);
   }

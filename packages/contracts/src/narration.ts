@@ -1,14 +1,14 @@
 import {z} from 'zod';
 import {EntityId, ObjectKey, Sha256} from './product';
 
-export const ScriptFactRef = z.enum(['propertyType', 'locality', 'price', 'area', 'rooms', 'transaction', 'photos', 'agency.name', 'agency.contact']);
+export const ScriptFactRef = z.enum(['propertyType', 'locality', 'price', 'area', 'rooms', 'transaction', 'photos', 'agency.name', 'agency.contact','narration']);
 export type ScriptFactRef = z.infer<typeof ScriptFactRef>;
 export const SceneKind = z.enum(['intro', 'area', 'rooms', 'price', 'location', 'gallery', 'contact']);
 export type SceneKind = z.infer<typeof SceneKind>;
 export const ScriptCopyVersion = z.enum(['factual-copy/1', 'factual-copy/2']);
 export type ScriptCopyVersion = z.infer<typeof ScriptCopyVersion>;
 export const ScriptPlan = z.object({scenes: z.array(z.object({
-  copyId: z.string().regex(/^(intro|area|rooms|price|location|gallery|contact)\/(direct|warm|short)$/),
+  copyId: z.string().regex(/^(intro|area|rooms|price|location|gallery|contact)\/(direct|warm|short|user)$/),
   photoAssetId: EntityId,
 }).strict()).min(4).max(6)}).strict();
 export type ScriptPlan = z.infer<typeof ScriptPlan>;
@@ -22,7 +22,7 @@ export const ListingScript = z.object({
   model: z.string().min(1).max(100), promptVersion: z.literal('narration-fr/1'), copyVersion: ScriptCopyVersion,
   disclosure: z.string().min(1).max(150), scenes: z.array(ScriptScene).min(4).max(6),
   provenance: z.array(z.object({ref: ScriptFactRef, status: z.enum(['verified', 'user_provided']),
-    sourcePath: z.string().min(1).max(160)}).strict()).min(1).max(9),
+    sourcePath: z.string().min(1).max(160)}).strict()).min(1).max(10),
 }).strict();
 export type ListingScript = z.infer<typeof ListingScript>;
 export const NarrationAudio = z.object({id: EntityId, cacheKey: Sha256, objectKey: ObjectKey, sha256: Sha256,

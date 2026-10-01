@@ -1,7 +1,7 @@
-import {GoogleVoiceConfig, NarrationAudio, NarrationFailure, PreparedNarration, VoiceFailure, type ListingScript} from '@bienvu/contracts';
+import {AgencyBrand,GoogleVoiceConfig, NarrationAudio, NarrationFailure, PreparedNarration, VoiceFailure,GenerationRequest,customizedListing,customizedBrand, type ListingScript} from '@bienvu/contracts';
 import {assertNarrationLease, checkpointNarrationScript, claimNarrationCall, failNarrationCall, findNarration, finishNarration,
   finishNarrationCall, narrationJobInput, releaseNarration, startNarration, type Database, type NarrationLease} from '@bienvu/db';
-import {generateScript, hashJson, scriptContext, shortenScript, validateScript, type ScriptContext, type ScriptProvider, type ScriptReply} from '@bienvu/narration';
+import {generateScript, hashJson, scriptContext,customScript, shortenScript, validateScript, type ScriptContext, type ScriptProvider, type ScriptReply} from '@bienvu/narration';
 import {googleTts, measureVoiceWav, voiceCacheKey, voiceSceneTiming} from '@bienvu/voice';
 
 type GoogleReply = Awaited<ReturnType<ReturnType<typeof googleTts>['synthesize']>>;
@@ -25,17 +25,19 @@ export async function prepareJobNarration(env: {DB: Database; MEDIA: NarrationBu
   const now = options.now ?? Date.now;
   const job = await narrationJobInput(env.DB, agencyId, jobId);
   const existing = await findNarration(env.DB, agencyId, jobId);
-  const snapshot = existing ? parseJson(existing.snapshot) as {listing: unknown; brand: unknown; contact: ScriptContext['contact']; copyVersion?: ScriptContext['copyVersion']} : null;
+  const snapshot = existing ? parseJson(existing.snapshot) as {listing: unknown; brand: unknown; contact: ScriptContext['contact']; copyVersion?: ScriptContext['copyVersion'];customNarration?:string[]} : null;
+  const customization=job.generationInput?GenerationRequest.parse(JSON.parse(job.generationInput)).customization:undefined;
   // Les snapshots antérieurs au catalogue oral n'avaient pas de copyVersion.
   // Ils gardent leur texte et leurs clés de cache, y compris après un crash.
-  const context = await scriptContext(snapshot?.listing ?? job.listing, snapshot?.brand ?? options.brand ?? job.brand, snapshot?.contact ?? options.contact,
-    snapshot ? snapshot.copyVersion ?? 'factual-copy/1' : undefined);
+  const context = await scriptContext(snapshot?.listing ?? customizedListing(job.listing,customization), snapshot?.brand ?? customizedBrand(AgencyBrand.parse(options.brand??job.brand),customization), snapshot?.contact ?? options.contact,
+    snapshot ? snapshot.copyVersion ?? 'factual-copy/1' : undefined,snapshot?snapshot.customNarration:customization?.narration);
   if (context.listing.agencyId !== agencyId || context.listing.id !== job.listing.id) throw new NarrationFailure('NARRATION_CONFLICT');
   if (existing && options.contact && options.contact !== context.contact) throw new NarrationFailure('NARRATION_CONFLICT');
   const config = GoogleVoiceConfig.parse(providers.voice.config);
   const configHash = await hashJson({voice: config, scriptModel: providers.script.model, promptVersion: 'narration-fr/1', mode: providers.mode});
   const {row, lease} = await startNarration(env.DB, {agencyId, jobId, inputHash: context.inputHash, configHash,
-    snapshot: JSON.stringify({listing: {...context.listing, description: null}, brand: context.brand, contact: context.contact, copyVersion: context.copyVersion}),
+    snapshot: JSON.stringify({listing: {...context.listing, description: null}, brand: context.brand, contact: context.contact, copyVersion: context.copyVersion,
+      ...(context.customNarration?{customNarration:context.customNarration}:{})}),
     mode: providers.mode, attempt: job.attempt}, now());
   let failure: string | undefined;
   try {
@@ -58,6 +60,7 @@ export async function prepareJobNarration(env: {DB: Database; MEDIA: NarrationBu
     }
     let script: ListingScript;
     if (row.script) script = validateScript(context, parseJson(row.script));
+    else if(context.customNarration){script=customScript(context);await checkpointNarrationScript(env.DB,lease,script,now());}
     else {
       const safeProvider: ScriptProvider = {model: providers.script.model, plan: async (input, correction) => {
         const requestHash = await hashJson({inputHash: input.inputHash, model: providers.script.model, promptVersion: 'narration-fr/1', correction});
@@ -77,7 +80,7 @@ export async function prepareJobNarration(env: {DB: Database; MEDIA: NarrationBu
       audio = await voiceScenes(env, lease, script, providers, now);
       durationFrames = voiceSceneTiming(audio.map(asset => asset.durationMs));
     } catch (error) {
-      if (!(error instanceof VoiceFailure) || error.code !== 'VOICE_DURATION_EXCEEDED' || script.version !== 1) throw error;
+      if (!(error instanceof VoiceFailure) || error.code !== 'VOICE_DURATION_EXCEEDED' || script.version !== 1 || context.customNarration) throw error;
       script = shortenScript(context, script);
       // La version 2 est persistée avant le premier nouvel appel. Un crash ne
       // remet pas à zéro l'unique raccourcissement autorisé.

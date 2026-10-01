@@ -17,6 +17,7 @@ Ces consignes accompagnent le cahier produit. Elles ne remplacent ni les instruc
 - Séparer le code compatible Workers du code Node natif. Aucun moteur de rendu vidéo dans le bundle de l'interface.
 - Conserver le parcours sans éditeur vidéo. Depuis la demande d’Alex du 28/09/2026, proposer aussi une saisie manuelle dépliable sous l’import URL, avec informations du bien et upload de photos. Cette décision remplace l’exclusion initiale du formulaire ; distinguer les faits importés des informations déclarées par l’utilisateur.
 - Ne pas développer une fonction d'achat de crédits, de publication sociale ou de collaboration d'équipe non prévue.
+- Depuis le 01/10/2026, Alex autorise la personnalisation avant génération : sélection et ordre des photos, styles de montage, couleurs, voix, sous-titres et narration modifiable. Conserver le montage automatique et les textes utilisateur ; aucun éditeur de timeline ou de MP4 terminé n'est ajouté.
 - Ne pas demander de décision sur chaque détail réversible. Choisir les valeurs proposées et documenter les écarts utiles.
 - Un accès ou un secret manquant ne doit pas empêcher de terminer les éléments locaux vérifiables. Décrire ensuite exactement la vérification distante restante.
 - Respecter les autorisations de la session pour les actions externes. Ne pas créer de frais, de service externe ou de changement de facturation non autorisé ; rendre ces opérations concrètes et révisables avant de demander une action à Alex si elle reste nécessaire.

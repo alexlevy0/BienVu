@@ -73,7 +73,7 @@ export async function reconcileGeneration(env:GenerationEnv,row:GenerationRow,co
 }
 export class GenerationWorkflow extends WorkflowEntrypoint<GenerationEnv,{agencyId:string;jobId:string}>{
   protected diagnostic(_error:unknown){}
-  protected providers(){return realProviders(this.env);}
+  protected providers(voiceName?:string){return realProviders(this.env,voiceName);}
   async run(event:WorkflowEvent<{agencyId:string;jobId:string}>,step:WorkflowStep){
     const {agencyId,jobId}=event.payload;
     const once={retries:{limit:0,delay:'1 second' as const},timeout:'10 minutes' as const};
@@ -82,7 +82,7 @@ export class GenerationWorkflow extends WorkflowEntrypoint<GenerationEnv,{agency
         return loadGenerationListing(this.env,row);});
       await step.do('script-and-voice-checkpoints',once,async()=>{
         const row=await active(this.env,agencyId,jobId);await setGenerationStage(this.env.DB,row,'scripting');
-        const providers=await this.providers(),guard=()=>active(this.env,agencyId,jobId);
+        const providers=await this.providers(GenerationRequest.parse(JSON.parse(row.input)).customization?.voice),guard=()=>active(this.env,agencyId,jobId);
         const source=providers.script,voice=providers.voice;
         providers.script={...source,plan:async(...args)=>{await guard();return source.plan(...args);}};
         providers.voice={...voice,synthesize:async text=>{await guard();return voice.synthesize(text);}};

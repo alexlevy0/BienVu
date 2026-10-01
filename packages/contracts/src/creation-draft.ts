@@ -1,5 +1,6 @@
 import {z} from 'zod';
 import {DESCRIPTION_MAX_CHARACTERS, PhotoAsset} from './product';
+import {VideoCustomization} from './customization';
 
 export const creationFieldNames = ['title','propertyType','transaction','locality','description','priceCents','charges','area','rooms'] as const;
 export type CreationFieldName = typeof creationFieldNames[number];
@@ -18,7 +19,7 @@ export type CreationFields=z.infer<typeof CreationFields>;
 export const CreationProvenance=z.object({source:z.enum(['import','ai','user']),evidence:z.string().max(500).nullable(),confirm:z.boolean()}).strict();
 export const CreationDraftData=z.object({fields:CreationFields,provenance:z.partialRecord(z.enum(creationFieldNames),CreationProvenance),
   originalText:z.string().max(DESCRIPTION_MAX_CHARACTERS).nullable(),canonicalUrl:z.string().url().nullable(),
-  warnings:z.array(z.string().max(300)).max(12)}).strict();
+  warnings:z.array(z.string().max(300)).max(12),videoCustomization:VideoCustomization.optional()}).strict();
 export type CreationDraftData=z.infer<typeof CreationDraftData>;
 export const CreationDraftView=z.object({id:z.string(),version:z.number().int().positive(),status:z.literal('needs_input'),
   sourceKind:z.enum(['url','manual']),sourceUrl:z.string().nullable(),expiresAt:z.iso.datetime(),data:CreationDraftData,

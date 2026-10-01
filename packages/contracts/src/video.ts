@@ -2,6 +2,7 @@ import {z} from 'zod';
 import {AgencyBrand, EntityId, ObjectKey, Sha256, type NormalizedListing} from './product';
 import {ScriptScene} from './narration';
 import {SYNTHETIC_VOICE_DISCLOSURE} from './voice';
+import {VideoStyle} from './customization';
 
 export const VideoAsset = z.object({id: EntityId, objectKey: ObjectKey, sha256: Sha256,
   sizeBytes: z.number().int().positive().max(10 * 1024 * 1024),
@@ -45,6 +46,7 @@ export const VideoManifest = z.object({schemaVersion: z.literal(2), templateVers
   presentation: VideoPresentation.optional(),
   // Do not insert a default into old manifests: their stored hashes must remain valid.
   subtitlesEnabled: z.boolean().optional(),
+  visualStyle:VideoStyle.optional(),photoMotion:z.boolean().optional(),photoTransition:z.enum(['fade','cut']).optional(),
 }).strict().superRefine((m, ctx) => {
   const fail = (message: string) => ctx.addIssue({code: 'custom', message});
   if (m.templateVersion === 'bienvu-vertical/2' ? !m.presentation : Boolean(m.presentation)) fail('Présentation incompatible avec le modèle vidéo.');

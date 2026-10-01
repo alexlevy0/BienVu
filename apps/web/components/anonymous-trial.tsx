@@ -1,4 +1,5 @@
 'use client';
+import type {VideoCustomization} from '@bienvu/contracts';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import Link from 'next/link';
 import {GenerationView,publicErrors,type PublicErrorCode} from '@bienvu/contracts';
@@ -19,12 +20,12 @@ export function useAnonymousTrial(enabled:boolean) {
   const {setJob:storeJob}=useGenerationStore();
   const [job,setJob]=useState<GenerationView|null>(null),[siteKey,setSiteKey]=useState<string|null>(null),[available,setAvailable]=useState(false),[used,setUsed]=useState(false),[failure,setFailure]=useState(''),[loaded,setLoaded]=useState(false);
   const [token,setToken]=useState(''),[challenge,setChallenge]=useState(false),[widgetVersion,setWidgetVersion]=useState(0);
-  const lock=useRef(false),intent=useRef<{url:string;key:string;subtitlesEnabled:boolean}|null>(null);
+  const lock=useRef(false),intent=useRef<{url:string;key:string;subtitlesEnabled:boolean;customization?:VideoCustomization}|null>(null);
   const refresh=useCallback(async()=>{try{const data=await value(await fetch('/api/trial',{cache:'no-store'}));setAvailable(data.enabled);setSiteKey(data.siteKey);setUsed(data.used);setJob(data.job?GenerationView.parse(data.job):null);setLoaded(true);setFailure('');}catch{setFailure('Impossible de retrouver votre essai. Réessayez.');setLoaded(true);}},[]);
   useEffect(()=>{if(enabled)void refresh();},[enabled,refresh]);
   useEffect(()=>{if(enabled&&job?.ownership==='anonymous')storeJob(job,anonymousGenerationScope);},[enabled,job,storeJob]);
   useEffect(()=>{if(!enabled||!job||!generationActive(job)||job.ownership==='owned')return;const timer=setInterval(()=>void refresh(),4000);return()=>clearInterval(timer);},[enabled,job?.id,job?.status,job?.ownership,refresh]);
-  async function start(url:string,verifiedToken?:string,subtitlesEnabled=true) {
+  async function start(url:string,verifiedToken?:string,subtitlesEnabled=true,customization?:VideoCustomization) {
     if(lock.current)return;setFailure('');
     if(!loaded){setFailure('Votre navigateur est en cours de vérification. Réessayez dans un instant.');return;}
     if(!available){setFailure(publicErrors.ANONYMOUS_UNAVAILABLE[1]);return;}
@@ -32,10 +33,10 @@ export function useAnonymousTrial(enabled:boolean) {
     if(job&&generationActive(job)){return;}
     const currentToken=verifiedToken??token;
     if(!currentToken&&!intent.current){setChallenge(true);return;}
-    if(intent.current?.url!==url||intent.current?.subtitlesEnabled!==subtitlesEnabled)intent.current={url,key:crypto.randomUUID(),subtitlesEnabled};
+    if(intent.current?.url!==url||intent.current?.subtitlesEnabled!==subtitlesEnabled||JSON.stringify(intent.current?.customization)!==JSON.stringify(customization))intent.current={url,key:crypto.randomUUID(),subtitlesEnabled,customization};
     lock.current=true;
     try{
-      const response=await fetch('/api/trial',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':intent.current.key},body:JSON.stringify({url,subtitlesEnabled,turnstileToken:currentToken})});
+      const response=await fetch('/api/trial',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':intent.current.key},body:JSON.stringify({url,subtitlesEnabled,...(customization?{customization}:{}),turnstileToken:currentToken})});
       const body=await response.json() as {error?:{code?:string;message?:string}};if(!response.ok){if(body.error?.code==='BOT_VERIFICATION_FAILED'){intent.current=null;setChallenge(true);}throw new Error(body.error?.message??'La création n’a pas démarré. Réessayez.');}
       setJob(GenerationView.parse(body));setChallenge(false);intent.current=null;
     }catch(e){setFailure(e instanceof Error?e.message:'La connexion a été interrompue. Réessayez pour retrouver votre demande.');}

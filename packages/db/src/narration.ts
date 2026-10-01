@@ -18,7 +18,8 @@ export async function narrationJobInput(db: Database, agencyId: string, jobId: s
   if (!row) throw new NarrationFailure('NARRATION_NOT_FOUND');
   const brand = await db.prepare(`SELECT id,owner_user_id AS ownerUserId,name,logo_asset_id AS logoAssetId,primary_color AS primaryColor,
     secondary_color AS secondaryColor,phone,email,website,created_at AS createdAt FROM agencies WHERE id=?`).bind(agencyId).first();
-  try {return {listing: GeneratableListing.parse(JSON.parse(row.listing)), brand: AgencyBrand.parse(await db.prepare('SELECT brand_json FROM generation_runs WHERE job_id=? AND anonymous_session_id IS NOT NULL').bind(jobId).first<{brand_json:string}>().then(row=>row?JSON.parse(row.brand_json):brand)), attempt: row.attempt};}
+  try {return {listing: GeneratableListing.parse(JSON.parse(row.listing)), brand: AgencyBrand.parse(await db.prepare('SELECT brand_json FROM generation_runs WHERE job_id=? AND anonymous_session_id IS NOT NULL').bind(jobId).first<{brand_json:string}>().then(row=>row?JSON.parse(row.brand_json):brand)), attempt: row.attempt,
+    generationInput:(await db.prepare('SELECT input_json AS input FROM generation_runs WHERE job_id=? AND agency_id=?').bind(jobId,agencyId).first<{input:string}>())?.input??null};}
   catch {throw new NarrationFailure('SCRIPT_INPUT_INVALID');}
 }
 export async function findNarration(db: Database, agencyId: string, jobId: string): Promise<NarrationRun | null> {

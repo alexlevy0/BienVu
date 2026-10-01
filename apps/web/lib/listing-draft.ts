@@ -1,4 +1,4 @@
-import {ListingUrl} from '@bienvu/contracts';
+import {ListingUrl,VideoCustomization} from '@bienvu/contracts';
 
 type ListingDraft = {kind: 'url'; url: string; savedAt: number} | {kind: 'manual'; savedAt: number;agencyId?:string;serverDraftId?:string};
 const key = 'bienvu:listing-draft';
@@ -12,10 +12,10 @@ const discardedServerDrafts=new Set<string>();
 export const manualDraftFields = ['title', 'propertyType', 'transaction', 'locality', 'priceCents', 'charges', 'area', 'rooms', 'description'] as const;
 export type ManualDraftFields = Record<typeof manualDraftFields[number], string>;
 export type ManualDraft = {fields: ManualDraftFields; photos: File[]; savedAt: number; step: number; agencyId?:string; serverDraftId?:string;
-  serverDraftVersion?:number};
+  serverDraftVersion?:number;videoCustomization?:VideoCustomization;photoSlots?:number[]};
 type StoredPhoto = {name: string; type: string; lastModified: number; blob: Blob};
 type StoredManualDraft = {fields: ManualDraftFields; photos: StoredPhoto[]; savedAt: number; step?: number; agencyId?:string; serverDraftId?:string;
-  serverDraftVersion?:number};
+  serverDraftVersion?:number;videoCustomization?:VideoCustomization;photoSlots?:number[]};
 
 function validTime(savedAt: number) {
   return Number.isFinite(savedAt) && savedAt <= Date.now() && Date.now() - savedAt <= lifetime;
@@ -76,12 +76,12 @@ export function saveListingDraft(value: {kind: 'url'; url: string} | {kind: 'man
 }
 
 export async function saveManualListingDraft(fields: ManualDraftFields, photos: File[], step = 0, agencyId?:string, serverDraftId?:string,
-  serverDraftVersion?:number) {
+  serverDraftVersion?:number,videoCustomization?:VideoCustomization,photoSlots?:number[]) {
   if(serverDraftId&&discardedServerDrafts.has(`${agencyId}:${serverDraftId}`))return false;
   try {
     const savedAt = Date.now();
     await manualRecord('write', {fields, photos: photos.map(file => ({name: file.name, type: file.type, lastModified: file.lastModified, blob: file})), savedAt,
-      step: Number.isInteger(step) && step >= 0 && step <= 4 ? step : 0,agencyId,serverDraftId,serverDraftVersion});
+      step: Number.isInteger(step) && step >= 0 && step <= 4 ? step : 0,agencyId,serverDraftId,serverDraftVersion,videoCustomization,photoSlots});
     if(serverDraftId&&discardedServerDrafts.has(`${agencyId}:${serverDraftId}`)){
       await discardManualListingDraft(agencyId!,serverDraftId);return false;}
     const marker=JSON.stringify({kind:'manual',savedAt,agencyId,serverDraftId});
@@ -124,7 +124,11 @@ export async function readManualListingDraft(agencyId?:string): Promise<ManualDr
     }
     if(record.agencyId && record.agencyId!==agencyId)return null;
     const photos = record.photos.map(photo => new File([photo.blob], photo.name, {type: photo.type, lastModified: photo.lastModified}));
+    const customization=VideoCustomization.safeParse(record.videoCustomization);
+    const slots=record.photoSlots;
     return {fields: record.fields, photos, savedAt: record.savedAt,agencyId:record.agencyId,serverDraftId:record.serverDraftId,
+      videoCustomization:customization.success?customization.data:undefined,
+      photoSlots:Array.isArray(slots)&&slots.length===photos.length&&slots.every(n=>Number.isInteger(n)&&n>=0&&n<=11)&&new Set(slots).size===slots.length?slots:undefined,
       serverDraftVersion:Number.isSafeInteger(record.serverDraftVersion)?record.serverDraftVersion:undefined,
       step: Number.isInteger(record.step) && record.step! >= 0 && record.step! <= 4 ? record.step! : 0};
   } catch {return null;}

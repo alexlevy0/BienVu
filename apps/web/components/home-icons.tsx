@@ -1,6 +1,9 @@
 import type {ReactNode} from 'react';
 
 const shapes = {
+  settings: <><path d="M3 6h5m4 0h9M3 12h10m4 0h4M3 18h3m4 0h11"/><circle cx="10" cy="6" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="8" cy="18" r="2"/></>,
+  image: <><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="1"/><path d="m3 17 6-6 4 4 3-3 5 5"/></>,
+  palette: <><path d="M12 2a10 10 0 1 0 0 20c2 0 3-1 2-3s0-3 2-3h2c6 0 3-14-6-14Z"/><circle cx="7" cy="9" r=".7"/><circle cx="12" cy="6" r=".7"/><circle cx="17" cy="9" r=".7"/></>,
   plus: <path d="M12 3v18M3 12h18"/>,
   video: <><rect x="2.5" y="4" width="19" height="16" rx="1.5"/><path d="m10 9 5 3-5 3V9Z"/></>,
   compass: <><circle cx="12" cy="12" r="10"/><path d="m16.5 7.5-3 6-6 3 3-6 6-3Z"/></>,

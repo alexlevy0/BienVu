@@ -52,8 +52,8 @@ export async function verifyTrialBot(env:TrialEnv,token:unknown,idempotency:stri
 }
 export async function startTrial(request:Request,env:TrialEnv,trustedCloudflare:boolean,verify=verifyTrialBot){
   assertSameOrigin(request,env);const session=await requireTrial(request,env),body=await boundedJson(request,8192);
-  if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).some(k=>!['url','turnstileToken','subtitlesEnabled'].includes(k))||!('url' in body))throw new RequestFailure('VALIDATION_ERROR');
-  const key=request.headers.get('Idempotency-Key')??'',input={url:body.url,...('subtitlesEnabled' in body?{subtitlesEnabled:body.subtitlesEnabled}:{})};
+  if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).some(k=>!['url','turnstileToken','subtitlesEnabled','customization'].includes(k))||!('url' in body))throw new RequestFailure('VALIDATION_ERROR');
+  const key=request.headers.get('Idempotency-Key')??'',input={url:body.url,...('subtitlesEnabled' in body?{subtitlesEnabled:body.subtitlesEnabled}:{}),...('customization' in body?{customization:body.customization}:{})};
   const prior=await priorTrial(env.DB,session,key,input);
   let row=prior.row;
   if(!row){

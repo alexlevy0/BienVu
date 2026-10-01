@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import {GenerationCustomization} from './customization';
 import {sameSourceHost, sourceForHost, sourceListingId} from './import-sources';
 
 export const EntityId = z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/);
@@ -193,6 +194,7 @@ export type CostEvent = z.infer<typeof CostEvent>;
 
 // Optional preserves existing admission hashes; omitted means subtitles enabled.
 export const GenerationInput = z.union([
-  z.object({url:ImportUrl,subtitlesEnabled:z.boolean().optional()}).strict(),
-  z.object({listingId:EntityId,subtitlesEnabled:z.boolean().optional()}).strict(),
+  z.object({url:ImportUrl,subtitlesEnabled:z.boolean().optional(),customization:GenerationCustomization.optional()}).strict()
+    .refine(value=>value.customization?.photoOrder===undefined,'Importez les photos avant de choisir leur ordre.'),
+  z.object({listingId:EntityId,subtitlesEnabled:z.boolean().optional(),customization:GenerationCustomization.optional()}).strict(),
 ]);

@@ -1,12 +1,13 @@
-import {GeneratableListing,ImportFailure} from '@bienvu/contracts';
+import {GeneratableListing,GenerationRequest,customizedListing,ImportFailure} from '@bienvu/contracts';
 import {beginImport,completeImport,failImport,findImport,journalImportPhoto,reserveHostedImport,GenerationFailure,type GenerationRow} from '@bienvu/db';
 import {importListing,readLimited,IMPORT_LIMITS,type ImportTransport} from '@bienvu/importers';
 export type GenerationImportEnv={DB:D1Database;MEDIA:R2Bucket;IMPORT_SERVICE:Fetcher;IMPORT_TOKEN:string};
 export async function loadGenerationListing(env:GenerationImportEnv,row:GenerationRow){
-  const input=JSON.parse(row.input) as {url?:string;listingId?:string};
-  let id=input.listingId;
+  const input=GenerationRequest.parse(JSON.parse(row.input));
+  let id='listingId' in input?input.listingId:undefined;
   if(!id){
-    const start=await beginImport(env.DB,row.agencyId,input.url!,`generation-${row.jobId}`);id=start.row.id;
+    if(!('url' in input))throw new GenerationFailure('VALIDATION_ERROR');
+    const start=await beginImport(env.DB,row.agencyId,input.url,`generation-${row.jobId}`);id=start.row.id;
     if(start.fresh){
       try {
         await reserveHostedImport(env.DB,row.agencyId,id);
@@ -22,7 +23,7 @@ export async function loadGenerationListing(env:GenerationImportEnv,row:Generati
             sourceBytes:Number(response.headers.get('X-Source-Bytes')),width:Number(response.headers.get('X-Image-Width'))||undefined,
             height:Number(response.headers.get('X-Image-Height'))||undefined,bytes:await readLimited(response,kind==='image'?IMPORT_LIMITS.imageBytes:IMPORT_LIMITS.htmlBytes)};
         }};
-        const {listing,diagnostics}=await importListing(input.url!,{agencyId:row.agencyId,importId:id},{transport,
+        const {listing,diagnostics}=await importListing(input.url,{agencyId:row.agencyId,importId:id},{transport,
           browserHtml:async(_url,signal)=>new TextDecoder().decode(await readLimited(await call('/browser',{},signal),IMPORT_LIMITS.htmlBytes)),
           store:async(photo,bytes,signal)=>{signal.throwIfAborted();await journalImportPhoto(env.DB,row.agencyId,id!,photo);
             await env.MEDIA.put(photo.objectKey,bytes,{httpMetadata:{contentType:photo.mime},customMetadata:{agencyId:row.agencyId,importId:id!,sha256:photo.contentHash}});}
@@ -34,8 +35,11 @@ export async function loadGenerationListing(env:GenerationImportEnv,row:Generati
   const imported=await findImport(env.DB,row.agencyId,id);
   if(!imported||imported.status!=='ready'||!imported.result||imported.expiresAt<=new Date().toISOString())throw new GenerationFailure('INCOMPLETE_LISTING');
   const listing=GeneratableListing.parse(JSON.parse(imported.result));
+  if(listing.agencyId!==row.agencyId||listing.id!==id)throw new GenerationFailure('NOT_FOUND');
+  let selected;
+  try{selected=customizedListing(listing,input.customization);}catch{throw new GenerationFailure('VALIDATION_ERROR');}
   // Les objets sont contrôlés avant tout appel texte/voix payant.
-  for(const photo of listing.photos){const object=await env.MEDIA.get(photo.objectKey);
+  for(const photo of selected.photos){const object=await env.MEDIA.get(photo.objectKey);
     if(!object||object.size!==photo.sizeBytes)throw new GenerationFailure('INVALID_PHOTO');
     const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',await object.arrayBuffer()))].map(b=>b.toString(16).padStart(2,'0')).join('');
     if(hash!==photo.contentHash)throw new GenerationFailure('INVALID_PHOTO');}
