@@ -10,6 +10,7 @@ import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import {migrateNarrationProbe} from '../scripts/narration-fixtures';
 import {admitAnonymous,createAnonymousSession,claimTrial,creditGrant,ensureAgency,listGenerations,findOwnedGeneration} from '../packages/db/src/index';
 import {generationVideo} from '../apps/web/lib/generations';
+import {getJobVideo} from '../apps/pipeline/src/video-manifest';
 test('Workflow anonyme complet workerd : import/voix/rendu simulés une fois, claim pendant rendu et reprise après crash',async t=>{
   const directory=await mkdtemp(path.join(tmpdir(),'bienvu-trial-workflow-'));t.after(()=>rm(directory,{recursive:true,force:true}));
   const require=createRequire(import.meta.url),wrangler=createRequire(require.resolve('wrangler/package.json'));
@@ -22,12 +23,13 @@ test('Workflow anonyme complet workerd : import/voix/rendu simulés une fois, cl
     durableObjects:{RENDERER:{className:'FixtureGenerationRenderer',useSQLite:true}},workflows:{GENERATION_WORKFLOW:{name:'fixture-trial',className:'FixtureGenerationWorkflow'}}}),resourcePersistencePath:path.join(directory,'storage')};
   let mf=new Miniflare(options);t.after(()=>mf.dispose());let env=await mf.getBindings<{DB:D1Database;MEDIA:R2Bucket}>();await migrateNarrationProbe(env.DB);
   await env.DB.prepare('INSERT INTO hosted_import_budget VALUES(?,0,2500,0)').bind(new Date().toISOString().slice(0,7)).run();await env.DB.exec('UPDATE generation_control SET enabled=1; UPDATE trial_policy SET enabled=1,free_enabled=1');
-  const {session}=await createAnonymousSession(env.DB),input={url:'https://www.century21.fr/trouver_logement/detail/123456/'},proof={ipHmac:'a'.repeat(64),turnstileHash:'b'.repeat(64)};
+  const {session}=await createAnonymousSession(env.DB),input={url:'https://www.century21.fr/trouver_logement/detail/123456/',subtitlesEnabled:false},proof={ipHmac:'a'.repeat(64),turnstileHash:'b'.repeat(64)};
   const pending=await admitAnonymous(env.DB,session,'workflow-anonymous-key',input,proof,'true');
   const headers={Authorization:'Bearer fixture-generation-token-1234567890','X-Agency-ID':session.scopeId};
   await mf.dispose();mf=new Miniflare(options);env=await mf.getBindings<{DB:D1Database;MEDIA:R2Bucket}>();await mf.dispatchFetch('https://test/tick',{headers});
   let status='queued';for(let i=0;i<100;i++){status=(await env.DB.prepare('SELECT status FROM jobs WHERE id=?').bind(pending.jobId).first<{status:string}>())!.status;if(['rendering','ready','failed'].includes(status))break;await new Promise(r=>setTimeout(r,100));}
   assert.equal(status,'rendering');assert.equal(imports,4);
+  assert.equal((await getJobVideo(env.DB,session.scopeId,pending.jobId))!.manifest.subtitlesEnabled,false);
   const user={id:'workflow-trial-owner',email:'owner@example.com'};await env.DB.prepare('INSERT INTO auth_user VALUES(?,?,?,1,NULL,?,?)').bind(user.id,'Owner',user.email,Date.now()-1000,Date.now()).run();const agency=await ensureAgency(env.DB,user);
   assert.equal((await claimTrial(env.DB,session,agency.id,pending.jobId)).creditStatus,'reserved');
   const before=(await env.DB.prepare('SELECT count(*) AS n FROM narration_calls').first<{n:number}>())!.n;assert.ok(before>4);

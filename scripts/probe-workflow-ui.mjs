@@ -36,7 +36,7 @@ const code=(mode,run)=>`(()=>{const native=window.fetch.bind(window),at=${JSON.s
   mode=${JSON.stringify(mode)},run=${JSON.stringify(run)};
   const key='bienvu:workflow-ui-'+run,empty=()=>({jobs:mode==='quota-refund'?{'quota-ready':{status:'ready'},'quota-active':{status:'rendering'}}:mode==='draft-actions'?{'fixture-existing':{status:'ready'}}:{},
     imports:mode==='draft-actions'?['ui-delete-'+run,'ui-preserve-'+run].map(id=>({id,sourceKind:'manual',status:'needs_input',draft:draft(id,partialFields)})):[],
-    posts:0,reports:[],reportAttempts:0,uploads:0,descriptionCalls:0,deleteAttempts:0,deletes:[]});
+    posts:0,generationInputs:[],reports:[],reportAttempts:0,uploads:0,descriptionCalls:0,deleteAttempts:0,deletes:[]});
   const load=()=>JSON.parse(sessionStorage.getItem(key)||JSON.stringify(empty())),save=s=>sessionStorage.setItem(key,JSON.stringify(s));
   const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json'}});
   const draft=(id,data,photos=[],version=1)=>({id,version,status:'needs_input',sourceKind:id.includes('url')?'url':'manual',
@@ -56,6 +56,10 @@ const code=(mode,run)=>`(()=>{const native=window.fetch.bind(window),at=${JSON.s
     if(p==='/api/me')return mode.startsWith('guest')?json({},401):json({...account,rights:{...account.rights,
       developmentRemaining:Math.max(0,2-Object.values(s.jobs).filter(job=>job.status!=='failed').length)}});
     if(p==='/api/trial'&&method==='GET'){s.trialReady=true;save(s);return json({enabled:true,siteKey:'fixture-site',used:false,job:null});}
+    if(p==='/api/trial'&&method==='POST'&&mode==='guest-subtitles'){
+      const body=JSON.parse(options.body),id='ui-guest-'+run;s.generationInputs.push(body);s.posts++;s.jobs[id]={status:'queued'};save(s);
+      return json({...job(id,s.jobs[id]),ownership:'anonymous',masterAccess:'locked',downloadUrl:null},202);}
+    if(p==='/api/trial/history'&&method==='GET')return json({jobs:[],nextCursor:null});
     if(p==='/api/trial/describe'&&method==='POST'){s.descriptionCalls++;save(s);
       if(mode==='guest-failure')return json({extraction:'unavailable',data:null});
       return json({extraction:'ready',data:{fields,
@@ -67,7 +71,9 @@ const code=(mode,run)=>`(()=>{const native=window.fetch.bind(window),at=${JSON.s
     if(p==='/api/imports'&&method==='GET')return json({imports:s.imports.map(i=>({id:i.id,sourceKind:i.sourceKind,
       status:i.status,title:i.draft?.data.fields.title??null,locality:i.draft?.data.fields.locality??null,
       previewPhotoId:i.draft?.photos[0]?.id??null,createdAt:at,expiresAt:expires,sourceUrl:i.sourceUrl??null,errorCode:null,transaction:'sale'}))});
-    if(p==='/api/imports'&&method==='POST'){const importId='ui-url-partial-'+run;
+    if(p==='/api/imports'&&method==='POST'){
+      if(mode==='auth-subtitles-url'){const value={...listing('ui-url-'+run),sourceKind:'url'};s.imports.push(value);save(s);return json(value,202);}
+      const importId='ui-url-partial-'+run;
       const savedPhotos=mode==='missing-locality'?[0,1,2].map(index=>({
       id:'ui-photo-'+index,agencyId:'ui-agency',listingId:importId,sourceUrl:null,sourceOrder:index,
       objectKey:'agencies/ui-agency/imports/'+importId+'/ui-photo-'+index+'.jpg',
@@ -105,7 +111,7 @@ const code=(mode,run)=>`(()=>{const native=window.fetch.bind(window),at=${JSON.s
     }
     if(p==='/api/generations'&&method==='GET')return json({jobs:Object.entries(s.jobs).map(([id,v])=>job(id,v)),nextCursor:null});
     if(p==='/api/generations'&&method==='POST'){const body=JSON.parse(options.body),id='ui-job-'+body.listingId;
-      if(!s.jobs[id])s.jobs[id]={status:'queued'};s.posts++;save(s);return json(job(id,s.jobs[id]),202);}
+      if(!s.jobs[id])s.jobs[id]={status:'queued'};s.posts++;s.generationInputs.push(body);save(s);return json(job(id,s.jobs[id]),202);}
     if(p==='/api/generations/shares')return json({shares:[]});
     if(p.startsWith('/api/generations/')&&method==='GET'){const id=p.split('/')[3];return s.jobs[id]?json(job(id,s.jobs[id])):json({error:{code:'NOT_FOUND'}},404);}
     if(p.match(/^\\/api\\/generations\\/[^/]+\\/report$/)&&method==='POST'){
@@ -117,8 +123,10 @@ const code=(mode,run)=>`(()=>{const native=window.fetch.bind(window),at=${JSON.s
 const report=[];
 const priceOnly=process.argv.includes('--price-only');
 const actionsOnly=process.argv.includes('--draft-actions-only');
+const historyActionsOnly=process.argv.includes('--history-draft-actions-only');
+const subtitlesOnly=process.argv.includes('--subtitles-only');
 try{
-  if(!priceOnly&&!actionsOnly){
+  if(!priceOnly&&!actionsOnly&&!historyActionsOnly&&!subtitlesOnly){
   for(const width of [1536,390]){
     const page=await browser.newPage({context:()=>null,logLevel:'error',indent:false,pageIndex:width,onBrowserLog:null,onLog:()=>{}}),cdp=page._client();
     await page.setViewport({width,height:width===1536?980:844,deviceScaleFactor:1});
@@ -221,7 +229,7 @@ try{
   await writeFile(path.join(output,'description-1536.png'),Buffer.from(picture.value.data,'base64'));
   await page.close();report.push({description:true,providerFixtureCalls:1,videoPosts:0,adaptiveStep:4});
   }
-  if(!actionsOnly)for(const width of [1536,390])for(const mode of ['auth-price','guest-price']){
+  if(!actionsOnly&&!historyActionsOnly&&!subtitlesOnly)for(const width of [1536,390])for(const mode of ['auth-price','guest-price']){
     const pricePage=await browser.newPage({context:()=>null,logLevel:'error',indent:false,pageIndex:994,onBrowserLog:null,onLog:()=>{}}),priceCdp=pricePage._client();
     // These are independent new-entry cases in the isolated fixture browser.
     await priceCdp.send('Storage.clearDataForOrigin',{origin:new URL(base).origin,storageTypes:'all'});
@@ -252,7 +260,7 @@ try{
       await writeFile(path.join(output,`${mode}-description-${width}.png`),Buffer.from((await priceCdp.send('Page.captureScreenshot',{format:'png'})).value.data,'base64'));}
     await pricePage.close();report.push({mode,width,priceEuros:200000,rewrittenDescription:true,originalRequestPreserved:true,unknownFieldsEmpty:true,videoPosts:0});
   }
-  if(!priceOnly&&!actionsOnly){
+  if(!priceOnly&&!actionsOnly&&!historyActionsOnly&&!subtitlesOnly){
   const latePage=await browser.newPage({context:()=>null,logLevel:'error',indent:false,pageIndex:996,onBrowserLog:null,onLog:()=>{}}),lateCdp=latePage._client();
   await latePage.setViewport({width:1536,height:980,deviceScaleFactor:1});
   await lateCdp.send('Page.addScriptToEvaluateOnNewDocument',{source:code('late-description',runSeed+'-late-description')});
@@ -396,6 +404,93 @@ try{
         openDraftHandled:true,reloadPreserved:true,otherDraftAndVideoPreserved:true,videoPosts:0});
     }
   }
-  await writeFile(path.join(output,actionsOnly?'draft-actions-report.json':priceOnly?'price-report.json':'report.json'),JSON.stringify({fixture:true,at:new Date().toISOString(),report},null,2));
+  if(historyActionsOnly)for(const width of [1536,390]){
+    const run=runSeed+'-history-delete-'+width,id='ui-delete-'+run,preserve='ui-preserve-'+run;
+    const p=await browser.newPage({context:()=>null,logLevel:'error',indent:false,pageIndex:912,onBrowserLog:null,onLog:()=>{}}),c=p._client();
+    await p.setViewport({width,height:width===390?844:980,deviceScaleFactor:1});
+    await c.send('Storage.clearDataForOrigin',{origin:new URL(base).origin,storageTypes:'all'});
+    await stubPrivateImages(c);
+    await c.send('Page.addScriptToEvaluateOnNewDocument',{source:code('draft-actions',run)+`(()=>{
+      const s=window.__workflow.load();s.imports[0].draft.data.fields.title='Maison à Lyon';
+      const other=s.imports[1];other.sourceKind='url';other.sourceUrl='https://fixtures.bienvu.example/vente';
+      other.draft.sourceKind='url';other.draft.sourceUrl=other.sourceUrl;
+      other.draft.data.fields={...other.draft.data.fields,title:'Appartement à Nantes',locality:'Nantes'};
+      other.draft.photos=[{id:'fixture-photo',sourceOrder:0}];
+      sessionStorage.setItem('bienvu:workflow-ui-'+${JSON.stringify(run)},JSON.stringify(s));})()`});
+    const e=async expression=>{const r=await c.send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true,userGesture:true});assert.ok(!r.value.exceptionDetails,JSON.stringify(r.value.exceptionDetails));return r.value.result.value;};
+    const wait=async expression=>{for(let i=0;i<160;i++){if(await e('Boolean('+expression+')'))return;await new Promise(r=>setTimeout(r,100));}throw Error('HISTORY DELETE WAIT '+expression);};
+    const shot=async name=>{await e('document.fonts.ready');const s=await c.send('Page.captureScreenshot',{format:'png'});await writeFile(path.join(output,`history-drafts-${name}-${width}.png`),Buffer.from(s.value.data,'base64'));};
+    await p.goto({url:base+'/historique',timeout:60000,options:{waitUntil:'load'}});
+    await wait("document.querySelectorAll('.video-library-drafts article').length===2&&document.querySelectorAll('.video-library-card').length===1");
+    await shot('list');
+    await e("document.querySelector('.video-library-drafts .home-draft-more').click()");
+    await wait("document.querySelector('.video-library-drafts [role=menuitem]')===document.activeElement");
+    const bounds=await e("(()=>{const b=document.querySelector('.video-library-drafts .home-draft-dropdown').getBoundingClientRect();return {left:b.left,right:b.right,width:innerWidth}})()");
+    assert.ok(bounds.left>=0&&bounds.right<=bounds.width);await shot('menu');
+    await e("document.querySelector('.video-library-drafts [role=menuitem]').click()");
+    await wait("document.querySelector('.video-library-drafts [role=alert]')");
+    assert.equal(await e("document.querySelectorAll('.video-library-drafts article').length"),2);
+    assert.equal(await e("document.querySelectorAll('.home-recents .home-draft-more').length"),2);
+    await c.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape'});await c.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape'});
+    await wait("!document.querySelector('.video-library-drafts [role=menuitem]')");
+    assert.equal(await e("document.activeElement===document.querySelector('.video-library-drafts .home-draft-more')"),true);
+    await e("document.querySelector('.video-library-drafts .home-draft-more').click()");
+    await e("document.querySelector('.video-library-drafts [role=menuitem]').click();document.querySelector('.video-library-drafts [role=menuitem]').click()");
+    await wait("document.querySelectorAll('.video-library-drafts article').length===1&&document.querySelectorAll('.home-recents .home-draft-more').length===1");
+    assert.deepEqual(await e('window.__workflow.load().deletes'),[id]);
+    assert.equal(await e('window.__workflow.load().deleteAttempts'),2);
+    await p.goto({url:base+'/historique',timeout:60000,options:{waitUntil:'load'}});
+    await wait("document.querySelectorAll('.video-library-drafts article').length===1&&document.querySelectorAll('.video-library-card').length===1");
+    assert.equal(await e("document.querySelector('.video-library-drafts h3').textContent"),'Appartement à Nantes');
+    await e("document.querySelector('.video-library-drafts .home-draft-more').click()");
+    await e("document.querySelector('.video-library-drafts [role=menuitem]').click()");
+    await wait("!document.querySelector('.video-library-drafts')&&!document.querySelector('.home-recents .home-draft-more')&&document.activeElement.id==='history-title'");
+    assert.deepEqual(await e('window.__workflow.load().deletes'),[id,preserve]);
+    assert.equal(await e('window.__workflow.load().jobs["fixture-existing"].status'),'ready');
+    assert.equal(await e('window.__workflow.load().posts'),0);
+    assert.equal(await e('document.documentElement.scrollWidth<=innerWidth+2'),true);
+    await p.close();report.push({historyDraftDeletion:true,width,manualAndUrl:true,retry:true,escapeFocus:true,duplicateClick:true,
+      recentsSynced:true,reloadPreserved:true,otherDraftAndVideoPreserved:true,emptySectionRemoved:true,videoPosts:0});
+  }
+  if(subtitlesOnly)for(const width of [1536,390])for(const scenario of ['url-enabled','url-disabled','manual-disabled','guest-disabled']){
+    const mode=scenario==='guest-disabled'?'guest-subtitles':scenario==='manual-disabled'?'auth':'auth-subtitles-url';
+    const run=runSeed+'-subtitles-'+scenario+'-'+width,enabled=scenario==='url-enabled';
+    const p=await browser.newPage({context:()=>null,logLevel:'error',indent:false,pageIndex:919,onBrowserLog:null,onLog:()=>{}}),c=p._client();
+    await p.setViewport({width,height:width===390?844:980,deviceScaleFactor:1});
+    await c.send('Storage.clearDataForOrigin',{origin:new URL(base).origin,storageTypes:'all'});await stubPrivateImages(c);
+    await c.send('Page.addScriptToEvaluateOnNewDocument',{source:code(mode,run)});
+    const e=async expression=>{const r=await c.send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true,userGesture:true});assert.ok(!r.value.exceptionDetails,JSON.stringify(r.value.exceptionDetails));return r.value.result.value;};
+    const wait=async expression=>{for(let i=0;i<180;i++){if(await e('Boolean('+expression+')'))return;await new Promise(r=>setTimeout(r,100));}throw Error('SUBTITLES WAIT '+expression+': '+await e('document.body.innerText.slice(-1400)'));};
+    const input=async value=>e(`(()=>{const n=document.querySelector('#home-listing-url');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(n,${JSON.stringify(value)});n.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+    await p.goto({url:base,timeout:60000,options:{waitUntil:'load'}});
+    await wait("document.querySelector('.home-subtitles-pill')&&!document.querySelector('.home-subtitles-pill').disabled");
+    assert.equal(await e("document.querySelector('.home-subtitles-pill').getAttribute('aria-pressed')"),'true');
+    if(!enabled){await e("document.querySelector('.home-subtitles-pill').click()");
+      await wait("document.querySelector('.home-subtitles-pill').getAttribute('aria-pressed')==='false'");
+      await p.goto({url:base,timeout:60000,options:{waitUntil:'load'}});
+      await wait("document.querySelector('.home-subtitles-pill')?.getAttribute('aria-pressed')==='false'&&!document.querySelector('.home-subtitles-pill').disabled");}
+    if(scenario.startsWith('url-')){await e('document.fonts.ready');const shot=await c.send('Page.captureScreenshot',{format:'png'});
+      await writeFile(path.join(output,`subtitles-${scenario}-${width}.png`),Buffer.from(shot.value.data,'base64'));}
+    if(mode==='guest-subtitles')await wait('window.__workflow.load().trialReady');
+    await input(mode==='guest-subtitles'?'https://www.century21.fr/trouver_logement/detail/123456/':'https://fixtures.bienvu.example/vente');
+    await e("document.querySelector('.home-composer').requestSubmit()");
+    if(scenario==='manual-disabled'){
+      await wait("document.querySelector('.manual-step-header')?.textContent.includes('4 SUR 5')");
+      assert.equal(await e("document.querySelector('.home-subtitles-pill').getAttribute('aria-pressed')"),'false');
+      await e(`(async()=>{const t=new DataTransfer();for(const name of ['paris','sud','lyon']){const b=await(await fetch('/images/studio-home/'+name+'.webp')).blob();t.items.add(new File([b],name+'.webp',{type:'image/webp'}));}const n=document.querySelector('#manual-photos');n.files=t.files;n.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+      await wait("document.querySelectorAll('.manual-photos li').length===3&&[...document.querySelectorAll('.manual-photos li')].every(li=>li.textContent.includes('Disponible'))");
+      await e("document.querySelector('.manual-step-actions .home-primary-button').click()");
+      await wait("document.querySelector('.manual-step-header')?.textContent.includes('5 SUR 5')");
+      await e("document.querySelector('.home-composer').requestSubmit()");
+    }
+    await wait('window.__workflow.load().posts===1');
+    const body=await e('window.__workflow.load().generationInputs[0]');assert.equal(body.subtitlesEnabled,enabled);
+    assert.equal(mode==='guest-subtitles'?Boolean(body.url):Boolean(body.listingId),true);
+    if(mode==='guest-subtitles')assert.equal(body.turnstileToken,'fixture-token');
+    await wait("document.querySelector('.home-subtitles-pill').disabled");
+    assert.equal(await e('document.documentElement.scrollWidth<=innerWidth+2'),true);
+    await p.close();report.push({subtitles:true,width,scenario,defaultEnabled:true,subtitlesEnabled:enabled,reloadPreserved:!enabled,admissions:1,providersMocked:true});
+  }
+  await writeFile(path.join(output,subtitlesOnly?'subtitles-report.json':historyActionsOnly?'history-draft-actions-report.json':actionsOnly?'draft-actions-report.json':priceOnly?'price-report.json':'report.json'),JSON.stringify({fixture:true,at:new Date().toISOString(),report},null,2));
   console.log(JSON.stringify({passed:true,report}));
 }finally{await browser.close({silent:true});}

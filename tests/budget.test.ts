@@ -37,5 +37,13 @@ test('hausse explicite à 50 € : la coupure 45 € garde 5 € de marge',()=>{
   assert.equal(raised.fixedAndOtherCents,old.fixedAndOtherCents);
   assert.equal(summary(raised).remainingEnvelopeCents,1450);
   assert.throws(()=>reserve({...raised,ceilingCents:4501},now),/BUDGET_CONFIG_INVALID/);
-  assert.throws(()=>reserve({...raised,envelopeCents:5001},now),/BUDGET_CONFIG_INVALID/);
+  assert.throws(()=>reserve({...raised,envelopeCents:10001},now),/BUDGET_CONFIG_INVALID/);
+});
+
+test('enveloppe 100 € explicitement autorisée : coupure 90 €, frais historiques conservés',()=>{
+  const b=reserve({...fresh(),fixedAndOtherCents:4475,committedCents:25,attempts:1,ceilingCents:9000,envelopeCents:10000},now);
+  assert.equal(b.fixedAndOtherCents,4475);assert.equal(b.committedCents,75);
+  assert.equal(summary(b).remainingEnvelopeCents,5450);
+  assert.throws(()=>reserve({...b,fixedAndOtherCents:8880},now),/BUDGET_LIMIT/);
+  assert.throws(()=>reserve({...b,ceilingCents:9501},now),/BUDGET_CONFIG_INVALID/);
 });

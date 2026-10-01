@@ -36,9 +36,15 @@ export const VideoManifest = z.object({schemaVersion: z.literal(2), templateVers
     z.object({kind: z.literal('free'), allocationId: EntityId, watermarked: z.literal(false)}).strict(),
     z.object({kind: z.literal('paid'), allocationId: EntityId, watermarked: z.literal(false)}).strict(),
   ]),
-  photos: z.array(VideoAsset).min(3).max(6), audio: z.array(VideoAsset).min(4).max(6),
+  photos: z.array(VideoAsset).min(3).max(12), audio: z.array(VideoAsset).min(4).max(6),
   scenes: z.array(ScriptScene.extend({audioAssetId: EntityId, durationFrames: z.number().int().positive().max(1050)})).min(4).max(6),
+  // Independent slideshow: speech scenes do not limit the number of photos.
+  // Optional without a default to preserve historical immutable hashes.
+  photoTimeline: z.array(z.object({photoAssetId: EntityId,
+    durationFrames: z.number().int().min(30).max(1050)}).strict()).min(3).max(12).optional(),
   presentation: VideoPresentation.optional(),
+  // Do not insert a default into old manifests: their stored hashes must remain valid.
+  subtitlesEnabled: z.boolean().optional(),
 }).strict().superRefine((m, ctx) => {
   const fail = (message: string) => ctx.addIssue({code: 'custom', message});
   if (m.templateVersion === 'bienvu-vertical/2' ? !m.presentation : Boolean(m.presentation)) fail('Présentation incompatible avec le modèle vidéo.');
@@ -62,11 +68,23 @@ export const VideoManifest = z.object({schemaVersion: z.literal(2), templateVers
       || index > 0 && m.scenes[index - 1].photoAssetId === s.photoAssetId) fail('Scène sans média valide ou voix tronquée.');
   }
   if (new Set(m.scenes.map(s => s.photoAssetId)).size < 3 || new Set(m.scenes.map(s => s.audioAssetId)).size !== m.audio.length
-    || m.photos.some(p => !m.scenes.some(s => s.photoAssetId === p.id))) fail('Médias inutilisés ou incomplets.');
+    || !m.photoTimeline && m.photos.some(p => !m.scenes.some(s => s.photoAssetId === p.id))) fail('Médias inutilisés ou incomplets.');
   const frames = m.scenes.reduce((n, s) => n + s.durationFrames, 0);
   if (frames < 600 || frames > 1050) fail('Durée hors de la plage de 20 à 35 secondes.');
+  if (m.photoTimeline && (m.templateVersion !== 'bienvu-vertical/2'
+    || m.photoTimeline.length !== m.photos.length
+    || m.photoTimeline.some((s, i) => s.photoAssetId !== m.photos[i].id)
+    || m.photoTimeline.reduce((n, s) => n + s.durationFrames, 0) !== frames)) fail('Galerie incomplète ou durée incohérente.');
 });
 export type VideoManifest = z.infer<typeof VideoManifest>;
+// Integer frames cover the complete narration exactly, including its last frame.
+// Preserve listing order; every distinct imported photo appears once.
+export function videoPhotoTimeline(photos: Pick<VideoAsset, 'id'>[], frames: number): NonNullable<VideoManifest['photoTimeline']> {
+  if (photos.length < 3 || photos.length > 12 || !Number.isInteger(frames) || frames < 600 || frames > 1050)
+    throw new Error('VIDEO_PHOTO_TIMELINE_INVALID');
+  return photos.map((photo, i) => ({photoAssetId: photo.id,
+    durationFrames: Math.floor((i + 1) * frames / photos.length) - Math.floor(i * frames / photos.length)}));
+}
 export function videoAssets(m: {photos: VideoAsset[]; audio: VideoAsset[]; logo: VideoAsset | null}): VideoAsset[] {
   return [...m.photos, ...m.audio, ...(m.logo ? [m.logo] : [])];
 }

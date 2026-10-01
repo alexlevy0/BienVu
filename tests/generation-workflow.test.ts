@@ -9,6 +9,7 @@ import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import {migrateNarrationProbe,seedNarrationFixture} from '../scripts/narration-fixtures';
 import {admitGeneration,setGenerationProgress,findGeneration} from '../packages/db/src/index';
 import {videoFixture} from '../fixtures/video';
+import {getJobVideo} from '../apps/pipeline/src/video-manifest';
 
 test('Workflow workerd réel, fournisseurs simulés : déconnexion, restart puis réconciliation après upload et quota unique',async t=>{
   const directory=await mkdtemp(path.join(tmpdir(),'bienvu-generation-'));t.after(()=>rm(directory,{recursive:true,force:true}));
@@ -30,12 +31,13 @@ test('Workflow workerd réel, fournisseurs simulés : déconnexion, restart puis
   await env.DB.prepare('INSERT INTO hosted_import_budget VALUES(?,0,3500,0)').bind(new Date().toISOString().slice(0,7)).run();await env.DB.exec('UPDATE generation_control SET enabled=1');
   const headers={'Content-Type':'application/json',Authorization:'Bearer fixture-generation-token-1234567890','X-Agency-ID':scope.agencyId,'Idempotency-Key':'fixture-workflow-idempotency'};
   assert.equal((await mf.dispatchFetch('https://test/generations',{method:'POST',body:'{}'})).status,401);
-  const create=()=>mf.dispatchFetch('https://test/generations',{method:'POST',headers,body:JSON.stringify({listingId:listing.id})});
+  const input={listingId:listing.id,subtitlesEnabled:false};
+  const create=()=>mf.dispatchFetch('https://test/generations',{method:'POST',headers,body:JSON.stringify(input)});
   const missing=listing.photos[0];await env.MEDIA.delete(missing.objectKey);
   assert.equal((await create()).status,422);
   assert.equal((await env.DB.prepare('SELECT count(*) AS n FROM generation_runs').first<{n:number}>())!.n,0);
   await env.MEDIA.put(missing.objectKey,new Uint8Array(fixture.files.get(missing.id)!),{customMetadata:{sha256:missing.contentHash}});
-  const pending=await admitGeneration(env.DB,scope.agencyId,headers['Idempotency-Key'],{listingId:listing.id},'true');
+  const pending=await admitGeneration(env.DB,scope.agencyId,headers['Idempotency-Key'],input,'true');
   assert.equal(pending.launchStatus,'pending');
   // Coupure entre la réservation et le démarrage : la réconciliation reprend l'intention.
   await mf.dispose();mf=new Miniflare(options);env=await mf.getBindings<{DB:D1Database;MEDIA:R2Bucket}>();
@@ -45,6 +47,7 @@ test('Workflow workerd réel, fournisseurs simulés : déconnexion, restart puis
   let row:{status:string}|null=null;
   for(let i=0;i<70;i++){row=await env.DB.prepare('SELECT status FROM jobs WHERE id=?').bind(job.id).first();if(['rendering','ready','failed'].includes(row!.status))break;await new Promise(r=>setTimeout(r,200));}
   assert.equal(row!.status,'rendering');
+  assert.equal((await getJobVideo(env.DB,scope.agencyId,job.id))!.manifest.subtitlesEnabled,false);
   const progressRow=(await findGeneration(env.DB,scope.agencyId,job.id))!;
   await setGenerationProgress(env.DB,progressRow,42);
   await setGenerationProgress(env.DB,progressRow,17);

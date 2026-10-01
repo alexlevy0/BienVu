@@ -4,11 +4,27 @@ import {createServer} from 'node:http';
 import {mkdtemp,readFile,writeFile,mkdir,rm,readdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
-import {VideoManifest,videoManifestHash,videoAssets,videoAssetFile,videoPresentation} from '../packages/contracts/src/index';
+import {VideoManifest,videoManifestHash,videoAssets,videoAssetFile,videoPresentation,videoPhotoTimeline} from '../packages/contracts/src/index';
+import {photoAtFrame} from '../packages/video/src/photo-timeline';
 import {videoFixture,videoReport} from '../fixtures/video';
 import {VideoService} from '../apps/renderer/src/video-service';
 import {isFastStart,parseRange,withVideoAssets} from '../apps/renderer/src/listing-render';
 import {subtitleGroups,fitFont,displayArea,displayPrice,displayRooms,displayLocation} from '../packages/video/src/layout';
+import {GenerationRequest} from '../packages/contracts/src/index';
+import {createHash} from 'node:crypto';
+
+test('choix des sous-titres : booléen strict, empreintes historiques préservées',async()=>{
+  for(const input of [{url:'https://www.orpi.com/annonce-vente-appartement-test/'},{listingId:'listing-fixture'}]){
+    assert.deepEqual(GenerationRequest.parse(input),input);
+    for(const enabled of [true,false])assert.equal(GenerationRequest.parse({...input,subtitlesEnabled:enabled}).subtitlesEnabled,enabled);
+    for(const invalid of ['false',0,null])assert.equal(GenerationRequest.safeParse({...input,subtitlesEnabled:invalid}).success,false);
+  }
+  const {manifest}=await videoFixture();
+  assert.equal(await videoManifestHash(manifest),createHash('sha256').update(JSON.stringify(manifest)).digest('hex'));
+  assert.equal(Object.hasOwn(VideoManifest.parse(manifest),'subtitlesEnabled'),false);
+  assert.notEqual(await videoManifestHash({...manifest,subtitlesEnabled:false}),await videoManifestHash({...manifest,subtitlesEnabled:true}));
+  assert.equal(VideoManifest.safeParse({...manifest,subtitlesEnabled:'false'}).success,false);
+});
 
 test('manifeste vidéo : droit, périmètre, timeline, sources figés',async()=>{
   const {manifest:m}=await videoFixture();
@@ -19,6 +35,28 @@ test('manifeste vidéo : droit, périmètre, timeline, sources figés',async()=>
   assert.equal(await videoManifestHash(m),await videoManifestHash(JSON.parse(JSON.stringify(m))));
   assert.notEqual(await videoManifestHash(m),await videoManifestHash({...m,brand:{...m.brand,name:'Nouvelle agence'}}));
   assert.equal((await videoFixture('paid')).manifest.rights.watermarked,false);
+});
+test('toute la galerie défile, indépendamment des scènes parlées et sans trou de timing',async()=>{
+  for(const count of [3,8,12]) {
+    const {manifest:m}=await videoFixture('paid',count),frames=601;
+    const timeline=videoPhotoTimeline(m.photos,frames);
+    assert.equal(timeline.reduce((n,p)=>n+p.durationFrames,0),frames);
+    assert.deepEqual([...new Set(Array.from({length:frames},(_,f)=>photoAtFrame(timeline,f).photo.photoAssetId))],m.photos.map(p=>p.id));
+    assert.ok(timeline.every(p=>p.durationFrames>=50));
+    let start=0;for(const p of timeline){assert.equal(photoAtFrame(timeline,start).photo.photoAssetId,p.photoAssetId);
+      assert.equal(photoAtFrame(timeline,start+p.durationFrames-1).photo.photoAssetId,p.photoAssetId);start+=p.durationFrames;}
+    assert.throws(()=>photoAtFrame(timeline,frames),/OUT_OF_RANGE/);
+  }
+  const {manifest:m}=await videoFixture('paid',8),timeline=m.photoTimeline!;
+  assert.equal(m.scenes.length,4);assert.equal(m.photos.length,8);
+  for(const value of [undefined,timeline.slice(1),timeline.map((p,i)=>i?p:{...p,photoAssetId:'foreign-photo'}),
+    timeline.map((p,i)=>i?p:{...p,photoAssetId:timeline[1].photoAssetId}),[...timeline].reverse(),
+    timeline.map((p,i)=>i?p:{...p,durationFrames:p.durationFrames+1}),timeline.map((p,i)=>i?p:{...p,durationFrames:1})])
+    assert.equal(VideoManifest.safeParse({...m,photoTimeline:value}).success,false);
+  assert.equal(VideoManifest.safeParse({...m,templateVersion:'bienvu-vertical/1',presentation:undefined}).success,false);
+  const legacy=(await videoFixture()).manifest;
+  assert.equal(Object.hasOwn(VideoManifest.parse(legacy),'photoTimeline'),false);
+  assert.equal(await videoManifestHash(legacy),createHash('sha256').update(JSON.stringify(legacy)).digest('hex'));
 });
 test('le modèle plein écran fige les faits admis et conserve les anciens manifestes',async()=>{
   const {manifest:legacy,listing}=await videoFixture();

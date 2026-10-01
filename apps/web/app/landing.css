@@ -113,7 +113,7 @@
 @media(prefers-reduced-motion:reduce){.home-composer {transition:none}.home-drop-overlay,.home-drop-overlay svg,.home-composer-attachments li {animation:none}}
 .home-composer-bottom {display:flex;align-items:flex-end;justify-content:space-between;gap:15px}
 .home-format-tags {display:flex;flex-wrap:wrap;gap:10px;padding-bottom:1px}
-.home-format-tags>span {display:inline-flex;align-items:center;gap:8px;min-height:38px;padding:7px 11px;border:1px solid #cdd6c2;border-radius:14px;font-size:14px;color:#50564f;white-space:nowrap}
+.home-format-tags>span {display:inline-flex;align-items:center;gap:8px;min-height:38px;padding:7px 11px;border:1px solid #cdd6c2;border-radius:14px;font-size:14px;color:#394639;white-space:nowrap}
 .home-format-tags svg {color:#172015}
 .home-studio .home-primary-button {display:inline-flex;align-items:center;justify-content:center;gap:15px;background:#11120f;color:#fffefa;border:1px solid #11120f;border-radius:9px;min-height:50px;padding:12px 24px;font-size:16px;font-weight:550;line-height:1.4;text-align:center;transition:background .15s,transform .15s}
 .home-primary-button:hover:not(:disabled) {background:#2e3729;transform:translateY(-1px)}
@@ -257,7 +257,7 @@
   .home-url-row input {font-size:15px;letter-spacing:-.15px;height:39px}
   .home-composer-bottom {flex-wrap:wrap;gap:18px}
   .home-format-tags {gap:7px;flex:1}
-  .home-format-tags>span {font-size:12px;min-height:32px;padding:5px 8px;border-radius:11px;gap:6px}
+  .home-format-tags>span {font-size:12px;min-height:32px;padding:5px 7px;border-radius:11px;gap:5px}
   .home-format-tags svg {width:17px;height:17px}
   .home-composer .home-primary-button {width:100%;font-size:15px;min-height:47px;border-radius:8px}
   .home-create-meta {gap:4px;padding:12px 0 4px;flex-direction:column}
@@ -322,8 +322,9 @@
 .home-create-conversation {flex:1;display:flex;flex-direction:column;text-align:left;min-height:0}
 .home-create-conversation .home-composer-dock {position:sticky;bottom:0;z-index:4;margin-top:auto;padding:12px 0 max(10px,env(safe-area-inset-bottom));background:linear-gradient(to bottom,transparent,var(--home-paper) 10px,var(--home-paper))}
 .home-create-note {font-size:12px;color:#747680!important;text-align:center;margin:8px 0 0!important}
-.home-mode-pill {display:inline-flex;align-items:center;gap:8px;min-height:38px;padding:7px 11px;border:1px solid #cdd6c2;border-radius:14px;background:transparent;font-size:14px!important;color:#394639!important;white-space:nowrap;cursor:pointer}
-.home-mode-pill:hover,.home-mode-pill.is-active {background:#f2f6ee;border-color:#9db593}
+.home-mode-pill,.home-subtitles-pill {display:inline-flex;align-items:center;gap:8px;min-height:38px;padding:7px 11px;border:1px solid #cdd6c2;border-radius:14px;background:transparent;font-size:14px!important;color:#394639!important;white-space:nowrap;cursor:pointer}
+.home-format-tags>span,.home-mode-pill:hover,.home-mode-pill.is-active,.home-subtitles-pill:hover,.home-subtitles-pill.is-active {background:#f2f6ee;border-color:#9db593}
+.home-subtitles-pill:disabled {cursor:default;opacity:.65}
 .home-format-tags {align-items:center}
 .home-conversation-manual,.home-conversation-job {width:100%;max-width:1020px;margin:0 auto}
 .home-request-bubble {width:max-content;max-width:min(76%,530px);min-width:0;margin:2px 0 28px auto;padding:17px 20px;border-radius:16px;background:#eaeae7;display:flex;align-items:flex-start;gap:17px;color:#15191a;font-size:15px;overflow-wrap:anywhere;text-align:left}
@@ -436,8 +437,8 @@
  .home-conversation-manual {padding-bottom:170px}
  .home-composer {min-height:0}
  .home-format-tags {gap:6px}
- .home-mode-pill {min-height:32px;padding:5px 7px;font-size:12px!important;gap:5px;border-radius:11px}
- .home-mode-pill svg {width:17px;height:17px}
+ .home-mode-pill,.home-subtitles-pill {min-height:32px;padding:5px 7px;font-size:12px!important;gap:5px;border-radius:11px}
+ .home-mode-pill svg,.home-subtitles-pill svg {width:17px;height:17px}
 }
 @media(prefers-reduced-motion:reduce){.home-studio .home-poster-skeleton,.home-studio .home-activity-ring,.home-studio .step-current .home-step-symbol,.home-studio .home-stage-track>span {animation:none!important}}
 

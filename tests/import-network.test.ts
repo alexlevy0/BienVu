@@ -55,6 +55,25 @@ test('galerie : doublons par contenu, ordre et rejet préalable de toutes les UR
   await assert.rejects(importListing(url, {agencyId: 'a', importId: 'b'}, {transport: unsafe, store: async () => {}}), e => e instanceof ImportFailure && e.code === 'UNSAFE_URL');
   assert.equal(imageCalls, 0);
 });
+test('une galerie de huit photos est importée entièrement avec les limites produit habituelles',async()=>{
+  const base=fixtureImportTransport(),stored:string[]=[];
+  const transport:ImportTransport={async load(value,kind,hosts,signal,maxBytes){
+    if(kind==='page') {
+      const resource=await base.load(value,kind,hosts,signal,maxBytes);
+      const html=new TextDecoder().decode(resource.bytes).replace('"/photos/c.jpg"',
+        Array.from({length:6},(_,n)=>`"/photos/extra-${n}.jpg"`).join(','));
+      resource.bytes=new TextEncoder().encode(html);resource.sourceBytes=resource.bytes.length;return resource;
+    }
+    const match=/extra-(\d)\.jpg$/.exec(value);
+    if(!match)return base.load(value,kind,hosts,signal,maxBytes);
+    const bytes=await sharp({create:{width:960,height:640,channels:3,background:{r:20+Number(match[1])*35,g:70,b:120}}}).jpeg().toBuffer();
+    return {url:value,sourceBytes:bytes.length,...await normalizePhoto(bytes,'image/jpeg')};
+  }};
+  const {listing}=await importListing(url,{agencyId:'agency-fixture',importId:'eight-photo-fixture'},
+    {transport,store:async p=>{stored.push(p.id);}});
+  assert.equal(listing.photos.length,8);assert.deepEqual(listing.photos.map(p=>p.id),stored);
+  assert.deepEqual(listing.photos.map(p=>p.sourceOrder),[0,1,2,3,4,5,6,7]);
+});
 test('deadline globale : arrêt même si un transport injecté ne répond plus', async () => {
   const abort = new AbortController(); const timer = setTimeout(() => abort.abort(), 20);
   try {await assert.rejects(importListing(url, {agencyId: 'a', importId: 'b'}, {transport: {load: () => new Promise(() => {})}, store: async () => {}}, {signal: abort.signal}),

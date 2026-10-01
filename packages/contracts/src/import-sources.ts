@@ -11,7 +11,7 @@ export const importSources: readonly ImportSource[] = [
   {id: 'century21', name: 'Century 21', hosts: ['www.century21.fr', 'century21.fr'],
     paths: [/^\/trouver_logement\/detail\/(\d+)\/$/], mediaHosts: ['www.century21.fr', 'images.century21.fr']},
   {id: 'figaro', name: 'Le Figaro Immobilier', hosts: ['immobilier.lefigaro.fr'],
-    paths: [/^\/annonces\/annonce-(\d+)\.html$/], mediaHosts: ['immobilier.lefigaro.fr']},
+    paths: [/^\/annonces\/annonce-(\d+)\.html$/], mediaHosts: ['immobilier.lefigaro.fr', 'cdn.immobilier.lefigaro.fr', 'lh3.googleusercontent.com']},
   {id: 'seloger', name: 'SeLoger', hosts: ['www.seloger.com', 'seloger.com'],
     paths: [/^\/annonce\/(?:achat|location)\/(?:[^/]+\/){3}([A-Z0-9]+)\/?$/,
       /^\/annonces\/(?:achat|locations)\/(?:[^/]+\/)+(\d+)\.htm$/], mediaHosts: ['www.seloger.com']},

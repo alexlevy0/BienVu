@@ -6,6 +6,7 @@ import {googleTts} from '../packages/voice/src/index';
 import {toneFixture} from './voice';
 import {fixturePlan,fixtureScriptMetrics} from './narration';
 import {findGeneration,generationView} from '../packages/db/src/index';
+import {productRenderBudget} from '../apps/pipeline/src/product-render-budget';
 export class FixtureGenerationWorkflow extends GenerationWorkflow {
   protected override diagnostic(error:unknown){console.error(error);}
   protected override async providers(){
@@ -20,6 +21,7 @@ export class FixtureGenerationRenderer extends DurableObject<GenerationEnv>{
     if(path==='/render'){
       const manifest=VideoManifest.parse(await request.json()),id=await videoManifestHash(manifest);
       const existing=await this.ctx.storage.get(id);if(existing)return Response.json(existing);
+      await productRenderBudget(this.env.DB,manifest,Date.now());
       const bytes=new Uint8Array([1,2,3,4]),sha=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(b=>b.toString(16).padStart(2,'0')).join('');
       const frames=manifest.scenes.reduce((n,s)=>n+s.durationFrames,0),at=new Date().toISOString(),objectKey=videoObjectKey(manifest,id);
       const report:VideoReport={id,manifestHash:id,sha256:sha,sizeBytes:bytes.length,width:1080,height:1920,fps:30,codec:'h264',audioCodec:'aac',durationFrames:frames,durationSeconds:frames/30,fastStart:true,watermarked:manifest.rights.watermarked,meanVolumeDb:-20,startedAt:at,endedAt:at,renderAndVerifySeconds:0};

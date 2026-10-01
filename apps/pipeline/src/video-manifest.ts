@@ -1,4 +1,4 @@
-import {EntityId, PreparedNarration, VideoAsset, VideoManifest, VideoFailure, videoAssets, videoManifestHash, videoPresentation} from '@bienvu/contracts';
+import {EntityId, GenerationRequest, PreparedNarration, VideoAsset, VideoManifest, VideoFailure, videoAssets, videoManifestHash, videoPresentation, videoPhotoTimeline} from '@bienvu/contracts';
 import {findNarration, type Database} from '@bienvu/db';
 import {scriptContext, validateScript, type ScriptContext} from '@bienvu/narration';
 import type {NarrationBucket} from './narration';
@@ -25,13 +25,13 @@ export async function getJobVideo(db: Database, agency: string, job: string): Pr
 export async function prepareJobVideo(env: {DB: Database; MEDIA: NarrationBucket}, agency: string, job: string): Promise<FrozenVideo> {
   EntityId.parse(agency); EntityId.parse(job);
   const entitlement=await env.DB.prepare(`SELECT j.attempt,j.listing_id AS listingId,a.id AS allocationId,
-    g.preview_provision_cents AS previewProvisionCents,IIF(g.anonymous_session_id IS NOT NULL,'anonymous',a.kind) AS kind
+    g.input_json AS generationInput,g.preview_provision_cents AS previewProvisionCents,IIF(g.anonymous_session_id IS NOT NULL,'anonymous',a.kind) AS kind
     FROM jobs j JOIN reservations r ON r.id=j.reservation_id AND r.job_id=j.id AND r.agency_id=j.agency_id
     LEFT JOIN allocations a ON a.id=r.allocation_id LEFT JOIN generation_runs g ON g.job_id=j.id
     WHERE j.agency_id=? AND j.id=? AND ((r.status='reserved' AND a.reserved>0)
       OR (g.anonymous_session_id IS NOT NULL AND g.retention='available' AND r.status='unfunded'))
     AND j.status IN ('scripting','voicing','rendering','retry_wait')`)
-    .bind(agency,job).first<{attempt:number;listingId:string;allocationId:string|null;previewProvisionCents:number;kind:'trial'|'paid'|'free'|'anonymous'}>();
+    .bind(agency,job).first<{attempt:number;listingId:string;allocationId:string|null;generationInput:string|null;previewProvisionCents:number;kind:'trial'|'paid'|'free'|'anonymous'}>();
   if(!entitlement)fail('VIDEO_NOT_AUTHORIZED');
   let stored=await row(env.DB,agency,job);
   if(!stored) {
@@ -43,8 +43,7 @@ export async function prepareJobVideo(env: {DB: Database; MEDIA: NarrationBucket
     const prepared=PreparedNarration.parse(JSON.parse(narration.result!));
     validateScript(context,prepared.script);
     const prefix=`agencies/${agency}/jobs/${job}/`, sources:Source[]=[];
-    const photos=Array.from(new Set(prepared.script.scenes.map(s=>s.photoAssetId))).map(id=>{
-      const p=context.listing.photos.find(p=>p.id===id);if(!p)fail('VIDEO_PHOTO_INVALID');
+    const photos=context.listing.photos.map(p=>{
       if(!p.objectKey.startsWith(`agencies/${agency}/imports/${context.listing.id}/`)&&!p.objectKey.startsWith(prefix))fail('VIDEO_SCOPE_INVALID');
       const asset=VideoAsset.parse({id:p.id,objectKey:`${prefix}photos/${p.contentHash}.${p.mime==='image/jpeg'?'jpg':p.mime==='image/png'?'png':'webp'}`,
         sha256:p.contentHash,sizeBytes:p.sizeBytes,mime:p.mime,width:p.width,height:p.height});
@@ -70,7 +69,9 @@ export async function prepareJobVideo(env: {DB: Database; MEDIA: NarrationBucket
       brand:context.brand,contact:context.contact,logo,width:1080,height:1920,fps:30,disclosure:prepared.script.disclosure,
       rights:entitlement.kind==='anonymous'?{kind:'anonymous',watermarked:false,previewProvisionCents:entitlement.previewProvisionCents}:{kind:entitlement.kind,allocationId:entitlement.allocationId,watermarked:entitlement.kind==='trial'},photos,audio,
       scenes:prepared.script.scenes.map((s,i)=>({...s,audioAssetId:audio[i].id,durationFrames:prepared.durationFrames[i]})),
-      presentation:videoPresentation(context.listing)});
+      photoTimeline:videoPhotoTimeline(photos,prepared.durationFrames.reduce((n,frames)=>n+frames,0)),
+      presentation:videoPresentation(context.listing),
+      subtitlesEnabled:entitlement.generationInput?GenerationRequest.parse(JSON.parse(entitlement.generationInput)).subtitlesEnabled??true:true});
     const at=new Date().toISOString(),hash=await videoManifestHash(manifest);
     await env.DB.prepare(`INSERT INTO video_manifests(job_id,agency_id,job_attempt,manifest_hash,manifest_json,sources_json,state,created_at,expires_at)
       SELECT ?,?,?,?,?,?,'preparing',?,? WHERE EXISTS(SELECT 1 FROM jobs j JOIN reservations r ON r.id=j.reservation_id AND r.agency_id=j.agency_id

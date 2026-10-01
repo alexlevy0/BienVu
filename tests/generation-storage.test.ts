@@ -25,9 +25,11 @@ test('admission D1 atomique : idempotence, budget, isolation, quota et résultat
   assert.equal((await env.DB.prepare('SELECT baseline_cents AS n FROM hosted_import_budget').first<{n:number}>())!.n,0);
   assert.ok((await generationRights(env.DB,agencyId,'true')).importRetryAt);
   await env.DB.prepare('UPDATE import_usage SET attempts=1 WHERE day=?').bind(now.slice(0,10)).run();
-  const body={listingId:'listing-admission'},key='same-admission-key-123456';
+  const body={listingId:'listing-admission',subtitlesEnabled:false},key='same-admission-key-123456';
   const [a,b]=await Promise.all([1,2].map(()=>admitGeneration(env.DB,agencyId,key,body,'true')));
   assert.equal(a.jobId,b.jobId);assert.equal(a.status,'queued');assert.equal(a.workflowId,`generation-${a.jobId}`);
+  assert.equal(JSON.parse(a.input).subtitlesEnabled,false);
+  await assert.rejects(admitGeneration(env.DB,agencyId,key,{...body,subtitlesEnabled:true},'true'),/CONFLICT/);
   assert.equal(Object.hasOwn(JSON.parse(a.brand), 'city'), false); // Le moteur vidéo déjà déployé lit encore l’ancien contrat de marque.
   assert.equal((await env.DB.prepare('SELECT reserved FROM allocations WHERE agency_id=?').bind(agencyId).first<{reserved:number}>())!.reserved,1);
   assert.equal((await env.DB.prepare('SELECT baseline_cents AS n FROM hosted_import_budget').first<{n:number}>())!.n,120);
@@ -60,7 +62,7 @@ test('admission D1 atomique : idempotence, budget, isolation, quota et résultat
   await env.DB.exec('UPDATE generation_control SET enabled=1');
   const ready=await admitGeneration(env.DB,agencyId,'ready-video-12345678',body,'true');
   await assert.rejects(env.DB.prepare("UPDATE jobs SET status='ready',lease_until=NULL WHERE id=?").bind(ready.jobId).run(),/GENERATION_ARTIFACT_REQUIRED/);
-  const f=await videoFixture(),bytes=new Uint8Array([1,2,3,4,5,6]),report=videoReport('a'.repeat(64),f.manifest,bytes);
+  const f=await videoFixture('trial',8),bytes=new Uint8Array([1,2,3,4,5,6]),report=videoReport('a'.repeat(64),f.manifest,bytes);
   const objectKey=`agencies/${agencyId}/jobs/${ready.jobId}/video/output.mp4`;
   await env.MEDIA.put(objectKey,bytes,{customMetadata:{sha256:report.sha256}});
   await env.DB.batch([env.DB.prepare('INSERT INTO generation_artifacts VALUES(?,?,?,?)').bind(ready.jobId,objectKey,JSON.stringify(report),now),
@@ -82,6 +84,7 @@ test('admission D1 atomique : idempotence, budget, isolation, quota et résultat
   await env.DB.prepare("INSERT INTO video_manifests(job_id,agency_id,job_attempt,manifest_hash,manifest_json,sources_json,state,created_at,expires_at) VALUES(?,?,?,?,?,?,'prepared',?,?)")
     .bind(ready.jobId,agencyId,1,hash,JSON.stringify(manifest),'[]',now,new Date(Date.now()+86400_000).toISOString()).run();
   const poster=await generationPoster(env,agencyId,ready.jobId);
+  assert.equal(manifest.photos.length,8);assert.equal(manifest.photoTimeline?.length,8);
   assert.equal(poster.headers.get('Content-Type'),'image/png');
   assert.deepEqual(new Uint8Array(await poster.arrayBuffer()),new Uint8Array(photoBytes));
   await assert.rejects(generationPoster(env,'another-agency',ready.jobId),/NOT_FOUND/);

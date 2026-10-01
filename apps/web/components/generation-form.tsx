@@ -10,6 +10,7 @@ import {GenerationProgress,generationActive,useGenerationProgress} from './gener
 import type {GenerationRequest} from '@bienvu/contracts';
 import {ImportCoverage} from './import-coverage';
 import {requestGeneration} from '../lib/generation-client';
+import {useSubtitlePreference} from './video-settings';
 
 export type ImportView = {id: string; sourceKind: 'url' | 'manual'; sourceUrl: string | null; status: 'importing' | 'needs_input' | 'ready' | 'failed'; errorCode: PublicErrorCode | null;
   createdAt: string; expiresAt: string; listing: NormalizedListing | null; draft?:CreationDraftView|null;
@@ -17,6 +18,7 @@ export type ImportView = {id: string; sourceKind: 'url' | 'manual'; sourceUrl: s
 const message = (code?: PublicErrorCode | null) => code && code in publicErrors ? publicErrors[code][1] : 'L’import n’a pas abouti. Réessayez.';
 export function GenerationForm() {
   const {me, loading} = useAccount();
+  const {subtitlesEnabled}=useSubtitlePreference();
   const [url, setUrl] = useState(''), [feedback, setFeedback] = useState(''), [busy, setBusy] = useState(false);
   const [imports, setImports] = useState<ImportView[]>([]), [result, setResult] = useState<ImportView | null>(null);
   const [manualOpen, setManualOpen] = useState(false), [manualBusy, setManualBusy] = useState(false);
@@ -41,7 +43,7 @@ export function GenerationForm() {
     } catch (error) {setFeedback(error instanceof Error ? error.message : message());}
   }
   async function generate(input:GenerationRequest) {
-    setJob(await requestGeneration(me!.agency.id,input));
+    setJob(await requestGeneration(me!.agency.id,{...input,subtitlesEnabled}));
   }
   async function generateSaved(id:string){if(working)return;setBusy(true);setFeedback('');try{await generate({listingId:id});}catch(error){setFeedback(error instanceof Error?error.message:message());}finally{setBusy(false);}}
   async function submit(event: FormEvent) {

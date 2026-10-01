@@ -7,6 +7,7 @@ import {generationActive} from './generation-progress';
 import {HomeIcon} from './home-icons';
 import {anonymousGenerationScope,useGenerationStore} from './generation-store';
 import {ProblemReport} from './problem-report';
+import {DraftActions} from './draft-actions';
 
 type Status = 'all' | 'ready' | 'active';
 type Sort = 'newest' | 'oldest';
@@ -138,7 +139,7 @@ export function GenerationHistory() {
     .sort((a,b)=>sort==='oldest'?a.createdAt.localeCompare(b.createdAt):b.createdAt.localeCompare(a.createdAt));
 
   return <section className="video-library" aria-labelledby="history-title">
-    <div className="video-library-heading"><div><h1 id="history-title">Mes vidéos</h1><p>Toutes vos créations, au même endroit.</p></div><Link href="/" className="video-library-create"><HomeIcon name="plus" size={26}/>Créer une vidéo</Link></div>
+    <div className="video-library-heading"><div><h1 id="history-title" tabIndex={-1}>Mes vidéos</h1><p>Toutes vos créations, au même endroit.</p></div><Link href="/" className="video-library-create"><HomeIcon name="plus" size={26}/>Créer une vidéo</Link></div>
     {loading ? <p role="status" className="video-library-status">Chargement de votre espace…</p> : <>
       {!me&&<p className="video-library-status">Retrouvez ici les essais créés dans ce navigateur. Connectez-vous pour les enregistrer dans votre compte.</p>}
       <div className="video-library-toolbar"><label className="video-library-search"><HomeIcon name="search" size={24}/><span className="sr-only">Rechercher une vidéo</span><input value={query} maxLength={80} onChange={event => setQuery(event.target.value)} placeholder="Rechercher une vidéo…"/></label>
@@ -151,8 +152,9 @@ export function GenerationHistory() {
         <div>{visibleDrafts.map(draft=><article key={draft.id}>
           {draft.previewPhotoId?<img src={`/api/imports/${draft.id}/photos/${draft.previewPhotoId}`} alt="Photo du bien à compléter"/>:
             <span className="video-library-draft-placeholder"><HomeIcon name="pencil" size={30}/></span>}
-          <div><h3>{draft.title||'Votre annonce'}</h3><p>À compléter{draft.locality?` · ${draft.locality}`:''}</p>
+          <div className="video-library-draft-content"><h3>{draft.title||'Votre annonce'}</h3><p>À compléter{draft.locality?` · ${draft.locality}`:''}</p>
             <Link href={`/?draft=${encodeURIComponent(draft.id)}`}>Continuer mon annonce <HomeIcon name="arrow" size={17}/></Link></div>
+          {me&&<DraftActions draft={draft} agencyId={me.agency.id} placement="history"/>}
         </article>)}</div></section>}
       {historyLoaded && !historyFeedback && visibleJobs.length===0&&visibleDrafts.length===0 && <div className="video-library-empty"><h2>{search || status!=='all' ? 'Aucune vidéo trouvée.' : 'Votre première vidéo vous attend.'}</h2><p>{search || status!=='all' ? 'Essayez une autre recherche ou un autre filtre.' : 'Vos créations apparaîtront ici dès leur démarrage.'}</p>{!search && status==='all' && <Link href="/" className="video-library-create">Créer une vidéo <HomeIcon name="arrow" size={18}/></Link>}</div>}
       <div className="video-library-grid">{visibleJobs.map(job => {

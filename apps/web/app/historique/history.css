@@ -25,6 +25,9 @@
 .video-library-drafts article>img,.video-library-draft-placeholder {width:68px;height:76px;flex:none;border-radius:6px;object-fit:cover}
 .video-library-draft-placeholder {display:grid;place-items:center;background:#e1e8d9}
 .video-library-drafts article>div {min-width:0}
+.video-library-draft-content {flex:1}
+.video-library-drafts .home-draft-actions {align-self:flex-start;margin-right:0}
+.video-library-drafts .home-draft-dropdown p {margin:5px 8px 8px;color:#893d32}
 .video-library-drafts h3 {margin:0 0 3px;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .video-library-drafts p {margin:0 0 8px;color:#687165;font-size:12px}
 .video-library-drafts a {display:inline-flex;align-items:center;gap:5px;font-size:13px;text-decoration:underline;text-underline-offset:3px}

@@ -62,7 +62,7 @@ const sections:Record<AdminSection,{sql:string;fields:string[];search:string[];s
     FROM generation_reports r JOIN jobs j ON j.id=r.job_id LEFT JOIN generation_runs g ON g.job_id=j.id LEFT JOIN agencies a ON a.id=coalesce(g.owner_agency_id,j.agency_id)`,
     fields:['id','sortKey','jobId','agencyId','agency','category','comment','status','videoStatus'],search:['agency','comment','jobId','id'],statuses:['new','reviewing','closed']},
   audit:{sql:`SELECT h.id,h.created_at AS sortKey,h.actor_user_id AS actorId,u.email AS actor,h.action AS status,h.target_id AS target,h.before_value AS before,h.after_value AS after,h.reason
-    FROM admin_audit h LEFT JOIN auth_user u ON u.id=h.actor_user_id`,fields:['id','sortKey','actorId','actor','status','target','before','after','reason'],search:['actor','target','reason','id'],statuses:['generation_gate','report_status','quota']},
+    FROM admin_audit h LEFT JOIN auth_user u ON u.id=h.actor_user_id`,fields:['id','sortKey','actorId','actor','status','target','before','after','reason'],search:['actor','target','reason','id'],statuses:['generation_gate','report_status','quota','monthly_budget']},
 };
 export async function adminPage(db:Database,input:AdminQuery,now=Date.now()):Promise<AdminPage>{
   const query=AdminQuery.parse(input),def=sections[query.section];
@@ -139,7 +139,10 @@ export async function adminOverview(db:Database,config:AdminOverview['config'],n
     selectRows(db,`SELECT substr(created_at,1,10) AS day,count(*) AS total,sum(status='ready') AS ready,sum(status='failed') AS failed FROM jobs WHERE created_at>=? GROUP BY day ORDER BY day`,['day','total','ready','failed'],[new Date(now-13*86400_000).toISOString().slice(0,10)]),
     selectRows(db,`SELECT code,stage,sum(n) AS count FROM (SELECT error_code AS code,stage,count(*) AS n FROM jobs WHERE error_code IS NOT NULL GROUP BY error_code,stage UNION ALL SELECT error_code,'importing',count(*) FROM listing_imports WHERE error_code IS NOT NULL GROUP BY error_code) GROUP BY code,stage ORDER BY count DESC LIMIT 20`,['code','stage','count']),
     selectRows(db,'SELECT provider,provider_mode AS mode,state,count(*) AS calls,sum(reservation_cents) AS reservedCents FROM narration_calls WHERE month=? GROUP BY provider,provider_mode,state',['provider','mode','state','calls','reservedCents'],[month]),
-    db.prepare(`SELECT month,baseline_cents AS baselineCents,ceiling_cents AS ceilingCents,paused,(SELECT coalesce(sum(reserved_cents),0) FROM hosted_import_costs WHERE month=b.month) AS importsCents FROM hosted_import_budget b WHERE month=?`).bind(month).first<NonNullable<AdminOverview['budget']>>(),
+    db.prepare(`SELECT b.month,b.baseline_cents AS baselineCents,b.ceiling_cents AS ceilingCents,b.paused,
+      coalesce(s.envelope_cents,b.ceiling_cents+500) AS envelopeCents,coalesce(s.revision,0) AS revision,
+      (SELECT coalesce(sum(reserved_cents),0) FROM hosted_import_costs WHERE month=b.month) AS importsCents
+      FROM hosted_import_budget b LEFT JOIN monthly_budget_settings s ON s.month=b.month WHERE b.month=?`).bind(month).first<NonNullable<AdminOverview['budget']>>(),
     db.prepare(`SELECT month,envelope_cents AS envelopeCents,paused,(SELECT coalesce(sum(reservation_cents),0) FROM narration_calls WHERE month=b.month AND provider_mode='real') AS reservedCents FROM narration_budget b WHERE month=?`).bind(month).first<NonNullable<AdminOverview['narrationBudget']>>(),
     selectRows(db,'SELECT currency,kind,sum(amount_micros) AS amountMicros,count(*) AS events FROM cost_events WHERE substr(created_at,1,7)=? GROUP BY currency,kind',['currency','kind','amountMicros','events'],[month]),
     selectRows(db,`SELECT kind,sum(bytes) AS bytes,sum(objects) AS objects FROM (SELECT kind,sum(size_bytes) AS bytes,count(*) AS objects FROM media_assets GROUP BY kind UNION ALL SELECT 'photo',sum(json_extract(photo_json,'$.sizeBytes')),count(*) FROM import_objects) GROUP BY kind`,['kind','bytes','objects']),
@@ -160,9 +163,16 @@ export async function adminOverview(db:Database,config:AdminOverview['config'],n
     performance:performance??{days:30,total:0,ready:0,failed:0,active:0,measuredReady:0,averageSeconds:null},monthlyCosts:monthlyCosts as AdminOverview['monthlyCosts']};
 }
 export async function adminAction(db:Database,actorId:string,input:AdminAction,now=Date.now()){
-  const action=AdminAction.parse(input),id=crypto.randomUUID(),target=action.action==='generation_gate'?'generations':action.id;
-  const before=String(action.action==='generation_gate'?Number(action.expected):action.expected);
-  const after=String(action.action==='generation_gate'?Number(action.enabled):action.action==='quota'?action.limit:action.status);
+  const action=AdminAction.parse(input),id=crypto.randomUUID();
+  const target=action.action==='generation_gate'?'generations':action.action==='monthly_budget'?action.month:action.id;
+  let before=String(action.action==='generation_gate'?Number(action.expected):action.expected);
+  if(action.action==='monthly_budget'&&action.expected!==null){
+    const previous=await db.prepare(`SELECT b.baseline_cents AS baselineCents,b.ceiling_cents AS ceilingCents,b.paused,
+      coalesce(s.envelope_cents,b.ceiling_cents+500) AS envelopeCents FROM hosted_import_budget b
+      LEFT JOIN monthly_budget_settings s ON s.month=b.month WHERE b.month=?`).bind(action.month).first<Record<string,number>>();
+    before=JSON.stringify({...previous,revision:action.expected});
+  }
+  const after=action.action==='monthly_budget'?JSON.stringify({envelopeCents:action.envelopeCents,ceilingCents:action.ceilingCents,openingCents:action.openingCents,paused:Number(action.paused)}):String(action.action==='generation_gate'?Number(action.enabled):action.action==='quota'?action.limit:action.status);
   await db.prepare('INSERT INTO admin_audit(id,actor_user_id,action,target_id,before_value,after_value,reason,created_at) VALUES(?,?,?,?,?,?,?,?)')
     .bind(id,actorId,action.action,target,before,after,action.reason,new Date(now).toISOString()).run();
   return {id};

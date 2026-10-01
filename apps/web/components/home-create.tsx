@@ -12,6 +12,7 @@ import {ConversationGeneration} from './conversation-generation';
 import {requestGeneration} from '../lib/generation-client';
 import {clearListingDraft, readListingDraft, saveListingDraft} from '../lib/listing-draft';
 import {inspectManualPhotos} from '../lib/manual-photos';
+import {useSubtitlePreference} from './video-settings';
 
 type RequestMessage = {kind: 'url' | 'manual'; text: string};
 type ComposerPhoto={id:string;file:File;preview:string};
@@ -36,6 +37,7 @@ function requestFor(job: GenerationView, url: string): RequestMessage {
 
 export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): void}) {
   const {me, loading} = useAccount();
+  const {subtitlesEnabled,setSubtitlesEnabled}=useSubtitlePreference();
   const [screen, setScreen] = useState<Screen>({kind: 'landing'});
   const [url, setUrl] = useState(''), [description, setDescription] = useState(''), [step, setStep] = useState(0);
   const [feedback, setFeedback] = useState(''), [manualBusy, setManualBusy] = useState(false);
@@ -225,7 +227,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   }, [screen.kind]);
 
   async function create(input: GenerationRequest, request: RequestMessage) {
-    const owner=me!.agency.id,version=interactionVersion.current,next = await requestGeneration(owner, input);
+    const owner=me!.agency.id,version=interactionVersion.current,next = await requestGeneration(owner, {...input,subtitlesEnabled});
     if(currentOwner.current!==owner||interactionVersion.current!==version)return;
     setJob(next); setScreen({kind: 'job', id: next.id, request}); remember(next.id, request);
     setUrl('');
@@ -299,9 +301,9 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     forget();saveListingDraft({kind:'url',url:parsed.data});
     setFeedback('');lock.current = true;
     if (!me) {
-      if (!trial.token) {await trial.start(parsed.data);lock.current = false;return;}
+      if (!trial.token) {await trial.start(parsed.data,undefined,subtitlesEnabled);lock.current = false;return;}
       setScreen({kind: 'sending', request});
-      try {await trial.start(parsed.data);} finally {lock.current = false;}
+      try {await trial.start(parsed.data,undefined,subtitlesEnabled);} finally {lock.current = false;}
       return;
     }
     setScreen({kind: 'sending', request});
@@ -313,7 +315,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
       }
       const response=await fetch('/api/imports',{method:'POST',headers:{'Content-Type':'application/json',
         'Idempotency-Key':pendingImport.current.key},body:JSON.stringify({url:parsed.data})});
-      const imported=await response.json() as {id?:string;status?:string;draft?:CreationDraftView|null;error?:{message?:string}};
+      const imported=await response.json() as {id?:string;status?:string;errorCode?:string|null;draft?:CreationDraftView|null;error?:{message?:string}};
       if(interactionVersion.current!==version||currentOwner.current!==owner)return;
       if(!response.ok)throw new Error(imported.error?.message??'L’import a été interrompu. Réessayez.');
       if(imported.status==='needs_input'&&imported.draft){
@@ -324,7 +326,10 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
           'Certaines informations du bien sont à compléter avant de créer la vidéo.');
         return;
       }
-      if(imported.status!=='ready'||!imported.id)throw new Error('Cette annonce ne contient pas encore assez d’informations. Vous pouvez continuer manuellement.');
+      if(imported.status!=='ready'||!imported.id)throw new Error(imported.errorCode==='SOURCE_BLOCKED'
+        ?'Ce site refuse actuellement la lecture automatique de cette annonce. Vous pouvez copier ses informations et ajouter vos photos en saisie manuelle.'
+        :imported.errorCode==='IMPORT_TIMEOUT'?'La lecture de cette annonce a pris trop de temps. Vous pouvez continuer en saisie manuelle.'
+        :'Cette annonce ne contient pas encore assez d’informations. Vous pouvez continuer manuellement.');
       pendingImport.current=null;sessionStorage.removeItem('bienvu:url-import-request');
       if(!canGenerate){setFeedback('Votre annonce est enregistrée. La création vidéo sera disponible dans votre espace.');setScreen({kind:'landing'});return;}
       await create({listingId:imported.id},request);
@@ -384,6 +389,9 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
       </li>)}</ol><p role="status">{composerPhotos.length} photo{composerPhotos.length>1?'s':''} · Appuyez sur Entrée pour compléter votre annonce.</p></div>}
       {photoChecking&&<p className="home-photo-status" role="status">Vérification des photos…</p>}
       <div className="home-composer-bottom"><div className="home-format-tags"><span><HomeIcon name="phone" size={21}/>Vertical 9:16</span><span><HomeIcon name="microphone" size={21}/>Voix française</span>
+        <button type="button" className={subtitlesEnabled?'home-subtitles-pill is-active':'home-subtitles-pill'} aria-pressed={subtitlesEnabled} aria-label="Sous-titres de la voix off"
+          title="Afficher ou masquer les sous-titres de la voix off" disabled={loading||busy||screen.kind==='job'&&generationActive(selectedJob)}
+          onClick={()=>setSubtitlesEnabled(!subtitlesEnabled)}><HomeIcon name="subtitles" size={20}/>Sous-titres</button>
         <button type="button" className={manual?'home-mode-pill is-active':'home-mode-pill'} aria-pressed={manual} disabled={busy || photoChecking || Boolean(incomingPhotos) || screen.kind==='job' && generationActive(selectedJob)} onClick={()=>{if(manual)void manualForm.current?.cancel();else if(composerPhotos.length)openWithPhotos();else openManual();}}><HomeIcon name="pencil" size={20}/>Saisie manuelle</button></div>
         <button type="submit" className="home-primary-button" disabled={composerDisabled} aria-describedby={manual&&!manualReady?'home-manual-action-note':undefined}>
           {incomingPhotos?'Ajout des photos…':composerPhotos.length?'Compléter mon annonce':screen.kind==='sending'||manualBusy?'Envoi en cours':screen.kind==='job'&&generationActive(selectedJob)?'Génération en cours':manual&&me&&!canGenerate?'Enregistrer mon annonce':'Créer ma vidéo'}<HomeIcon name="arrow" size={20}/></button></div>
@@ -396,7 +404,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
         const pending=guestPending.current;if(pending){trial.setChallenge(false);void analyzeGuest(pending.text,pending.key,token);return;}
         const parsed=ImportUrl.safeParse(url.trim());if(!parsed.success){trial.setChallenge(false);setFeedback('Collez un lien HTTPS public valide.');return;}
         trial.setChallenge(false);setScreen({kind:'sending',request:{kind:'url',text:parsed.data}});
-        void trial.start(parsed.data,token);
+        void trial.start(parsed.data,token,subtitlesEnabled);
       }} onError={trial.setFailure}/>}
     {!me && trial.failure && screen.kind !== 'error' && <p className="home-form-feedback" role="alert">{trial.failure} <Link href="/connexion">Se connecter</Link></p>}
     {importPaused && <p className="home-form-note" role="status">La limite d’imports est atteinte. Vous pourrez ajouter une annonce à partir du {new Date(me!.rights.importRetryAt!).toLocaleString('fr-FR')}.</p>}

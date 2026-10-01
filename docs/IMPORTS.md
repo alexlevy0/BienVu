@@ -4,6 +4,8 @@ Le parcours local ou Cloudflare transforme un lien en annonce privée et galerie
 
 **État au 28/09 :** imports URL et saisie manuelle actifs sur bienvu.online, avec Container privé à IP épinglée/Sharp, fallback Browser Run et D1/R2 existants. Trois agences réelles importées avec 12/11/7 photos ; recette séparée pour la page JavaScript et la saisie synthétiques. [Rapport Cloudflare](preuves/sprint-03/CLOUDFLARE.md).
 
+**Maintenance du 01/10 :** les informations déjà extraites sont conservées dans un brouillon même si les photos sont refusées ou trop lentes. Un adaptateur Figaro recoupe les titres, prix, description et JSON-LD liés à la fiche. Le formulaire connecté reçoit les champs récupérés et demande les photos manquantes. Les tests de ce préremplissage utilisent une fixture reconstruite ; **le lien Figaro fourni par Alex reste refusé par le portail depuis Cloudflare**, `SOURCE_BLOCKED/access_denied`, avant toute extraction. [Recette, publication et limites](preuves/maintenance/IMPORT-PARTIEL-FIGARO-01-10.md).
+
 ## Lancer et utiliser
 
 La tranche locale du **sprint 04** ajoute le [registre et la couverture datée](preuves/sprint-04/RAPPORT.md), visibles sur `/sources` et sous le champ d’URL. Les trois agences ci-dessus disposent d’une preuve Cloudflare du sprint 03. Aucun des quatre portails n’a encore produit un import automatique complet validé ; la nouvelle tranche n’est pas encore déployée.
@@ -28,7 +30,7 @@ Le pont natif écoute uniquement sur `127.0.0.1:8791`. Il exige `LOCAL_IMPORT_TO
 
 ## Extraction et frontières de confiance
 
-`packages/importers` contient le parseur HTML parse5 8.0.0, les extracteurs TypeScript et l’orchestration, séparés du réseau. Aucun `eval`, appel IA ou exécution de texte extrait. Le chemin statique lit JSON-LD (y compris les références `@graph`), microdata, puis les adaptateurs Espaces Atypiques, Orpi et Century 21. Chaque fait garde `sourcePath`, une preuve bornée et une version d’adaptateur. Identité, vente/location et localisation sont obligatoires ; un prix ou une surface absent reste absent, une contradiction vérifiable bloque l’import. Un loyer n’est retenu qu’avec EUR, période mensuelle et traitement explicite des charges.
+`packages/importers` contient le parseur HTML parse5 8.0.0, les extracteurs TypeScript et l’orchestration, séparés du réseau. Aucun `eval`, appel IA ou exécution de texte extrait. Le chemin statique lit JSON-LD (y compris les références `@graph`), microdata, puis les adaptateurs Espaces Atypiques, Orpi, Century 21 et Figaro. Chaque fait garde `sourcePath`, une preuve bornée et une version d’adaptateur. Identité, vente/location et localisation sont obligatoires pour lancer une génération ; le parcours connecté peut conserver une annonce partielle identifiable et demander les compléments. Un prix ou une surface absent reste absent, une contradiction vérifiable bloque l’import. Un loyer n’est retenu qu’avec EUR, période mensuelle et traitement explicite des charges.
 
 Les adaptateurs 3.2 extraient aussi la description liée au bien. Le HTML est converti en texte brut, entités décodées, paragraphes et sauts de ligne conservés, éléments actifs et blocs de navigation ignorés. La provenance est enregistrée dans `description.sourcePath`. Aucun résumé ni reformulation automatique : la description conserve le texte de la source et reste séparée des faits vérifiés. Le champ vaut `null` si le bloc manque ou si plusieurs blocs candidats ont des textes différents. L’interface affiche cette absence ; aucun éditeur n’est ajouté.
 
@@ -39,6 +41,10 @@ Les demandes usuelles « Je voudrais/veux/souhaite vendre ou louer un appartemen
 Le même transport Node en local et dans le Container Cloudflare résout toutes les adresses d’un hôte et refuse une résolution vide, mixte publique/privée ou réservée. Il épingle l’adresse publique dans la connexion HTTPS en conservant le nom TLS/SNI et la vérification du certificat. Chaque redirection repasse par les contrôles ; aucune deuxième résolution implicite par `fetch`. Pas de cookie, authentification, proxy ou en-tête de l’utilisateur transmis aux agences. Pages limitées à l’hôte source ; CDN d’images autorisés explicitement par adaptateur. Pas de joker ni de nouvel hôte autorisé parce que la page le demande. Les URL de toute la galerie sont contrôlées avant son téléchargement.
 
 Les galeries sont délimitées par la structure de l’annonce et, lorsque disponible, sa référence. Lazy loading et `srcset` sont résolus à partir des URL présentes. Logos, avatars, plans identifiés et recommandations hors galerie sont écartés ; aucun classifieur visuel ne garantit l’exclusion d’un visuel mal étiqueté par la source. Sharp décode réellement JPEG/PNG/WebP, vérifie les dimensions et réencode en JPEG orienté sans métadonnées. Les empreintes du contenu normalisé dédupliquent les photos ; l’ordre de la galerie est conservé. Les filigranes présents sur les photos des agences restent présents.
+
+L'adaptateur **Figaro 4.1** lit un titre `Vente/Location … à …`, une référence canonique et un prix lié à ce même titre ou à son produit JSON-LD. Il refuse les contradictions de transaction, type, ville, département, surface, pièces, prix ou référence. Taxes, simulations de crédit et recommandations ne servent pas à remplir le prix. La description garde ses paragraphes ; un texte abrégé est signalé, ou remplacé par la version complète du même JSON-LD lorsque son début correspond. Les images sont liées au produit exact ou aux métadonnées `og:url` de cette fiche ; aucune URL de galerie n'est devinée. Les CDN `cdn.immobilier.lefigaro.fr` et `lh3.googleusercontent.com` sont autorisés explicitement pour ce portail, avec les mêmes contrôles réseau et décodage.
+
+Avec `allowPartial`, une photo refusée, invalide ou expirée n'efface pas les faits lus. Un CDN public hors liste est ignoré **sans requête**, avec diagnostic et avertissement. Une URL privée/malformée, une résolution privée, une redirection interdite, une panne de stockage, l'annulation de l'appelant ou l'expiration globale restent fatales. Le téléchargement photo est borné à **50 s**, et au temps restant de l'import moins **2 s** pour la persistance ; les plafonds d'octets et de requêtes restent applicables. Moins de trois photos ouvre un brouillon à compléter, jamais une génération incomplète. Le chemin strict utilisé par la génération anonyme exige toujours une annonce complète : cette maintenance ne lui ajoute pas de conversion automatique en formulaire partiel.
 
 ## Limites effectives
 
@@ -55,6 +61,7 @@ Les HTTP 401/403/429 produisent `SOURCE_BLOCKED` avec un motif privé `login_req
 | Limite | Valeur |
 |---|---|
 | Durée d’un import / d’une ressource | 60 s / 12 s |
+| Fenêtre photo après extraction | 50 s maximum, limitée au temps global restant moins 2 s |
 | HTML / image source / total de corps source | 2 Mio / 10 Mio / 50 Mio |
 | Description normalisée | 20 000 caractères ; troncature indiquée dans le résultat et l’interface |
 | Redirections par ressource | 3, contrôlées à chaque étape |

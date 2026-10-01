@@ -191,4 +191,8 @@ export const CostEvent = z.object({
 }).strict().refine(event => !event.jobId || Boolean(event.agencyId), 'Un coût de traitement doit être rattaché à une agence.');
 export type CostEvent = z.infer<typeof CostEvent>;
 
-export const GenerationInput = z.union([z.object({url:ImportUrl}).strict(),z.object({listingId:EntityId}).strict()]);
+// Optional preserves existing admission hashes; omitted means subtitles enabled.
+export const GenerationInput = z.union([
+  z.object({url:ImportUrl,subtitlesEnabled:z.boolean().optional()}).strict(),
+  z.object({listingId:EntityId,subtitlesEnabled:z.boolean().optional()}).strict(),
+]);

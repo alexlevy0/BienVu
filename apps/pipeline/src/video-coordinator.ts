@@ -7,7 +7,7 @@ export type VideoJob = {id:string;manifest:VideoManifest;status:'accepted'|'stag
   diagnostic?:{operation:'submit'|'boot';httpStatus?:number;code?:string};attempt?:number;retryOf?:number};
 type Dependencies = {storage:DurableObjectStorage;bucket:R2Bucket;call:(path:string,init?:RequestInit)=>Promise<Response>;
   running:()=>Promise<boolean>;stop:()=>Promise<void>;schedule:()=>Promise<unknown>;now?:()=>number;
-  budget:Budget;maxAttempts:number};
+  budget:Budget;maxAttempts:number;productBudget?:(manifest:VideoManifest,now:number)=>Promise<Budget>};
 const terminal=(job:VideoJob)=>['ready','failed'].includes(job.status);
 const safeError=(error:unknown)=>error instanceof Error&&/^[A-Z_]{3,64}$/.test(error.message)?error.message:'VIDEO_INTERNAL_ERROR';
 
@@ -24,15 +24,34 @@ export class VideoCoordinator {
   private now(){return this.deps.now?.()??Date.now();}
   async accept(input:unknown) {
     const manifest=VideoManifest.parse(input),id=await videoManifestHash(manifest);
+    // D1 est relu hors transaction DO : un rejeu ne relance pas les lectures,
+    // et les éventuelles reprises de transaction n'exécutent aucun I/O externe.
+    const known=await this.deps.storage.get<VideoJob>(`video:${id}`);
+    if(known){if(!terminal(known))await this.deps.schedule();return known;}
+    const now=this.now(),snapshot=await this.deps.productBudget?.(manifest,now);
     const result=await this.deps.storage.transaction(async tx=>{
       const old=await tx.get<VideoJob>(`video:${id}`);if(old)return old;
       if(await tx.get(`cancel:${id}`))throw new Error('VIDEO_CANCELLED');
       if(await tx.get('cancelling'))throw new Error('VIDEO_BUSY');
       if(await tx.get('paused'))throw new Error('VIDEO_PAUSED');
       if(await tx.get('active'))throw new Error('VIDEO_BUSY');
-      const budget=await tx.get<Budget>('budget')??this.deps.budget;
-      if(budget.attempts>=this.deps.maxAttempts)throw new Error('VIDEO_ATTEMPT_LIMIT');
-      await tx.put('budget',reserve(budget,new Date(this.now()),manifest.rights.kind==='anonymous'?50+manifest.rights.previewProvisionCents:50));
+      const previous=await tx.get<Budget>('budget'),budget=previous??this.deps.budget;
+      const provision=manifest.rights.kind==='anonymous'?50+manifest.rights.previewProvisionCents:50;
+      if(snapshot){
+        budgetLimits(snapshot);
+        if(snapshot.paused||snapshot.month!==new Date(now).toISOString().slice(0,7)||snapshot.fixedAndOtherCents>budgetLimits(snapshot).ceilingCents)throw new Error('VIDEO_BUDGET_LIMIT');
+        const sameMonth=previous?.month===snapshot.month;
+        if(previous&&!sameMonth)await tx.put(`budget-history:${budget.month}`,budget);
+        const committed=(sameMonth?budget.committedCents:0)+provision,day=new Date(now).toISOString().slice(0,10);
+        if(snapshot.fixedAndOtherCents<committed)throw new Error('VIDEO_BUDGET_RECONCILIATION_REQUIRED');
+        // Journal technique inclus dans la provision D1. Limites produit : D1
+        // (5/jour, 30/mois), distinctes des cinq tentatives de la recette initiale.
+        await tx.put('budget',{...snapshot,committedCents:committed,fixedAndOtherCents:snapshot.fixedAndOtherCents-committed,
+          attempts:(sameMonth?budget.attempts:0)+1,days:{...(sameMonth?budget.days:{}),[day]:(sameMonth?budget.days[day]??0:0)+1}} satisfies Budget);
+      }else{
+        if(budget.attempts>=this.deps.maxAttempts)throw new Error('VIDEO_ATTEMPT_LIMIT');
+        await tx.put('budget',reserve(budget,new Date(now),provision));
+      }
       const job:VideoJob={id,manifest,status:'accepted',startedAt:this.now(),updatedAt:this.now(),failures:0,attempt:1};
       await tx.put(`video:${id}`,job);await tx.put('active',id);return job;
     });

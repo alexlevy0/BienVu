@@ -2,13 +2,13 @@ import {readFile,writeFile,mkdir,copyFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import path from 'node:path';
 import sharp from 'sharp';
-import {PreparedNarration,VideoManifest,videoAssetFile,videoPresentation,type VideoAsset} from '../packages/contracts/src/index';
+import {PreparedNarration,VideoManifest,videoAssetFile,videoPresentation,videoPhotoTimeline,type VideoAsset} from '../packages/contracts/src/index';
 import {narrationBrand,narrationListing} from '../fixtures/narration';
 import {compileScript,DEFAULT_SCRIPT_MODEL,scriptContext} from '../packages/narration/src/index';
 
 const hash=(bytes:Uint8Array)=>createHash('sha256').update(bytes).digest('hex');
 export async function makeVideoFixture(kind:'trial'|'paid'='trial', agencyId=`s06-${kind}`,jobId=`job-video-${kind}`,
-  templateVersion:'bienvu-vertical/1'|'bienvu-vertical/2'='bienvu-vertical/1') {
+  templateVersion:'bienvu-vertical/1'|'bienvu-vertical/2'='bienvu-vertical/1',gallery?:{path:string;flip?:boolean}[]) {
   const directory=path.resolve(`evidence/local/sprint-06/${jobId}`);await mkdir(directory,{recursive:true,mode:0o700});
   const source=path.resolve('evidence/remote/sprint-05/naturalness'), proof=JSON.parse(await readFile(path.join(source,'run.json'),'utf8'));
   if(proof.providerMock===true || proof.humanListening?.status!=='validated')throw new Error('VALIDATED_VOICE_REQUIRED');
@@ -16,8 +16,9 @@ export async function makeVideoFixture(kind:'trial'|'paid'='trial', agencyId=`s0
   listing.id=`listing-${jobId}`;listing.agencyId=agencyId;
   const prefix=`agencies/${agencyId}/jobs/${jobId}/`;
   const photos:VideoAsset[]=[];
-  for(const [index,name] of ['interieur','riviera','maison'].entries()) {
-    const bytes=await sharp(`apps/web/public/images/landing/${name}.webp`).jpeg({quality:90}).toBuffer();
+  const images=gallery??['interieur','riviera','maison'].map(name=>({path:`apps/web/public/images/landing/${name}.webp`,flip:false}));
+  for(const [index,image] of images.entries()) {
+    const bytes=await sharp(image.path).flop(Boolean(image.flip)).jpeg({quality:90}).toBuffer();
     const meta=await sharp(bytes).metadata();
     const asset:VideoAsset={id:`photo-${index+1}`,objectKey:`${prefix}photos/${hash(bytes)}.jpg`,sha256:hash(bytes),
       sizeBytes:bytes.length,mime:'image/jpeg',width:meta.width!,height:meta.height!};
@@ -43,7 +44,8 @@ export async function makeVideoFixture(kind:'trial'|'paid'='trial', agencyId=`s0
   const manifest=VideoManifest.parse({schemaVersion:2,templateVersion,agencyId,jobId,listingId:listing.id,brand,contact:ctx.contact,
     logo,width:1080,height:1920,fps:30,disclosure:script.disclosure,rights:{kind,allocationId:`allocation-${jobId}`,watermarked:kind==='trial'},
     photos,audio,scenes:script.scenes.map((s,i)=>({...s,audioAssetId:audio[i].id,durationFrames:prepared.durationFrames[i]})),
-    ...(templateVersion==='bienvu-vertical/2'?{presentation:videoPresentation(listing)}:{})});
+    ...(templateVersion==='bienvu-vertical/2'?{presentation:videoPresentation(listing),
+      ...(gallery?{photoTimeline:videoPhotoTimeline(photos,prepared.durationFrames.reduce((n,f)=>n+f,0))}:{})}:{})});
   await writeFile(path.join(directory,'manifest.json'),JSON.stringify(manifest,null,2)+'\n',{mode:0o600});
   await writeFile(path.join(directory,'fixture.json'),JSON.stringify({syntheticListing:true,syntheticImages:true,voice:'existing_real_google_audio',
     sourceListingId:prepared.script.listingId,sourceProviderMock:false,newTtsCalls:0,newTextCalls:0,listing,script},null,2)+'\n',{mode:0o600});

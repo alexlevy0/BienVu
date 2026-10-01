@@ -2,6 +2,7 @@ import React, {useEffect, useState} from 'react';
 import {AbsoluteFill, Audio, Img, Sequence, cancelRender, continueRender, delayRender, interpolate, useCurrentFrame} from 'remotion';
 import {VideoManifest, type VideoPresentation} from '@bienvu/contracts';
 import {contrastInk, displayArea, displayLocation, displayPrice, displayRooms, fitDisplayFont, fitFont, subtitleGroups, VIDEO_SAFE as safe} from './layout';
+import {photoAtFrame} from './photo-timeline';
 
 // Ces URL sont résolues uniquement par le renderer Node vers son serveur
 // loopback privé. Le manifeste serveur n'accepte jamais d'URL d'asset cliente.
@@ -37,9 +38,9 @@ function PhotoScene({manifest: m, media, index}: {manifest: VideoManifest; media
       {m.contact!=='none' && <div style={{marginTop:32,borderTop:`2px solid ${dark}30`,paddingTop:30,
         fontSize:fitFont(m.brand[m.contact]!,safe.width,160,47,25),lineHeight:1.3,overflowWrap:'anywhere',fontWeight:550}}>{m.brand[m.contact]}</div>}
     </div>}
-    <div style={{position:'absolute',left:safe.left,right:safe.right,bottom:390,background:dark,color:'#fff',
+    {m.subtitlesEnabled!==false&&<div data-bienvu-subtitle="true" style={{position:'absolute',left:safe.left,right:safe.right,bottom:390,background:dark,color:'#fff',
       padding:'22px 30px',borderRadius:16,fontSize:fitFont(current,safe.width-60,150,40,25),lineHeight:1.28,
-      overflowWrap:'anywhere',textAlign:'left'}}>{current}</div>
+      overflowWrap:'anywhere',textAlign:'left'}}>{current}</div>}
     <Audio src={media[audio.id]} volume={1}/>
   </AbsoluteFill>;
 }
@@ -61,6 +62,17 @@ function posterLabel(kind: VideoManifest['scenes'][number]['kind'], p: VideoPres
   if(kind==='gallery')return 'LA VISITE';
   return contact?'VOTRE CONTACT':'POUR EN SAVOIR PLUS';
 }
+function GalleryBackground({manifest:m,media}: {manifest:VideoManifest;media:Record<string,string>}) {
+  const frame=useCurrentFrame(),current=photoAtFrame(m.photoTimeline!,frame);
+  const previous=current.index>0?m.photoTimeline![current.index-1]:null;
+  const zoom=interpolate(current.frame,[0,current.photo.durationFrames],[1.01,1.055],{extrapolateRight:'clamp'});
+  const opacity=previous?interpolate(current.frame,[0,8],[0,1],{extrapolateRight:'clamp'}):1;
+  const style={position:'absolute' as const,width:'100%',height:'100%',objectFit:'cover' as const,objectPosition:'center'};
+  return <AbsoluteFill style={{overflow:'hidden'}}>
+    {previous&&current.frame<8&&<Img src={media[previous.photoAssetId]} style={{...style,transform:'scale(1.055)'}}/>}
+    <Img src={media[current.photo.photoAssetId]} style={{...style,opacity,transform:`scale(${zoom})`}}/>
+  </AbsoluteFill>;
+}
 function EditorialPhotoScene({manifest:m,media,index}: {manifest:VideoManifest;media:Record<string,string>;index:number}) {
   const f=useCurrentFrame(),scene=m.scenes[index],photo=m.photos.find(a=>a.id===scene.photoAssetId)!;
   const p=m.presentation!,contact=scene.kind==='contact',intro=scene.kind==='intro';
@@ -73,18 +85,18 @@ function EditorialPhotoScene({manifest:m,media,index}: {manifest:VideoManifest;m
   const opacity=interpolate(f,[0,7],[index?0:1,1],{extrapolateRight:'clamp'});
   const accent=m.brand.primaryColor,ink=contrastInk(accent),width=safe.width;
   const zoom=interpolate(f,[0,scene.durationFrames],[1.01,1.055],{extrapolateRight:'clamp'});
-  return <AbsoluteFill style={{opacity,background:'#151b16',color:'#fff',overflow:'hidden'}}>
-    <Img src={media[photo.id]} style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:'center',transform:`scale(${zoom})`}}/>
+  return <AbsoluteFill style={{opacity,background:m.photoTimeline?undefined:'#151b16',color:'#fff',overflow:'hidden'}}>
+    {!m.photoTimeline&&<Img src={media[photo.id]} style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:'center',transform:`scale(${zoom})`}}/>}
     <AbsoluteFill style={{background:'linear-gradient(180deg,rgba(8,13,10,.30) 0%,rgba(8,13,10,.06) 36%,rgba(8,13,10,.15) 51%,rgba(8,13,10,.54) 70%,rgba(8,13,10,.78) 100%)'}}/>
     <div style={{position:'absolute',left:safe.left,top:186,maxWidth:width,background:accent,color:ink,
       padding:'13px 27px 11px',fontSize:38,fontWeight:750,letterSpacing:8,lineHeight:1.1}}>{posterLabel(scene.kind,p,m.contact!=='none')}</div>
     <div style={{position:'absolute',left:safe.left,right:safe.right,top:286,maxHeight:385,
       fontFamily:'BienVu Display, Impact, sans-serif',fontSize:fitDisplayFont(heading,width,370,240,42),
       lineHeight:.98,letterSpacing:-2,textShadow:'0 4px 28px #0008',overflowWrap:'anywhere'}}>{heading}</div>
-    <div style={{position:'absolute',left:safe.left,right:safe.right,bottom:675,
+    {m.subtitlesEnabled!==false&&<div data-bienvu-subtitle="true" style={{position:'absolute',left:safe.left,right:safe.right,bottom:675,
       background:'rgba(15,23,18,.78)',borderLeft:`7px solid ${accent}`,padding:'20px 25px',
       fontSize:fitFont(subtitle,width-57,170,49,34),fontWeight:600,lineHeight:1.2,
-      overflowWrap:'anywhere',whiteSpace:'pre-wrap'}}>{subtitle}</div>
+      overflowWrap:'anywhere',whiteSpace:'pre-wrap'}}>{subtitle}</div>}
     {intro && <div style={{position:'absolute',left:safe.left,right:safe.right,bottom:337}}>
       {p.priceCents!==null && <div style={{fontFamily:'BienVu Display, Impact, sans-serif',
         fontSize:fitDisplayFont(displayPrice(p.priceCents),width,190,190,45),lineHeight:1,
@@ -126,6 +138,7 @@ export function ListingFilm(props: ListingVideoProps) {
   const editorial=m.templateVersion==='bienvu-vertical/2';
   const compactBrand=m.brand.name.length<=28?m.brand.name:null;
   return <AbsoluteFill style={{background:editorial?'#151b16':paper,fontFamily:'BienVu Video, DejaVu Sans, sans-serif',color:editorial?'#fff':dark}}>
+    {m.photoTimeline&&<GalleryBackground manifest={m} media={props.media}/>}
     {scenes.map(({s,index,from}) => <Sequence key={s.id} from={from} durationInFrames={s.durationFrames}>
       {editorial?<EditorialPhotoScene manifest={m} media={props.media} index={index}/>:<PhotoScene manifest={m} media={props.media} index={index}/>}
     </Sequence>)}

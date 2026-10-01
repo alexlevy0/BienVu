@@ -2,10 +2,10 @@ export type Budget={month:string;paused:boolean;fixedAndOtherCents:number;commit
   ceilingCents?:number;envelopeCents?:number};
 export function budgetLimits(b:Pick<Budget,'ceilingCents'|'envelopeCents'>) {
   // Les anciens journaux gardent leur enveloppe. Une hausse exige une
-  // configuration explicite ; Alex autorise 50 € depuis le 29/09/2026.
+  // configuration explicite ; Alex autorise 100 € depuis le 01/10/2026.
   const ceilingCents=b.ceilingCents??2500,envelopeCents=b.envelopeCents??3000;
   if(!Number.isSafeInteger(ceilingCents)||!Number.isSafeInteger(envelopeCents)||ceilingCents<0
-    ||ceilingCents>4500||envelopeCents>5000||envelopeCents-ceilingCents<500)throw new Error('BUDGET_CONFIG_INVALID');
+    ||ceilingCents>9500||envelopeCents>10000||envelopeCents-ceilingCents<500)throw new Error('BUDGET_CONFIG_INVALID');
   return {ceilingCents,envelopeCents};
 }
 export function reserve(b:Budget,now=new Date(),provisionCents=50):Budget {

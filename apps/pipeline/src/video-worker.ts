@@ -3,7 +3,8 @@ import {authorized,json} from './auth';
 import {getJobVideo,prepareJobVideo} from './video-manifest';
 import {VideoCoordinator} from './video-coordinator';
 import {containerGrossUsd} from './budget';
-type Env=VideoEnv&{PROBE_TOKEN?:string;RENDER_TOKEN?:string};
+import {productRenderBudget} from './product-render-budget';
+type Env=VideoEnv&{PROBE_TOKEN?:string;RENDER_TOKEN?:string;GENERATION_TOKEN?:string};
 export class VideoRenderer extends Container<Env> {
   defaultPort=8080;
   sleepAfter='30s';
@@ -27,6 +28,7 @@ export class VideoRenderer extends Container<Env> {
       return this.containerFetch(`http://container${path}`,{...init,headers,signal:AbortSignal.timeout(60_000)});},
     running:async()=>['running','healthy'].includes((await this.getState()).status),stop:()=>this.stop(),
     schedule:async()=>{this.deleteSchedules('advance');await this.schedule(5,'advance');},
+    productBudget:this.env.GENERATION_TOKEN?(manifest,now)=>productRenderBudget(this.env.DB,manifest,now):undefined,
     maxAttempts:Number(this.env.VIDEO_MAX_ATTEMPTS),budget:{month:this.env.VIDEO_BUDGET_MONTH,paused:false,
       fixedAndOtherCents:Number(this.env.VIDEO_OTHER_CENTS),ceilingCents:Number(this.env.VIDEO_CEILING_CENTS),
       envelopeCents:Number(this.env.VIDEO_ENVELOPE_CENTS),committedCents:0,attempts:0,days:{}}});

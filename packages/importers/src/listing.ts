@@ -5,6 +5,7 @@ import {IMPORT_LIMITS, publicUrl} from './network';
 import {selectAdapter} from './registry';
 import {clean, missing, numeric, unique, verified} from './facts';
 import {extractBienici} from './portals/bienici';
+import {extractFigaro} from './portals/figaro';
 export {verified, missing} from './facts';
 
 type Obj = Record<string, unknown>;
@@ -33,7 +34,7 @@ function identity(node: Obj, url: string) {
       throw new ImportFailure('CONFLICTING_FACTS', 'Les données désignent une autre annonce.');
   }
 }
-function structured(documents: unknown[], url: string, canonicalUrl: string): ExtractedListing {
+function structured(documents: unknown[], url: string, canonicalUrl: string, confirmedTransaction?: ExtractedListing['transaction']): ExtractedListing {
   const nodes = documents.flatMap(v => Array.isArray(v) ? v : list(obj(v)['@graph'] ?? v)).map(obj);
   if (nodes.some(n => types(n).some(t => ['ItemList', 'CollectionPage', 'SearchResultsPage'].includes(t))))
     throw new ImportFailure('NOT_A_LISTING', 'Une liste de résultats ne constitue pas une annonce.', 'not_listing');
@@ -60,7 +61,8 @@ function structured(documents: unknown[], url: string, canonicalUrl: string): Ex
   // one of these fields is absent. GeneratableListing remains the final gate.
   const offers = [...list(home.offers), ...list(wrapper.offers)].map(resolve);
   const functions = offers.map(o => String(o.businessFunction ?? '')).filter(Boolean);
-  const transaction = unique(functions.map(f => /[#/]Sell$|^Sell$/.test(f) ? 'sale' as const : /[#/]LeaseOut$|^LeaseOut$/.test(f) ? 'rent' as const : null).filter(v => v !== null), 'Vente et location contradictoires.');
+  const transaction = unique([...functions.map(f => /[#/]Sell$|^Sell$/.test(f) ? 'sale' as const : /[#/]LeaseOut$|^LeaseOut$/.test(f) ? 'rent' as const : null).filter(v => v !== null),
+    ...(confirmedTransaction ? [confirmedTransaction] : [])], 'Vente et location contradictoires.');
   if (!transaction) throw new ImportFailure('INCOMPLETE_LISTING', 'Vente ou location non établie.');
   const warnings: string[] = [];
   const specs = offers.flatMap(o => list(o.priceSpecification).map(resolve));
@@ -215,14 +217,15 @@ export function extractListingHtml(html: string, url: string, options: {allowPar
   const scripts = nodes.filter(n => tag(n) === 'script' && attr(n, 'type') === 'application/ld+json');
   if (scripts.length > 20) throw new ImportFailure('NOT_A_LISTING', 'Trop de blocs JSON-LD.');
   const documents = scripts.flatMap(n => {const content = rawText(n); if (content.length > 128_000) throw new ImportFailure('NOT_A_LISTING', 'JSON-LD trop volumineux.'); try {return [JSON.parse(content) as unknown];} catch {return [];}});
+  const figaro = adapter.id === 'figaro' ? extractFigaro(nodes, documents, url, canonicalUrl, adapter.listingId!) : undefined;
   let output: ExtractedListing | undefined;
-  try {if (documents.length) output = structured(documents, url, canonicalUrl);} catch (error) {
+  try {if (documents.length) output = structured(documents, url, canonicalUrl, figaro?.transaction);} catch (error) {
     if (!(error instanceof ImportFailure) || error.code !== 'NOT_A_LISTING' || error.reason === 'not_listing') throw error;
   }
   const microHomes = nodes.filter(n => /\/(House|Apartment|SingleFamilyResidence|Residence)$/.test(attr(n, 'itemtype')));
   if (microHomes.length > 1) throw new ImportFailure('CONFLICTING_FACTS', 'Plusieurs biens dans le DOM.');
   if (microHomes.length === 1) {
-    const home = microHomes[0], micro = structured([microdata(home)], url, canonicalUrl);
+    const home = microHomes[0], micro = structured([microdata(home)], url, canonicalUrl, figaro?.transaction);
     micro.adapterVersion = 'microdata/3.2';
     // Le texte riche est lu dans le DOM pour conserver ses paragraphes.
     const descriptionNodes = descendants(home).filter(n => attr(n, 'itemprop').split(/\s+/).includes('description') && attr(n, 'content') === '')
@@ -258,14 +261,26 @@ export function extractListingHtml(html: string, url: string, options: {allowPar
     agency.description ??= output?.description ?? null;
     output = agency;
   }
-  const dom = adapter.id === 'bienici' ? extractBienici(nodes, documents, url, canonicalUrl, adapter.listingId!)
-    : domAgency(nodes, url, canonicalUrl, options.allowPartial);
+  const dom = figaro ?? (adapter.id === 'bienici' ? extractBienici(nodes, documents, url, canonicalUrl, adapter.listingId!)
+    : domAgency(nodes, url, canonicalUrl, options.allowPartial));
   if (dom) {
-    if (output) for (const field of ['price', 'propertyType', 'locality', 'area'] as const) {
+    if (output) for (const field of ['price', 'propertyType', 'locality', 'area', 'rooms'] as const) {
       const a = output.facts[field], b = dom.facts[field];
-      if (a.status === 'verified' && b.status === 'verified') unique([a.value, b.value], `Contradiction structurée/DOM : ${field}.`);
+      if (a?.status === 'verified' && b?.status === 'verified') unique([a.value, b.value], `Contradiction structurée/DOM : ${field}.`);
     }
     dom.description ??= output?.description ?? null;
+    if (figaro && output) {
+      for (const field of ['title', 'propertyType', 'locality', 'area', 'rooms', 'price'] as const)
+        if (dom.facts[field]?.status === 'missing' && output.facts[field]?.status === 'verified')
+          Object.assign(dom.facts, {[field]: output.facts[field]});
+      if (dom.facts.price.status === 'verified') dom.warnings = dom.warnings.filter(w => !w.startsWith('Prix omis'));
+      if (dom.description?.truncated && output.description && !output.description.truncated
+        && output.description.text.startsWith(dom.description.text.replace(/(?:…|\.\.\.)$/, '').trimEnd())) {
+        dom.description = output.description;
+        dom.warnings = dom.warnings.filter(w => !w.includes('description publiée est abrégée'));
+      }
+      dom.photoUrls = [...new Set([...output.photoUrls, ...dom.photoUrls])].slice(0, IMPORT_LIMITS.candidates);
+    }
     output = dom;
   }
   if (!output) throw new ImportFailure('NOT_A_LISTING', 'Aucune annonce structurée exploitable.', 'structure_changed');

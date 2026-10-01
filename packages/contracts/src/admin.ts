@@ -11,7 +11,16 @@ export const AdminQuery = z.object({
 }).strict().refine(v=>!v.from||!v.to||v.from<=v.to,{message:'INVALID_DATE_RANGE'});
 export type AdminQuery = z.infer<typeof AdminQuery>;
 const reason = z.string().trim().min(5).max(300);
+// Autorisation du pilote : 100 €, dont au moins 5 € de marge de sécurité.
+export const MAX_MONTHLY_BUDGET_CENTS=10000;
+const MonthlyBudgetAction=z.object({action:z.literal('monthly_budget'),month:z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
+  envelopeCents:z.number().int().min(500).max(MAX_MONTHLY_BUDGET_CENTS),
+  ceilingCents:z.number().int().min(0).max(MAX_MONTHLY_BUDGET_CENTS-500),
+  openingCents:z.number().int().min(0).max(MAX_MONTHLY_BUDGET_CENTS),paused:z.boolean(),
+  expected:z.number().int().min(0).nullable(),reason}).strict()
+  .refine(v=>v.envelopeCents-v.ceilingCents>=500&&v.openingCents<=v.ceilingCents&& (v.expected===null||v.openingCents===0),{message:'INVALID_MONTHLY_BUDGET'});
 export const AdminAction = z.discriminatedUnion('action',[
+  MonthlyBudgetAction,
   z.object({action:z.literal('generation_gate'),enabled:z.boolean(),expected:z.boolean(),reason}).strict(),
   z.object({action:z.literal('report_status'),id:EntityId,status:z.enum(['new','reviewing','closed']),expected:z.enum(['new','reviewing','closed']),reason}).strict(),
   z.object({action:z.literal('quota'),id:EntityId,limit:z.number().int().min(1).max(1000),expected:z.number().int().min(1).max(1000),reason}).strict(),
@@ -24,7 +33,7 @@ export type AdminOverview = {
   daily:{day:string;total:number;ready:number;failed:number}[];
   errors:{code:string;stage:string;count:number}[];
   providers:{provider:string;mode:string;state:string;calls:number;reservedCents:number}[];
-  budget:{month:string;baselineCents:number;importsCents:number;ceilingCents:number;paused:number}|null;
+  budget:{month:string;baselineCents:number;importsCents:number;ceilingCents:number;envelopeCents:number;revision:number;paused:number}|null;
   narrationBudget:{month:string;envelopeCents:number;reservedCents:number;paused:number}|null;
   costs:{currency:string;kind:string;amountMicros:number;events:number}[];
   storage:{kind:string;bytes:number;objects:number}[];

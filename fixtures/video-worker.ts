@@ -1,7 +1,7 @@
 import {DurableObject} from 'cloudflare:workers';
 import {VideoCoordinator, type VideoJob} from '../apps/pipeline/src/video-coordinator';
 import type {VideoReport,VideoManifest} from '../packages/contracts/src/index';
-type Env={MEDIA:R2Bucket;COORDINATOR:DurableObjectNamespace};
+type Env={MEDIA:R2Bucket;COORDINATOR:DurableObjectNamespace;PRODUCT_BUDGET?:string};
 // Backend de rendu simulé, jamais déployé : D.O. SQLite et R2 sont réels dans workerd.
 export class FixtureVideo extends DurableObject<Env> {
   private engine=new VideoCoordinator({storage:this.ctx.storage,bucket:this.env.MEDIA,
@@ -20,10 +20,12 @@ export class FixtureVideo extends DurableObject<Env> {
       return Response.json({id:await this.ctx.storage.get('id'),status:await this.ctx.storage.get('hold')?'rendering':'ready',
         progressPercent:await this.ctx.storage.get('progressPercent')??0,report:await this.ctx.storage.get('report')});
     },running:async()=>!await this.ctx.storage.get('stopped'),stop:async()=>{await this.ctx.storage.put('stopped',true);},schedule:async()=>{},
+    productBudget:this.env.PRODUCT_BUDGET==='true'?async()=>{const snapshot=await this.ctx.storage.get<import('../apps/pipeline/src/budget').Budget>('productBudget');if(!snapshot)throw new Error('VIDEO_BUDGET_LIMIT');return snapshot;}:undefined,
     now:()=>this.clock,maxAttempts:4,budget:{month:new Date().toISOString().slice(0,7),paused:false,fixedAndOtherCents:2425,
       ceilingCents:3500,envelopeCents:4000,committedCents:0,attempts:0,days:{}}});
   private clock=Date.now();
   override async fetch(request:Request) {
+    this.clock=await this.ctx.storage.get<number>('clock')??this.clock;
     const path=new URL(request.url).pathname;
     if(path==='/accept') {
       const {manifest,report}=await request.json() as {manifest:VideoManifest;report:VideoReport};
@@ -42,6 +44,7 @@ export class FixtureVideo extends DurableObject<Env> {
       catch(error){return Response.json({error:(error as Error).message},{status:409});}
     }
     if(path==='/history')return Response.json(await this.engine.history((await this.ctx.storage.get<string>('id'))!));
+    if(path==='/budget-history')return Response.json([...await this.ctx.storage.list({prefix:'budget-history:'})]);
     const id=await this.ctx.storage.get<string>('id');return Response.json({state:await this.engine.state(),job:id?await this.engine.get(id):null,
       starts:await this.ctx.storage.get('starts')??0,cleaned:await this.ctx.storage.get('cleaned')??false,stopped:await this.ctx.storage.get('stopped')??false});
   }

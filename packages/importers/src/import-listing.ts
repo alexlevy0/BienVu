@@ -27,16 +27,16 @@ export async function importListing(url: string, context: {agencyId: string; imp
   // toujours mesurables (flux interrompu ou image indécodable).
   let byteBudgetUsed = 0;
   const maxPhotos = Math.min(IMPORT_LIMITS.photos, Math.max(3, options.maxPhotos ?? IMPORT_LIMITS.photos));
-  const load = async (value: string, kind: 'page' | 'image') => {
-    signal.throwIfAborted();
+  const load = async (value: string, kind: 'page' | 'image', resourceSignal = signal) => {
+    resourceSignal.throwIfAborted();
     if (++diagnostics.resources > IMPORT_LIMITS.requests) throw new ImportFailure('IMPORT_TIMEOUT', 'Plafond de requêtes atteint.');
     const hosts = kind === 'page' ? policy.pageHosts : policy.imageHosts;
     scopedUrl(value, hosts);
     const limit = Math.min(kind === 'page' ? IMPORT_LIMITS.htmlBytes : IMPORT_LIMITS.imageBytes, IMPORT_LIMITS.totalBytes - byteBudgetUsed);
     if (limit <= 0) throw new ImportFailure('SOURCE_UNAVAILABLE', 'Plafond total de médias atteint.');
     byteBudgetUsed += limit;
-    const resource = await abortable(ports.transport.load(value, kind, hosts, signal, limit), signal);
-    scopedUrl(resource.url, hosts); signal.throwIfAborted();
+    const resource = await abortable(ports.transport.load(value, kind, hosts, resourceSignal, limit), resourceSignal);
+    scopedUrl(resource.url, hosts); resourceSignal.throwIfAborted();
     if (!Number.isInteger(resource.sourceBytes) || resource.sourceBytes < 0 || resource.sourceBytes > limit)
       throw new ImportFailure('SOURCE_UNAVAILABLE', 'Réponse hors limites.');
     byteBudgetUsed -= limit - resource.sourceBytes;
@@ -56,18 +56,37 @@ export async function importListing(url: string, context: {agencyId: string; imp
       extracted = extractListingHtml(await abortable(ports.browserHtml(page.url, signal), signal), page.url,
         {allowPartial: options.allowPartial});
     }
-    // Validation de TOUTE la galerie avant récupération ; une URL privée ne passe
-    // pas simplement en warning parce que trois autres images fonctionnent.
-    for (const value of extracted.photoUrls) scopedUrl(value, policy.imageHosts);
+    // Validation de TOUTE la galerie avant récupération. Une URL privée ou
+    // malformée reste fatale. Un CDN public non autorisé n'est jamais contacté,
+    // mais ne doit pas effacer les faits d'un brouillon partiel.
+    const candidates = extracted.photoUrls.flatMap((value, order) => {
+      const photoUrl = publicUrl(value);
+      if (!policy.imageHosts.includes(photoUrl.hostname) && options.allowPartial) {
+        diagnostics.rejected.push({order, reason: 'MEDIA_HOST_UNSUPPORTED'}); return [];
+      }
+      scopedUrl(value, policy.imageHosts); return [{value, order}];
+    });
+    if (diagnostics.rejected.length) extracted.warnings.push('Certaines photos ne sont pas disponibles à l’import. Vous pouvez les ajouter manuellement.');
     const photos: NormalizedListing['photos'] = [], hashes = new Set<string>();
-    for (const [order, candidate] of extracted.photoUrls.entries()) {
+    // Garder une marge pour enregistrer les faits déjà lus. Le budget photo
+    // peut expirer ; l'annulation de l'appelant et la deadline globale restent fatales.
+    const photoTimeout = AbortSignal.timeout(Math.max(1, Math.min(IMPORT_LIMITS.photoDurationMs,
+      IMPORT_LIMITS.durationMs - (Date.now() - start) - 2_000)));
+    const photoSignal = AbortSignal.any([signal, photoTimeout]);
+    for (const {order, value: candidate} of candidates) {
       if (photos.length >= maxPhotos) break;
       if (diagnostics.resources >= IMPORT_LIMITS.requests) break;
       if (byteBudgetUsed >= IMPORT_LIMITS.totalBytes) {extracted.warnings.push('Galerie limitée au plafond de téléchargement de cet import.'); break;}
       signal.throwIfAborted();
+      if (photoTimeout.aborted) {extracted.warnings.push('Téléchargement des photos interrompu : les informations déjà récupérées sont conservées.'); break;}
       let resource;
-      try {resource = await load(candidate, 'image');} catch (error) {
-        if (signal.aborted || !(error instanceof ImportFailure) || ['UNSAFE_URL', 'IMPORT_TIMEOUT'].includes(error.code)) throw error;
+      try {resource = await load(candidate, 'image', photoSignal);} catch (error) {
+        if (signal.aborted || error instanceof ImportFailure && error.code === 'UNSAFE_URL') throw error;
+        if (photoTimeout.aborted) {
+          diagnostics.rejected.push({order, reason: 'IMPORT_TIMEOUT'});
+          extracted.warnings.push('Téléchargement des photos interrompu : les informations déjà récupérées sont conservées.'); break;
+        }
+        if (!(error instanceof ImportFailure)) throw error;
         diagnostics.rejected.push({order, reason: error.code}); continue;
       }
       if (resource.mime !== 'image/jpeg' || !resource.width || !resource.height || resource.width < 640 || resource.height < 360
@@ -85,7 +104,9 @@ export async function importListing(url: string, context: {agencyId: string; imp
       await abortable(ports.store(photo, resource.bytes, signal), signal);
       signal.throwIfAborted(); photos.push(photo); diagnostics.storedBytes += resource.bytes.length;
     }
+    signal.throwIfAborted();
     if (photos.length < 3 && !options.allowPartial) throw new ImportFailure('INSUFFICIENT_PHOTOS', 'Moins de trois photos distinctes et décodées.');
+    if (photos.length < 3) extracted.warnings.push('Les informations du bien ont été récupérées. Ajoutez au moins trois photos pour créer la vidéo.');
     const {photoUrls: _sourceCandidates, ...data} = extracted;
     const listing = (options.allowPartial ? NormalizedListing : GeneratableListing).parse({...data, id, agencyId, sourceUrl: source,
       sourceHost: new URL(source).hostname, fetchedAt: new Date().toISOString(), photos});
