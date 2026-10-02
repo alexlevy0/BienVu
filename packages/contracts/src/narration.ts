@@ -5,7 +5,7 @@ export const ScriptFactRef = z.enum(['propertyType', 'locality', 'price', 'area'
 export type ScriptFactRef = z.infer<typeof ScriptFactRef>;
 export const SceneKind = z.enum(['intro', 'area', 'rooms', 'price', 'location', 'gallery', 'contact']);
 export type SceneKind = z.infer<typeof SceneKind>;
-export const ScriptCopyVersion = z.enum(['factual-copy/1', 'factual-copy/2', 'description-copy/1']);
+export const ScriptCopyVersion = z.enum(['factual-copy/1', 'factual-copy/2', 'description-copy/1', 'description-copy/2']);
 export type ScriptCopyVersion = z.infer<typeof ScriptCopyVersion>;
 export const ScriptPlan = z.object({scenes: z.array(z.object({
   copyId: z.string().regex(/^(intro|area|rooms|price|location|gallery|contact)\/(direct|warm|short|user|description-\d{1,2})$/),
@@ -19,7 +19,7 @@ export const ScriptScene = z.object({id: EntityId, kind: SceneKind, copyId: z.st
 export const ListingScript = z.object({
   id: EntityId, agencyId: EntityId, listingId: EntityId, version: z.union([z.literal(1), z.literal(2)]),
   language: z.literal('fr-FR'), sourceKind: z.enum(['url', 'manual']), inputHash: Sha256,
-  model: z.string().min(1).max(100), promptVersion: z.enum(['narration-fr/1','narration-fr/2']), copyVersion: ScriptCopyVersion,
+  model: z.string().min(1).max(100), promptVersion: z.enum(['narration-fr/1','narration-fr/2','narration-fr/3']), copyVersion: ScriptCopyVersion,
   disclosure: z.string().min(1).max(150), scenes: z.array(ScriptScene).min(4).max(6),
   provenance: z.array(z.object({ref: ScriptFactRef, status: z.enum(['verified', 'user_provided']),
     sourcePath: z.string().min(1).max(160)}).strict()).min(1).max(10),

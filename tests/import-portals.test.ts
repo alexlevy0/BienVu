@@ -69,6 +69,23 @@ test('Orpi : fiche avec ou sans slash final, même référence et contrôles des
     assert.throws(() => selectAdapter(invalid), fails('NOT_A_LISTING'));
 });
 
+test('Orpi : surface absente du titre, faits et galerie conservés en vente et location', async () => {
+  for (const [name,transaction,area] of [['orpi','vente','65,5'],['orpi-rent','location','37,23']] as const) {
+    const url=`https://www.orpi.com/annonce-${transaction}-appartement-test-12345678-1234-1234-1234-123456789012/`;
+    const html=await fixture(name),original=extractListingHtml(html,url);
+    const changed=html.replace(`${area} m2 `,'');
+    assert.notEqual(changed,html);
+    const result=extractListingHtml(changed,url);
+    assert.equal(result.facts.area.status,'missing');assert.equal(result.facts.area.value,null);
+    for(const key of ['propertyType','locality','rooms','price'] as const)assert.deepEqual(result.facts[key],original.facts[key]);
+    assert.deepEqual(result.photoUrls,original.photoUrls);assert.deepEqual(result.description,original.description);
+    assert.equal(result.transaction,original.transaction);assert.ok(result.warnings.some(w=>w.startsWith('Surface non indiquée')));
+    for(const invalid of [`${area} m2`, '-65 m2 Ville de recette','inconnue m2 Ville de recette'])
+      assert.throws(()=>extractListingHtml(html.replace(`${area} m2 Ville de recette`,invalid),url),fails('INCOMPLETE_LISTING'));
+    assert.throws(()=>extractListingHtml(changed.replace('12345678-1234-1234-1234-123456789012--a','99999999-1234-1234-1234-123456789012--a'),url),fails('CONFLICTING_FACTS'));
+  }
+});
+
 test('Orpi location : loyer mensuel et charges de l’en-tête, jamais dépôt, honoraires ou bien voisin', async () => {
   const url = 'https://www.orpi.com/annonce-location-appartement-test-12345678-1234-1234-1234-123456789012/';
   const html = await fixture('orpi-rent'), result = extractListingHtml(html, url);

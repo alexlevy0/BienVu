@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import {useEffect, useLayoutEffect, useRef, useState, type DragEvent, type FormEvent} from 'react';
-import {VideoDuration,ImportUrl, GenerationView, defaultVideoCustomization,GenerationCustomization, type VideoCustomization, type CreationDraftData, type CreationDraftView, type GenerationRequest} from '@bienvu/contracts';
+import {VideoDuration,ImportUrl, GenerationView, defaultVideoCustomization,GenerationCustomization,publicErrors, type VideoCustomization, type CreationDraftData, type CreationDraftView, type GenerationRequest} from '@bienvu/contracts';
 import {useAnonymousTrial, TrialChallenge} from './anonymous-trial';
 import {useAccount} from './account';
 import {HomeIcon} from './home-icons';
@@ -290,6 +290,11 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
       const response=await fetch('/api/imports',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':pendingImport.current.key},body:JSON.stringify({url:parsed.data})});
       const imported=await response.json() as {id?:string;status?:string;draft?:CreationDraftView;errorCode?:string;error?:{message?:string}};
       if(!response.ok)throw new Error(imported.error?.message??'La lecture de l’annonce a été interrompue.');
+      if(imported.status==='failed'){
+        pendingImport.current=null;sessionStorage.removeItem('bienvu:url-import-request');
+        throw new Error(imported.errorCode&&Object.hasOwn(publicErrors,imported.errorCode)
+          ?publicErrors[imported.errorCode as keyof typeof publicErrors][1]:'La lecture de l’annonce a échoué. Vous pouvez réessayer ou continuer manuellement.');
+      }
       let draft=imported.draft;
       if(imported.status==='ready'&&imported.id){
         if(pendingCustomization.current?.id!==imported.id){
@@ -373,6 +378,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
       const imported=await response.json() as {id?:string;status?:string;errorCode?:string|null;draft?:CreationDraftView|null;error?:{message?:string}};
       if(interactionVersion.current!==version||currentOwner.current!==owner)return;
       if(!response.ok)throw new Error(imported.error?.message??'L’import a été interrompu. Réessayez.');
+      if(imported.status==='failed'){pendingImport.current=null;sessionStorage.removeItem('bienvu:url-import-request');}
       if(imported.status==='needs_input'&&imported.draft){
         startFresh.current=true;forget();setImportDraft(imported.draft);setDescription(imported.draft.data.fields.description??'');
         setStep(0);setScreen({kind:'manual'});

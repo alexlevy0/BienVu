@@ -1,14 +1,14 @@
 import {AgencyBrand, GeneratableListing, ListingScript, NarrationFailure, ScriptCopyVersion, ScriptPlan, SYNTHETIC_VOICE_DISCLOSURE,
   CustomNarration,type NormalizedListing, type SceneKind, type ScriptFactRef, type VideoDuration} from '@bienvu/contracts';
 import {displayEuros, displayNumber, frenchDecimal, frenchEuros, frenchInteger} from './french';
-import {descriptionPassages,narrationWordLimit,wordCount} from './suggestion';
+import {descriptionPassages,expandedNarrationLines,narrationWordLimit,narrationWordTarget,wordCount} from './suggestion';
 
 export const PROMPT_VERSION = 'narration-fr/1' as const;
 export const COPY_VERSION = 'factual-copy/2' as const;
 export type Copy = {id: string; kind: SceneKind; narrationText: string; captionText: string; factRefs: ScriptFactRef[];condition?:boolean};
 export type ScriptContext = {listing: NormalizedListing; brand: AgencyBrand; contact: 'phone' | 'email' | 'website' | 'none';
   copyVersion: ScriptCopyVersion; copies: Copy[]; provenance: ListingScript['provenance']; inputHash: string;customNarration?:string[];durationSeconds?:VideoDuration};
-export const scriptPromptVersion=(context:Pick<ScriptContext,'copyVersion'>)=>context.copyVersion==='description-copy/1'?'narration-fr/2' as const:PROMPT_VERSION;
+export const scriptPromptVersion=(context:Pick<ScriptContext,'copyVersion'>)=>context.copyVersion==='description-copy/2'?'narration-fr/3' as const:context.copyVersion==='description-copy/1'?'narration-fr/2' as const:PROMPT_VERSION;
 export async function hashJson(value: unknown) {
   const bytes = new TextEncoder().encode(JSON.stringify(value)), hash = await crypto.subtle.digest('SHA-256', bytes);
   return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, '0')).join('');
@@ -97,11 +97,31 @@ export async function scriptContext(listingInput: unknown, brandInput: unknown, 
         factRefs:['description'],...(passage.condition?{condition:true}:{})});
     if(passages.length&&listing.description)provenance.push({ref:'description',status,sourcePath:listing.description.sourcePath});
   }
+  if(copyVersion==='description-copy/2'){
+    if(![20,30,40].includes(durationSeconds??20))throw new NarrationFailure('SCRIPT_INPUT_INVALID');
+    const intro=copies.find(c=>c.id==='intro/short')!,ending=copies.find(c=>c.id==='contact/short')!;
+    const facts=['price','area','rooms'].flatMap(kind=>{const c=copies.find(c=>c.id===`${kind}/direct`);return c?[{text:c.narrationText,refs:c.factRefs}]:[];});
+    const maximum=narrationWordLimit(durationSeconds,copyVersion),seen=new Set<string>();
+    for(const budget of [...new Set([32,40,48,56,64,72,80,88,96,98,104,112,120,maximum])].filter(n=>n<=maximum).sort((a,b)=>a-b)){
+      const lines=expandedNarrationLines({text:intro.narrationText,refs:intro.factRefs},{text:ending.narrationText,refs:ending.factRefs},facts,listing.description?.text??'',budget);
+      if(!lines.length)continue;
+      const key=JSON.stringify(lines);if(seen.has(key))continue;seen.add(key);
+      for(const [index,line] of lines.entries()){
+        const kind=(['intro','gallery','location','contact'] as const)[index];
+        const base=copies.find(c=>c.id===`${kind}/short`)!;
+        copies.push({id:`${kind}/description-${seen.size-1}`,kind,narrationText:line.text,captionText:base.captionText,factRefs:line.refs,
+          ...(line.condition?{condition:true}:{})});
+      }
+    }
+    if(!copies.some(c=>c.id.startsWith('intro/description-')))throw new NarrationFailure('SCRIPT_INPUT_INVALID');
+    if(copies.some(c=>c.factRefs.includes('description'))&&listing.description)
+      provenance.push({ref:'description',status,sourcePath:listing.description.sourcePath});
+  }
   // Seuls les faits et extraits de description filtrés du catalogue sont envoyés.
   // Aucun titre libre, URL ou secret n'est transmis au LLM.
   const inputHash = await hashJson({listingId: listing.id, agencyId: listing.agencyId, sourceKind: listing.sourceKind,
     copies, provenance, photos: listing.photos.map(p => ({id: p.id, contentHash: p.contentHash})), copyVersion,
-    ...(copyVersion==='description-copy/1'?{durationSeconds:durationSeconds??20}: {})});
+    ...(copyVersion.startsWith('description-copy/')?{durationSeconds:durationSeconds??20}: {})});
   if(userNarration){
     const parsed=CustomNarration.safeParse(userNarration);if(!parsed.success)throw new NarrationFailure('SCRIPT_INPUT_INVALID');
     const middle=copies.filter(copy=>copy.id.endsWith('/direct')&&!['intro','contact'].includes(copy.kind));
@@ -114,7 +134,58 @@ export async function scriptContext(listingInput: unknown, brandInput: unknown, 
       inputHash:await hashJson({inputHash,customNarration:parsed.data})};
   }
   return {listing, brand, contact: channel, copyVersion, copies, provenance, inputHash,
-    ...(copyVersion==='description-copy/1'?{durationSeconds:durationSeconds??20}:{})};
+    ...(copyVersion.startsWith('description-copy/')?{durationSeconds:durationSeconds??20}:{})};
+}
+// Select a coherent, sourced four-paragraph variant. Validate the provider IDs
+// before filling an under-length answer; foreign data must never be repaired.
+export function filledNarrationPlan(context:ScriptContext,input:unknown,targetWords=narrationWordTarget(context.durationSeconds)){
+  if(context.copyVersion!=='description-copy/2'||context.customNarration)return input;
+  const parsed=ScriptPlan.safeParse(input);
+  if(!parsed.success||parsed.data.scenes.some(s=>!context.copies.some(c=>c.id===s.copyId)
+    ||!context.listing.photos.some(p=>p.id===s.photoAssetId)))throw new NarrationFailure('SCRIPT_INVALID');
+  const variants=context.copies.filter(c=>c.kind==='intro'&&c.id.includes('/description-')).map(intro=>{
+    const suffix=intro.id.split('/')[1],copies=(['intro','gallery','location','contact'] as const).map(kind=>context.copies.find(c=>c.id===`${kind}/${suffix}`)!);
+    return {copies,words:wordCount(copies.map(c=>c.narrationText).join(' '))};
+  }).filter(v=>(!context.copies.some(c=>c.factRefs.includes('description'))||v.copies.some(c=>c.factRefs.includes('description')))
+    &&(!context.copies.some(c=>c.condition)||v.copies.some(c=>c.condition))).sort((a,b)=>a.words-b.words);
+  const selected=variants.filter(v=>v.words<=targetWords).at(-1)??variants[0];
+  if(!selected)throw new NarrationFailure('SCRIPT_INVALID');
+  return {scenes:selected.copies.map((c,index)=>({copyId:c.id,photoAssetId:context.listing.photos[index%context.listing.photos.length].id}))};
+}
+// One measured adaptation, checkpointed before further synthesis. Never edit
+// user-authored text, repeat a fact, stretch or cut a spoken sentence.
+export function fitNarrationDuration(context:ScriptContext,script:ListingScript,durationsMs:readonly number[]):ListingScript|null{
+  if(context.copyVersion!=='description-copy/2'||context.customNarration||script.version!==1)return null;
+  validateScript(context,script);
+  if(durationsMs.length!==script.scenes.length||durationsMs.some(n=>!Number.isInteger(n)||n<=0))throw new NarrationFailure('SCRIPT_INVALID');
+  const total=durationsMs.reduce((a,b)=>a+b,0),target=(context.durationSeconds??20)*1000-800-(durationsMs.length-1)*134;
+  if(total>=target*.94&&total<=target)return null;
+  const words=wordCount(script.scenes.map(s=>s.narrationText).join(' '));
+  const desired=Math.min(narrationWordLimit(context.durationSeconds,context.copyVersion),Math.floor(words*target/total*(total>target?.97:1)));
+  const plan=filledNarrationPlan(context,{scenes:script.scenes.map(s=>({copyId:s.copyId,photoAssetId:s.photoAssetId}))},desired);
+  const next=compileScript(context,plan,script.model,2),nextWords=wordCount(next.scenes.map(s=>s.narrationText).join(' '));
+  if(total<target?nextWords<=words:nextWords>=words)return null;
+  return next;
+}
+// The initial and adjusted variants can share entire paragraphs. Choose the
+// fullest combination whose WAVs have ALL been measured; this is a free cache
+// selection, not another synthesis or an unbounded fitting loop.
+export function fitCachedNarration(context:ScriptContext,script:ListingScript,tracks:readonly {text:string;durationMs:number}[]):ListingScript|null{
+  if(context.copyVersion!=='description-copy/2'||context.customNarration)return null;
+  validateScript(context,script);
+  const durations=new Map(tracks.map(t=>[t.text,t.durationMs])),maximumFrames=(context.durationSeconds??20)*30;
+  const candidates=context.copies.filter(c=>c.kind==='intro'&&c.id.includes('/description-')).flatMap(intro=>{
+    const suffix=intro.id.split('/')[1],copies=(['intro','gallery','location','contact'] as const).map(kind=>context.copies.find(c=>c.id===`${kind}/${suffix}`)!);
+    if(copies.some(c=>!durations.has(c.narrationText))
+      ||context.copies.some(c=>c.factRefs.includes('description'))&&!copies.some(c=>c.factRefs.includes('description'))
+      ||context.copies.some(c=>c.condition)&&!copies.some(c=>c.condition))return [];
+    const frames=copies.reduce((n,c,index)=>n+Math.ceil(durations.get(c.narrationText)!*30/1000)+(index<3?4:0),0);
+    return frames<=maximumFrames?[{copies,frames}]:[];
+  }).sort((a,b)=>b.frames-a.frames);
+  const best=candidates[0];if(!best)return null;
+  const currentFrames=script.scenes.reduce((n,s,index)=>n+Math.ceil((durations.get(s.narrationText)??0)*30/1000)+(index<3?4:0),0);
+  if(best.frames<=currentFrames&&currentFrames<=maximumFrames)return null;
+  return compileScript(context,{scenes:best.copies.map((c,index)=>({copyId:c.id,photoAssetId:context.listing.photos[index%context.listing.photos.length].id}))},script.model,2);
 }
 export function customScript(context:ScriptContext):ListingScript {
   if(!context.customNarration)throw new NarrationFailure('SCRIPT_INPUT_INVALID');
@@ -149,7 +220,8 @@ export function compileScript(context: ScriptContext, input: unknown, model: str
     // Unknown copy/photo IDs still fail before any adaptation.
     if(plan.some(s=>!context.copies.some(c=>c.id===s.copyId)||!context.listing.photos.some(p=>p.id===s.photoAssetId)))throw new NarrationFailure('SCRIPT_INVALID');
     const intro=context.copies.find(c=>c.id==='intro/short')!,ending=context.copies.find(c=>c.id==='contact/short')!;
-    let middle=plan.map(s=>context.copies.find(c=>c.id===s.copyId)!).filter(c=>!['intro','contact'].includes(c.kind));
+    const selected=plan.map(s=>context.copies.find(c=>c.id===s.copyId)!).filter(c=>!['intro','contact'].includes(c.kind));
+    let middle=[...selected];
     middle=middle.filter((c,index)=>middle.findIndex(other=>other.kind===c.kind)===index);
     const caveat=context.copies.filter(c=>c.kind==='gallery'&&c.condition).sort((a,b)=>wordCount(a.narrationText)-wordCount(b.narrationText))[0];
     if(caveat&&!middle.some(c=>c.condition))middle=[...middle.filter(c=>c.kind!=='gallery'),caveat];
@@ -157,14 +229,27 @@ export function compileScript(context: ScriptContext, input: unknown, model: str
       const description=context.copies.filter(c=>c.kind==='location'&&c.factRefs.includes('description')).sort((a,b)=>wordCount(a.narrationText)-wordCount(b.narrationText))[0];
       if(description)middle=[...middle.filter(c=>c.kind!=='location'),description];
     }
+    // Several sourced passages can share the same kind. Deduplicating them
+    // must not leave fewer than four scenes: reuse an equivalent catalogue
+    // entry of another kind, then a short sourced/factual entry if needed.
+    const alternatives=[...selected.flatMap(copy=>context.copies.filter(c=>c.narrationText===copy.narrationText)),
+      ...context.copies.filter(c=>c.factRefs.includes('description')),...context.copies.filter(c=>c.id.endsWith('/short'))];
+    while(middle.length<2){
+      const candidates=alternatives.filter(c=>!['intro','contact'].includes(c.kind)
+        &&!middle.some(other=>other.kind===c.kind||other.narrationText===c.narrationText));
+      const remaining=narrationWordLimit(context.durationSeconds,context.copyVersion)-wordCount([intro,...middle,ending].map(c=>c.narrationText).join(' '));
+      const extra=candidates.find(c=>wordCount(c.narrationText)<=remaining)
+        ??candidates.sort((a,b)=>wordCount(a.narrationText)-wordCount(b.narrationText))[0];
+      if(!extra)break;middle.push(extra);
+    }
     const total=()=>wordCount([intro,...middle,ending].map(c=>c.narrationText).join(' '));
     const maximumScenes=context.durationSeconds===20?4:context.durationSeconds===30?5:6;
-    while(middle.length>2&&(middle.length+2>maximumScenes||total()>narrationWordLimit(context.durationSeconds))){
+    while(middle.length>2&&(middle.length+2>maximumScenes||total()>narrationWordLimit(context.durationSeconds,context.copyVersion))){
       const removable=middle.filter(c=>!c.condition&&(!c.factRefs.includes('description')||middle.filter(c=>c.factRefs.includes('description')).length>1))
         .sort((a,b)=>Number(a.factRefs.includes('description'))-Number(b.factRefs.includes('description'))||wordCount(b.narrationText)-wordCount(a.narrationText))[0];
       if(!removable)break;middle=middle.filter(c=>c!==removable);
     }
-    if(total()>narrationWordLimit(context.durationSeconds))middle=middle.map(current=>{
+    if(total()>narrationWordLimit(context.durationSeconds,context.copyVersion))middle=middle.map(current=>{
       const shorter=context.copies.filter(c=>c.kind===current.kind&&Boolean(c.condition)===Boolean(current.condition)
         &&c.factRefs.includes('description')===current.factRefs.includes('description')).sort((a,b)=>wordCount(a.narrationText)-wordCount(b.narrationText))[0];
       return shorter&&wordCount(shorter.narrationText)<wordCount(current.narrationText)?shorter:current;
@@ -181,8 +266,8 @@ export function compileScript(context: ScriptContext, input: unknown, model: str
   if (scenes[0].kind !== 'intro' || scenes.at(-1)!.kind !== 'contact' || new Set(scenes.map(s => s.kind)).size !== scenes.length
     || new Set(scenes.map(s => s.photoAssetId)).size < 3 || scenes.some((s, i) => i > 0 && scenes[i - 1].photoAssetId === s.photoAssetId)
     || scenes.reduce((n, s) => n + s.narrationText.length, 0) > 1000) throw new NarrationFailure('SCRIPT_INVALID');
-  if(context.copyVersion==='description-copy/1'&&!context.customNarration){
-    if(wordCount(scenes.map(s=>s.narrationText).join(' '))>narrationWordLimit(context.durationSeconds))throw new NarrationFailure('SCRIPT_INVALID');
+  if(context.copyVersion.startsWith('description-copy/')&&!context.customNarration){
+    if(wordCount(scenes.map(s=>s.narrationText).join(' '))>narrationWordLimit(context.durationSeconds,context.copyVersion))throw new NarrationFailure('SCRIPT_INVALID');
     if(context.copies.some(c=>c.factRefs.includes('description'))&&!scenes.some(s=>s.factRefs.includes('description')))
       throw new NarrationFailure('SCRIPT_INVALID');
     if(context.copies.some(c=>c.condition)&&!scenes.some(s=>context.copies.find(c=>c.id===s.copyId)?.condition))

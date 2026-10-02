@@ -1,7 +1,9 @@
-import type {VideoDuration} from '@bienvu/contracts';
+import type {VideoDuration, ScriptCopyVersion, ScriptFactRef} from '@bienvu/contracts';
 import {frenchDecimal, frenchEuros, frenchInteger} from './french';
 
-export const narrationWordLimit = (duration: VideoDuration = 20) => ({20: 40, 30: 60, 40: 75})[duration];
+export const narrationWordLimit = (duration: VideoDuration = 20,version:ScriptCopyVersion='description-copy/2') =>
+  (version==='description-copy/2'?{20:60,30:90,40:120}:{20:40,30:60,40:75})[duration];
+export const narrationWordTarget = (duration: VideoDuration = 20) => ({20:50,30:77,40:104})[duration];
 export const wordCount = (text: string) => text.trim().split(/\s+/u).filter(Boolean).length;
 export type DescriptionPassage = {text: string; narrationText: string; condition: boolean; score: number};
 const administrative = /(?:RSAC|RNE|SIRE[NT]|immatricul|agent commercial|registre|honoraires|géorisques|diagnostic|DPE|copropriété|charges annuelles|consommation énergétique|estimation des coûts|référence annonce|nos agences|nous contacter|contactez|exclusivité chez|en exclusivité)/iu;
@@ -11,7 +13,7 @@ const condition = /(?:rafra[iî]chissement|r[eé]novation|travaux|r[eé]nover|ra
 // Extractive catalogue: every property assertion retains its complete source
 // clause, including negatives, future tense and supplements. No arbitrary word
 // truncation, and no free assertion authored by the model.
-export function descriptionPassages(description: string): DescriptionPassage[] {
+export function descriptionPassages(description: string,expanded=false): DescriptionPassage[] {
   const source = description.normalize('NFC').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
   const tail = source.search(/(?:Monsieur\s+\p{Lu}|Madame\s+\p{Lu}|exerce l'activité|registre national|registre spécial|RSAC|SIRE[NT])/iu);
   const body = tail >= 0 ? source.slice(0, tail) : source;
@@ -33,7 +35,7 @@ export function descriptionPassages(description: string): DescriptionPassage[] {
       }
       if (/^(?:appartement\s+T\d|T\d\b)/iu.test(text)) continue;
       const count = wordCount(text);
-      if (count < 3 || count > 28 || text.length > 165) continue;
+      if (count < 3 || count > (expanded?50:28) || text.length > (expanded?340:165)) continue;
       // Ignore isolated advertising fragments and agent identifiers.
       if (!/(?:séjour|salon|chambre|cuisine|balcon|terrasse|jardin|piscine|cave|garage|box|cellier|placard|rangement|résidence|calme|lumineu|expos|étage|ascenseur|commerces|métro|gare|proche|rafra[iî]ch|r[eé]nov|travaux|vue|bain|douche|parquet|cheminée|pierre|bureau|suite|extérieur|pièce de vie|centre|transport)/iu.test(text)) continue;
       text = text[0].toLocaleUpperCase('fr-FR') + text.slice(1);
@@ -50,6 +52,41 @@ export function descriptionPassages(description: string): DescriptionPassage[] {
   return passages.slice(0, 16);
 }
 
+export type NarrationPhrase={text:string;refs:ScriptFactRef[];condition?:boolean};
+// Whole source clauses only. Longer durations get more clauses, never padded
+// repetitions or invented features. The two middle paragraphs fit the editable
+// and rendered scene contracts and preserve their source references.
+export function expandedNarrationLines(intro:NarrationPhrase,ending:NarrationPhrase,facts:NarrationPhrase[],description:string,maximumWords:number):NarrationPhrase[]{
+  const passages=descriptionPassages(description,true),essential=passages.filter(p=>p.condition),selected:NarrationPhrase[]=[];
+  const reserve=essential.reduce((n,p)=>n+wordCount(p.narrationText),0);
+  const textOf=(items:NarrationPhrase[])=>items.map(p=>p.text).join(' ');
+  const pack=(items:NarrationPhrase[]):NarrationPhrase[][]|null=>{
+    const result:NarrationPhrase[][]=[[],[]];
+    for(const phrase of items){const index=[0,1].sort((a,b)=>textOf(result[a]).length-textOf(result[b]).length)
+      .find(i=>textOf([...result[i],phrase]).length<=500);if(index===undefined)return null;result[index].push(phrase);}
+    return result;
+  };
+  const add=(phrase:NarrationPhrase,extraReserve=0)=>{
+    const all=[intro,...selected,phrase,ending];
+    if(wordCount(textOf(all))+extraReserve>maximumWords||textOf(all).length>860||!pack([...selected,phrase])
+      ||selected.some(p=>p.text===phrase.text))return false;
+    selected.push(phrase);return true;
+  };
+  // Include the price first when the source provides it. At longer durations,
+  // room count and area also have room alongside the property description.
+  if(facts[0])add(facts[0],reserve+(passages.some(p=>!p.condition)?8:0));
+  for(const passage of passages.filter(p=>!p.condition).sort((a,b)=>b.score-a.score))
+    add({text:passage.narrationText,refs:['description']},reserve);
+  for(const passage of essential){if(!add({text:passage.narrationText,refs:['description'],condition:true}))return [];}
+  for(const fact of facts.slice(1))add(fact);
+  const packed=pack(selected)!;
+  const middle=packed.map((phrases,index):NarrationPhrase=>phrases.length?{text:textOf(phrases),
+    refs:[...new Set(phrases.flatMap(p=>p.refs))],...(phrases.some(p=>p.condition)?{condition:true}:{})}
+    :{text:index?'Poursuivons la visite en images.':'Découvrez les lieux en images.',refs:['photos']});
+  const result=[intro,...middle,ending];
+  return wordCount(textOf(result))<=maximumWords&&textOf(result).length<=900?result:[];
+}
+
 export type SuggestedListing = {propertyType: string; transaction: string; locality: string; description: string;
   priceCents: string; area: string; rooms: string; charges?: string};
 const positive = (value: string) => {const n = Number(value.replace(/\s/g, '').replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null;};
@@ -60,7 +97,7 @@ export function suggestedNarration(fields: SuggestedListing, agency: string, dur
   const property = fields.propertyType === 'house' ? 'cette maison' : fields.propertyType === 'apartment' ? 'cet appartement' : 'ce bien';
   const intro = `${fields.transaction === 'rent' ? 'À louer' : 'À vendre'}, ${property}${fields.locality ? ` à ${fields.locality}` : ''}.`;
   const ending = agency ? `Contactez ${agency}.` : 'Découvrez cette annonce.';
-  const limit = narrationWordLimit(duration), available = limit - wordCount(intro + ' ' + ending);
+  const limit = narrationWordLimit(duration,'description-copy/1'), available = limit - wordCount(intro + ' ' + ending);
   const passages = descriptionPassages(fields.description), selected: string[] = [];
   let used = 0;
   const add = (text: string, reserve = 0) => {
@@ -86,5 +123,8 @@ export function suggestedNarration(fields: SuggestedListing, agency: string, dur
   while (selected.length < 2) add(selected.length ? 'Poursuivons la visite.' : 'Découvrez les lieux en images.') || selected.push('La visite en images.');
   const middle = ['', ''];
   selected.forEach((text, index) => {const at = index % 2; middle[at] += (middle[at] ? ' ' : '') + text;});
-  return [intro, ...middle, ending];
+  const longer=expandedNarrationLines({text:intro,refs:['propertyType','transaction','locality']},{text:ending,refs:['agency.name']},
+    [facts.find(f=>f.includes('euros')),...facts.filter(f=>!f.includes('euros'))].filter((text):text is string=>Boolean(text)).map(text=>({text,refs:['photos']})),
+    fields.description,narrationWordTarget(duration));
+  return longer.length?longer.map(p=>p.text):[intro,...middle,ending];
 }

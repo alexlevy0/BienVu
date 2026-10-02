@@ -14,10 +14,10 @@ export const frenchVoices=[{id:'fr-FR-Chirp3-HD-Aoede',name:'Aoede',provider:'Go
 export const VideoStyle=z.enum(['editorial','minimal','cinematic']);
 const photoOrder=z.array(z.number().int().min(0).max(11)).max(12)
   .refine(values=>new Set(values).size===values.length,'Une photo ne peut être sélectionnée deux fois.');
-export const CustomNarration=z.array(z.string().trim().min(1).max(300)
+export const CustomNarration=z.array(z.string().trim().min(1).max(500)
   .refine(value=>!/[<>\u0000-\u001f\u007f]/.test(value),'Utilisez du texte simple, sans balise.')).min(4).max(6)
   .refine(lines=>lines.join(' ').length<=900,'Limitez la narration à 900 caractères.')
-  .refine(lines=>lines.join(' ').split(/\s+/).length<=75,'Limitez la narration à 75 mots pour conserver les phrases complètes.');
+  .refine(lines=>lines.join(' ').split(/\s+/).length<=120,'Limitez la narration à 120 mots pour conserver les phrases complètes.');
 // No defaults: historical draft and admission JSON remain unchanged.
 export const VideoCustomization=z.object({style:VideoStyle,
   voice:z.enum(['fr-FR-Chirp3-HD-Aoede','fr-FR-Chirp3-HD-Kore','fr-FR-Chirp3-HD-Charon','fish-manon','fish-lucas','fish-camille']),
@@ -26,7 +26,7 @@ export const VideoCustomization=z.object({style:VideoStyle,
   // Optional to preserve historical request hashes. Generation, never preview, pays for these clips.
   runwayClips:z.number().int().min(0).max(2).optional(),
   // Draft text may be incomplete while editing; generation validates it below.
-  narration:z.array(z.string().max(300)).min(4).max(6).optional()}).strict();
+  narration:z.array(z.string().max(500)).min(4).max(6).optional()}).strict();
 export type VideoCustomization=z.infer<typeof VideoCustomization>;
 export const GenerationCustomization=VideoCustomization.superRefine((value,context)=>{
   if(value.photoOrder&&value.photoOrder.length<3)context.addIssue({code:'custom',path:['photoOrder'],message:'Sélectionnez au moins trois photos.'});

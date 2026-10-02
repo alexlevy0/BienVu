@@ -21,7 +21,7 @@ export function fixturePlan(context: ScriptContext): ScriptPlan {
     const copies=[context.copies.find(c=>c.id==='intro/short')!],ending=context.copies.find(c=>c.id==='contact/short')!;
     const add=(copy:ScriptContext['copies'][number]|undefined)=>{
       if(!copy||copies.some(c=>c.kind===copy.kind||c.narrationText===copy.narrationText)
-        ||wordCount([...copies,copy,ending].map(c=>c.narrationText).join(' '))>narrationWordLimit(context.durationSeconds))return;
+        ||wordCount([...copies,copy,ending].map(c=>c.narrationText).join(' '))>narrationWordLimit(context.durationSeconds,context.copyVersion))return;
       copies.push(copy);
     };
     add(context.copies.find(c=>c.kind==='gallery'&&c.condition));

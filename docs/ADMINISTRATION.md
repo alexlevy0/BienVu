@@ -29,6 +29,8 @@ La page vérifie le rôle côté serveur : redirection vers la connexion si aucu
 
 Les listes utilisent une pagination stable de 30 lignes, sans limite de deux éléments ni troncature de l’historique. Les curseurs sont liés aux filtres ; changer les critères exige une nouvelle première page. Les requêtes sont paramétrées et les projections de champs explicites. L’export CSV porte sur les **lignes affichées**, protège les cellules qui pourraient être interprétées comme formules et reste local au navigateur.
 
+Pour confirmer une modification, renseigner un **motif obligatoire d’au moins 5 caractères** (hors espaces de début/fin). La boîte de dialogue précise cette condition lorsque le bouton est grisé, puis indique que le motif sera conservé dans le journal dès qu’il est valide. L’ajustement d’un quota propose un exemple de motif sans le remplir à la place de l’administrateur.
+
 ## Actions et migration
 
 Appliquer `0023_admin_audit.sql` avant de déployer le Worker. Cette migration ajoute une table et des index ; aucun registre existant n’est reconstruit. Les modifications passent par un seul INSERT D1 et des triggers : validation optimiste de la valeur précédente, mutation et audit sont atomiques. Une période expirée, un quota inférieur à `consommé + réservé`, un essai porté au-delà d’un crédit ou une valeur devenue obsolète provoquent un conflit sans audit de succès. Le type de crédit ne change jamais avec un ajustement. Le journal est immuable, et les modifications sont limitées à 20/minute par administrateur. Les POST imposent une origine identique, des corps bornés et un motif de 5 à 300 caractères.

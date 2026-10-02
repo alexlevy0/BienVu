@@ -76,3 +76,15 @@ export function voiceSceneTiming(durationsMs: readonly number[],durationSeconds?
   frames[frames.length - 1] += remaining;
   return frames;
 }
+
+// New descriptive narrations run consecutively. Legacy timing stays available
+// for immutable snapshots; these frame counts work with the existing renderer.
+export function compactVoiceSceneTiming(durationsMs:readonly number[],durationSeconds:VideoDuration){
+  if(!VideoDuration.safeParse(durationSeconds).success||durationsMs.length<4||durationsMs.length>6
+    ||durationsMs.some(n=>!Number.isInteger(n)||n<=0||n>35000))throw new VoiceFailure('VOICE_AUDIO_INVALID');
+  const frames=durationsMs.map((n,index)=>Math.ceil(n*30/1000)+(index<durationsMs.length-1?4:0));
+  const total=frames.reduce((a,b)=>a+b,0),target=durationSeconds*30;
+  if(total>target)throw new VoiceFailure('VOICE_DURATION_EXCEEDED');
+  frames[frames.length-1]+=target-total;
+  return frames;
+}

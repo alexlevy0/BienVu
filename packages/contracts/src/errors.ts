@@ -41,6 +41,7 @@ export const publicErrors = {
   GENERATION_BUSY: [409, 'Une vidéo est déjà en préparation. Retrouvez-la dans votre historique.'],
   GENERATION_BUDGET_LIMIT: [429, 'Le budget des générations de développement est atteint.'],
   GENERATION_FAILED: [422, 'La vidéo n’a pas pu être terminée. Votre crédit vidéo a été libéré.'],
+  SCRIPT_INVALID: [422, 'La rédaction de la narration a échoué. Votre crédit vidéo a été libéré. Vous pouvez réessayer depuis votre annonce.'],
   GENERATION_TIMEOUT: [422, 'La préparation a dépassé le délai autorisé. Votre crédit vidéo a été libéré.'],
   FEATURE_UNAVAILABLE: [503, 'Cette fonctionnalité est en cours de développement.'],
   INTERNAL_ERROR: [500, 'Une erreur est survenue. Réessayez plus tard.'],

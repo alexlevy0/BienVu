@@ -1,8 +1,8 @@
 import {AgencyBrand,VoiceConfig, NarrationAudio, NarrationFailure, PreparedNarration, VoiceFailure,GenerationRequest,customizedListing,customizedBrand, type ListingScript} from '@bienvu/contracts';
 import {assertNarrationLease, checkpointNarrationScript, claimNarrationCall, failNarrationCall, findNarration, finishNarration,
   finishNarrationCall, narrationJobInput, releaseNarration, startNarration, type Database, type NarrationLease} from '@bienvu/db';
-import {generateScript, hashJson, scriptContext,scriptPromptVersion,customScript, shortenScript, validateScript, type ScriptContext, type ScriptProvider, type ScriptReply} from '@bienvu/narration';
-import {googleTts,fishTts, measureVoiceWav, voiceCacheKey, voiceSceneTiming} from '@bienvu/voice';
+import {generateScript, hashJson, scriptContext,scriptPromptVersion,customScript, shortenScript, fitNarrationDuration,fitCachedNarration, validateScript, type ScriptContext, type ScriptProvider, type ScriptReply} from '@bienvu/narration';
+import {googleTts,fishTts, measureVoiceWav, voiceCacheKey, voiceSceneTiming,compactVoiceSceneTiming} from '@bienvu/voice';
 
 type VoiceReply = Awaited<ReturnType<ReturnType<typeof googleTts>['synthesize']>>|Awaited<ReturnType<ReturnType<typeof fishTts>['synthesize']>>;
 export type NarrationProviders = {mode: 'real' | 'mock'; script: ScriptProvider;
@@ -31,16 +31,18 @@ export async function prepareJobNarration(env: {DB: Database; MEDIA: NarrationBu
   // Les snapshots antérieurs au catalogue oral n'avaient pas de copyVersion.
   // Ils gardent leur texte et leurs clés de cache, y compris après un crash.
   const context = await scriptContext(snapshot?.listing ?? customizedListing(job.listing,customization), snapshot?.brand ?? customizedBrand(AgencyBrand.parse(options.brand??job.brand),customization), snapshot?.contact ?? options.contact,
-    snapshot ? snapshot.copyVersion ?? 'factual-copy/1' : durationSeconds!==undefined?'description-copy/1':undefined,snapshot?snapshot.customNarration:customization?.narration,durationSeconds);
+    snapshot ? snapshot.copyVersion ?? 'factual-copy/1' : durationSeconds!==undefined?'description-copy/2':undefined,snapshot?snapshot.customNarration:customization?.narration,durationSeconds);
   if (context.listing.agencyId !== agencyId || context.listing.id !== job.listing.id) throw new NarrationFailure('NARRATION_CONFLICT');
   if (existing && options.contact && options.contact !== context.contact) throw new NarrationFailure('NARRATION_CONFLICT');
   const config = VoiceConfig.parse(providers.voice.config);
   const configHash = await hashJson({voice: config, scriptModel: providers.script.model, promptVersion: scriptPromptVersion(context), mode: providers.mode,...(!voiceEnabled?{voiceEnabled:false}:{}),...(durationSeconds!==undefined?{durationSeconds}:{})});
   const {row, lease} = await startNarration(env.DB, {agencyId, jobId, inputHash: context.inputHash, configHash,
-    snapshot: JSON.stringify({listing: {...context.listing, description: context.copyVersion==='description-copy/1'?context.listing.description:null}, brand: context.brand, contact: context.contact, copyVersion: context.copyVersion,
+    snapshot: JSON.stringify({listing: {...context.listing, description: context.copyVersion.startsWith('description-copy/')?context.listing.description:null}, brand: context.brand, contact: context.contact, copyVersion: context.copyVersion,
       ...(context.customNarration?{customNarration:context.customNarration}:{})}),
     mode: providers.mode, attempt: job.attempt}, now());
   let failure: string | undefined;
+  const timingFor=(audio:PreparedNarration['audio'])=>context.copyVersion==='description-copy/2'
+    ?compactVoiceSceneTiming(audio.map(a=>a.durationMs),durationSeconds??20):voiceSceneTiming(audio.map(a=>a.durationMs),durationSeconds);
   try {
     if (row.state === 'prepared') {
       const result = PreparedNarration.parse(parseJson(row.result));
@@ -54,7 +56,7 @@ export async function prepareJobNarration(env: {DB: Database; MEDIA: NarrationBu
       await assertNarrationLease(env.DB, lease, now());
       // Le rythme peut évoluer sans changer le texte ni régénérer les pistes.
       // Recalcul uniquement après vérification des WAV sauvegardés.
-      const timing = voiceEnabled?voiceSceneTiming(result.audio.map(asset => asset.durationMs),durationSeconds):result.durationFrames;
+      const timing = voiceEnabled?timingFor(result.audio):result.durationFrames;
       if (timing.some((frames, index) => frames !== result.durationFrames[index])) {
         result.durationFrames = timing;
         await finishNarration(env.DB, lease, result, now());
@@ -87,9 +89,28 @@ export async function prepareJobNarration(env: {DB: Database; MEDIA: NarrationBu
     }
     await options.onVoicing?.();
     let audio: PreparedNarration['audio'], durationFrames: number[];
+    if(context.copyVersion==='description-copy/2'){
+      audio=await voiceScenes(env,lease,script,providers,now);
+      const measured=script.scenes.map((s,index)=>({text:s.narrationText,durationMs:audio[index].durationMs,asset:audio[index]}));
+      const fitted=fitNarrationDuration(context,script,audio.map(a=>a.durationMs));
+      if(fitted){
+        script=fitted;
+        // Persist the one measured adaptation before further TTS. Unchanged
+        // opening/contact tracks reuse their journal and private WAV cache.
+        await checkpointNarrationScript(env.DB,lease,script,now());
+        audio=await voiceScenes(env,lease,script,providers,now);
+      }
+      measured.push(...script.scenes.map((s,index)=>({text:s.narrationText,durationMs:audio[index].durationMs,asset:audio[index]})));
+      const cached=fitCachedNarration(context,script,measured);
+      if(cached){
+        script=cached;audio=script.scenes.map(s=>measured.find(t=>t.text===s.narrationText)!.asset);
+        await checkpointNarrationScript(env.DB,lease,script,now());
+      }
+      durationFrames=timingFor(audio);
+    }else{
     try {
       audio = await voiceScenes(env, lease, script, providers, now);
-      durationFrames = voiceSceneTiming(audio.map(asset => asset.durationMs),durationSeconds);
+      durationFrames = timingFor(audio);
     } catch (error) {
       if (!(error instanceof VoiceFailure) || error.code !== 'VOICE_DURATION_EXCEEDED' || script.version !== 1 || context.customNarration) throw error;
       script = shortenScript(context, script);
@@ -97,7 +118,8 @@ export async function prepareJobNarration(env: {DB: Database; MEDIA: NarrationBu
       // remet pas à zéro l'unique raccourcissement autorisé.
       await checkpointNarrationScript(env.DB, lease, script, now());
       audio = await voiceScenes(env, lease, script, providers, now);
-      durationFrames = voiceSceneTiming(audio.map(asset => asset.durationMs),durationSeconds);
+      durationFrames = timingFor(audio);
+    }
     }
     const result = PreparedNarration.parse({script, audio, durationFrames,...(durationSeconds!==undefined?{durationSeconds}:{})});
     await finishNarration(env.DB, lease, result, now());

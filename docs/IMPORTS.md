@@ -6,6 +6,8 @@ Le parcours local ou Cloudflare transforme un lien en annonce privée et galerie
 
 **Maintenance du 01/10 :** les informations déjà extraites sont conservées dans un brouillon même si les photos sont refusées ou trop lentes. Un adaptateur Figaro recoupe les titres, prix, description et JSON-LD liés à la fiche. Le formulaire connecté reçoit les champs récupérés et demande les photos manquantes. Les tests de ce préremplissage utilisent une fixture reconstruite ; **le lien Figaro fourni par Alex reste refusé par le portail depuis Cloudflare**, `SOURCE_BLOCKED/access_denied`, avant toute extraction. [Recette, publication et limites](preuves/maintenance/IMPORT-PARTIEL-FIGARO-01-10.md).
 
+**Maintenance du 02/10 — Orpi Sanary :** l’adaptateur `orpi-dom/4.2` accepte désormais un titre sans surface, en conservant celle-ci comme manquante. L’import réel Cloudflare du lien signalé récupère le prix, les 5 pièces, la description et 12 photos. Après un échec terminal, un nouvel essai explicite crée une nouvelle requête ; une réponse réseau incertaine conserve sa clé pour éviter un doublon. [Diagnostic et recette](preuves/maintenance/ORPI-SANARY-02-10.md).
+
 ## Lancer et utiliser
 
 La tranche locale du **sprint 04** ajoute le [registre et la couverture datée](preuves/sprint-04/RAPPORT.md), visibles sur `/sources` et sous le champ d’URL. Les trois agences ci-dessus disposent d’une preuve Cloudflare du sprint 03. Aucun des quatre portails n’a encore produit un import automatique complet validé ; la nouvelle tranche n’est pas encore déployée.
@@ -71,7 +73,7 @@ Les HTTP 401/403/429 produisent `SOURCE_BLOCKED` avec un motif privé `login_req
 | Image décodée | 16 millions de pixels maximum ; minimum 640×360 |
 | JPEG stocké | 2 048×2 048 maximum, ratio préservé |
 | Imports URL actifs / dossiers stockés par agence | 1 / 30, tous modes pour le stockage |
-| Tentatives d’import, toutes agences | 10 par jour UTC / 30 par mois UTC |
+| Tentatives d’import, toutes agences | 20 par jour UTC / 60 par mois UTC |
 | Récupérations simultanées du pont/conteneur | 2 |
 | Conservation / bail / délai avant purge | 30 jours / 90 s URL, 15 min saisie / bail + 5 min |
 

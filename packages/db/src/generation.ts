@@ -5,16 +5,17 @@ import {findImport} from './imports';
 
 export class GenerationFailure extends Error {constructor(public code:PublicErrorCode){super(code);}}
 export type GenerationRow={ownerAgencyId:string|null;anonymousSessionId:string|null;retention:'available'|'expiring'|'expired';creditStatus:'unfunded'|'reserved'|'consumed'|'released';previewKey:string|null;previewReport:string|null;jobId:string;agencyId:string;inputHash:string;input:string;brand:string;deadline:string;expiresAt:string;
-  status:GenerationView['status'];stage:GenerationView['stage'];progressPercent:number;attempt:number;errorCode:string|null;createdAt:string;updatedAt:string;sourceKind:'url'|'manual'|null;
+  status:GenerationView['status'];stage:GenerationView['stage'];progressPercent:number;attempt:number;errorCode:string|null;narrationErrorCode?:string|null;createdAt:string;updatedAt:string;sourceKind:'url'|'manual'|null;
   workflowId:string;listingId:string|null;objectKey:string|null;report:string|null;launchStatus:string;title:string;locality:string|null};
 const columns=`g.owner_agency_id AS ownerAgencyId,g.anonymous_session_id AS anonymousSessionId,g.retention,r.status AS creditStatus,p.object_key AS previewKey,p.report_json AS previewReport,g.job_id AS jobId,g.agency_id AS agencyId,g.input_hash AS inputHash,g.input_json AS input,g.brand_json AS brand,
-  g.deadline,g.expires_at AS expiresAt,j.status,j.stage,j.progress_percent AS progressPercent,j.attempt,j.error_code AS errorCode,j.created_at AS createdAt,j.updated_at AS updatedAt,
+  g.deadline,g.expires_at AS expiresAt,j.status,j.stage,j.progress_percent AS progressPercent,j.attempt,j.error_code AS errorCode,n.error_code AS narrationErrorCode,j.created_at AS createdAt,j.updated_at AS updatedAt,
   j.workflow_id AS workflowId,j.listing_id AS listingId,a.object_key AS objectKey,a.report_json AS report,l.status AS launchStatus,
   coalesce(json_extract(i.result_json,'$.facts.title.value'),'Votre annonce') AS title,
   json_extract(i.result_json,'$.facts.locality.value') AS locality,
   CASE WHEN json_type(g.input_json,'$.url') IS NOT NULL THEN 'url' ELSE i.source_kind END AS sourceKind`;
 const joins=`FROM generation_runs g JOIN jobs j ON j.id=g.job_id JOIN job_launch_intents l ON l.job_id=j.id
-  JOIN reservations r ON r.job_id=j.id LEFT JOIN generation_previews p ON p.job_id=j.id LEFT JOIN generation_artifacts a ON a.job_id=j.id LEFT JOIN listing_imports i ON i.id=j.listing_id AND i.agency_id=j.agency_id`;
+  JOIN reservations r ON r.job_id=j.id LEFT JOIN narration_runs n ON n.job_id=j.id AND n.agency_id=j.agency_id
+  LEFT JOIN generation_previews p ON p.job_id=j.id LEFT JOIN generation_artifacts a ON a.job_id=j.id LEFT JOIN listing_imports i ON i.id=j.listing_id AND i.agency_id=j.agency_id`;
 export async function findGeneration(db:Database,agencyId:string,jobId:string){
   EntityId.parse(agencyId);EntityId.parse(jobId);
   return db.prepare(`SELECT ${columns} ${joins} WHERE g.agency_id=? AND g.job_id=?`).bind(agencyId,jobId).first<GenerationRow>();
@@ -27,8 +28,10 @@ export function generationView(row:GenerationRow,now=Date.now(),audience:'owner'
   const available=row.retention==='available'&&row.status==='ready'&&Boolean(row.objectKey)&&row.expiresAt>new Date(now).toISOString();
   const unlocked=audience==='owner'&&!!row.ownerAgencyId&&row.creditStatus==='consumed';
   const preview=available&&Boolean(row.previewKey);
+  const errorCode=row.status==='failed'&&row.errorCode==='GENERATION_FAILED'&&row.narrationErrorCode==='SCRIPT_INVALID'
+    ?row.narrationErrorCode:row.errorCode;
   return GenerationView.parse({ownership:row.ownerAgencyId?'owned':'anonymous',masterAccess:unlocked?'unlocked':row.creditStatus==='reserved'?'reserved':'locked',retention:row.retention,id:row.jobId,status:row.status,stage:row.stage,progressPercent:row.progressPercent,attempt:row.attempt,sourceKind:row.sourceKind,
-    errorCode:row.errorCode&&row.errorCode in publicErrors?row.errorCode:row.errorCode?'GENERATION_FAILED':null,
+    errorCode:errorCode&&errorCode in publicErrors?errorCode:errorCode?'GENERATION_FAILED':null,
     createdAt:row.createdAt,updatedAt:row.updatedAt,expiresAt:row.expiresAt,title:row.title,locality:row.locality,
     videoUrl:available&&unlocked?`/api/generations/${row.jobId}/video`:preview?audience==='anonymous'?`/api/trial/${row.jobId}/preview`:`/api/generations/${row.jobId}/preview`:null,downloadUrl:available&&unlocked?`/api/generations/${row.jobId}/video?download=1`:null,
     durationSeconds:row.report?VideoReport.parse(JSON.parse(row.report)).durationSeconds:null,

@@ -16,6 +16,15 @@ export class FixtureGenerationWorkflow extends GenerationWorkflow {
     return {mode:'mock' as const,script:{model:DEFAULT_SCRIPT_MODEL,plan:async(context:Parameters<typeof fixturePlan>[0])=>({plan:fixturePlan(context),metrics:fixtureScriptMetrics()})},voice:{config,synthesize:voiceEnabled?voice.synthesize:async():Promise<never>=>{throw Error('TTS_MUST_NOT_RUN');}}};
   }
 }
+export class FixtureInvalidScriptWorkflow extends FixtureGenerationWorkflow {
+  protected override async providers(voiceName?:string,voiceEnabled=true){
+    const providers=await super.providers(voiceName,voiceEnabled);
+    return {...providers,script:{...providers.script,plan:async(context:Parameters<typeof fixturePlan>[0])=>{
+      const plan=fixturePlan(context);plan.scenes[1].copyId='gallery/foreign';
+      return {plan,metrics:fixtureScriptMetrics()};
+    }}};
+  }
+}
 export class FixtureGenerationRenderer extends DurableObject<GenerationEnv>{
   override async fetch(request:Request){
     const path=new URL(request.url).pathname;

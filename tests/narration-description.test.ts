@@ -79,6 +79,29 @@ test('sélection : limites de longueur, extrait requis, caveat conservé, pas de
   assert.equal(fitted.scenes.length,4);assert.ok(wordCount(fitted.scenes.map(s=>s.narrationText).join(' '))<=40);
 });
 
+test('plusieurs extraits du même type restent une narration valide à 20, 30 et 40 secondes',async()=>{
+  const listing=describedListing();
+  listing.description!.text='Un séjour ouvert sur la cuisine. Une terrasse exposée sud. Deux chambres donnent sur le jardin.';
+  for(const duration of [20,30,40] as const){
+    const context=await scriptContext(listing,narrationBrand,undefined,'description-copy/1',undefined,duration);
+    for(const kind of ['gallery','location']){
+      const selected=[context.copies.find(c=>c.id==='intro/short')!,
+        ...context.copies.filter(c=>c.kind===kind&&c.factRefs.includes('description')).slice(0,3),
+        context.copies.find(c=>c.id==='contact/short')!];
+      assert.equal(selected.length,5);
+      const plan={scenes:selected.map((c,i)=>({copyId:c.id,photoAssetId:listing.photos[i%3].id}))};
+      const script=compileScript(context,plan,DEFAULT_SCRIPT_MODEL);
+      assert.equal(script.scenes.length,4);
+      assert.equal(new Set(script.scenes.map(s=>s.kind)).size,4);
+      assert.equal(script.scenes.filter(s=>s.factRefs.includes('description')).length,2);
+      assert.ok(wordCount(script.scenes.map(s=>s.narrationText).join(' '))<=narrationWordLimit(duration));
+      assert.deepEqual(validateScript(context,script),script);
+      assert.throws(()=>compileScript(context,{scenes:plan.scenes.map((s,i)=>i===1?{...s,copyId:'gallery/foreign'}:s)},DEFAULT_SCRIPT_MODEL),/SCRIPT_INVALID/);
+      assert.throws(()=>compileScript(context,{scenes:plan.scenes.map((s,i)=>i===1?{...s,photoAssetId:'photo-foreign'}:s)},DEFAULT_SCRIPT_MODEL),/SCRIPT_INVALID/);
+    }
+  }
+});
+
 test('pipeline : snapshot descriptif privé, WAV simulés, durée exacte, reprise sans nouvel appel',async t=>{
   const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:'export default {fetch(){return new Response("fixture")}}',compatibilityDate:'2026-09-27',d1Databases:['DB'],r2Buckets:['MEDIA']}));
   t.after(()=>mf.dispose());const env=await mf.getBindings<{DB:D1Database;MEDIA:R2Bucket}>();await migrateNarrationProbe(env.DB);
@@ -97,7 +120,7 @@ test('pipeline : snapshot descriptif privé, WAV simulés, durée exacte, repris
   const prepared=await prepareJobNarration(env,scope.agencyId,job.jobId,providers);
   assert.equal(prepared.durationFrames.reduce((n,f)=>n+f,0),600);
   const row=(await findNarration(env.DB,scope.agencyId,job.jobId))!,snapshot=JSON.parse(row.snapshot);
-  assert.equal(snapshot.listing.description.text,propertyDescription);assert.equal(snapshot.copyVersion,'description-copy/1');
+  assert.equal(snapshot.listing.description.text,propertyDescription);assert.equal(snapshot.copyVersion,'description-copy/2');
   const before=calls;assert.deepEqual(await prepareJobNarration(env,scope.agencyId,job.jobId,providers),prepared);assert.equal(calls,before);
   assert.equal((await env.DB.prepare('SELECT sum(reservation_cents) n FROM narration_calls').first<{n:number}>())?.n,0);
 });

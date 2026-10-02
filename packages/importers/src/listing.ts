@@ -158,9 +158,13 @@ function domAgency(nodes: HtmlNode[], url: string, canonicalUrl: string, allowPa
   const title = text(heads[0]);
   const transaction = orpi && new URL(url).pathname.startsWith('/annonce-location-') ? 'rent' : 'sale';
   const match = century ? title.match(/^(Appartement|Maison)(?:\s+\S+)? à vendre\s+(\d+) pièces?\s*-\s*([\d.,]+) m[²2]\s+(.+?)\s*-\s*\d{5}$/i)
-    : title.match(new RegExp(`^(Appartement|Maison) à ${transaction === 'rent' ? 'louer' : 'vendre'}\\s+(\\d+) pièces?\\s*•\\s*([\\d.,]+) m[²2]\\s+(.+)$`, 'i'));
+    : title.match(new RegExp(`^(Appartement|Maison) à ${transaction === 'rent' ? 'louer' : 'vendre'}\\s+(\\d+) pièces?\\s*•\\s*(?:([\\d.,]+) m[²2]\\s+)?(.+)$`, 'i'));
   if (!match) throw new ImportFailure('INCOMPLETE_LISTING', 'Type, surface ou localisation non établis.');
   const [, kind, roomsText, areaText, locality] = match;
+  // Some Orpi listings omit the area entirely. Never reinterpret an invalid
+  // or incomplete area as a locality, or invent it from the URL/description.
+  if (!areaText && /\bm[²2](?:\s|$)/i.test(locality))
+    throw new ImportFailure('INCOMPLETE_LISTING', 'Surface ou localisation ambiguë.');
   const parent = 'parentNode' in heads[0] ? heads[0].parentNode : null;
   const header = parent && 'parentNode' in parent ? parent.parentNode : null;
   if (!header) throw new ImportFailure('INCOMPLETE_LISTING', 'En-tête de bien absent.');
@@ -202,13 +206,14 @@ function domAgency(nodes: HtmlNode[], url: string, canonicalUrl: string, allowPa
         "h2[L'avis de l'agent] + div .s-cms");
     }
   }
-  return {canonicalUrl, sourceListingId: id, adapterVersion: century ? 'century21-dom/3.2' : 'orpi-dom/4.1', transaction, description,
+  return {canonicalUrl, sourceListingId: id, adapterVersion: century ? 'century21-dom/3.2' : 'orpi-dom/4.2', transaction, description,
     facts: {title: verified(title, 'text', 'h1'), propertyType: verified(kind.toLowerCase() === 'maison' ? 'house' : 'apartment', 'category', 'h1', kind),
-      locality: verified(locality, 'text', 'h1.locality'), area: verified(numeric(areaText)!, 'm2', 'h1.area', areaText),
+      locality: verified(locality, 'text', 'h1.locality'), area: areaText ? verified(numeric(areaText)!, 'm2', 'h1.area', areaText) : missing('m2'),
       rooms: verified(Number(roomsText), 'rooms', 'h1.rooms', roomsText),
       price},
-    photoUrls: [...new Set(photoUrls)].slice(0, IMPORT_LIMITS.candidates), warnings: price.status === 'missing'
-      ? ['Prix omis : montant, période ou charges non vérifiables.'] : []};
+    photoUrls: [...new Set(photoUrls)].slice(0, IMPORT_LIMITS.candidates), warnings: [
+      ...(price.status === 'missing' ? ['Prix omis : montant, période ou charges non vérifiables.'] : []),
+      ...(!areaText ? ['Surface non indiquée dans l’annonce ; vous pouvez la compléter manuellement.'] : [])]};
 }
 
 export function extractListingHtml(html: string, url: string, options: {allowPartial?: boolean} = {}): ExtractedListing {
