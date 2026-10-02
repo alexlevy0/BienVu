@@ -7,7 +7,7 @@ import {promisify} from 'node:util';
 import path from 'node:path';
 import sharp from 'sharp';
 import {renderMedia, renderStill, selectComposition} from '@remotion/renderer';
-import {VideoManifest, VideoReport, videoAssets, videoAssetFile, videoManifestHash} from '@bienvu/contracts';
+import {VideoManifest, VideoReport, videoAssets, videoAssetFile, videoManifestHash,editorHasAudio} from '@bienvu/contracts';
 import {measureVoiceWav} from '@bienvu/voice';
 import {bundleDir} from './paths';
 import type {ListingVideoProps} from '../../../packages/video/src/listing';
@@ -50,7 +50,7 @@ export async function withVideoAssets<T>(input: unknown, directory: string, use:
     const bytes = await readFile(file);
     if (sha(bytes) !== asset.sha256) throw new Error('VIDEO_ASSET_HASH_MISMATCH');
     if (asset.mime === 'audio/wav') {
-      if (measureVoiceWav(bytes).durationMs !== asset.durationMs) throw new Error('VIDEO_AUDIO_DURATION_MISMATCH');
+      if (measureVoiceWav(bytes,asset.id===manifest.music?.asset.id?40000:35000).durationMs !== asset.durationMs) throw new Error('VIDEO_AUDIO_DURATION_MISMATCH');
     } else if(asset.mime==='video/mp4'){
       const {stdout}=await exec(binary('ffprobe'),['-v','error','-show_format','-show_streams','-of','json',file],{cwd:cwd(binary('ffprobe')),timeout:20_000,maxBuffer:128_000});
       const metadata=JSON.parse(stdout) as {format:{duration:string};streams:{codec_type:string;codec_name:string;width:number;height:number}[]};
@@ -75,6 +75,8 @@ export async function withVideoAssets<T>(input: unknown, directory: string, use:
   files.set('font.woff2',{file:font,mime:'font/woff2',size:(await stat(font)).size});
   const displayFont = path.join(bundleDir,'public/video-display.ttf');
   files.set('display.ttf',{file:displayFont,mime:'font/ttf',size:(await stat(displayFont)).size});
+  const serifFont=path.join(bundleDir,'public/video-serif.woff2');
+  files.set('serif.woff2',{file:serifFont,mime:'font/woff2',size:(await stat(serifFont)).size});
   const server = createServer((req,res) => {
     const prefix=`/${token}/`, key=req.url?.startsWith(prefix) ? req.url.slice(prefix.length) : '';
     const asset=files.get(key);
@@ -91,10 +93,10 @@ export async function withVideoAssets<T>(input: unknown, directory: string, use:
     const address=server.address();if(!address || typeof address==='string')throw new Error('VIDEO_ASSET_SERVER_FAILED');
     const base=`http://127.0.0.1:${address.port}/${token}/`;
     for(const asset of videoAssets(manifest))media[asset.id]=base+videoAssetFile(asset);
-    return await use({manifest,media,logoBackground,fontUrl:base+'font.woff2',displayFontUrl:base+'display.ttf'});
+    return await use({manifest,media,logoBackground,fontUrl:base+'font.woff2',displayFontUrl:base+'display.ttf',serifFontUrl:base+'serif.woff2'});
   }finally{server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));}
 }
-export async function verifyVideoArtifact(file:string,id:string,frames:number,watermarked:boolean,startedAt:string,start:number,voiceEnabled=true,dimensions:Pick<VideoManifest,'width'|'height'>={width:1080,height:1920}) {
+export async function verifyVideoArtifact(file:string,id:string,frames:number,watermarked:boolean,startedAt:string,start:number,voiceEnabled=true,dimensions:Pick<VideoManifest,'width'|'height'>={width:1080,height:1920},minimumVolumeDb=-50) {
     const {stdout}=await exec(binary('ffprobe'),['-v','error','-show_format','-show_streams','-of','json',file],{cwd:cwd(binary('ffprobe')),timeout:20_000,maxBuffer:128_000});
     const metadata=JSON.parse(stdout) as {format:{duration:string};streams:{codec_type:string;codec_name:string;width?:number;height?:number;avg_frame_rate?:string;nb_frames?:string}[]};
     const video=metadata.streams.find(s=>s.codec_type==='video'), audio=metadata.streams.find(s=>s.codec_type==='audio');
@@ -116,7 +118,7 @@ export async function verifyVideoArtifact(file:string,id:string,frames:number,wa
     if(!pcm?.length||pcm.length%2)throw new Error('VIDEO_AUDIO_INVALID');
     let sum=0;for(let i=0;i+2<=pcm.length;i+=2)sum+=(pcm.readInt16LE(i)/32768)**2;
     meanVolumeDb=10*Math.log10(sum/(pcm.length/2));
-    if(!Number.isFinite(meanVolumeDb)||meanVolumeDb < -50)throw new Error('VIDEO_AUDIO_SILENT');
+    if(!Number.isFinite(meanVolumeDb)||meanVolumeDb < minimumVolumeDb)throw new Error('VIDEO_AUDIO_SILENT');
     }
     const bytes=await readFile(file);
     if(!isFastStart(bytes))throw new Error('VIDEO_NOT_STREAMABLE');
@@ -165,7 +167,7 @@ export async function renderListingVideo(input: unknown, directory: string): Pro
     progress(0);
     await withVideoAssets(manifest,directory,async props=>{
       const composition=await selectComposition({serveUrl:bundleDir,id:'BienVuListing',inputProps:props,...browser()});
-      await renderMedia({serveUrl:bundleDir,composition,inputProps:props,...browser(),codec:'h264',audioCodec:'aac',muted:manifest.voiceEnabled===false,
+      await renderMedia({serveUrl:bundleDir,composition,inputProps:props,...browser(),codec:'h264',audioCodec:'aac',muted:!editorHasAudio(manifest),
         pixelFormat:'yuv420p',outputLocation:raw,concurrency:1,timeoutInMilliseconds:120_000,
         audioBitrate:'192k',crf:21,logLevel:'error',onProgress:state=>progress(state.progress*85)});
     });
@@ -174,10 +176,12 @@ export async function renderListingVideo(input: unknown, directory: string): Pro
     if(isFastStart(await readFile(raw)))await rename(raw,partial);
     else await exec(binary('ffmpeg'),['-v','error','-i',raw,'-map','0','-c','copy','-movflags','+faststart','-y',partial],{cwd:cwd(binary('ffmpeg')),timeout:60_000});
     const dimensions={width:manifest.width,height:manifest.height};
-    const report=await verifyVideoArtifact(partial,id,frames,manifest.rights.watermarked,startedAt,start,manifest.voiceEnabled!==false,dimensions);
+    // Sources are measured before rendering. An editor can intentionally keep a
+    // short, quiet music passage or reduce voice gain; retain the silence guard.
+    const report=await verifyVideoArtifact(partial,id,frames,manifest.rights.watermarked,startedAt,start,editorHasAudio(manifest),dimensions,manifest.editor?-90:-50);
     await rename(partial,output);await chmod(output,0o600);
     progress(90);
-    if(manifest.rights.kind==='anonymous')report.preview=await createWatermarkedPreview(output,directory,id,frames,manifest.voiceEnabled!==false,dimensions);
+    if(manifest.rights.kind==='anonymous')report.preview=await createWatermarkedPreview(output,directory,id,frames,editorHasAudio(manifest),dimensions);
     progress(94);
     await writeFile(path.join(directory,'report.json'),JSON.stringify(report,null,2)+'\n',{mode:0o600});
     progress(95);

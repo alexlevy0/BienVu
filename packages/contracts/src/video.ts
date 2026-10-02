@@ -3,12 +3,13 @@ import {AgencyBrand, EntityId, ObjectKey, Sha256, VideoDuration, type Normalized
 import {ScriptScene} from './narration';
 import {SYNTHETIC_VOICE_DISCLOSURE} from './voice';
 import {VideoStyle} from './customization';
+import {EditorDocument} from './editor';
 
 export const VideoAsset = z.object({id: EntityId, objectKey: ObjectKey, sha256: Sha256,
   sizeBytes: z.number().int().positive().max(10 * 1024 * 1024),
   mime: z.enum(['image/jpeg', 'image/png', 'image/webp', 'audio/wav', 'video/mp4']),
   width: z.number().int().positive().max(12000).optional(), height: z.number().int().positive().max(12000).optional(),
-  durationMs: z.number().int().positive().max(35000).optional(),
+  durationMs: z.number().int().positive().max(40000).optional(),
 }).strict();
 export type VideoAsset = z.infer<typeof VideoAsset>;
 export const PhotoAnimation=z.object({photoAssetId:EntityId,sourceSha256:Sha256,
@@ -53,6 +54,8 @@ export const VideoManifest = z.object({schemaVersion: z.literal(2), templateVers
   durationSeconds:VideoDuration.optional(),
   visualStyle:VideoStyle.optional(),photoMotion:z.boolean().optional(),photoTransition:z.enum(['fade','cut']).optional(),
   photoAnimations:z.array(PhotoAnimation).max(12).optional(),
+  editor:EditorDocument.optional(),
+  music:z.object({asset:VideoAsset}).strict().optional(),
 }).strict().superRefine((m, ctx) => {
   const fail = (message: string) => ctx.addIssue({code: 'custom', message});
   if(m.voiceEnabled===false?m.audio.length!==0:m.audio.length<4)fail('Médias audio incompatibles avec le choix de voix.');
@@ -71,7 +74,9 @@ export const VideoManifest = z.object({schemaVersion: z.literal(2), templateVers
     ||m.photoAnimations.some(c=>!m.photos.some(p=>p.id===c.photoAssetId&&p.sha256===c.sourceSha256)
       ||c.asset.mime!=='video/mp4'||!((c.asset.width===720&&c.asset.height===1280)||(m.width===1920&&c.asset.width===1280&&c.asset.height===720))||c.asset.durationMs!==5000)))fail('Animation hors périmètre ou invalide.');
   if ([...m.photos, ...(m.logo ? [m.logo] : [])].some(a => !a.mime.startsWith('image/') || !a.width || !a.height || a.durationMs)
-    || m.audio.some(a => a.mime !== 'audio/wav' || !a.durationMs || a.width || a.height)) fail('Type de média invalide.');
+    || m.audio.some(a => a.mime !== 'audio/wav' || !a.durationMs || a.durationMs>35000 || a.width || a.height)) fail('Type de média invalide.');
+  if(Boolean(m.music)!==Boolean(m.editor?.music)||m.music&&(!m.editor||m.music.asset.mime!=='audio/wav'||
+    m.music.asset.id!==m.editor.music?.assetId||m.music.asset.durationMs!==m.editor.music.durationMs||m.music.asset.width||m.music.asset.height))fail('Musique hors périmètre ou invalide.');
   if (new Set(m.photos.map(a => a.sha256)).size !== m.photos.length
     || new Set(m.scenes.map(s => s.id)).size !== m.scenes.length
     || new Set(m.scenes.map(s => s.kind)).size !== m.scenes.length
@@ -87,6 +92,9 @@ export const VideoManifest = z.object({schemaVersion: z.literal(2), templateVers
   const frames = m.scenes.reduce((n, s) => n + s.durationFrames, 0);
   if (frames < 600 || frames > 1200) fail('Durée hors de la plage de 20 à 40 secondes.');
   if(m.durationSeconds!==undefined&&frames!==m.durationSeconds*m.fps)fail('La durée ne correspond pas au choix demandé.');
+  if(m.editor&&(m.editor.durationSeconds*30!==frames||m.editor.aspectRatio!==(m.width===1920?'16:9':'9:16')||
+    m.editor.voiceEnabled!==(m.voiceEnabled!==false)||m.editor.subtitlesEnabled!==(m.subtitlesEnabled!==false)||
+    m.editor.clips.some(c=>c.photoSlot>=m.photos.length)||new Set(m.editor.clips.map(c=>c.photoSlot)).size!==m.photos.length))fail('Timeline incompatible avec la vidéo.');
   if (m.photoTimeline && (m.templateVersion === 'bienvu-vertical/1'
     || m.photoTimeline.length !== m.photos.length
     || m.photoTimeline.some((s, i) => s.photoAssetId !== m.photos[i].id)
@@ -111,8 +119,8 @@ export function videoPhotoTimeline(photos: Pick<VideoAsset, 'id'>[], frames: num
   return photos.map((photo, i) => ({photoAssetId: photo.id,
     durationFrames: Math.floor((i + 1) * frames / photos.length) - Math.floor(i * frames / photos.length)}));
 }
-export function videoAssets(m: {photos: VideoAsset[]; audio: VideoAsset[]; logo: VideoAsset | null;photoAnimations?:PhotoAnimation[]}): VideoAsset[] {
-  return [...m.photos, ...m.audio, ...(m.logo ? [m.logo] : []),...(m.photoAnimations??[]).map(c=>c.asset)];
+export function videoAssets(m: {photos: VideoAsset[]; audio: VideoAsset[]; logo: VideoAsset | null;photoAnimations?:PhotoAnimation[];music?:{asset:VideoAsset}}): VideoAsset[] {
+  return [...m.photos, ...m.audio, ...(m.logo ? [m.logo] : []),...(m.photoAnimations??[]).map(c=>c.asset),...(m.music?[m.music.asset]:[])];
 }
 export function videoAssetFile(asset: VideoAsset) {
   return `${asset.sha256}.${({'image/jpeg':'jpg','image/png':'png','image/webp':'webp','audio/wav':'wav','video/mp4':'mp4'} as const)[asset.mime]}`;

@@ -81,6 +81,7 @@ export const PhotoAsset = z.object({
   sizeBytes: z.number().int().positive().max(10 * 1024 * 1024), sourceOrder: z.number().int().min(0).max(11),
 }).strict().refine(asset => asset.objectKey.startsWith(`agencies/${asset.agencyId}/jobs/`)
   || asset.objectKey.startsWith(`agencies/${asset.agencyId}/imports/${asset.listingId}/`), 'Le fichier doit appartenir à cette agence et à cet import.');
+export type PhotoAsset=z.infer<typeof PhotoAsset>;
 
 export const NormalizedListing = z.object({
   id: EntityId, agencyId: EntityId, sourceKind: z.enum(['url', 'manual']).default('url'),
@@ -201,6 +202,10 @@ export const videoDimensions = (ratio:VideoAspectRatio='9:16') => ratio==='16:9'
 // Optional fields preserve existing admission hashes and historical timing.
 export const GenerationInput = z.union([
   z.object({url:ImportUrl,subtitlesEnabled:z.boolean().optional(),voiceEnabled:z.boolean().optional(),durationSeconds:VideoDuration.optional(),aspectRatio:VideoAspectRatio.optional(),customization:GenerationCustomization.optional()}).strict()
-    .refine(value=>value.customization?.photoOrder===undefined&&value.customization?.runwayPhotos===undefined,'Importez les photos avant de choisir leur ordre ou leurs animations.'),
+    .refine(value=>value.customization?.photoOrder===undefined&&value.customization?.runwayPhotos===undefined&&value.customization?.editor===undefined,'Importez les photos avant de choisir leur ordre ou leurs animations.'),
   z.object({listingId:EntityId,subtitlesEnabled:z.boolean().optional(),voiceEnabled:z.boolean().optional(),durationSeconds:VideoDuration.optional(),aspectRatio:VideoAspectRatio.optional(),customization:GenerationCustomization.optional()}).strict(),
-]);
+]).refine(value=>!value.customization?.editor||(
+  value.durationSeconds===value.customization.editor.durationSeconds&&value.aspectRatio===value.customization.editor.aspectRatio&&
+  (value.voiceEnabled!==false)===value.customization.editor.voiceEnabled&&
+  (value.voiceEnabled!==false&&value.subtitlesEnabled!==false)===value.customization.editor.subtitlesEnabled
+),'Les paramètres de génération doivent correspondre à ceux de l’éditeur.');

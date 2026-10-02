@@ -4,10 +4,11 @@ import {VideoManifest, type VideoPresentation} from '@bienvu/contracts';
 import {contrastInk, displayArea, displayLocation, displayPrice, displayRooms, fitDisplayFont, fitFont, subtitleGroups, VIDEO_SAFE as safe} from './layout';
 import {cameraMotion} from './camera-motion';
 import {HorizontalPhotoScene} from './horizontal';
+import {EditorFilm} from './editor';
 
 // Ces URL sont résolues uniquement par le renderer Node vers son serveur
 // loopback privé. Le manifeste serveur n'accepte jamais d'URL d'asset cliente.
-export type ListingVideoProps = {manifest: VideoManifest | null; media: Record<string, string>; logoBackground: string; fontUrl: string; displayFontUrl: string};
+export type ListingVideoProps = {manifest: VideoManifest | null; media: Record<string, string>; logoBackground: string; fontUrl: string; displayFontUrl: string;serifFontUrl?:string};
 const dark = '#132a23', paper = '#f5f7f0';
 function PhotoScene({manifest: m, media, index}: {manifest: VideoManifest; media: Record<string,string>; index: number}) {
   const f = useCurrentFrame(), scene = m.scenes[index], photo = m.photos.find(a => a.id === scene.photoAssetId)!;
@@ -195,9 +196,11 @@ export function ListingFilm(props: ListingVideoProps) {
   useEffect(() => {
     const faces=[new FontFace('BienVu Video', `url('${props.fontUrl}')`, {weight:'100 900'})];
     if(m.templateVersion!=='bienvu-vertical/1')faces.push(new FontFace('BienVu Display',`url('${props.displayFontUrl}')`,{weight:'400'}));
+    if(m.editor&&props.serifFontUrl)faces.push(new FontFace('BienVu Serif',`url('${props.serifFontUrl}')`,{weight:'400'}));
     Promise.all(faces.map(face=>face.load())).then(loaded=>{for(const face of loaded)document.fonts.add(face);
       setFontLoaded(true);requestAnimationFrame(()=>continueRender(fontWait));}).catch(cancelRender);
-  }, [fontWait, props.fontUrl, props.displayFontUrl, m.templateVersion]);
+  }, [fontWait, props.fontUrl, props.displayFontUrl,props.serifFontUrl, m.templateVersion,Boolean(m.editor)]);
+  if(m.editor)return <EditorFilm manifest={m} media={props.media}/>;
   let at = 0;
   const scenes = m.scenes.map((s, index) => {const from = at; at += s.durationFrames; return {s,index,from};});
   const horizontal=m.templateVersion==='bienvu-horizontal/1';

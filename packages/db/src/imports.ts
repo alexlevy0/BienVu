@@ -96,7 +96,11 @@ export async function markImportDeleting(db: Database, agencyId: string, id: str
   return Boolean(row);
 }
 export async function importObjectKeys(db: Database, agencyId: string, id: string) {
-  const row = await db.prepare(`SELECT json_group_array(object_key) AS keys FROM import_objects WHERE agency_id=? AND import_id=?`).bind(agencyId, id).first<{keys: string}>();
+  const row = await db.prepare(`SELECT json_group_array(object_key) AS keys FROM (
+    SELECT object_key FROM import_objects WHERE agency_id=? AND import_id=?
+    UNION ALL SELECT object_key FROM editor_music_assets WHERE agency_id=? AND import_id=?
+    UNION ALL SELECT json_extract(a.value,'$.objectKey') FROM editor_voice_sources v,json_each(v.source_json,'$.audio') a
+      WHERE v.agency_id=? AND v.import_id=?)`).bind(agencyId,id,agencyId,id,agencyId,id).first<{keys: string}>();
   return JSON.parse(row?.keys ?? '[]') as string[];
 }
 export async function removeImport(db: Database, agencyId: string, id: string) {

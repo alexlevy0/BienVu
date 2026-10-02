@@ -40,7 +40,8 @@ export async function patchCreationDraft(db:Database,agencyId:string,id:string,b
     provenance[key]={...provenance[key],confirm:false};
   if('transaction' in changes&&before.data.fields.transaction!==fields.data.transaction){
     // A sale price is never silently turned into monthly rent or vice versa.
-    fields.data.priceCents=null;fields.data.charges=null;delete provenance.priceCents;delete provenance.charges;
+    if(!('priceCents' in changes)){fields.data.priceCents=null;delete provenance.priceCents;}
+    if(!('charges' in changes)){fields.data.charges=null;delete provenance.charges;}
   }
   const settings=input.videoCustomization===undefined?undefined:VideoCustomization.safeParse(input.videoCustomization);
   if(settings&&!settings.success)throw new RequestFailure('VALIDATION_ERROR');

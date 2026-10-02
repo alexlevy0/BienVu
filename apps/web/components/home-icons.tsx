@@ -1,6 +1,21 @@
 import type {ReactNode} from 'react';
 
 const shapes = {
+  clapper: <><path d="M3 8h18v13H3V8Zm0-5 17-2 1 5-18 2-1-5Zm4-1 3 5m3-6 3 5"/></>,
+  pause: <><path d="M8 5v14M16 5v14" strokeWidth="4"/></>,
+  previous: <><path d="M5 5v14m14-14L8 12l11 7V5Z"/></>,
+  next: <><path d="M19 5v14M5 5l11 7-11 7V5Z"/></>,
+  fullscreen: <path d="M3 9V3h6m6 0h6v6m0 6v6h-6m-6 0H3v-6"/>,
+  undo: <><path d="M3 8h10a7 7 0 0 1 0 14h-2M8 3 3 8l5 5"/></>,
+  redo: <><path d="M21 8H11a7 7 0 0 0 0 14h2m3-19 5 5-5 5"/></>,
+  copy: <><rect x="8" y="7" width="13" height="15" rx="2"/><path d="M15 7V2H3v15h5"/></>,
+  alignLeft: <path d="M4 5h16M4 10h11M4 15h16M4 20h11"/>,
+  alignCenter: <path d="M4 5h16M7 10h10M4 15h16M7 20h10"/>,
+  alignRight: <path d="M4 5h16M9 10h11M4 15h16M9 20h11"/>,
+  music: <><path d="M9 19V4l12-2v15M9 7l12-2"/><ellipse cx="6" cy="19" rx="3" ry="2"/><ellipse cx="18" cy="17" rx="3" ry="2"/></>,
+  scissors: <><circle cx="5" cy="6" r="3"/><circle cx="5" cy="18" r="3"/><path d="m8 8 13 13M8 16 21 3"/></>,
+  magnet: <path d="M5 3v10a7 7 0 0 0 14 0V3h-4v10a3 3 0 0 1-6 0V3H5Zm0 5h4m6 0h4"/>,
+  check: <path d="m5 12 4 4L20 5"/>,
   play: <path d="m8 5 11 7-11 7V5Z"/>,
   stop: <rect x="6" y="6" width="12" height="12" rx="1"/>,
   settings: <><path d="M3 6h5m4 0h9M3 12h10m4 0h4M3 18h3m4 0h11"/><circle cx="10" cy="6" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="8" cy="18" r="2"/></>,

@@ -1,6 +1,7 @@
 import {z} from 'zod';
 import type {AgencyBrand, NormalizedListing} from './product';
 import {fishFrenchVoices} from './voice';
+import {EditorDocument} from './editor';
 
 export const DEFAULT_VIDEO_VOICE='fish-manon' as const;
 
@@ -27,14 +28,20 @@ export const VideoCustomization=z.object({style:VideoStyle,
   runwayClips:z.number().int().min(0).max(2).optional(),
   runwayPhotos:photoOrder.optional(),
   // Draft text may be incomplete while editing; generation validates it below.
-  narration:z.array(z.string().max(500)).min(4).max(6).optional()}).strict();
+  narration:z.array(z.string().max(500)).min(4).max(6).optional(),editor:EditorDocument.optional(),
+  voiceSourceId:z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/).optional()}).strict();
 export type VideoCustomization=z.infer<typeof VideoCustomization>;
 export const GenerationCustomization=VideoCustomization.superRefine((value,context)=>{
+  if(value.voiceSourceId&&!value.editor)context.addIssue({code:'custom',path:['voiceSourceId'],message:'La voix conservée nécessite un projet d’éditeur.'});
   if(value.runwayPhotos&&value.runwayClips!==undefined&&value.runwayClips!==value.runwayPhotos.length)
     context.addIssue({code:'custom',path:['runwayPhotos'],message:'Choisissez une seule liste de photos à animer.'});
   if(value.runwayPhotos?.some(slot=>value.photoOrder&&!value.photoOrder.includes(slot)))
     context.addIssue({code:'custom',path:['runwayPhotos'],message:'Une photo animée doit être sélectionnée dans la vidéo.'});
   if(value.photoOrder&&value.photoOrder.length<3)context.addIssue({code:'custom',path:['photoOrder'],message:'Sélectionnez au moins trois photos.'});
+  if(value.editor){const slots=[...new Set(value.editor.clips.map(c=>c.photoSlot))];
+    if(slots.length<3||!value.photoOrder||slots.length!==value.photoOrder.length||slots.some(slot=>!value.photoOrder!.includes(slot)))
+      context.addIssue({code:'custom',path:['editor','clips'],message:'La timeline doit contenir au moins trois photos sélectionnées.'});
+  }
   if(value.narration){const parsed=CustomNarration.safeParse(value.narration);if(!parsed.success)
     for(const issue of parsed.error.issues)context.addIssue({code:'custom',path:['narration',...issue.path],message:issue.message});}
 });

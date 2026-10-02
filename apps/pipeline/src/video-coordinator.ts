@@ -1,4 +1,4 @@
-import {VideoManifest, VideoReport, videoAssets, videoManifestHash, videoObjectKey,videoPreviewKey} from '@bienvu/contracts';
+import {VideoManifest, VideoReport, videoAssets, videoManifestHash, videoObjectKey,videoPreviewKey,editorHasAudio} from '@bienvu/contracts';
 import {reserve, budgetLimits, type Budget} from './budget';
 import {storeRenderArtifact} from './render-artifact';
 
@@ -183,7 +183,7 @@ export class VideoCoordinator {
         }
         const report=VideoReport.parse(result.report),frames=job.manifest.scenes.reduce((n,s)=>n+s.durationFrames,0);
         if(report.id!==id||report.manifestHash!==id||report.width!==job.manifest.width||report.height!==job.manifest.height||report.watermarked!==job.manifest.rights.watermarked||report.durationFrames!==frames
-          ||Math.abs(report.durationSeconds-frames/30)>.12||report.audioCodec!==(job.manifest.voiceEnabled===false?null:'aac'))throw new Error('VIDEO_REPORT_INVALID');
+          ||Math.abs(report.durationSeconds-frames/30)>.12||report.audioCodec!==(editorHasAudio(job.manifest)?'aac':null))throw new Error('VIDEO_REPORT_INVALID');
         if(job.manifest.rights.kind==='anonymous'&&(!report.preview||!report.preview.watermarked||report.preview.manifestHash!==id||report.preview.id!==id||report.preview.durationFrames!==frames||Math.abs(report.preview.durationSeconds-report.durationSeconds)>.12||report.preview.sha256===report.sha256))throw new Error('VIDEO_PREVIEW_INVALID');
         job={...job,status:'publishing',progressPercent:96,report,objectKey:videoObjectKey(job.manifest,id)};await this.save(job);
       }

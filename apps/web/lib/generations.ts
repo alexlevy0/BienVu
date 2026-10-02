@@ -1,5 +1,5 @@
 import {EntityId,VideoReport,publicErrors,type PublicErrorCode} from '@bienvu/contracts';
-import {findOwnedGeneration,generationEvent,generationMasterUnlocked,GenerationFailure,listGenerations,type GenerationRow} from '@bienvu/db';
+import {findOwnedGeneration,generationEvent,generationMasterUnlocked,GenerationFailure,listGenerations,type GenerationRow,type Database} from '@bienvu/db';
 import {RequestFailure} from './http';
 export async function callGeneration(env:CloudflareEnv&{GENERATION_SERVICE?:Fetcher;GENERATION_TOKEN?:string},agencyId:string,path:string,body:unknown,key=''){
   if(!env.GENERATION_SERVICE||!env.GENERATION_TOKEN)throw new RequestFailure('GENERATIONS_PAUSED');
@@ -9,7 +9,7 @@ export async function callGeneration(env:CloudflareEnv&{GENERATION_SERVICE?:Fetc
   if(!response.ok)throw new RequestFailure(value.error&&value.error in publicErrors?value.error as PublicErrorCode:'INTERNAL_ERROR');
   return Response.json(value,{status:response.status});
 }
-export async function ownGeneration(env:Pick<CloudflareEnv,'DB'>,agencyId:string,id:string){
+export async function ownGeneration(env:{DB:Database},agencyId:string,id:string){
   if(!EntityId.safeParse(id).success)throw new RequestFailure('NOT_FOUND');
   const row=await findOwnedGeneration(env.DB,agencyId,id);if(!row)throw new RequestFailure('NOT_FOUND');return row;
 }

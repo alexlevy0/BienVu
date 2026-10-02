@@ -162,7 +162,7 @@ export default {
         catch{return json({error:'SOURCE_UNAVAILABLE'},502);}
       }
       if(path==='/generations'&&request.method==='POST'){
-        const body=await request.text();if(body.length>4096)return json({error:'VALIDATION_ERROR'},422);
+        const body=await request.text();if(body.length>32_000)return json({error:'VALIDATION_ERROR'},422);
         const input=GenerationRequest.safeParse(JSON.parse(body));if(!input.success)return json({error:'VALIDATION_ERROR'},422);
         const row=await admitGeneration(env.DB,agencyId!,request.headers.get('Idempotency-Key')??'',input.data,env.GENERATIONS_ENABLED,Date.now(),async listing=>{
           for(const photo of listing.photos){const head=await env.MEDIA.head(photo.objectKey);if(!head||head.size!==photo.sizeBytes||head.customMetadata?.sha256&&head.customMetadata.sha256!==photo.contentHash)throw new GenerationFailure('INVALID_PHOTO');}

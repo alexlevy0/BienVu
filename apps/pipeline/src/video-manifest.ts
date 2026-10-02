@@ -67,6 +67,19 @@ export async function prepareJobVideo(env: {DB: Database; MEDIA: NarrationBucket
       return VideoAsset.parse({id:a.id,objectKey:a.objectKey,sha256:a.sha256,sizeBytes:a.sizeBytes,mime:'audio/wav',durationMs:a.durationMs});
     });
     const customization=input?.customization;
+    let editor=customization?.editor,music:VideoManifest['music'];
+    if(editor){
+      const order=customization?.photoOrder;
+      if(!order)fail('VIDEO_SCOPE_INVALID');
+      editor={...editor,clips:editor.clips.map(clip=>({...clip,photoSlot:order!.indexOf(clip.photoSlot)}))};
+      if(editor.music){const stored=await env.DB.prepare('SELECT asset_json AS asset FROM editor_music_assets WHERE id=? AND agency_id=? AND import_id=?')
+        .bind(editor.music.assetId,agency,entitlement.listingId).first<{asset:string}>();
+        if(!stored)fail('VIDEO_SCOPE_INVALID');
+        const source=VideoAsset.parse(JSON.parse(stored.asset));
+        if(!source.objectKey.startsWith(`agencies/${agency}/imports/${entitlement.listingId}/music/`)||source.durationMs!==editor.music.durationMs)fail('VIDEO_SCOPE_INVALID');
+        music={asset:{...source,objectKey:`${prefix}music/${source.sha256}.wav`}};sources.push({id:source.id,key:source.objectKey});
+      }
+    }
     if((prepared.voiceEnabled!==false)!==(input?.voiceEnabled!==false))fail('VIDEO_SCOPE_INVALID');
     if(prepared.durationSeconds!==input?.durationSeconds)fail('VIDEO_SCOPE_INVALID');
     const animations:PhotoAnimation[]=[];
@@ -88,7 +101,7 @@ export async function prepareJobVideo(env: {DB: Database; MEDIA: NarrationBucket
       ...(input?.voiceEnabled===false?{voiceEnabled:false}:{}),
       ...(input?.durationSeconds!==undefined?{durationSeconds:input.durationSeconds}:{}),
       ...(customization?{visualStyle:customization.style,photoMotion:customization.photoMotion,photoTransition:customization.transition}:{visualStyle:'cinematic'}),
-      ...(animations.length?{photoAnimations:animations}:{})});
+      ...(animations.length?{photoAnimations:animations}:{}),...(editor?{editor}:{}),...(music?{music}:{})});
     const at=new Date().toISOString(),hash=await videoManifestHash(manifest);
     await env.DB.prepare(`INSERT INTO video_manifests(job_id,agency_id,job_attempt,manifest_hash,manifest_json,sources_json,state,created_at,expires_at)
       SELECT ?,?,?,?,?,?,'preparing',?,? WHERE EXISTS(SELECT 1 FROM jobs j JOIN reservations r ON r.id=j.reservation_id AND r.agency_id=j.agency_id

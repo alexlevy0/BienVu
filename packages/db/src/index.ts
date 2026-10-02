@@ -5,6 +5,7 @@ export * from './creation-drafts';
 export * from './import-budget';
 export * from './narration';
 export * from './generation';
+export * from './editor-voice';
 
 // Port structurel minimal compatible D1 ; pas de transaction interactive.
 export interface SqlStatement {

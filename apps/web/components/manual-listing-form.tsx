@@ -1,6 +1,6 @@
 'use client';
 import {useEffect, useImperativeHandle, useRef, useState, type ChangeEvent, type FormEvent, type Ref} from 'react';
-import {generationCreditCost,defaultVideoCustomization,VideoCustomization,GenerationCustomization,DESCRIPTION_MAX_CHARACTERS, ManualListingInput, MANUAL_PHOTO_LIMITS, publicErrors, type PublicErrorCode,
+import {generationCreditCost,defaultVideoCustomization,createEditorDocument,CreationFields,VideoCustomization,GenerationCustomization,DESCRIPTION_MAX_CHARACTERS, ManualListingInput, MANUAL_PHOTO_LIMITS, publicErrors, type PublicErrorCode,
   type CreationDraftData, type CreationDraftView, type NormalizedListing,type VideoDuration,type VideoAspectRatio} from '@bienvu/contracts';
 import {HomeIcon} from './home-icons';
 import type {ImportView} from './generation-form';
@@ -396,6 +396,19 @@ export function ManualListingForm(props: Props) {
     } catch (error) {setFeedback(error instanceof FormFailure ? error.message : 'L’envoi a été interrompu. Réessayez avec les mêmes informations et photos.');}
     finally {submitLock.current=false;setBusy(false); setProgress('');}
   }
+  async function openEditor(){if(busy||!props.guided?.agencyId)return;setBusy(true);setFeedback('');
+    try{await settingsWrite.current;const current=await ensureServerDraft(),raw=draftFields(),number=(value:string)=>value.trim()?Number(value.replace(/\s/g,'').replace(',','.')):null;
+      const fields=CreationFields.parse({title:raw.title.trim()||null,locality:raw.locality.trim()||null,propertyType:raw.propertyType||null,transaction:raw.transaction||null,
+        description:raw.description.trim()||null,priceCents:number(raw.priceCents)===null?null:Math.round(number(raw.priceCents)!*100),charges:raw.charges||null,area:number(raw.area),rooms:number(raw.rooms)});
+      const settings={...defaultVideoCustomization(props.brand),...customizationRef.current},order=settings.photoOrder??current.photos.map(p=>p.sourceOrder),
+        editor=settings.editor??createEditorDocument(order.flatMap(slot=>current.photos.filter(p=>p.sourceOrder===slot)),fields,{agencyName:props.brand?.name,durationSeconds:props.durationSeconds,aspectRatio:props.aspectRatio,
+          voiceEnabled:props.voiceEnabled,subtitlesEnabled:props.subtitlesEnabled});
+      const response=await fetch(`/api/imports/${current.id}/draft`,{method:'PATCH',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({version:current.version,changes:fields,confirm:[],videoCustomization:{...settings,photoOrder:[...new Set(editor.clips.map(c=>c.photoSlot))],editor}})});
+      if(!response.ok)throw new Error('Le brouillon n’a pas pu être enregistré. Réessayez avant d’ouvrir l’Éditeur.');
+      window.location.assign(`/editeur?draft=${encodeURIComponent(current.id)}`);
+    }catch(error){setFeedback(error instanceof Error&&error.name!=='ZodError'?error.message:'Vérifiez les informations saisies avant d’ouvrir l’Éditeur.');setBusy(false);}
+  }
   const error = (name: string) => errors[name] ? <p id={`manual-${name}-error`} className="form-feedback error">{errors[name]}</p> : null;
   const attributes = (name: string) => ({id: `manual-${name}`, name, 'aria-invalid': Boolean(errors[name]), 'aria-describedby': errors[name] ? `manual-${name}-error` : undefined});
   const summaryValue=(name:keyof ManualDraftFields)=>{
@@ -420,7 +433,9 @@ export function ManualListingForm(props: Props) {
     onRetry={id=>{const photo=selected.current.find(p=>p.id===id);if(photo)void uploadSelected(photo);}}
     onRemove={id=>{const photo=selected.current.find(p=>p.id===id);if(photo)void removePhoto(photo);}} busy={busy||photoChecking}
     ready={finalInput()?.success===true&&unresolved().length===0&&photos.filter(p=>p.state==='ready').length>=3}
-    onEdit={()=>props.onCloseCustomizer?.()} saved={settingsSaved}/>}<form ref={formRef} style={props.customizing?{display:'none'}:undefined} id={props.guided?'manual-guided-form':undefined} className={`manual-listing-form${props.guided?' manual-guided-form':''}`} onSubmit={submit} noValidate
+    onEdit={()=>props.onCloseCustomizer?.()} saved={settingsSaved}/>}
+    {props.customizing&&props.guided?.agencyId&&<div className="customizer-editor-entry"><button type="button" disabled={busy||photoChecking||photos.some(p=>p.state!=='ready'||p.removing)} onClick={()=>void openEditor()}><HomeIcon name="clapper" size={18}/>Ouvrir le mode Éditeur <HomeIcon name="arrow" size={18}/></button><p>Placez vos textes et ajustez chaque plan dans la timeline.</p></div>}
+    <form ref={formRef} style={props.customizing?{display:'none'}:undefined} id={props.guided?'manual-guided-form':undefined} className={`manual-listing-form${props.guided?' manual-guided-form':''}`} onSubmit={submit} noValidate
     onKeyDown={event=>{if(props.guided&&event.key==='Enter'&&event.target instanceof HTMLInputElement&&event.target.type==='text'){
       event.preventDefault();if(props.guided.step<4)void nextStep();
     }}}

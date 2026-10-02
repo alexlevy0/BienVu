@@ -93,3 +93,4 @@
 @media(prefers-reduced-motion:reduce){.video-progress-indeterminate {animation:none;}}
 
 .video-library-dialog.is-horizontal {max-width:960px}.video-library-dialog.is-horizontal video {width:100%;height:auto;aspect-ratio:16/9;object-fit:contain}
+.video-library-edit{display:inline-flex;align-items:center;gap:8px;font-size:13px;margin:9px 0;color:#51634b;text-decoration:underline;text-underline-offset:4px}

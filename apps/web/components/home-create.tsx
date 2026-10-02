@@ -141,6 +141,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     void fetch(`/api/imports/${encodeURIComponent(id)}`,{cache:'no-store',signal:controller.signal}).then(async response=>{
       if(!response.ok)return;const value=await response.json() as {status:string;draft?:CreationDraftView|null};
       if(controller.signal.aborted||interactionVersion.current!==version||value.status!=='needs_input'||!value.draft)return;
+      if(value.draft.data.videoCustomization?.editor){window.location.replace(`/editeur?draft=${encodeURIComponent(value.draft.id)}`);return;}
       interactionVersion.current++;
       startFresh.current=true;setImportDraft(value.draft);setGuestExtraction(null);
       setDescription(value.draft.data.fields.description??value.draft.data.originalText??'');setStep(0);setScreen({kind:'manual'});

@@ -10,7 +10,7 @@ export async function GET(request:Request,context:Context){return respond(async(
 });}
 export async function PATCH(request:Request,context:Context){return respond(async()=>{
   const {env,agency}=await requireOwner(request);assertSameOrigin(request,env);
-  return Response.json(await patchCreationDraft(env.DB,agency.id,(await context.params).id,await boundedJson(request,32_000)));
+  return Response.json(await patchCreationDraft(env.DB,agency.id,(await context.params).id,await boundedJson(request,64_000)));
 });}
 export async function DELETE(request:Request,context:Context){return respond(async()=>{
   const {env,agency}=await requireOwner(request);assertSameOrigin(request,env);

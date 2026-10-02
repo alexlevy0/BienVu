@@ -1,7 +1,8 @@
-import {AgencyBrand, EntityId, Timestamp, GeneratableListing, GenerationRequest, GenerationView, VideoReport, publicErrors,customizedListing,generationCreditCost,requestedAnimations,CREDIT_PRICING_VERSION,selectedAnimationIndices, type PublicErrorCode,type NormalizedListing} from '@bienvu/contracts';
+import {AgencyBrand, EntityId, Timestamp, GeneratableListing, GenerationRequest, GenerationView, VideoReport, VideoAsset, publicErrors,customizedListing,generationCreditCost,requestedAnimations,CREDIT_PRICING_VERSION,selectedAnimationIndices, type PublicErrorCode,type NormalizedListing} from '@bienvu/contracts';
 import type {Database} from './index';
 import {creditGrant,creditBalance} from './credits';
 import {findImport} from './imports';
+import {findEditorVoiceSource} from './editor-voice';
 
 export class GenerationFailure extends Error {constructor(public code:PublicErrorCode){super(code);}}
 export type GenerationRow={ownerAgencyId:string|null;anonymousSessionId:string|null;retention:'available'|'expiring'|'expired';creditStatus:'unfunded'|'reserved'|'consumed'|'released';previewKey:string|null;previewReport:string|null;jobId:string;agencyId:string;inputHash:string;input:string;brand:string;deadline:string;expiresAt:string;
@@ -74,7 +75,15 @@ export async function admitGeneration(db:Database,agencyId:string,key:string,inp
   if('listingId' in parsed.data){const row=await findImport(db,agencyId,parsed.data.listingId);
     if(!row||row.status!=='ready'||row.expiresAt<=new Date(now+600_000).toISOString()||!row.result)throw new GenerationFailure('NOT_FOUND');
     saved=GeneratableListing.parse(JSON.parse(row.result));if(saved.agencyId!==agencyId||saved.id!==parsed.data.listingId)throw new GenerationFailure('NOT_FOUND');
-    try{saved=customizedListing(saved,parsed.data.customization);}catch{throw new GenerationFailure('VALIDATION_ERROR');}}
+    try{saved=customizedListing(saved,parsed.data.customization);}catch{throw new GenerationFailure('VALIDATION_ERROR');}
+    const voiceSourceId=parsed.data.customization?.voiceSourceId;
+    if(voiceSourceId&&!await findEditorVoiceSource(db,agencyId,parsed.data.listingId,voiceSourceId))throw new GenerationFailure('VALIDATION_ERROR');
+    const music=parsed.data.customization?.editor?.music;
+    if(music){const stored=await db.prepare('SELECT asset_json AS asset FROM editor_music_assets WHERE id=? AND agency_id=? AND import_id=?')
+      .bind(music.assetId,agencyId,parsed.data.listingId).first<{asset:string}>();
+      const asset=stored?VideoAsset.safeParse(JSON.parse(stored.asset)):null;
+      if(!asset?.success||asset.data.mime!=='audio/wav'||asset.data.durationMs!==music.durationMs||
+        !asset.data.objectKey.startsWith(`agencies/${agencyId}/imports/${parsed.data.listingId}/music/`))throw new GenerationFailure('VALIDATION_ERROR');}}
   const brandRow=await db.prepare(`SELECT id,owner_user_id AS ownerUserId,name,logo_asset_id AS logoAssetId,primary_color AS primaryColor,
     secondary_color AS secondaryColor,phone,email,website,created_at AS createdAt FROM agencies WHERE id=?`).bind(agencyId).first();
   const brand=AgencyBrand.safeParse(brandRow);if(!brand.success)throw new GenerationFailure('VALIDATION_ERROR');

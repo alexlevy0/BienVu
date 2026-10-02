@@ -15,6 +15,8 @@ COPY packages/voice packages/voice
 COPY apps/web/public/fonts/inter-tight.woff2 apps/web/public/fonts/inter-tight.woff2
 COPY apps/web/public/fonts/anton-regular.ttf apps/web/public/fonts/anton-regular.ttf
 COPY apps/web/public/fonts/anton-OFL.txt apps/web/public/fonts/anton-OFL.txt
+COPY apps/web/public/fonts/instrument-serif.woff2 apps/web/public/fonts/instrument-serif.woff2
+COPY apps/web/public/fonts/instrument-serif-OFL.txt apps/web/public/fonts/instrument-serif-OFL.txt
 COPY scripts/generate-fixtures.ts scripts/generate-fixtures.ts
 RUN pnpm install --frozen-lockfile --filter @bienvu/renderer... --filter bienvu
 RUN pnpm fixtures && pnpm --filter @bienvu/renderer bundle

@@ -6,4 +6,5 @@ import {root, fixturesDir, bundleDir} from './paths';
 await bundle({entryPoint:path.join(root,'packages/video/src/index.tsx'),publicDir:fixturesDir,outDir:bundleDir});
 await copyFile(path.join(root,'apps/web/public/fonts/inter-tight.woff2'),path.join(bundleDir,'public/video-font.woff2'));
 await copyFile(path.join(root,'apps/web/public/fonts/anton-regular.ttf'),path.join(bundleDir,'public/video-display.ttf'));
+await copyFile(path.join(root,'apps/web/public/fonts/instrument-serif.woff2'),path.join(bundleDir,'public/video-serif.woff2'));
 if(!process.env.REMOTION_BROWSER_EXECUTABLE)await ensureBrowser();

@@ -6,6 +6,8 @@ export * from './agency';
 export * from './manual-listing';
 export * from './creation-draft';
 export * from './customization';
+export * from './editor';
+export * from './editor-voice';
 export * from './credits';
 export * from './import-sources';
 export * from './voice';
