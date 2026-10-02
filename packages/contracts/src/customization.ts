@@ -2,6 +2,8 @@ import {z} from 'zod';
 import type {AgencyBrand, NormalizedListing} from './product';
 import {fishFrenchVoices} from './voice';
 
+export const DEFAULT_VIDEO_VOICE='fish-manon' as const;
+
 export const videoStyles=[{id:'editorial',name:'Éditorial',description:'Des repères affirmés, en grand.'},
   {id:'minimal',name:'Minimal',description:'Des informations sobres, au fil des photos.'},
   {id:'cinematic',name:'Cinéma',description:'Les images à l’honneur, les informations à la fin.'}] as const;
@@ -32,7 +34,7 @@ export const GenerationCustomization=VideoCustomization.superRefine((value,conte
     for(const issue of parsed.error.issues)context.addIssue({code:'custom',path:['narration',...issue.path],message:issue.message});}
 });
 export function defaultVideoCustomization(brand?:{primaryColor:string;secondaryColor:string}):VideoCustomization {
-  return {style:'cinematic',voice:'fr-FR-Chirp3-HD-Aoede',primaryColor:brand?.primaryColor??'#E1E8D9',
+  return {style:'cinematic',voice:DEFAULT_VIDEO_VOICE,primaryColor:brand?.primaryColor??'#E1E8D9',
     secondaryColor:brand?.secondaryColor??'#171714',photoMotion:true,transition:'fade'};
 }
 export function customizedListing(listing:NormalizedListing,settings?:VideoCustomization):NormalizedListing {

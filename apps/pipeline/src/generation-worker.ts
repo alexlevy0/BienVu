@@ -1,5 +1,5 @@
 import {WorkflowEntrypoint,type WorkflowEvent,type WorkflowStep} from 'cloudflare:workers';
-import {EntityId,GenerationRequest,VideoReport,publicErrors,videoObjectKey,videoPreviewKey} from '@bienvu/contracts';
+import {EntityId,GenerationRequest,VideoReport,publicErrors,videoObjectKey,videoPreviewKey,DEFAULT_VIDEO_VOICE} from '@bienvu/contracts';
 import {admitGeneration,findGeneration,generationView,GenerationFailure,failGeneration,setGenerationStage,setGenerationProgress,type GenerationRow} from '@bienvu/db';
 import {authorized,json} from './auth';
 import {VideoRenderer} from './video-worker';
@@ -86,7 +86,7 @@ export class GenerationWorkflow extends WorkflowEntrypoint<GenerationEnv,{agency
       await step.do('script-and-voice-checkpoints',once,async()=>{
         const row=await active(this.env,agencyId,jobId);await setGenerationStage(this.env.DB,row,'scripting');
         const input=GenerationRequest.parse(JSON.parse(row.input));
-        const providers=await this.providers(input.customization?.voice,input.voiceEnabled!==false),guard=()=>active(this.env,agencyId,jobId);
+        const providers=await this.providers(input.customization?.voice??DEFAULT_VIDEO_VOICE,input.voiceEnabled!==false),guard=()=>active(this.env,agencyId,jobId);
         const source=providers.script,voice=providers.voice;
         providers.script={...source,plan:async(...args)=>{await guard();return source.plan(...args);}};
         providers.voice={...voice,synthesize:async text=>{await guard();return voice.synthesize(text);}};

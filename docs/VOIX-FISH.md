@@ -1,6 +1,6 @@
 # Voix Fish Audio
 
-Ajout du 2 octobre 2026 : Manon, Lucas et Camille dans **Personnaliser → Voix et texte**, en plus des trois voix Google existantes. Aoede reste le choix par défaut. Le choix est sauvegardé dans le brouillon puis figé dans la demande de génération. Désactiver la voix off empêche toute synthèse et désactive les sous-titres.
+Ajout du 2 octobre 2026 : Manon, Lucas et Camille dans **Personnaliser → Voix et texte**, en plus des trois voix Google existantes. **Manon est la voix par défaut** pour les nouvelles vidéos, y compris les créations directes sans personnalisation et les essais anonymes. Le choix explicite d’une autre voix reste prioritaire et les brouillons déjà personnalisés conservent leur voix. Le choix est sauvegardé dans le brouillon puis figé dans la demande de génération. Désactiver la voix off empêche toute synthèse et désactive les sous-titres. Le défaut des sondes opérateur Google reste indépendant.
 
 ## Offre retenue
 

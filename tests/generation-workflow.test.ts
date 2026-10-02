@@ -7,9 +7,11 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import {migrateNarrationProbe,seedNarrationFixture} from '../scripts/narration-fixtures';
-import {admitGeneration,setGenerationProgress,findGeneration} from '../packages/db/src/index';
+import {admitGeneration,setGenerationProgress,findGeneration,findNarration} from '../packages/db/src/index';
 import {videoFixture} from '../fixtures/video';
 import {getJobVideo} from '../apps/pipeline/src/video-manifest';
+import {FishVoiceConfig} from '../packages/contracts/src/index';
+import {hashJson,DEFAULT_SCRIPT_MODEL} from '../packages/narration/src/index';
 
 for(const voiceEnabled of [true,false])test(`Workflow workerd réel ${voiceEnabled?'avec voix':'sans voix ni sous-titres'}, fournisseurs simulés : déconnexion, restart puis réconciliation après upload et quota unique`,async t=>{
   const directory=await mkdtemp(path.join(tmpdir(),'bienvu-generation-'));t.after(()=>rm(directory,{recursive:true,force:true}));
@@ -47,6 +49,12 @@ for(const voiceEnabled of [true,false])test(`Workflow workerd réel ${voiceEnabl
   let row:{status:string}|null=null;
   for(let i=0;i<70;i++){row=await env.DB.prepare('SELECT status FROM jobs WHERE id=?').bind(job.id).first();if(['rendering','ready','failed'].includes(row!.status))break;await new Promise(r=>setTimeout(r,200));}
   assert.equal(row!.status,'rendering');
+  const narration=(await findNarration(env.DB,scope.agencyId,job.id))!;
+  assert.equal(narration.configHash,await hashJson({voice:FishVoiceConfig.parse({voice:'fish-manon'}),
+    scriptModel:DEFAULT_SCRIPT_MODEL,promptVersion:JSON.parse(narration.script!).promptVersion,mode:'mock',...(!voiceEnabled?{voiceEnabled:false}:{})}));
+  const voiceCalls=await env.DB.prepare("SELECT DISTINCT provider FROM narration_calls WHERE job_id=? AND provider!='openai'")
+    .bind(job.id).all<{provider:string}>();
+  assert.deepEqual(voiceCalls.results,voiceEnabled?[{provider:'fish'}]:[]);
   assert.equal((await getJobVideo(env.DB,scope.agencyId,job.id))!.manifest.subtitlesEnabled,false);
   assert.equal((await getJobVideo(env.DB,scope.agencyId,job.id))!.manifest.audio.length===0,!voiceEnabled);
   const progressRow=(await findGeneration(env.DB,scope.agencyId,job.id))!;
