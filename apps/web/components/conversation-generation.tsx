@@ -1,19 +1,21 @@
 'use client';
 import Link from 'next/link';
 import {useEffect,useState} from 'react';
-import {publicErrors,type GenerationView,type PublicErrorCode} from '@bienvu/contracts';
+import {publicErrors,type GenerationView,type PublicErrorCode,type VideoAspectRatio} from '@bienvu/contracts';
 import {generationActive} from './generation-progress';
 import {HomeIcon} from './home-icons';
 import {ProblemReport} from './problem-report';
 
 type RequestMessage={kind:'url'|'manual';text:string};
-const stages=['Annonce analysée','Photos sélectionnées','Voix off prête','Assemblage de la vidéo'] as const;
-export function ConversationGeneration({job,request,sending,anonymous,unavailable,onRefresh}:{
-  job:GenerationView|null;request:RequestMessage;sending:boolean;anonymous:boolean;unavailable?:boolean;onRefresh():Promise<void>}){
+
+export function ConversationGeneration({job,request,sending,anonymous,unavailable,onRefresh,aspectRatio}:{
+  aspectRatio?:VideoAspectRatio;job:GenerationView|null;request:RequestMessage;sending:boolean;anonymous:boolean;unavailable?:boolean;onRefresh():Promise<void>}){
   const [posterFailed,setPosterFailed]=useState(false),[busy,setBusy]=useState(false),[feedback,setFeedback]=useState('');
   const poster=job&&!['queued','importing','failed'].includes(job.status)
     ?`/api/${anonymous?'trial':'generations'}/${job.id}/source-photo`:null;
   useEffect(()=>setPosterFailed(false),[poster]);
+  const stages=['Annonce analysée','Photos sélectionnées',job?.syntheticVoice===false?'Texte prêt':'Voix off prête','Assemblage de la vidéo'];
+  const horizontal=(job?.aspectRatio??aspectRatio)==='16:9';
   const ready=job?.status==='ready',active=job&&generationActive(job);
   const assembling=job?.status==='rendering';
   const percent=assembling?job.progressPercent:0;
@@ -31,14 +33,14 @@ export function ConversationGeneration({job,request,sending,anonymous,unavailabl
     </div></div>
     <div className="home-conversation-response">
       <p className="home-conversation-lead" role="status">{sending?'Envoi de votre demande…':ready?'Votre vidéo est prête.':job?.status==='failed'?'La création a été interrompue.':'Nous préparons votre visite en vidéo.'}</p>
-      <div className="home-conversation-result"><div className="home-conversation-media">
+      <div className={`home-conversation-result${horizontal?' is-horizontal':''}`}><div className={`home-conversation-media${horizontal?' is-horizontal':''}`}>
         {job?.videoUrl?<video src={job.videoUrl} controls playsInline preload="metadata" aria-label={anonymous?'Aperçu filigrané de votre vidéo':'Votre vidéo immobilière'}/>
           :<div className={`home-conversation-poster${job?.status==='failed'?' home-poster-failed':''}`}>{poster&&!posterFailed&&<img src={poster} alt="" onError={()=>setPosterFailed(true)}/>}
             {(!poster||posterFailed)&&<span className="home-poster-skeleton" aria-hidden="true"/>}
             <div className="home-poster-overlay">{job?.status==='failed'||ready?<span className="home-poster-stopped" aria-hidden="true">!</span>:<span className="home-activity-ring" aria-hidden="true"/>}
               <strong>{sending?'Envoi en cours':job?.status==='failed'?'Création interrompue':ready?'Vidéo indisponible':'Génération en cours'}</strong>
               {assembling&&<span className="home-poster-percent">Assemblage · {percent} %</span>}</div>
-            <small>Vertical 9:16 · Voix française</small></div>}
+            <small>{horizontal?'Horizontal 16:9':'Vertical 9:16'} · {job?.syntheticVoice===false?'Sans voix off':'Voix française'}</small></div>}
       </div><div className="home-conversation-status">
         {active||sending?<ol className="home-conversation-steps" aria-label="Étapes de création">{stages.map((label,index)=>{
           const state=sending?'future':index<completed?'done':index===completed?'current':'future';

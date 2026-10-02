@@ -34,6 +34,7 @@ test('manifeste D1/R2 : copie vérifiée, droits serveur immuables et isolation'
   const [first,second]=await Promise.all([1,2].map(()=>prepareJobVideo(env,scope.agencyId,scope.jobId)));
   assert.deepEqual(first,second);assert.equal(first.state,'prepared');assert.deepEqual(first.manifest.rights,{kind:'trial',allocationId:'allocation-video',watermarked:true});
   assert.equal(first.manifest.templateVersion,'bienvu-vertical/2');
+  assert.equal(first.manifest.visualStyle,'cinematic'); // New preparation without customization.
   assert.equal(first.manifest.subtitlesEnabled,true); // Legacy job without a generation input.
   assert.equal(first.manifest.photos.length,8);
   assert.deepEqual(first.manifest.photoTimeline?.map(p=>p.photoAssetId),listing.photos.map(p=>p.id));

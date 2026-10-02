@@ -1,0 +1,6 @@
+/audio/voice-previews/v1/*
+  Cache-Control: public, max-age=31536000, immutable
+  X-Content-Type-Options: nosniff
+/audio/voice-previews/fish-v1/*
+  Cache-Control: public, max-age=31536000, immutable
+  X-Content-Type-Options: nosniff

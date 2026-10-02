@@ -1,6 +1,8 @@
 import type {ReactNode} from 'react';
 
 const shapes = {
+  play: <path d="m8 5 11 7-11 7V5Z"/>,
+  stop: <rect x="6" y="6" width="12" height="12" rx="1"/>,
   settings: <><path d="M3 6h5m4 0h9M3 12h10m4 0h4M3 18h3m4 0h11"/><circle cx="10" cy="6" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="8" cy="18" r="2"/></>,
   image: <><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="1"/><path d="m3 17 6-6 4 4 3-3 5 5"/></>,
   palette: <><path d="M12 2a10 10 0 1 0 0 20c2 0 3-1 2-3s0-3 2-3h2c6 0 3-14-6-14Z"/><circle cx="7" cy="9" r=".7"/><circle cx="12" cy="6" r=".7"/><circle cx="17" cy="9" r=".7"/></>,
@@ -14,6 +16,7 @@ const shapes = {
   microphone: <><rect x="9" y="2" width="6" height="13" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2m-7 9v3m-4 0h8"/></>,
   subtitles: <><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 11h4m4 0h4M6 15h7m3 0h2"/></>,
   phone: <><rect x="6" y="1.5" width="12" height="21" rx="2"/><path d="M10 4h4m-3 16h2"/></>,
+  landscape: <><rect x="1.5" y="5" width="21" height="14" rx="2"/><path d="M4 10v4"/></>,
   arrow: <path d="M4 12h16m-6-6 6 6-6 6"/>,
   refresh: <><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6 7a7 7 0 0 1 12-1l2 6M4 12l2 6a7 7 0 0 0 12-1"/></>,
   external: <path d="M6 18 18 6M6 6h12v12"/>,

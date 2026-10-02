@@ -55,7 +55,7 @@ export async function assertNarrationLease(db: Database, lease: NarrationLease, 
   if (!await db.prepare(`SELECT job_id FROM narration_runs WHERE ${leaseCondition}`).bind(...leaseValues(lease, now)).first()) throw new NarrationFailure('NARRATION_CONFLICT');
 }
 export async function claimNarrationCall(db: Database, lease: NarrationLease, input: {
-  stepKey: string; requestHash: string; provider: 'openai' | 'google'; mode: 'real' | 'mock'; objectKey?: (id: string) => string;
+  stepKey: string; requestHash: string; provider: 'openai' | 'google' | 'fish'; mode: 'real' | 'mock'; objectKey?: (id: string) => string;
 }, now = Date.now()): Promise<{row: NarrationCall; fresh: boolean}> {
   Sha256.parse(input.requestHash);
   if (!/^(script\/[12]|voice\/[a-f0-9]{64})$/.test(input.stepKey)) throw new NarrationFailure('SCRIPT_INPUT_INVALID');

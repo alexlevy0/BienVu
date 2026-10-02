@@ -1,16 +1,19 @@
 import {z} from 'zod';
-import {AgencyBrand, EntityId, ObjectKey, Sha256, type NormalizedListing} from './product';
+import {AgencyBrand, EntityId, ObjectKey, Sha256, VideoDuration, type NormalizedListing} from './product';
 import {ScriptScene} from './narration';
 import {SYNTHETIC_VOICE_DISCLOSURE} from './voice';
 import {VideoStyle} from './customization';
 
 export const VideoAsset = z.object({id: EntityId, objectKey: ObjectKey, sha256: Sha256,
   sizeBytes: z.number().int().positive().max(10 * 1024 * 1024),
-  mime: z.enum(['image/jpeg', 'image/png', 'image/webp', 'audio/wav']),
+  mime: z.enum(['image/jpeg', 'image/png', 'image/webp', 'audio/wav', 'video/mp4']),
   width: z.number().int().positive().max(12000).optional(), height: z.number().int().positive().max(12000).optional(),
   durationMs: z.number().int().positive().max(35000).optional(),
 }).strict();
 export type VideoAsset = z.infer<typeof VideoAsset>;
+export const PhotoAnimation=z.object({photoAssetId:EntityId,sourceSha256:Sha256,
+  provider:z.literal('runway'),model:z.literal('gen4_turbo'),asset:VideoAsset}).strict();
+export type PhotoAnimation=z.infer<typeof PhotoAnimation>;
 export const VideoPresentation = z.object({
   transaction: z.enum(['sale', 'rent']), propertyType: z.enum(['apartment', 'house', 'other']),
   locality: z.string().trim().min(1).max(200), title: z.string().trim().min(1).max(200),
@@ -26,10 +29,10 @@ export function videoPresentation(listing: NormalizedListing): VideoPresentation
     locality: known(facts.locality), title: known(facts.title),
     priceCents: known(facts.price)?.amountCents ?? null, areaM2: known(facts.area), rooms: known(facts.rooms)});
 }
-export const VideoManifest = z.object({schemaVersion: z.literal(2), templateVersion: z.enum(['bienvu-vertical/1', 'bienvu-vertical/2']),
+export const VideoManifest = z.object({schemaVersion: z.literal(2), templateVersion: z.enum(['bienvu-vertical/1', 'bienvu-vertical/2','bienvu-horizontal/1']),
   agencyId: EntityId, jobId: EntityId, listingId: EntityId, brand: AgencyBrand,
   contact: z.enum(['phone', 'email', 'website', 'none']), logo: VideoAsset.nullable(),
-  width: z.literal(1080), height: z.literal(1920), fps: z.literal(30),
+  width: z.union([z.literal(1080),z.literal(1920)]), height: z.union([z.literal(1920),z.literal(1080)]), fps: z.literal(30),
   disclosure: z.literal(SYNTHETIC_VOICE_DISCLOSURE),
   rights: z.discriminatedUnion('kind', [
     z.object({kind: z.literal('trial'), allocationId: EntityId, watermarked: z.literal(true)}).strict(),
@@ -37,26 +40,36 @@ export const VideoManifest = z.object({schemaVersion: z.literal(2), templateVers
     z.object({kind: z.literal('free'), allocationId: EntityId, watermarked: z.literal(false)}).strict(),
     z.object({kind: z.literal('paid'), allocationId: EntityId, watermarked: z.literal(false)}).strict(),
   ]),
-  photos: z.array(VideoAsset).min(3).max(12), audio: z.array(VideoAsset).min(4).max(6),
-  scenes: z.array(ScriptScene.extend({audioAssetId: EntityId, durationFrames: z.number().int().positive().max(1050)})).min(4).max(6),
+  photos: z.array(VideoAsset).min(3).max(12), audio: z.array(VideoAsset).max(6),
+  scenes: z.array(ScriptScene.extend({audioAssetId: EntityId.nullable(), durationFrames: z.number().int().positive().max(1200)})).min(4).max(6),
   // Independent slideshow: speech scenes do not limit the number of photos.
   // Optional without a default to preserve historical immutable hashes.
   photoTimeline: z.array(z.object({photoAssetId: EntityId,
-    durationFrames: z.number().int().min(30).max(1050)}).strict()).min(3).max(12).optional(),
+    durationFrames: z.number().int().min(30).max(1200)}).strict()).min(3).max(12).optional(),
   presentation: VideoPresentation.optional(),
   // Do not insert a default into old manifests: their stored hashes must remain valid.
   subtitlesEnabled: z.boolean().optional(),
+  voiceEnabled:z.boolean().optional(),
+  durationSeconds:VideoDuration.optional(),
   visualStyle:VideoStyle.optional(),photoMotion:z.boolean().optional(),photoTransition:z.enum(['fade','cut']).optional(),
+  photoAnimations:z.array(PhotoAnimation).max(2).optional(),
 }).strict().superRefine((m, ctx) => {
   const fail = (message: string) => ctx.addIssue({code: 'custom', message});
-  if (m.templateVersion === 'bienvu-vertical/2' ? !m.presentation : Boolean(m.presentation)) fail('Présentation incompatible avec le modèle vidéo.');
+  if(m.voiceEnabled===false?m.audio.length!==0:m.audio.length<4)fail('Médias audio incompatibles avec le choix de voix.');
+  if(m.voiceEnabled===false&&m.subtitlesEnabled!==false)fail('Les sous-titres exigent une voix off.');
+  if (m.templateVersion !== 'bienvu-vertical/1' ? !m.presentation : Boolean(m.presentation)) fail('Présentation incompatible avec le modèle vidéo.');
+  if(m.templateVersion==='bienvu-horizontal/1' ? m.width!==1920||m.height!==1080 : m.width!==1080||m.height!==1920)fail('Dimensions incompatibles avec le format vidéo.');
   if(m.rights.kind==='anonymous'&&(!m.brand.neutral||m.contact!=='none'))fail('Habillage anonyme invalide.');
   const assets = videoAssets(m), prefix = `agencies/${m.agencyId}/jobs/${m.jobId}/`;
   if (m.brand.id !== m.agencyId || (m.contact==='none' ? !m.brand.neutral : !m.brand[m.contact]) || Boolean(m.brand.logoAssetId) !== Boolean(m.logo)
     || m.logo && m.logo.id !== m.brand.logoAssetId) fail('Marque ou contact incohérent.');
   if(m.contact!=='none'&&(m.brand[m.contact]?.length??0)>180)fail('Coordonnée trop longue pour la carte de contact.');
   if (assets.some(a => !a.objectKey.startsWith(prefix)) || new Set(assets.map(a => a.id)).size !== assets.length
-    || assets.reduce((n, a) => n + a.sizeBytes, 0) > 70 * 1024 * 1024) fail('Médias hors périmètre ou trop volumineux.');
+    || assets.reduce((n, a) => n + a.sizeBytes, 0) > 90 * 1024 * 1024) fail('Médias hors périmètre ou trop volumineux.');
+  if(m.photoAnimations?.length&&(!m.photoTimeline||m.templateVersion==='bienvu-vertical/1'
+    ||new Set(m.photoAnimations.map(c=>c.photoAssetId)).size!==m.photoAnimations.length
+    ||m.photoAnimations.some(c=>!m.photos.some(p=>p.id===c.photoAssetId&&p.sha256===c.sourceSha256)
+      ||c.asset.mime!=='video/mp4'||!((c.asset.width===720&&c.asset.height===1280)||(m.width===1920&&c.asset.width===1280&&c.asset.height===720))||c.asset.durationMs!==5000)))fail('Animation hors périmètre ou invalide.');
   if ([...m.photos, ...(m.logo ? [m.logo] : [])].some(a => !a.mime.startsWith('image/') || !a.width || !a.height || a.durationMs)
     || m.audio.some(a => a.mime !== 'audio/wav' || !a.durationMs || a.width || a.height)) fail('Type de média invalide.');
   if (new Set(m.photos.map(a => a.sha256)).size !== m.photos.length
@@ -65,15 +78,16 @@ export const VideoManifest = z.object({schemaVersion: z.literal(2), templateVers
     || m.scenes[0].kind !== 'intro' || m.scenes.at(-1)!.kind !== 'contact') fail('Scènes incohérentes.');
   for (const [index, s] of m.scenes.entries()) {
     const audio = m.audio.find(a => a.id === s.audioAssetId);
-    if (!m.photos.some(p => p.id === s.photoAssetId) || !audio
+    if (!m.photos.some(p => p.id === s.photoAssetId) || (m.voiceEnabled===false?s.audioAssetId!==null:!audio)
       || audio && s.durationFrames < Math.ceil(audio.durationMs! * 30 / 1000)
       || index > 0 && m.scenes[index - 1].photoAssetId === s.photoAssetId) fail('Scène sans média valide ou voix tronquée.');
   }
-  if (new Set(m.scenes.map(s => s.photoAssetId)).size < 3 || new Set(m.scenes.map(s => s.audioAssetId)).size !== m.audio.length
+  if (new Set(m.scenes.map(s => s.photoAssetId)).size < 3 || new Set(m.scenes.map(s => s.audioAssetId).filter(id=>id!==null)).size !== m.audio.length
     || !m.photoTimeline && m.photos.some(p => !m.scenes.some(s => s.photoAssetId === p.id))) fail('Médias inutilisés ou incomplets.');
   const frames = m.scenes.reduce((n, s) => n + s.durationFrames, 0);
-  if (frames < 600 || frames > 1050) fail('Durée hors de la plage de 20 à 35 secondes.');
-  if (m.photoTimeline && (m.templateVersion !== 'bienvu-vertical/2'
+  if (frames < 600 || frames > 1200) fail('Durée hors de la plage de 20 à 40 secondes.');
+  if(m.durationSeconds!==undefined&&frames!==m.durationSeconds*m.fps)fail('La durée ne correspond pas au choix demandé.');
+  if (m.photoTimeline && (m.templateVersion === 'bienvu-vertical/1'
     || m.photoTimeline.length !== m.photos.length
     || m.photoTimeline.some((s, i) => s.photoAssetId !== m.photos[i].id)
     || m.photoTimeline.reduce((n, s) => n + s.durationFrames, 0) !== frames)) fail('Galerie incomplète ou durée incohérente.');
@@ -81,28 +95,41 @@ export const VideoManifest = z.object({schemaVersion: z.literal(2), templateVers
 export type VideoManifest = z.infer<typeof VideoManifest>;
 // Integer frames cover the complete narration exactly, including its last frame.
 // Preserve listing order; every distinct imported photo appears once.
-export function videoPhotoTimeline(photos: Pick<VideoAsset, 'id'>[], frames: number): NonNullable<VideoManifest['photoTimeline']> {
-  if (photos.length < 3 || photos.length > 12 || !Number.isInteger(frames) || frames < 600 || frames > 1050)
+export function videoPhotoTimeline(photos: Pick<VideoAsset, 'id'>[], frames: number, animatedIds:string[]=[]): NonNullable<VideoManifest['photoTimeline']> {
+  if (photos.length < 3 || photos.length > 12 || !Number.isInteger(frames) || frames < 600 || frames > 1200)
     throw new Error('VIDEO_PHOTO_TIMELINE_INVALID');
+  if(animatedIds.length>2||new Set(animatedIds).size!==animatedIds.length||animatedIds.some(id=>!photos.some(p=>p.id===id)))throw new Error('VIDEO_PHOTO_TIMELINE_INVALID');
+  if(animatedIds.length){
+    // Play each paid five-second clip completely, while retaining every photo
+    // and the exact narration duration. Even 12 photos retain at least 1 s.
+    const remaining=frames-animatedIds.length*150,count=photos.length-animatedIds.length;let at=0;
+    return photos.map(photo=>({photoAssetId:photo.id,durationFrames:animatedIds.includes(photo.id)?150:
+      Math.floor(++at*remaining/count)-Math.floor((at-1)*remaining/count)}));
+  }
   return photos.map((photo, i) => ({photoAssetId: photo.id,
     durationFrames: Math.floor((i + 1) * frames / photos.length) - Math.floor(i * frames / photos.length)}));
 }
-export function videoAssets(m: {photos: VideoAsset[]; audio: VideoAsset[]; logo: VideoAsset | null}): VideoAsset[] {
-  return [...m.photos, ...m.audio, ...(m.logo ? [m.logo] : [])];
+export function videoAssets(m: {photos: VideoAsset[]; audio: VideoAsset[]; logo: VideoAsset | null;photoAnimations?:PhotoAnimation[]}): VideoAsset[] {
+  return [...m.photos, ...m.audio, ...(m.logo ? [m.logo] : []),...(m.photoAnimations??[]).map(c=>c.asset)];
 }
 export function videoAssetFile(asset: VideoAsset) {
-  return `${asset.sha256}.${({'image/jpeg':'jpg','image/png':'png','image/webp':'webp','audio/wav':'wav'} as const)[asset.mime]}`;
+  return `${asset.sha256}.${({'image/jpeg':'jpg','image/png':'png','image/webp':'webp','audio/wav':'wav','video/mp4':'mp4'} as const)[asset.mime]}`;
 }
 export const VideoSubmission = z.object({id: Sha256, manifest: VideoManifest}).strict();
 export type VideoSubmission = z.infer<typeof VideoSubmission>;
-export const VideoArtifactReport = z.object({id: Sha256, manifestHash: Sha256, sha256: Sha256,
+const VideoArtifactFields = z.object({id: Sha256, manifestHash: Sha256, sha256: Sha256,
   sizeBytes: z.number().int().positive().max(50 * 1024 * 1024),
-  width: z.literal(1080), height: z.literal(1920), fps: z.literal(30), codec: z.literal('h264'), audioCodec: z.literal('aac'),
-  durationFrames: z.number().int().min(600).max(1050), durationSeconds: z.number().min(19.9).max(35.2),
-  fastStart: z.literal(true), watermarked: z.boolean(), meanVolumeDb: z.number().finite(),
+  width: z.union([z.literal(1080),z.literal(1920)]), height: z.union([z.literal(1920),z.literal(1080)]), fps: z.literal(30), codec: z.literal('h264'), audioCodec: z.literal('aac').nullable(),
+  durationFrames: z.number().int().min(600).max(1200), durationSeconds: z.number().min(19.9).max(40.2),
+  fastStart: z.literal(true), watermarked: z.boolean(), meanVolumeDb: z.number().finite().nullable(),
   startedAt: z.iso.datetime(), endedAt: z.iso.datetime(), renderAndVerifySeconds: z.number().nonnegative(),
 }).strict();
-export const VideoReport = VideoArtifactReport.extend({preview:VideoArtifactReport.optional()});
+export const VideoArtifactReport=VideoArtifactFields.refine(r=>r.width!==r.height,'Dimensions vidéo incompatibles.');
+export const VideoReport = VideoArtifactFields.extend({preview:VideoArtifactReport.optional()}).superRefine((r,ctx)=>{
+  if(r.width===r.height||r.preview&&(r.preview.width!==r.width||r.preview.height!==r.height))ctx.addIssue({code:'custom',message:'Dimensions vidéo incompatibles.'});
+  if([r,...(r.preview?[r.preview]:[])].some(a=>(a.audioCodec===null)!==(a.meanVolumeDb===null))
+    ||r.preview&&r.preview.audioCodec!==r.audioCodec)ctx.addIssue({code:'custom',message:'Rapport audio incohérent.'});
+});
 export type VideoReport = z.infer<typeof VideoReport>;
 export async function videoManifestHash(input: unknown) {
   const data = new TextEncoder().encode(JSON.stringify(VideoManifest.parse(input)));

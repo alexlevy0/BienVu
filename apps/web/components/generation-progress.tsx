@@ -23,7 +23,7 @@ export function GenerationProgress({job,unavailable=false}:{job:GenerationView;u
     {job.status==='failed'&&<p className="form-feedback error" role="alert">{publicErrors[job.errorCode as PublicErrorCode]?.[1]??publicErrors.GENERATION_FAILED[1]}</p>}
     {job.retryAllowed&&<button className="text-button" disabled={retrying} onClick={()=>void retry()}>Relancer le démarrage</button>}
     {feedback&&<p role="status">{feedback}</p>}
-    {job.videoUrl&&<><video className="generated-video" src={job.videoUrl} controls playsInline preload="metadata" aria-label={`Vidéo : ${job.title}`}/><p className="field-help">Voix de synthèse · Disponible jusqu’au {new Date(job.expiresAt).toLocaleDateString('fr-FR')}.</p>{job.downloadUrl&&<a className="button primary" href={job.downloadUrl} download>Télécharger la vidéo</a>}</>}
+    {job.videoUrl&&<><video className={`generated-video${job.aspectRatio==='16:9'?' is-horizontal':''}`} src={job.videoUrl} controls playsInline preload="metadata" aria-label={`Vidéo : ${job.title}`}/><p className="field-help">Voix de synthèse · Disponible jusqu’au {new Date(job.expiresAt).toLocaleDateString('fr-FR')}.</p>{job.downloadUrl&&<a className="button primary" href={job.downloadUrl} download>Télécharger la vidéo</a>}</>}
     {job.status==='ready'&&!job.videoUrl&&<p>La période de conservation de cette vidéo est terminée.</p>}
   </section>;
 }

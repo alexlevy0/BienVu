@@ -1,5 +1,5 @@
 'use client';
-import type {VideoCustomization} from '@bienvu/contracts';
+import type {VideoCustomization,VideoDuration,VideoAspectRatio} from '@bienvu/contracts';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import Link from 'next/link';
 import {GenerationView,publicErrors,type PublicErrorCode} from '@bienvu/contracts';
@@ -20,12 +20,12 @@ export function useAnonymousTrial(enabled:boolean) {
   const {setJob:storeJob}=useGenerationStore();
   const [job,setJob]=useState<GenerationView|null>(null),[siteKey,setSiteKey]=useState<string|null>(null),[available,setAvailable]=useState(false),[used,setUsed]=useState(false),[failure,setFailure]=useState(''),[loaded,setLoaded]=useState(false);
   const [token,setToken]=useState(''),[challenge,setChallenge]=useState(false),[widgetVersion,setWidgetVersion]=useState(0);
-  const lock=useRef(false),intent=useRef<{url:string;key:string;subtitlesEnabled:boolean;customization?:VideoCustomization}|null>(null);
+  const lock=useRef(false),intent=useRef<{url:string;key:string;subtitlesEnabled:boolean;voiceEnabled:boolean;durationSeconds:VideoDuration;aspectRatio:VideoAspectRatio;customization?:VideoCustomization}|null>(null);
   const refresh=useCallback(async()=>{try{const data=await value(await fetch('/api/trial',{cache:'no-store'}));setAvailable(data.enabled);setSiteKey(data.siteKey);setUsed(data.used);setJob(data.job?GenerationView.parse(data.job):null);setLoaded(true);setFailure('');}catch{setFailure('Impossible de retrouver votre essai. Réessayez.');setLoaded(true);}},[]);
   useEffect(()=>{if(enabled)void refresh();},[enabled,refresh]);
   useEffect(()=>{if(enabled&&job?.ownership==='anonymous')storeJob(job,anonymousGenerationScope);},[enabled,job,storeJob]);
   useEffect(()=>{if(!enabled||!job||!generationActive(job)||job.ownership==='owned')return;const timer=setInterval(()=>void refresh(),4000);return()=>clearInterval(timer);},[enabled,job?.id,job?.status,job?.ownership,refresh]);
-  async function start(url:string,verifiedToken?:string,subtitlesEnabled=true,customization?:VideoCustomization) {
+  async function start(url:string,verifiedToken?:string,subtitlesEnabled=true,customization?:VideoCustomization,voiceEnabled=true,durationSeconds:VideoDuration=20,aspectRatio:VideoAspectRatio='9:16') {
     if(lock.current)return;setFailure('');
     if(!loaded){setFailure('Votre navigateur est en cours de vérification. Réessayez dans un instant.');return;}
     if(!available){setFailure(publicErrors.ANONYMOUS_UNAVAILABLE[1]);return;}
@@ -33,10 +33,10 @@ export function useAnonymousTrial(enabled:boolean) {
     if(job&&generationActive(job)){return;}
     const currentToken=verifiedToken??token;
     if(!currentToken&&!intent.current){setChallenge(true);return;}
-    if(intent.current?.url!==url||intent.current?.subtitlesEnabled!==subtitlesEnabled||JSON.stringify(intent.current?.customization)!==JSON.stringify(customization))intent.current={url,key:crypto.randomUUID(),subtitlesEnabled,customization};
+    if(intent.current?.url!==url||intent.current?.subtitlesEnabled!==subtitlesEnabled||intent.current?.voiceEnabled!==voiceEnabled||intent.current?.durationSeconds!==durationSeconds||intent.current?.aspectRatio!==aspectRatio||JSON.stringify(intent.current?.customization)!==JSON.stringify(customization))intent.current={url,key:crypto.randomUUID(),subtitlesEnabled,voiceEnabled,durationSeconds,aspectRatio,customization};
     lock.current=true;
     try{
-      const response=await fetch('/api/trial',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':intent.current.key},body:JSON.stringify({url,subtitlesEnabled,...(customization?{customization}:{}),turnstileToken:currentToken})});
+      const response=await fetch('/api/trial',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':intent.current.key},body:JSON.stringify({url,subtitlesEnabled,voiceEnabled,durationSeconds,aspectRatio,...(customization?{customization}:{}),turnstileToken:currentToken})});
       const body=await response.json() as {error?:{code?:string;message?:string}};if(!response.ok){if(body.error?.code==='BOT_VERIFICATION_FAILED'){intent.current=null;setChallenge(true);}throw new Error(body.error?.message??'La création n’a pas démarré. Réessayez.');}
       setJob(GenerationView.parse(body));setChallenge(false);intent.current=null;
     }catch(e){setFailure(e instanceof Error?e.message:'La connexion a été interrompue. Réessayez pour retrouver votre demande.');}
@@ -68,8 +68,8 @@ export function AnonymousTrialResult({job}:{job:GenerationView}) {
     {expired?<p>Votre aperçu n’est plus disponible. Aucun nouveau traitement n’a été lancé.</p>:job.ownership==='owned'?<p>Cette vidéo a été enregistrée dans un compte. <Link href="/essai/recuperer">Retrouver ma vidéo</Link></p>:<>
       {generationActive(job)&&<><ol className="generation-steps" aria-label="Étapes de création">{(['importing','scripting','voicing','rendering'] as const).map((s,i)=><li key={s} aria-current={job.stage===s?'step':undefined}>{i+1}. {['Annonce','Texte','Voix','Vidéo'][i]}</li>)}</ol><p>Vous pouvez revenir sur cette page depuis ce navigateur. Votre vidéo y sera conservée.</p><button type="button" className="text-button" disabled={busy} onClick={()=>void connect()}>Me connecter pendant la création</button></>}
       {job.status==='failed'&&<p role="alert">{publicErrors[job.errorCode as PublicErrorCode]?.[1]??publicErrors.GENERATION_FAILED[1]}</p>}
-      {job.videoUrl&&<><video className="generated-video" src={job.videoUrl} controls playsInline preload="metadata" controlsList="nodownload" aria-label="Aperçu complet de votre vidéo avec filigrane"/>
-        <p className="field-help">Voix de synthèse · Aperçu disponible jusqu’au {new Date(job.expiresAt).toLocaleString('fr-FR')}.</p><button className="home-primary-button" type="button" disabled={busy} onClick={()=>void connect()}>{busy?'Ouverture…':'Télécharger sans filigrane'}</button><p>Créez votre compte gratuitement pour récupérer votre vidéo.</p></>}
+      {job.videoUrl&&<><video className={`generated-video${job.aspectRatio==='16:9'?' is-horizontal':''}`} src={job.videoUrl} controls playsInline preload="metadata" controlsList="nodownload" aria-label="Aperçu complet de votre vidéo avec filigrane"/>
+        <p className="field-help">Aperçu disponible jusqu’au {new Date(job.expiresAt).toLocaleString('fr-FR')}.</p><button className="home-primary-button" type="button" disabled={busy} onClick={()=>void connect()}>{busy?'Ouverture…':'Télécharger sans filigrane'}</button><p>Créez votre compte gratuitement pour récupérer votre vidéo.</p></>}
     </>}{failure&&<p role="alert">{failure}</p>}
   </section>;
 }

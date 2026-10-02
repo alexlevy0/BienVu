@@ -19,6 +19,7 @@ const lines=['Découvrez cet appartement à Lyon, à vendre.','Une nouvelle adre
   'Prenons le temps de parcourir les lieux.','Pour en savoir plus, contactez votre agence.'];
 test('personnalisation : entrée stricte, ordre privé et narration exacte',async()=>{
   const settings={...defaultVideoCustomization(),photoOrder:[2,0,1],narration:lines};
+  assert.equal(settings.style,'cinematic');assert.equal(settings.runwayClips,undefined);
   assert.ok(GenerationRequest.safeParse({listingId:'listing-test',customization:settings}).success);
   for(const invalid of [{...settings,voice:'arbitrary'}, {...settings,objectKey:'agencies/elsewhere/photo.jpg'},
     {...settings,photoOrder:[0,0,1]}, {...settings,photoOrder:[0,1]}, {...settings,narration:['<script>',...lines.slice(1)]},

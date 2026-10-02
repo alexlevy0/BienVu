@@ -91,3 +91,5 @@
 .video-progress-indeterminate {width:35%; animation:video-progress-wait 1.5s ease-in-out infinite alternate;}
 @keyframes video-progress-wait {to {transform:translateX(170%);}}
 @media(prefers-reduced-motion:reduce){.video-progress-indeterminate {animation:none;}}
+
+.video-library-dialog.is-horizontal {max-width:960px}.video-library-dialog.is-horizontal video {width:100%;height:auto;aspect-ratio:16/9;object-fit:contain}

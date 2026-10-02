@@ -9,10 +9,10 @@ import {findGeneration,generationView} from '../packages/db/src/index';
 import {productRenderBudget} from '../apps/pipeline/src/product-render-budget';
 export class FixtureGenerationWorkflow extends GenerationWorkflow {
   protected override diagnostic(error:unknown){console.error(error);}
-  protected override async providers(){
+  protected override async providers(_voiceName?:string,voiceEnabled=true){
     const config=GoogleVoiceConfig.parse({projectId:'bienvu-fixture'});
     const voice=googleTts(config,async()=>'fixture-token-never-networked', {fetch:async()=>{const bytes=toneFixture(4500);let text='';for(const b of bytes)text+=String.fromCharCode(b);return Response.json({audioContent:btoa(text)});}});
-    return {mode:'mock' as const,script:{model:DEFAULT_SCRIPT_MODEL,plan:async(context:Parameters<typeof fixturePlan>[0])=>({plan:fixturePlan(context),metrics:fixtureScriptMetrics()})},voice:{config,synthesize:voice.synthesize}};
+    return {mode:'mock' as const,script:{model:DEFAULT_SCRIPT_MODEL,plan:async(context:Parameters<typeof fixturePlan>[0])=>({plan:fixturePlan(context),metrics:fixtureScriptMetrics()})},voice:{config,synthesize:voiceEnabled?voice.synthesize:async():Promise<never>=>{throw Error('TTS_MUST_NOT_RUN');}}};
   }
 }
 export class FixtureGenerationRenderer extends DurableObject<GenerationEnv>{
@@ -24,7 +24,7 @@ export class FixtureGenerationRenderer extends DurableObject<GenerationEnv>{
       await productRenderBudget(this.env.DB,manifest,Date.now());
       const bytes=new Uint8Array([1,2,3,4]),sha=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(b=>b.toString(16).padStart(2,'0')).join('');
       const frames=manifest.scenes.reduce((n,s)=>n+s.durationFrames,0),at=new Date().toISOString(),objectKey=videoObjectKey(manifest,id);
-      const report:VideoReport={id,manifestHash:id,sha256:sha,sizeBytes:bytes.length,width:1080,height:1920,fps:30,codec:'h264',audioCodec:'aac',durationFrames:frames,durationSeconds:frames/30,fastStart:true,watermarked:manifest.rights.watermarked,meanVolumeDb:-20,startedAt:at,endedAt:at,renderAndVerifySeconds:0};
+      const report:VideoReport={id,manifestHash:id,sha256:sha,sizeBytes:bytes.length,width:manifest.width,height:manifest.height,fps:30,codec:'h264',audioCodec:manifest.voiceEnabled===false?null:'aac',durationFrames:frames,durationSeconds:frames/30,fastStart:true,watermarked:manifest.rights.watermarked,meanVolumeDb:manifest.voiceEnabled===false?null:-20,startedAt:at,endedAt:at,renderAndVerifySeconds:0};
       await this.env.MEDIA.put(objectKey,bytes,{customMetadata:{sha256:sha,manifestHash:id}});
       if(manifest.rights.kind==='anonymous'){
         const preview=new Uint8Array([5,6,7,8]),previewHash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',preview))].map(b=>b.toString(16).padStart(2,'0')).join('');

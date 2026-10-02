@@ -34,6 +34,6 @@ const Root = () => <>
   <Composition id="BienVuProbe" component={Film} width={1080} height={1920} fps={30} durationInFrames={180} defaultProps={defaults} calculateMetadata={({props})=>({durationInFrames:props.durationSeconds*props.fps})}/>
   <Composition id="BienVuListing" component={ListingFilm} width={1080} height={1920} fps={30} durationInFrames={600}
     defaultProps={{manifest:null,media:{},logoBackground:'#ffffff',fontUrl:staticFile('video-font.woff2'),displayFontUrl:staticFile('video-display.ttf')}}
-    calculateMetadata={({props}: {props: ListingVideoProps}) => ({durationInFrames:props.manifest?.scenes.reduce((n,s)=>n+s.durationFrames,0) ?? 600})}/>
+    calculateMetadata={({props}: {props: ListingVideoProps}) => ({width:props.manifest?.width??1080,height:props.manifest?.height??1920,durationInFrames:props.manifest?.scenes.reduce((n,s)=>n+s.durationFrames,0) ?? 600})}/>
 </>;
 registerRoot(Root);

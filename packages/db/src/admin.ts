@@ -92,27 +92,30 @@ export async function adminPage(db:Database,input:AdminQuery,now=Date.now()):Pro
 // Metrics are explicitly projected, never the provider payload, prompt or assets.
 // Old/failed calls with missing metrics remain unknown, rather than free.
 const metricNumber=(path:string)=>`CASE WHEN json_type(result_json,'${path}')='integer' AND json_extract(result_json,'${path}') BETWEEN 0 AND 9007199254740991 THEN json_extract(result_json,'${path}') END`;
-const callFields=['id','provider','mode','state','error','reservedCents','at','step','model','voice','requestId','providerRequestId','responseId','requestDurationMs','inputTokens','outputTokens','cachedInputTokens','inputCharacters','currency','priceDate','estimatedMicros'];
+const callFields=['id','provider','mode','state','error','reservedCents','at','step','model','voice','requestId','providerRequestId','responseId','requestDurationMs','inputTokens','outputTokens','cachedInputTokens','inputCharacters','inputUtf8Bytes','currency','priceDate','estimatedMicros'];
 const callMetrics=`SELECT id,provider,provider_mode AS mode,state,error_code AS error,reservation_cents AS reservedCents,created_at AS at,step_key AS step,
-  json_extract(result_json,'$.metrics.model') AS model,json_extract(result_json,'$.metrics.config.voice') AS voice,
+  coalesce(json_extract(result_json,'$.metrics.model'),json_extract(result_json,'$.metrics.config.model')) AS model,json_extract(result_json,'$.metrics.config.voice') AS voice,
   json_extract(result_json,'$.metrics.requestId') AS requestId,json_extract(result_json,'$.metrics.providerRequestId') AS providerRequestId,
   json_extract(result_json,'$.metrics.responseId') AS responseId,${metricNumber('$.metrics.requestDurationMs')} AS requestDurationMs,
   ${metricNumber('$.metrics.usage.inputTokens')} AS inputTokens,${metricNumber('$.metrics.usage.outputTokens')} AS outputTokens,
-  ${metricNumber('$.metrics.usage.cachedInputTokens')} AS cachedInputTokens,${metricNumber('$.metrics.usage.inputCharacters')} AS inputCharacters,
+  ${metricNumber('$.metrics.usage.cachedInputTokens')} AS cachedInputTokens,${metricNumber('$.metrics.usage.inputCharacters')} AS inputCharacters,${metricNumber('$.metrics.usage.inputUtf8Bytes')} AS inputUtf8Bytes,
   CASE WHEN json_extract(result_json,'$.metrics.cost.currency')='USD' THEN 'USD' END AS currency,
   json_extract(result_json,'$.metrics.cost.priceDate') AS priceDate,
   CASE WHEN provider_mode='real' AND json_extract(result_json,'$.metrics.cost.currency')='USD' THEN
     CASE WHEN provider='openai' THEN ${metricNumber('$.metrics.cost.estimatedMicrosBeforeCacheDiscount')}
-      WHEN provider='google' THEN ${metricNumber('$.metrics.cost.estimatedMicrosBeforeFreeTier')} END END AS estimatedMicros
+      WHEN provider IN ('google','fish') THEN ${metricNumber('$.metrics.cost.estimatedMicrosBeforeFreeTier')} END END AS estimatedMicros
   FROM narration_calls`;
 export async function adminVideoDetail(db:Database,id:string):Promise<AdminVideoDetail|null>{
   EntityId.parse(id);
   const video=(await selectRows(db,`SELECT * FROM (${videos}) WHERE id=?`,videoFields,[id]))[0];if(!video)return null;
-  const [events,reports,calls]=await Promise.all([
+  const [events,reports,calls,animations]=await Promise.all([
     selectRows(db,'SELECT event,created_at AS at FROM generation_events WHERE job_id=? ORDER BY created_at LIMIT 30',['event','at'],[id]),
     selectRows(db,'SELECT id,category,comment,status,created_at AS at FROM generation_reports WHERE job_id=? ORDER BY created_at DESC LIMIT 30',['id','category','comment','status','at'],[id]),
     selectRows(db,callMetrics+' WHERE job_id=? ORDER BY created_at,id',callFields,[id]),
-  ]);return {video,events,reports,calls:calls as AdminNarrationCall[]};
+    selectRows(db,`SELECT id,photo_id AS photoId,mode,model,state,task_id AS taskId,error_code AS error,
+      credits,reserved_cents AS reservedCents,created_at AS at FROM photo_animations WHERE job_id=? ORDER BY slot`,
+      ['id','photoId','mode','model','state','taskId','error','credits','reservedCents','at'],[id]),
+  ]);return {video,events,reports,calls:calls as AdminNarrationCall[],animations};
 }
 export async function adminOverview(db:Database,config:AdminOverview['config'],now=Date.now()):Promise<AdminOverview>{
   const at=new Date(now).toISOString(),month=at.slice(0,7);

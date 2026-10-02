@@ -27,7 +27,7 @@ export async function videoFixture(kind:'trial'|'paid'|'anonymous'='trial', phot
 }
 export function videoReport(id:string,manifest:VideoManifest,bytes:Uint8Array=new Uint8Array([1,2,3])):VideoReport {
   const frames=manifest.scenes.reduce((n,s)=>n+s.durationFrames,0),at=new Date().toISOString();
-  return {id,manifestHash:id,sha256:sha(bytes),sizeBytes:bytes.length,width:1080,height:1920,fps:30,codec:'h264',audioCodec:'aac',
+  return {id,manifestHash:id,sha256:sha(bytes),sizeBytes:bytes.length,width:manifest.width,height:manifest.height,fps:30,codec:'h264',audioCodec:'aac',
     durationFrames:frames,durationSeconds:frames/30,fastStart:true,watermarked:manifest.rights.watermarked,meanVolumeDb:-20,
     startedAt:at,endedAt:at,renderAndVerifySeconds:0};
 }

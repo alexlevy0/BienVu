@@ -23,7 +23,7 @@ for(const style of ['editorial','minimal','cinematic'] as const){
   await renderListingStills(manifest,directory,join(directory,'frames'),[30,frames-30]);
   for(const frame of [30,frames-30])captures.push(await sharp(join(directory,'frames',`frame-${frame}.png`)).resize(270,480).png().toBuffer());
   const video=style==='cinematic'?await renderListingVideo(manifest,directory):null;
-  if(video){assert.equal(video.width,1080);assert.equal(video.height,1920);assert.equal(video.audioCodec,'aac');assert.ok(video.meanVolumeDb>-45);}
+  if(video){assert.equal(video.width,1080);assert.equal(video.height,1920);assert.equal(video.audioCodec,'aac');assert.ok((video.meanVolumeDb??-Infinity)>-45);}
   report.push({style,manifestHash:await videoManifestHash(manifest),photos:manifest.photos.length,stills:[30,frames-30],video});
 }
 await sharp({create:{width:1620,height:480,channels:3,background:'#fff'}}).composite(captures.map((input,i)=>({input,left:i*270,top:0}))).png().toFile('evidence/local/video-customizer/styles-contact-sheet.png');

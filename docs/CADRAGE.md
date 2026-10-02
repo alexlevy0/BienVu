@@ -14,10 +14,12 @@ Référence du 27 septembre 2026. Les décisions confirmées priment sur les pro
 | Parcours | Renseigner/importer, générer, prévisualiser, télécharger ; aucun éditeur vidéo |
 | Import | Priorité aux sites d'agences ; Le Figaro Immobilier, SeLoger, Leboncoin, Bien'ici et les autres si possible |
 | Marque | Logo, couleurs et coordonnées enregistrés pour les vidéos de l'agence |
+| Animation | Depuis le 01/10 : mouvements de caméra fluides et option Runway pour une ou deux photos, réglable avant génération. Achat API déclaré de 10 € ; recette réelle et solde requis avant activation. |
+| Rendu de référence | Le 01/10, Alex confirme une visite immersive avec les informations surtout à la fin. Cinéma devient le défaut des nouvelles créations ; Éditorial et Minimal restent proposés et les brouillons conservent leur style enregistré. |
 | Revenus | Plusieurs abonnements selon le nombre de vidéos |
 | Essai | Depuis le 29/09 : un essai anonyme abouti avec aperçu filigrané ; connexion et crédit pour récupérer le master propre, sans nouveau rendu. Compte gratuit : trois vidéos/mois, essai récupéré compris. |
 | Hébergement | Tout chez Cloudflare si techniquement possible |
-| Budget | Enveloppe d'origine 30 €/mois, portée explicitement à 40 € le 29/09 ; coupure préventive existante à 35 €. Facture et coût par vidéo à rapprocher. Les protections de l'extraction réservent 0,05 € par tentative, sans relever les plafonds de production. |
+| Budget | Enveloppe actuelle 100 €/mois, coupure à 90 €, confirmées le 01/10 ; anciens relevés conservés. Achat Runway API de 10 € déclaré, compris dans cette enveloppe et à imputer une fois. Factures et coût par vidéo à rapprocher. |
 
 La préférence de développement est Next.js et TypeScript. Remotion est le moteur vidéo envisagé. Python et Scrapling ne constituent pas une obligation.
 
@@ -25,13 +27,13 @@ La préférence de développement est Next.js et TypeScript. Remotion est le mot
 
 - Interface française ; agences et annonces françaises au lancement.
 - MP4 H.264/AAC, 1080 × 1920, 30 images/s, environ 30 secondes, plage cible 20–35 secondes selon le contenu.
-- Un modèle visuel sobre : 4–6 séquences de photos existantes, mouvements lents, transitions courtes, sous-titres et écran de contact.
+- Un modèle visuel sobre : 4–6 scènes de narration, jusqu'à 12 photos distinctes du bien, mouvements lents, transitions courtes, sous-titres et écran de contact.
 - Voix française synthétique standard, testée à l'écoute ; aucune imitation ou création de voix personnelle.
-- Pas de musique au premier lancement. Pas d'avatar ni de modification générative des pièces.
+- Pas de musique au premier lancement. Pas d'avatar. L'animation Runway demandée le 01/10 vise un mouvement de caméra sur les photographies existantes, avec instruction de conserver les pièces et leurs détails ; les originaux restent conservés et le rendu doit être vérifié avant partage.
 - Un utilisateur propriétaire pour une agence ; pas encore d'invitations d'équipe ou de gestion de plusieurs agences.
 - Connexion **e-mail/mot de passe en plus de Google**, demandée par Alex le 28/09/2026. Confirmation d’adresse obligatoire et récupération de mot de passe. Better Auth/D1 reste le choix technique d’implémentation ; les e-mails transactionnels sont préparés sur Cloudflare Email Service, avec essais locaux en attendant Workers Paid et un domaine expéditeur vérifié.
 - Essai anonyme lisible avec filigrane incrusté. Connexion et crédit pour télécharger sans filigrane ; abonnements destinés au volume supplémentaire. [Règles et activation du pilote](ESSAI-ANONYME.md).
-- Prix proposés uniquement dans BUDGET-ET-OFFRES.md. Ils ne sont ni validés commercialement ni publiés.
+- Offres confirmées par Alex dans BUDGET-ET-OFFRES.md : Gratuit 3 vidéos/mois, Plus 19 € HT/20 vidéos, Pro 49 € HT/60 vidéos. Présentation publiée ; souscription payante non ouverte.
 
 ## Parcours minimal
 
@@ -59,7 +61,7 @@ Les annonces de vente sont le premier cas de recette. Pour une location, reconna
 - Ne pas inventer un étage, une vue, une proximité, une performance énergétique ou une adresse.
 - Conserver le mode de création, le lien lorsqu’il existe, la date, la provenance des champs et les contradictions éventuelles. Aucune URL fictive pour une saisie manuelle.
 - Conserver les mentions énergétiques et commerciales utiles issues de la source ; leur présentation applicable aux publicités immobilières françaises doit être vérifiée avant lancement. Ce dossier n'établit pas une conformité juridique automatique.
-- Présenter clairement que la narration est synthétique. La mention ne doit pas disparaître avec le retrait du filigrane d'essai.
+- Conserver la provenance synthétique de la narration dans le manifeste serveur. Alex a demandé le 29/09 de retirer la mention visible de l'image ; cette mention n'est pas réintroduite dans les vidéos.
 - L'autorisation d'utiliser une photo et l'accès technique au portail sont deux sujets distincts ; ne pas présenter l'import comme une licence de réutilisation.
 
 ## Hors périmètre de cette première version

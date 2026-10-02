@@ -32,7 +32,8 @@ export function generationView(row:GenerationRow,now=Date.now(),audience:'owner'
     createdAt:row.createdAt,updatedAt:row.updatedAt,expiresAt:row.expiresAt,title:row.title,locality:row.locality,
     videoUrl:available&&unlocked?`/api/generations/${row.jobId}/video`:preview?audience==='anonymous'?`/api/trial/${row.jobId}/preview`:`/api/generations/${row.jobId}/preview`:null,downloadUrl:available&&unlocked?`/api/generations/${row.jobId}/video?download=1`:null,
     durationSeconds:row.report?VideoReport.parse(JSON.parse(row.report)).durationSeconds:null,
-    syntheticVoice:true,retryAllowed:row.status==='queued'&&row.launchStatus==='pending'});
+    aspectRatio:GenerationRequest.parse(JSON.parse(row.input)).aspectRatio??'9:16',
+    syntheticVoice:GenerationRequest.parse(JSON.parse(row.input)).voiceEnabled!==false,retryAllowed:row.status==='queued'&&row.launchStatus==='pending'});
 }
 export async function generationRights(db:Database,agencyId:string,flag:string|undefined,now=Date.now()) {
   const at=new Date(now).toISOString();
@@ -42,7 +43,7 @@ export async function generationRights(db:Database,agencyId:string,flag:string|u
     .bind(at.slice(0,10),at.slice(0,7)).first<{month:number;day:number}>();
   const nextDay=new Date(at.slice(0,10)+'T00:00:00Z').getTime()+86400_000;
   const nextMonth=Date.UTC(new Date(now).getUTCFullYear(),new Date(now).getUTCMonth()+1,1);
-  const importRetryAt=usage&&usage.month>=30?new Date(nextMonth).toISOString():usage&&usage.day>=10?new Date(nextDay).toISOString():null;
+  const importRetryAt=usage&&usage.month>=60?new Date(nextMonth).toISOString():usage&&usage.day>=20?new Date(nextDay).toISOString():null;
   return {generationEnabled:flag==='true'&&grant?.enabled===1&&gate?.enabled===1,developmentRemaining:grant?.remaining??0,renewalAt:grant?.renewalAt??null,creditKind:grant?.kind??null,importRetryAt};
 }
 export async function admitGeneration(db:Database,agencyId:string,key:string,input:unknown,flag:string|undefined,now=Date.now(),verifyPhotos?:(listing:NormalizedListing)=>Promise<void>) {

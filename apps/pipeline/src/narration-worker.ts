@@ -1,7 +1,7 @@
-import {GoogleVoiceConfig, NarrationFailure, PreparedNarration, VoiceFailure} from '@bienvu/contracts';
+import {GoogleVoiceConfig,FishVoiceConfig, NarrationFailure, PreparedNarration, VoiceFailure} from '@bienvu/contracts';
 import {findNarration} from '@bienvu/db';
 import {openaiScripts} from '@bienvu/narration';
-import {googleServiceAccountAccess, googleTts} from '@bienvu/voice';
+import {googleServiceAccountAccess, googleTts,fishTts} from '@bienvu/voice';
 import {prepareJobNarration, readNarrationAudio, type NarrationProviders} from './narration';
 
 // Bindings générés depuis Wrangler ; valeurs sensibles via `secret bulk`.
@@ -35,12 +35,22 @@ async function authorized(request: Request, expected?: string) {
   return crypto.subtle.verify('HMAC', key, signature, expectedHash);
 }
 
-export async function realProviders(env: Pick<Env,'GOOGLE_SERVICE_ACCOUNT_JSON'|'GOOGLE_CLOUD_PROJECT'|'GOOGLE_TTS_VOICE'|'OPENAI_API_KEY'|'SCRIPT_MODEL'>,voiceName?:GoogleVoiceConfig['voice']): Promise<NarrationProviders> {
+export type FishVoiceEnv={FISH_API_KEY?:string;FISH_TTS_ENABLED?:string};
+export async function realProviders(env: Pick<Env,'GOOGLE_SERVICE_ACCOUNT_JSON'|'GOOGLE_CLOUD_PROJECT'|'GOOGLE_TTS_VOICE'|'OPENAI_API_KEY'|'SCRIPT_MODEL'>&FishVoiceEnv,voiceName?:string,voiceEnabled=true): Promise<NarrationProviders> {
+  const fish=voiceName?.startsWith('fish-')===true;
+  const config=fish?FishVoiceConfig.parse({voice:voiceName}):GoogleVoiceConfig.parse({projectId:env.GOOGLE_CLOUD_PROJECT,voice:voiceName??env.GOOGLE_TTS_VOICE});
+  if(!voiceEnabled)return {mode:'real',script:openaiScripts(env.OPENAI_API_KEY??'',env.SCRIPT_MODEL),voice:{
+    config,
+    synthesize:async()=>{throw new VoiceFailure('VOICE_CONFIG_INVALID');}}};
+  if(config.provider==='fish'){
+    if(env.FISH_TTS_ENABLED!=='true')throw new VoiceFailure('VOICE_UNAVAILABLE');
+    const voice=fishTts(config,env.FISH_API_KEY??'');
+    return {mode:'real',script:openaiScripts(env.OPENAI_API_KEY??'',env.SCRIPT_MODEL),voice:{config,synthesize:voice.synthesize}};
+  }
   const secret = env.GOOGLE_SERVICE_ACCOUNT_JSON;
   if (!secret || secret.length > 16_384) throw new NarrationFailure('SCRIPT_CONFIG_INVALID');
   let account: unknown;
   try {account = JSON.parse(secret);} catch {throw new NarrationFailure('SCRIPT_CONFIG_INVALID');}
-  const config = GoogleVoiceConfig.parse({projectId: env.GOOGLE_CLOUD_PROJECT, voice: voiceName??env.GOOGLE_TTS_VOICE});
   const access = await googleServiceAccountAccess(account, config.projectId);
   const voice = googleTts(config, access);
   return {mode: 'real', script: openaiScripts(env.OPENAI_API_KEY ?? '', env.SCRIPT_MODEL), voice: {config, synthesize: voice.synthesize}};

@@ -11,7 +11,7 @@ import {admitGeneration,setGenerationProgress,findGeneration} from '../packages/
 import {videoFixture} from '../fixtures/video';
 import {getJobVideo} from '../apps/pipeline/src/video-manifest';
 
-test('Workflow workerd réel, fournisseurs simulés : déconnexion, restart puis réconciliation après upload et quota unique',async t=>{
+for(const voiceEnabled of [true,false])test(`Workflow workerd réel ${voiceEnabled?'avec voix':'sans voix ni sous-titres'}, fournisseurs simulés : déconnexion, restart puis réconciliation après upload et quota unique`,async t=>{
   const directory=await mkdtemp(path.join(tmpdir(),'bienvu-generation-'));t.after(()=>rm(directory,{recursive:true,force:true}));
   const require=createRequire(import.meta.url),wrangler=createRequire(require.resolve('wrangler/package.json'));
   const esbuild=await import(pathToFileURL(wrangler.resolve('esbuild')).href) as {build:(o:unknown)=>Promise<unknown>};
@@ -31,7 +31,7 @@ test('Workflow workerd réel, fournisseurs simulés : déconnexion, restart puis
   await env.DB.prepare('INSERT INTO hosted_import_budget VALUES(?,0,3500,0)').bind(new Date().toISOString().slice(0,7)).run();await env.DB.exec('UPDATE generation_control SET enabled=1');
   const headers={'Content-Type':'application/json',Authorization:'Bearer fixture-generation-token-1234567890','X-Agency-ID':scope.agencyId,'Idempotency-Key':'fixture-workflow-idempotency'};
   assert.equal((await mf.dispatchFetch('https://test/generations',{method:'POST',body:'{}'})).status,401);
-  const input={listingId:listing.id,subtitlesEnabled:false};
+  const input={listingId:listing.id,subtitlesEnabled:!voiceEnabled,...(!voiceEnabled?{voiceEnabled:false}:{})};
   const create=()=>mf.dispatchFetch('https://test/generations',{method:'POST',headers,body:JSON.stringify(input)});
   const missing=listing.photos[0];await env.MEDIA.delete(missing.objectKey);
   assert.equal((await create()).status,422);
@@ -48,13 +48,15 @@ test('Workflow workerd réel, fournisseurs simulés : déconnexion, restart puis
   for(let i=0;i<70;i++){row=await env.DB.prepare('SELECT status FROM jobs WHERE id=?').bind(job.id).first();if(['rendering','ready','failed'].includes(row!.status))break;await new Promise(r=>setTimeout(r,200));}
   assert.equal(row!.status,'rendering');
   assert.equal((await getJobVideo(env.DB,scope.agencyId,job.id))!.manifest.subtitlesEnabled,false);
+  assert.equal((await getJobVideo(env.DB,scope.agencyId,job.id))!.manifest.audio.length===0,!voiceEnabled);
   const progressRow=(await findGeneration(env.DB,scope.agencyId,job.id))!;
   await setGenerationProgress(env.DB,progressRow,42);
   await setGenerationProgress(env.DB,progressRow,17);
   assert.equal((await env.DB.prepare('SELECT progress_percent AS percent FROM jobs WHERE id=?').bind(job.id).first<{percent:number}>())!.percent,42);
   // Détruire workerd pendant le sleep, après le stockage R2. La requête HTTP est terminée depuis longtemps.
   const beforeCalls=(await env.DB.prepare('SELECT count(*) AS n FROM narration_calls').first<{n:number}>())!.n;
-  assert.ok(beforeCalls>1);
+  if(voiceEnabled)assert.ok(beforeCalls>1);
+  else assert.equal(beforeCalls,1);
   await mf.dispose();mf=new Miniflare(options);env=await mf.getBindings<{DB:D1Database;MEDIA:R2Bucket}>();
   await mf.dispatchFetch(`https://test/reconcile/${job.id}`,{headers});
   for(let i=0;i<100;i++){row=await env.DB.prepare('SELECT status FROM jobs WHERE id=?').bind(job.id).first();if(['ready','failed'].includes(row!.status))break;await new Promise(r=>setTimeout(r,200));}

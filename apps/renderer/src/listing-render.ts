@@ -51,6 +51,13 @@ export async function withVideoAssets<T>(input: unknown, directory: string, use:
     if (sha(bytes) !== asset.sha256) throw new Error('VIDEO_ASSET_HASH_MISMATCH');
     if (asset.mime === 'audio/wav') {
       if (measureVoiceWav(bytes).durationMs !== asset.durationMs) throw new Error('VIDEO_AUDIO_DURATION_MISMATCH');
+    } else if(asset.mime==='video/mp4'){
+      const {stdout}=await exec(binary('ffprobe'),['-v','error','-show_format','-show_streams','-of','json',file],{cwd:cwd(binary('ffprobe')),timeout:20_000,maxBuffer:128_000});
+      const metadata=JSON.parse(stdout) as {format:{duration:string};streams:{codec_type:string;codec_name:string;width:number;height:number}[]};
+      const video=metadata.streams.filter(s=>s.codec_type==='video');
+      const duration=Number(metadata.format.duration);
+      if(video.length!==1||video[0].codec_name!=='h264'||video[0].width!==asset.width||video[0].height!==asset.height
+        ||!Number.isFinite(duration)||Math.abs(duration*1000-asset.durationMs!)>200)throw Error('VIDEO_ANIMATION_INVALID');
     } else {
       const meta = await sharp(bytes, {limitInputPixels: 40_000_000}).metadata();
       if (meta.format !== ({'image/jpeg':'jpeg','image/png':'png','image/webp':'webp'} as const)[asset.mime]
@@ -87,13 +94,15 @@ export async function withVideoAssets<T>(input: unknown, directory: string, use:
     return await use({manifest,media,logoBackground,fontUrl:base+'font.woff2',displayFontUrl:base+'display.ttf'});
   }finally{server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));}
 }
-export async function verifyVideoArtifact(file:string,id:string,frames:number,watermarked:boolean,startedAt:string,start:number) {
+export async function verifyVideoArtifact(file:string,id:string,frames:number,watermarked:boolean,startedAt:string,start:number,voiceEnabled=true,dimensions:Pick<VideoManifest,'width'|'height'>={width:1080,height:1920}) {
     const {stdout}=await exec(binary('ffprobe'),['-v','error','-show_format','-show_streams','-of','json',file],{cwd:cwd(binary('ffprobe')),timeout:20_000,maxBuffer:128_000});
     const metadata=JSON.parse(stdout) as {format:{duration:string};streams:{codec_type:string;codec_name:string;width?:number;height?:number;avg_frame_rate?:string;nb_frames?:string}[]};
     const video=metadata.streams.find(s=>s.codec_type==='video'), audio=metadata.streams.find(s=>s.codec_type==='audio');
-    if(metadata.streams.length!==2 || video?.codec_name!=='h264' || video.width!==1080 || video.height!==1920
-      || video.avg_frame_rate!=='30/1' || Number(video.nb_frames)!==frames || audio?.codec_name!=='aac'
+    if(metadata.streams.length!==(voiceEnabled?2:1) || video?.codec_name!=='h264' || video.width!==dimensions.width || video.height!==dimensions.height
+      || video.avg_frame_rate!=='30/1' || Number(video.nb_frames)!==frames || (voiceEnabled?audio?.codec_name!=='aac':Boolean(audio))
       || Math.abs(Number(metadata.format.duration)-frames/30)>.12)throw new Error('VIDEO_MP4_INVALID');
+    let meanVolumeDb:number|null=null;
+    if(voiceEnabled){
     const {stdout:wav}=await exec(binary('ffmpeg'),['-v','error','-i',file,'-map','0:a:0','-ar','16000','-ac','1','-f','wav','-c:a','pcm_s16le','pipe:1'],
       {cwd:cwd(binary('ffmpeg')),encoding:'buffer',timeout:30_000,maxBuffer:2_000_000});
     if(wav.toString('ascii',0,4)!=='RIFF'||wav.toString('ascii',8,12)!=='WAVE')throw new Error('VIDEO_AUDIO_INVALID');
@@ -106,18 +115,19 @@ export async function verifyVideoArtifact(file:string,id:string,frames:number,wa
     }
     if(!pcm?.length||pcm.length%2)throw new Error('VIDEO_AUDIO_INVALID');
     let sum=0;for(let i=0;i+2<=pcm.length;i+=2)sum+=(pcm.readInt16LE(i)/32768)**2;
-    const meanVolumeDb=10*Math.log10(sum/(pcm.length/2));
+    meanVolumeDb=10*Math.log10(sum/(pcm.length/2));
     if(!Number.isFinite(meanVolumeDb)||meanVolumeDb < -50)throw new Error('VIDEO_AUDIO_SILENT');
+    }
     const bytes=await readFile(file);
     if(!isFastStart(bytes))throw new Error('VIDEO_NOT_STREAMABLE');
-    const report=VideoReport.parse({id,manifestHash:id,sha256:sha(bytes),sizeBytes:bytes.length,width:1080,height:1920,fps:30,
-      codec:'h264',audioCodec:'aac',durationFrames:frames,durationSeconds:Number(metadata.format.duration),fastStart:true,
+    const report=VideoReport.parse({id,manifestHash:id,sha256:sha(bytes),sizeBytes:bytes.length,...dimensions,fps:30,
+      codec:'h264',audioCodec:voiceEnabled?'aac':null,durationFrames:frames,durationSeconds:Number(metadata.format.duration),fastStart:true,
       watermarked,meanVolumeDb,startedAt,endedAt:new Date().toISOString(),renderAndVerifySeconds:(performance.now()-start)/1000});
     return report;
 }
 // One bounded derivative from the finished master. The AAC stream is copied;
 // neither Remotion, narration nor the importer runs a second time.
-export async function createWatermarkedPreview(master:string,directory:string,id:string,frames:number) {
+export async function createWatermarkedPreview(master:string,directory:string,id:string,frames:number,voiceEnabled=true,dimensions:Pick<VideoManifest,'width'|'height'>={width:1080,height:1920}) {
   const start=performance.now(),startedAt=new Date().toISOString(),watermark=path.join(directory,'trial-watermark.png');
   const output=path.join(directory,'preview.mp4');
   const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="660" height="112" viewBox="0 0 660 112">
@@ -127,11 +137,13 @@ export async function createWatermarkedPreview(master:string,directory:string,id
     <text x="124" y="88" font-family="sans-serif" font-size="22" fill="#fff">bienvu.online</text></svg>`;
   await sharp(Buffer.from(svg)).png().toFile(watermark);
   try {
-    await exec(binary('ffmpeg'),['-v','error','-i',master,'-i',watermark,'-filter_complex','[0:v][1:v]overlay=(W-w)/2:690:format=auto[v]',
-      '-map','[v]','-map','0:a:0','-c:v','libx264','-preset','veryfast','-crf','21','-pix_fmt','yuv420p','-threads','1','-c:a','copy','-movflags','+faststart','-y',output],
-      {cwd:cwd(binary('ffmpeg')),timeout:120_000,maxBuffer:128_000});
+    await exec(binary('ffmpeg'),['-v','error','-i',master,'-i',watermark,'-filter_complex',`[0:v][1:v]overlay=(W-w)/2:${dimensions.width>dimensions.height?'(H-h)/2':'690'}:format=auto[v]`,
+      '-map','[v]',...(voiceEnabled?['-map','0:a:0']:[]),'-c:v','libx264','-preset','veryfast','-crf','21','-pix_fmt','yuv420p','-threads','1','-c:a','copy','-movflags','+faststart','-y',output],
+      // Scale the bounded transcode allowance with the validated 20–40 s
+      // master, so anonymous 40 s previews do not inherit a 20 s timeout.
+      {cwd:cwd(binary('ffmpeg')),timeout:Math.ceil(frames/30)*6000,maxBuffer:128_000});
     if((await stat(output)).size>50*1024*1024)throw new Error('VIDEO_TOO_LARGE');
-    const report=await verifyVideoArtifact(output,id,frames,true,startedAt,start);
+    const report=await verifyVideoArtifact(output,id,frames,true,startedAt,start,voiceEnabled,dimensions);
     await chmod(output,0o600);return report;
   }finally{await rm(watermark,{force:true});}
 }
@@ -153,7 +165,7 @@ export async function renderListingVideo(input: unknown, directory: string): Pro
     progress(0);
     await withVideoAssets(manifest,directory,async props=>{
       const composition=await selectComposition({serveUrl:bundleDir,id:'BienVuListing',inputProps:props,...browser()});
-      await renderMedia({serveUrl:bundleDir,composition,inputProps:props,...browser(),codec:'h264',audioCodec:'aac',
+      await renderMedia({serveUrl:bundleDir,composition,inputProps:props,...browser(),codec:'h264',audioCodec:'aac',muted:manifest.voiceEnabled===false,
         pixelFormat:'yuv420p',outputLocation:raw,concurrency:1,timeoutInMilliseconds:120_000,
         audioBitrate:'192k',crf:21,logLevel:'error',onProgress:state=>progress(state.progress*85)});
     });
@@ -161,10 +173,11 @@ export async function renderListingVideo(input: unknown, directory: string): Pro
     if((await stat(raw)).size>50*1024*1024)throw new Error('VIDEO_TOO_LARGE');
     if(isFastStart(await readFile(raw)))await rename(raw,partial);
     else await exec(binary('ffmpeg'),['-v','error','-i',raw,'-map','0','-c','copy','-movflags','+faststart','-y',partial],{cwd:cwd(binary('ffmpeg')),timeout:60_000});
-    const report=await verifyVideoArtifact(partial,id,frames,manifest.rights.watermarked,startedAt,start);
+    const dimensions={width:manifest.width,height:manifest.height};
+    const report=await verifyVideoArtifact(partial,id,frames,manifest.rights.watermarked,startedAt,start,manifest.voiceEnabled!==false,dimensions);
     await rename(partial,output);await chmod(output,0o600);
     progress(90);
-    if(manifest.rights.kind==='anonymous')report.preview=await createWatermarkedPreview(output,directory,id,frames);
+    if(manifest.rights.kind==='anonymous')report.preview=await createWatermarkedPreview(output,directory,id,frames,manifest.voiceEnabled!==false,dimensions);
     progress(94);
     await writeFile(path.join(directory,'report.json'),JSON.stringify(report,null,2)+'\n',{mode:0o600});
     progress(95);

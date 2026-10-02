@@ -192,9 +192,15 @@ export const CostEvent = z.object({
 }).strict().refine(event => !event.jobId || Boolean(event.agencyId), 'Un coût de traitement doit être rattaché à une agence.');
 export type CostEvent = z.infer<typeof CostEvent>;
 
-// Optional preserves existing admission hashes; omitted means subtitles enabled.
+export const VideoDuration = z.union([z.literal(20),z.literal(30),z.literal(40)]);
+export type VideoDuration = z.infer<typeof VideoDuration>;
+export const VideoAspectRatio = z.enum(['9:16','16:9']);
+export type VideoAspectRatio = z.infer<typeof VideoAspectRatio>;
+export const videoDimensions = (ratio:VideoAspectRatio='9:16') => ratio==='16:9'
+  ? {width:1920 as const,height:1080 as const} : {width:1080 as const,height:1920 as const};
+// Optional fields preserve existing admission hashes and historical timing.
 export const GenerationInput = z.union([
-  z.object({url:ImportUrl,subtitlesEnabled:z.boolean().optional(),customization:GenerationCustomization.optional()}).strict()
+  z.object({url:ImportUrl,subtitlesEnabled:z.boolean().optional(),voiceEnabled:z.boolean().optional(),durationSeconds:VideoDuration.optional(),aspectRatio:VideoAspectRatio.optional(),customization:GenerationCustomization.optional()}).strict()
     .refine(value=>value.customization?.photoOrder===undefined,'Importez les photos avant de choisir leur ordre.'),
-  z.object({listingId:EntityId,subtitlesEnabled:z.boolean().optional(),customization:GenerationCustomization.optional()}).strict(),
+  z.object({listingId:EntityId,subtitlesEnabled:z.boolean().optional(),voiceEnabled:z.boolean().optional(),durationSeconds:VideoDuration.optional(),aspectRatio:VideoAspectRatio.optional(),customization:GenerationCustomization.optional()}).strict(),
 ]);

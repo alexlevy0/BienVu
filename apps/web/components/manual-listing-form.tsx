@@ -1,14 +1,15 @@
 'use client';
 import {useEffect, useImperativeHandle, useRef, useState, type ChangeEvent, type FormEvent, type Ref} from 'react';
 import {defaultVideoCustomization,VideoCustomization,GenerationCustomization,DESCRIPTION_MAX_CHARACTERS, ManualListingInput, MANUAL_PHOTO_LIMITS, publicErrors, type PublicErrorCode,
-  type CreationDraftData, type CreationDraftView, type NormalizedListing} from '@bienvu/contracts';
+  type CreationDraftData, type CreationDraftView, type NormalizedListing,type VideoDuration,type VideoAspectRatio} from '@bienvu/contracts';
 import {HomeIcon} from './home-icons';
 import type {ImportView} from './generation-form';
 import {manualDraftFields, readManualListingDraft, saveManualListingDraft, type ManualDraft, type ManualDraftFields} from '../lib/listing-draft';
 import {inspectManualPhotos} from '../lib/manual-photos';
-import {VideoCustomizer,suggestedNarration} from './video-customizer';
+import {photoUploadError} from '../lib/photo-upload-error';
+import {VideoCustomizer} from './video-customizer';
 
-type SelectedPhoto = {id: string; file: File|null; preview: string; remote?:NormalizedListing['photos'][number]; state:'ready'|'sending'|'error'; slot:number};
+type SelectedPhoto = {id: string; file: File|null; preview: string; remote?:NormalizedListing['photos'][number]; state:'ready'|'sending'|'error'; slot:number; error?:string; removing?:boolean};
 type Guided={step:number;setStep(step:number):void;description:string;setDescription(value:string):void;onCancel():void;
   agencyId?:string;initialDraft?:CreationDraftView|null;initialData?:CreationDraftData|null;
   onReadyChange?(ready:boolean,reason:string):void;onDraftChange?():void};
@@ -19,7 +20,8 @@ const labels: Record<string, string> = {title: 'titre', locality: 'localisation'
 type Props = {busy: boolean; generate?: boolean; setBusy(value: boolean): void;guided?:Guided;ref?:Ref<ManualListingFormHandle>;
   customizing?:boolean;onCloseCustomizer?():void;brand?:{name:string;primaryColor:string;secondaryColor:string};
   initialCustomization?:VideoCustomization;
-  subtitlesEnabled?:boolean;onSubtitles?(value:boolean):void;
+  subtitlesEnabled?:boolean;onSubtitles?(value:boolean):void;voiceEnabled?:boolean;onVoice?(value:boolean):void;
+  durationSeconds?:VideoDuration;aspectRatio?:VideoAspectRatio;
   incomingPhotos?:{id:string;files:File[]}|null;onPhotosReceived?(id:string,result:{accepted:File[];issues:string[]}):void} & (
   {prepareGuest: true; onPrepared(): void; onCreated?: never} |
   {prepareGuest?: false; onCreated(value: ImportView): Promise<void>; onPrepared?: never}
@@ -38,6 +40,7 @@ export function ManualListingForm(props: Props) {
   const history=useRef<number[]>([]);
   const selected = useRef(photos), pending = useRef<{fingerprint: string; key: string} | null>(null),formRef=useRef<HTMLFormElement>(null),submitLock=useRef(false);
   const removedIds=useRef<Set<string>>(new Set());
+  const uploads=useRef(new Set<string>()),removals=useRef(new Set<string>());
   const receivedBatches=useRef(new Set<string>()),photoLock=useRef(false),mounted=useRef(true);
   const [customization,setCustomization]=useState<VideoCustomization|undefined>(),[settingsSaved,setSettingsSaved]=useState(false);
   const customizationRef=useRef<VideoCustomization|undefined>(undefined),settingsVersion=useRef(0),customInitialized=useRef(false),settingsWrite=useRef<Promise<void>|null>(null);
@@ -69,10 +72,10 @@ export function ManualListingForm(props: Props) {
     const selectionValid=!customization||GenerationCustomization.safeParse(customization).success&&
       (!customization.photoOrder||customization.photoOrder.every(slot=>photos.some(photo=>photo.slot===slot&&photo.state==='ready')));
     const ready=(completed||hydrated&&(props.guided.step===4||props.customizing)&&fieldsValid&&unresolved().length===0&&photos.filter(photo=>photo.state==='ready').length>=3&&
-      !photos.some(photo=>photo.state!=='ready')&&(!props.guided.agencyId||Boolean(serverDraft)));
+      !photos.some(photo=>photo.state!=='ready'||photo.removing)&&(!props.guided.agencyId||Boolean(serverDraft)));
     const reason=!selectionValid?'Vérifiez la narration et sélectionnez au moins trois photos.':completed?'':!hydrated?'Chargement du brouillon en cours.':props.guided.step!==4&&!props.customizing?'Terminez les sections puis vérifiez votre annonce.':
       unresolved().length?'Confirmez les informations signalées avant la création.':
-      photos.some(photo=>photo.state==='sending')?'Envoi des photos en cours.':photos.some(photo=>photo.state==='error')?
+      photos.some(photo=>photo.removing)?'Retrait des photos en cours.':photos.some(photo=>photo.state==='sending')?'Envoi des photos en cours.':photos.some(photo=>photo.state==='error')?
       'Réessayez ou retirez les photos en erreur.':photos.length<3?'Ajoutez au moins trois photos.':!serverDraft&&props.guided.agencyId?
       'Préparation du brouillon privé en cours.':!fieldsValid?'Vérifiez les informations du bien dans les sections indiquées.':'';
     props.guided.onReadyChange?.(Boolean(ready&&selectionValid),reason);
@@ -101,7 +104,7 @@ export function ManualListingForm(props: Props) {
       const keyName=`bienvu:manual-start:${props.guided!.agencyId}`;
       let key=sessionStorage.getItem(keyName);if(!key){key=crypto.randomUUID();sessionStorage.setItem(keyName,key);}
       const response=await fetch('/api/imports/draft',{method:'POST',headers:{'Idempotency-Key':key}});
-      if(!response.ok)throw new FormFailure('Impossible de préparer le brouillon privé. Réessayez.');
+      if(!response.ok)throw new FormFailure(await photoUploadError(response,'Impossible de préparer le brouillon privé. Réessayez.'));
       const value=await response.json() as CreationDraftView;serverRef.current=value;setServerDraft(value);
       props.guided?.onDraftChange?.();return value;
     })().finally(()=>{draftPromise.current=null;});
@@ -173,8 +176,7 @@ export function ManualListingForm(props: Props) {
   useEffect(()=>{
     if(!props.customizing||!hydrated||!formRef.current||customInitialized.current)return;
     customInitialized.current=true;
-    setCustomization(current=>({...defaultVideoCustomization(props.brand),...current,photoOrder:current?.photoOrder??photos.map(p=>p.slot),
-      narration:current?.narration??suggestedNarration(draftFields(),props.brand?.name??'')}));
+    setCustomization(current=>({...defaultVideoCustomization(props.brand),...current,photoOrder:current?.photoOrder??photos.map(p=>p.slot)}));
   },[props.customizing,hydrated]);
   useEffect(()=>{
     if(!hydrated||!customization||!serverDraft||busy||!VideoCustomization.safeParse(customization).success)return;
@@ -212,26 +214,41 @@ export function ManualListingForm(props: Props) {
     return result;
   }
   async function uploadSelected(photo:SelectedPhoto){
-    if(!photo.file)return;
-    setPhotos(current=>current.map(item=>item.id===photo.id?{...item,state:'sending'}:item));
-    try{const draft=await ensureServerDraft();const response=await fetch(`/api/imports/${draft.id}/uploads/${photo.slot}`,{
-      method:'PUT',headers:{'Content-Type':photo.file.type,'X-Upload-ID':photo.id},body:photo.file});
-      if(!response.ok)throw new FormFailure('Cette photo n’a pas été envoyée. Réessayez.');
+    if(!photo.file||uploads.current.has(photo.id)||removedIds.current.has(photo.id))return;
+    uploads.current.add(photo.id);
+    setPhotos(current=>current.map(item=>item.id===photo.id?{...item,state:'sending',error:undefined}:item));
+    try{const draft=await ensureServerDraft();
+      if(removedIds.current.has(photo.id)||!selected.current.some(item=>item.id===photo.id))return;
+      const response=await fetch(`/api/imports/${draft.id}/uploads/${photo.slot}`,{
+      method:'PUT',headers:{'Content-Type':photo.file.type,'X-Upload-ID':photo.id},body:photo.file,signal:AbortSignal.timeout(65_000)});
+      if(!response.ok)throw new FormFailure(await photoUploadError(response,'Cette photo n’a pas été envoyée. Réessayez.'));
       const value=await response.json() as {photo:NormalizedListing['photos'][number]};
       if(removedIds.current.has(photo.id)||!selected.current.some(item=>item.id===photo.id)){
         await fetch(`/api/imports/${draft.id}/uploads/${photo.slot}`,{method:'DELETE',headers:{'X-Upload-ID':photo.id}});return;}
-      setPhotos(current=>current.map(item=>item.id===photo.id?{...item,remote:value.photo,state:'ready'}:item));
-    }catch{if(!removedIds.current.has(photo.id)&&selected.current.some(item=>item.id===photo.id))
-      setPhotos(current=>current.map(item=>item.id===photo.id?{...item,state:'error'}:item));}
+      setPhotos(current=>current.map(item=>item.id===photo.id?{...item,remote:value.photo,state:'ready',error:undefined}:item));
+    }catch(error){if(!removedIds.current.has(photo.id)&&selected.current.some(item=>item.id===photo.id))
+      setPhotos(current=>current.map(item=>item.id===photo.id?{...item,state:'error',error:error instanceof FormFailure?error.message:'Envoi interrompu. Vérifiez votre connexion puis réessayez.'}:item));
+    }finally{uploads.current.delete(photo.id);}
   }
   async function removePhoto(photo:SelectedPhoto){
+    if(removals.current.has(photo.id))return;
+    removals.current.add(photo.id);
     removedIds.current.add(photo.id);
-    if(props.guided?.agencyId){try{const draft=await ensureServerDraft();const response=await fetch(`/api/imports/${draft.id}/uploads/${photo.slot}`,{
-      method:'DELETE',headers:{'X-Upload-ID':photo.id}});
-      if(!response.ok)throw 0;
-    }catch{removedIds.current.delete(photo.id);setFeedback('Cette photo n’a pas pu être retirée du brouillon privé. Réessayez.');return;}}
+    setPhotos(current=>current.map(item=>item.id===photo.id?{...item,removing:true}:item));
+    try{if(props.guided?.agencyId){
+      // Removing a local failed photo must not create a new server draft (which
+      // may itself be refused). Wait only for a draft already being prepared.
+      const draft=serverRef.current??await draftPromise.current?.catch(()=>null);
+      if(draft){const response=await fetch(`/api/imports/${draft.id}/uploads/${photo.slot}`,{
+        method:'DELETE',headers:{'X-Upload-ID':photo.id},signal:AbortSignal.timeout(20_000)});
+        if(!response.ok&&response.status!==404)throw new FormFailure(await photoUploadError(response,'Cette photo n’a pas pu être retirée. Réessayez.'));}
+    }}catch(error){removedIds.current.delete(photo.id);
+      setPhotos(current=>current.map(item=>item.id===photo.id?{...item,removing:false,error:error instanceof FormFailure?error.message:'Retrait interrompu. Vérifiez votre connexion puis réessayez.'}:item));
+      return;
+    }finally{removals.current.delete(photo.id);}
     if(photo.file)URL.revokeObjectURL(photo.preview);
-    setPhotos(current=>current.filter(p=>p.id!==photo.id));setCustomization(current=>current?{...current,photoOrder:current.photoOrder?.filter(slot=>slot!==photo.slot)}:current);setErrors(current=>({...current,photos:''}));
+    selected.current=selected.current.filter(p=>p.id!==photo.id);setPhotos(selected.current);
+    setCustomization(current=>current?{...current,photoOrder:current.photoOrder?.filter(slot=>slot!==photo.slot)}:current);setErrors(current=>({...current,photos:''}));
   }
   function focusError(name:string){requestAnimationFrame(()=>formRef.current?.querySelector<HTMLElement>(name==='photos'?'#manual-photos':`[name="${name}"]`)?.focus());}
   async function nextStep(){
@@ -250,7 +267,7 @@ export function ManualListingForm(props: Props) {
       if(props.guided.description.length>DESCRIPTION_MAX_CHARACTERS)next.description='Limitez la description à 20 000 caractères.';
     }
     if(step===3){if(photos.filter(p=>p.state==='ready').length<MANUAL_PHOTO_LIMITS.minimum)next.photos='Ajoutez au moins 3 photos du bien.';
-      else if(photos.some(p=>p.state==='sending'||p.state==='error'))next.photos='Terminez ou retirez les envois en attente.';
+      else if(photos.some(p=>p.state==='sending'||p.state==='error'||p.removing))next.photos='Terminez ou retirez les envois en attente.';
       else {setPhotoChecking(true);try{const hashes=await Promise.all(photos.map(async p=>p.remote?.contentHash??Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await p.file!.arrayBuffer())),n=>n.toString(16).padStart(2,'0')).join('')));
         if(new Set(hashes).size!==hashes.length)next.photos='Choisissez des photos différentes du bien.';
       }finally{setPhotoChecking(false);}}
@@ -309,7 +326,7 @@ export function ManualListingForm(props: Props) {
           if(validated){const fields:Record<string,string>={};for(const issue of validated.error.issues)
             fields[String(issue.path[0]??'form')]=issue.message;setErrors(fields);}
           throw new FormFailure('Vérifiez les champs indiqués avant de créer la vidéo.');}
-        if(photos.some(photo=>photo.state!=='ready')||photos.filter(photo=>photo.remote).length<3)
+        if(photos.some(photo=>photo.state!=='ready'||photo.removing)||photos.filter(photo=>photo.remote).length<3)
           throw new FormFailure('Complétez l’envoi de trois photos valides avant de créer la vidéo.');
         const changes={title:text('title')||null,propertyType:propertyType||null,transaction:transaction||null,
           locality:text('locality')||null,description:props.guided.description||null,
@@ -384,13 +401,22 @@ export function ManualListingForm(props: Props) {
     return control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement || control instanceof HTMLSelectElement
       ? control.value : restored?.fields[name]??'';
   };
+  function detailsComplete(){
+    const fields: (keyof ManualDraftFields)[]=['priceCents','area','rooms','description',...(transaction==='rent'?['charges' as const]:[])];
+    // Optional fields may be skipped, but an empty section is not completed.
+    if(!fields.some(name=>(name==='description'&&props.guided?props.guided.description:summaryValue(name)).trim()))return false;
+    const input=finalInput();
+    return Boolean(input&&(input.success||!input.error.issues.some(issue=>fields.includes(issue.path[0] as keyof ManualDraftFields))));
+  }
   const sectionComplete=(index:number)=>index===0?Boolean(propertyType&&transaction):index===1?
-    summaryValue('title').trim().length>=3&&summaryValue('locality').trim().length>=2:index===2?true:index===3?
-    photos.filter(photo=>photo.state==='ready').length>=3&&!photos.some(photo=>photo.state!=='ready'):false;
+    summaryValue('title').trim().length>=3&&summaryValue('locality').trim().length>=2:index===2?detailsComplete():index===3?
+    photos.filter(photo=>photo.state==='ready').length>=3&&!photos.some(photo=>photo.state!=='ready'||photo.removing):false;
   return <>{props.customizing&&hydrated&&<VideoCustomizer settings={customization??defaultVideoCustomization(props.brand)}
     onChange={value=>{settingsVersion.current++;setSettingsSaved(false);setCustomization(value);}} photos={photos} fields={draftFields()}
-    agencyName={props.brand?.name??''} subtitlesEnabled={props.subtitlesEnabled!==false} onSubtitles={value=>props.onSubtitles?.(value)}
-    onBack={()=>props.onCloseCustomizer?.()} onAdd={files=>void addPhotos(files)} busy={busy||photoChecking}
+    agencyName={props.brand?.name??''} durationSeconds={props.durationSeconds} aspectRatio={props.aspectRatio} voiceEnabled={props.voiceEnabled} onVoice={props.onVoice} subtitlesEnabled={props.subtitlesEnabled!==false} onSubtitles={value=>props.onSubtitles?.(value)}
+    onBack={()=>props.onCloseCustomizer?.()} onAdd={files=>void addPhotos(files)}
+    onRetry={id=>{const photo=selected.current.find(p=>p.id===id);if(photo)void uploadSelected(photo);}}
+    onRemove={id=>{const photo=selected.current.find(p=>p.id===id);if(photo)void removePhoto(photo);}} busy={busy||photoChecking}
     ready={finalInput()?.success===true&&unresolved().length===0&&photos.filter(p=>p.state==='ready').length>=3}
     onEdit={()=>props.onCloseCustomizer?.()} saved={settingsSaved}/>}<form ref={formRef} style={props.customizing?{display:'none'}:undefined} id={props.guided?'manual-guided-form':undefined} className={`manual-listing-form${props.guided?' manual-guided-form':''}`} onSubmit={submit} noValidate
     onKeyDown={event=>{if(props.guided&&event.key==='Enter'&&event.target instanceof HTMLInputElement&&event.target.type==='text'){
@@ -440,8 +466,9 @@ export function ManualListingForm(props: Props) {
         <p id="manual-photo-feedback" className="form-feedback error">{errors.photos}{photoIssues.map(issue=><span key={issue}>{issue}<br/></span>)}</p>
         {photos.length > 0 && <><p className="field-help">{`${photos.length} photo${photos.length > 1 ? 's' : ''} sélectionnée${photos.length > 1 ? 's' : ''}`}</p><ol className="manual-photos">{photos.map((photo, index) => <li key={photo.id}>
           <img src={photo.preview} alt={`Aperçu de la photo ${index + 1}`}/><span title={photo.file?.name??'Photo importée'}>{photo.file?.name??'Photo importée'} · {photo.state==='sending'?'Envoi…':photo.state==='error'?'Erreur':'Disponible'}</span>
-          {photo.state==='error'&&<button type="button" onClick={()=>void uploadSelected(photo)}>Réessayer</button>}
-          <button type="button" aria-label={`Retirer la photo ${index + 1}`} onClick={() => void removePhoto(photo)}>Retirer</button>
+          {photo.error&&<p className="manual-photo-error" role="alert">{photo.error}</p>}
+          {photo.state==='error'&&photo.file&&<button type="button" disabled={photo.removing} onClick={()=>void uploadSelected(photo)}>Réessayer</button>}
+          <button type="button" disabled={photo.removing} aria-label={`Retirer la photo ${index + 1}`} onClick={() => void removePhoto(photo)}>{photo.removing?'Retrait…':'Retirer'}</button>
         </li>)}</ol></>}
       </div></div>
       {props.guided&&<div className="manual-step-fields manual-recap" hidden={props.guided.step!==4}>

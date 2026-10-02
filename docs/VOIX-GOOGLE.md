@@ -6,6 +6,14 @@ Le connecteur fonctionne depuis le Mac et depuis un vrai Worker Cloudflare. Le s
 
 **Naturel de la narration :** le catalogue `factual-copy/2` écrit désormais pour l'oral, avec des phrases comme « Vous disposez ici de… » et « Envie d'en savoir plus ? ». Prix, surfaces et charges restent exacts. Aoede et son débit par défaut sont conservés ; le montage ajoute normalement 0,3 s entre les pistes et place l'attente supplémentaire sur la carte de contact. Les pauses internes de Google restent présentes. Les anciens jobs conservent leurs formulations et leurs WAV. Cette évolution suit les [conseils Google sur le phrasé et la ponctuation](https://docs.cloud.google.com/text-to-speech/docs/chirp3-hd?hl=fr#scripting-and-prompting-tips) ; elle demande une comparaison à l'écoute, sans promettre une voix indiscernable d'un humain.
 
+## Préécoute dans Personnaliser — 02/10/2026
+
+**Voix et texte → Écouter un extrait** propose Aoede, Kore et Charon avec le même texte de démonstration préenregistré. Les fichiers MP3 publics de 6–8 secondes sont servis depuis `apps/web/public/audio/voice-previews/v1/`, sans nouvelle synthèse, clé côté navigateur ou crédit vidéo utilisé. Aucun audio n'est téléchargé avant le clic ; changer de voix ou quitter l'onglet arrête l'écoute. Le cache HTTP est immutable sur l'URL versionnée.
+
+La préparation opérateur `pnpm exec tsx scripts/prepare-voice-previews.ts --check` vérifie leur présence sans réseau. `--replay` reconvertit les WAV privés déjà enregistrés et vérifie les empreintes, avec zéro appel fournisseur. `--real` exige une provision globale persistée ; une tentative incertaine ne se relance pas automatiquement. Une autre série d'échantillons doit utiliser une nouvelle version d'URL plutôt que remplacer les fichiers `v1`.
+
+Trois synthèses Google réelles réalisées une seule fois, lecteur local et publié vérifié à trois largeurs. Provision **0,20 €**, comprise dans le registre global ; qualité du timbre de ces nouveaux extraits non encore évaluée à l'écoute humaine. [Mesures, commandes et limites](preuves/maintenance/PREECOUTE-VOIX-02-10.md).
+
 ## Configurer l'accès local
 
 1. Dans le sélecteur de projet Google Cloud, relever l'**ID du projet**, par exemple `bienvu-123456`, distinct du nom BienVu.

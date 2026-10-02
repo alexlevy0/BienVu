@@ -48,6 +48,8 @@ Avec `allowPartial`, une photo refusée, invalide ou expirée n'efface pas les f
 
 ## Limites effectives
 
+Depuis le 02/10/2026, les plafonds partagés des imports par lien sont **20 tentatives/jour UTC et 60/mois UTC** (migration `0029`, compteurs conservés). Les droits affichés dans l’accueil et l’admission de génération utilisent les mêmes seuils. Les uploads personnels restent hors de ce compteur depuis `0028`. La capacité de 30 dossiers par agence et les réservations financières continuent à s’appliquer.
+
 ### Registre et portails
 
 `packages/contracts/src/import-sources.ts` centralise les hôtes exacts, leurs alias, routes d’annonces, CDN explicites et résultats datés. Le registre dans `packages/importers/src/registry.ts` refuse une recherche sur un portail connu avant le réseau et vérifie qu’une redirection conserve la même référence. Un domaine inconnu reste sur l’import générique protégé ; aucun CDN ne lui est accordé par ressemblance de nom. Un canonique peut utiliser un alias enregistré, sans changer de chemin ; pour une fiche Orpi reconnue, seul le slash final est aussi optionnel. Les fragments de suivi SeLoger observés (`#ln=…`) sont retirés par `ImportUrl` avant la validation ; les autres fragments restent refusés.

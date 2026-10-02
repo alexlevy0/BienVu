@@ -7,7 +7,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import {videoFixture,videoReport} from '../fixtures/video';
-import {videoManifestHash,videoAssets,videoPreviewKey} from '../packages/contracts/src/index';
+import {videoManifestHash,videoAssets,videoPreviewKey,VideoManifest} from '../packages/contracts/src/index';
 import type {VideoJob} from '../apps/pipeline/src/video-coordinator';
 type Snapshot={starts:number;cleaned:boolean;stopped:boolean;job:VideoJob;state:{active:string|null;budget:{attempts:number;committedCents:number;fixedAndOtherCents:number}}};
 test('contrôleur durable workerd : budget, concurrence, R2, timeout et coupures',async t=>{
@@ -89,6 +89,14 @@ test('contrôleur durable workerd : budget, concurrence, R2, timeout et coupures
   await call('missing-preview','/accept',{manifest:anonymous.manifest,report:videoReport(anonymousId,anonymous.manifest)});await call('missing-preview','/advance');
   assert.equal((await snapshot('missing-preview')).job.error,'VIDEO_PREVIEW_INVALID');
   assert.equal((await snapshot('missing-preview')).state.budget.committedCents,80);
+  const landscape=await videoFixture('anonymous',8);
+  const horizontal=VideoManifest.parse({...landscape.manifest,templateVersion:'bienvu-horizontal/1',width:1920,height:1080});
+  const horizontalId=await videoManifestHash(horizontal),horizontalReport=videoReport(horizontalId,horizontal);
+  for(const asset of videoAssets(horizontal))await bucket.put(asset.objectKey,new Uint8Array(landscape.files.get(asset.id)!));
+  await call('horizontal','/accept',{manifest:horizontal,report:{...horizontalReport,preview:{...videoReport(horizontalId,horizontal,new Uint8Array([3,2,1])),watermarked:true}}});
+  await call('horizontal','/advance');assert.equal((await snapshot('horizontal')).job.status,'ready');
+  await call('wrong-orientation','/accept',{manifest:horizontal,report:{...horizontalReport,width:1080,height:1920}});
+  await call('wrong-orientation','/advance');assert.equal((await snapshot('wrong-orientation')).job.error,'VIDEO_REPORT_INVALID');
   await bucket.delete(manifest.photos[0].objectKey);await accept('missing');await call('missing','/advance');
   state=await snapshot('missing');assert.equal(state.job.error,'VIDEO_ASSET_MISSING');assert.equal(state.starts,0);assert.equal(state.state.active,null);
 });

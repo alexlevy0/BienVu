@@ -7,7 +7,7 @@ import {HomeIcon} from './home-icons';
 const benefits = [
   'Import par lien ou saisie manuelle',
   'Voix off française',
-  'Format vertical 9:16',
+  'Formats vertical 9:16 et horizontal 16:9',
   'Téléchargement sans filigrane avec un crédit',
   'Logo et couleurs de votre agence',
 ];

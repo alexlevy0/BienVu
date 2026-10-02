@@ -78,7 +78,7 @@ export default {
         return new Response(resource.bytes, {headers: {'Content-Type': resource.mime, 'X-Source-Url': resource.url,
           'X-Source-Bytes': String(resource.sourceBytes), 'X-Image-Width': String(resource.width ?? 0), 'X-Image-Height': String(resource.height ?? 0)}});
       }
-      if (path === '/normalize-photo' && row.sourceKind === 'manual') {
+      if (path === '/normalize-photo' && (row.sourceKind === 'manual' || row.draftPending === 1)) {
         const bytes = await readLimited(request, IMPORT_LIMITS.imageBytes);
         await claimHostedResource(env.DB, row.agencyId, row.id, bytes.length);
         return await env.IMPORT_CONTAINER.getByName('imports-single-slot').fetch(new Request('http://container/normalize-photo', {

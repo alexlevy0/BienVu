@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "provider": "google",
+  "model": "chirp3-hd",
+  "text": "Bonjour, voici un aperçu de ma voix. Avec BienVu, transformez les photos de votre bien en une visite qui donne envie.",
+  "samples": [
+    {
+      "voice": "fr-FR-Chirp3-HD-Aoede",
+      "name": "Aoede",
+      "src": "/audio/voice-previews/v1/aoede.mp3",
+      "sha256": "8af79cbf94898a655099e529f638770e8027407d7c1a2697bfb219ec4fa5516e",
+      "sizeBytes": 89324,
+      "durationMs": 7360,
+      "codec": "mp3",
+      "rmsDbfs": -21.376073198313833
+    },
+    {
+      "voice": "fr-FR-Chirp3-HD-Kore",
+      "name": "Kore",
+      "src": "/audio/voice-previews/v1/kore.mp3",
+      "sha256": "2a1932a2d84d81ac309eddfe1787cdce3ff70215fdfece2722580674435c70ad",
+      "sizeBytes": 88460,
+      "durationMs": 7280,
+      "codec": "mp3",
+      "rmsDbfs": -21.620757913415343
+    },
+    {
+      "voice": "fr-FR-Chirp3-HD-Charon",
+      "name": "Charon",
+      "src": "/audio/voice-previews/v1/charon.mp3",
+      "sha256": "6289c25853b4ebb6e8e106f8312e0b19785088fc2e944883df032b36d5b9e5ae",
+      "sizeBytes": 76364,
+      "durationMs": 6280,
+      "codec": "mp3",
+      "rmsDbfs": -17.272510813501952
+    }
+  ]
+}

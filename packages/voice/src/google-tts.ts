@@ -1,4 +1,4 @@
-import {GoogleVoiceConfig, VoiceFailure, VoiceText} from '@bienvu/contracts';
+import {GoogleVoiceConfig, VoiceConfig, VoiceFailure, VoiceText} from '@bienvu/contracts';
 import {googleJson, sha256, type VoiceFetch} from './http';
 
 const endpoint = 'https://texttospeech.googleapis.com/v1';
@@ -15,8 +15,10 @@ export function voiceRequest(configInput: unknown, textInput: unknown) {
 }
 
 export async function voiceCacheKey(configInput: unknown, textInput: unknown): Promise<string> {
-  const {config, text} = voiceRequest(configInput, textInput);
-  return sha256(new TextEncoder().encode(JSON.stringify({config, text})));
+  const config=VoiceConfig.safeParse(configInput),text=VoiceText.safeParse(textInput);
+  if(!config.success)throw new VoiceFailure('VOICE_CONFIG_INVALID');
+  if(!text.success)throw new VoiceFailure('VOICE_TEXT_INVALID');
+  return sha256(new TextEncoder().encode(JSON.stringify({config:config.data,text:text.data})));
 }
 
 export function googleTts(configInput: unknown, accessToken: () => Promise<string>, options: {fetch?: VoiceFetch} = {}) {

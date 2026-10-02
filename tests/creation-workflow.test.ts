@@ -21,6 +21,39 @@ const extracted={fields:{propertyType:'apartment',transaction:'sale',locality:'L
   evidence:{propertyType:'Appartement',transaction:'à vendre',locality:'Lyon 6',priceCents:'280 000 €',charges:null,area:'65 m²',rooms:'3 pièces'},ambiguous:[]};
 const errorCode=(code:string)=>(e:unknown)=>e instanceof RequestFailure&&e.code===code;
 
+test('photos du brouillon : réessai après put interrompu, retrait repris après panne R2, aucun PUT tardif rétabli',async t=>{
+  const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:'export default {fetch(){return new Response("test")}}',
+    compatibilityDate:'2026-09-27',d1Databases:['DB'],r2Buckets:['MEDIA']}));t.after(()=>mf.dispose());
+  const {DB,MEDIA}=await mf.getBindings<Pick<CloudflareEnv,'DB'|'MEDIA'>>(),env={DB,MEDIA};
+  for(const file of (await readdir(new URL('../packages/db/migrations/',import.meta.url))).filter(f=>f.endsWith('.sql')).sort())
+    await DB.exec((await readFile(new URL(`../packages/db/migrations/${file}`,import.meta.url),'utf8')).replace(/^--.*$/gm,'').replace(/\n/g,' '));
+  const at=new Date().toISOString();await DB.prepare("INSERT INTO agencies(id,owner_user_id,name,created_at,updated_at) VALUES('retry-photos','retry-photos','Recette',?,?)").bind(at,at).run();
+  const draft=await startManualCreationDraft(DB,'retry-photos','retry-photos-draft-01');
+  const bytes=new Uint8Array(await sharp({create:{width:960,height:640,channels:3,background:'#557c6c'}}).png().toBuffer());
+  const id='retry-photos-upload-01',signal=new AbortController().signal;
+  await assert.rejects(uploadCreationPhoto({DB,MEDIA:{put:async()=>{throw Error('PUT_FAILED');},head:MEDIA.head.bind(MEDIA),delete:MEDIA.delete.bind(MEDIA)}},
+    'retry-photos',draft.id,0,id,bytes,'image/png',normalizePhoto,signal),/PUT_FAILED/);
+  const photo=await uploadCreationPhoto(env,'retry-photos',draft.id,0,id,bytes,'image/png',normalizePhoto,signal);
+  assert.equal((await MEDIA.head(photo.objectKey))?.size,photo.sizeBytes);
+  await assert.rejects(removeCreationPhoto({DB,MEDIA:{put:MEDIA.put.bind(MEDIA),head:MEDIA.head.bind(MEDIA),delete:async()=>{throw Error('DELETE_FAILED');}}},
+    'retry-photos',draft.id,id),/DELETE_FAILED/);
+  assert.ok(await DB.prepare('SELECT id FROM import_objects WHERE id=?').bind(id).first(),'Journal conservé pendant la panne');
+  let normalizations=0;const refuseNormalization=async()=>{normalizations++;throw Error('SHOULD_NOT_NORMALIZE');};
+  await assert.rejects(uploadCreationPhoto(env,'retry-photos',draft.id,0,id,bytes,'image/png',refuseNormalization,signal),errorCode('CONFLICT'));
+  assert.equal(normalizations,0,'La suppression empêche aussi le retour depuis le cache R2');
+  await removeCreationPhoto(env,'retry-photos',draft.id,id);
+  assert.equal(await MEDIA.head(photo.objectKey),null);assert.equal(await DB.prepare('SELECT id FROM import_objects WHERE id=?').bind(id).first(),null);
+  await removeCreationPhoto(env,'retry-photos',draft.id,id);
+  const replacement=await uploadCreationPhoto(env,'retry-photos',draft.id,0,'retry-photos-replace-01',bytes,'image/png',normalizePhoto,signal);
+  assert.ok(await MEDIA.head(replacement.objectKey));
+  // A delete that arrives while R2.put is in progress must win.
+  await removeCreationPhoto(env,'retry-photos',draft.id,replacement.id);
+  const lateEnv={DB,MEDIA:{head:MEDIA.head.bind(MEDIA),delete:MEDIA.delete.bind(MEDIA),put:async(...args:Parameters<typeof MEDIA.put>)=>{
+    const result=await MEDIA.put(...args);await removeCreationPhoto(env,'retry-photos',draft.id,'retry-photos-late-01');return result;}}};
+  await assert.rejects(uploadCreationPhoto(lateEnv,'retry-photos',draft.id,0,'retry-photos-late-01',bytes,'image/png',normalizePhoto,signal),errorCode('CONFLICT'));
+  assert.equal(JSON.parse((await findImport(DB,'retry-photos',draft.id))!.draftPhotos).length,0);
+});
+
 test('extraction structurée : faits sourcés, absent et contradiction sans inventer',async()=>{
   const data=validateExtraction(sample,extracted);
   assert.equal(data.fields.title,'Appartement 3 pièces à Lyon 6e');

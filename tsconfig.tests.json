@@ -19,8 +19,10 @@
     "scripts/probe-import-descriptions.ts",
     "scripts/probe-portals.ts",
     "scripts/probe-voice.ts",
+    "scripts/prepare-voice-previews.ts",
     "scripts/voice-probe-store.ts",
     "scripts/probe-narration.ts",
+    "scripts/probe-description-narration.ts",
     "scripts/probe-narration-worker.ts",
     "scripts/narration-fixtures.ts",
     "scripts/narration-preview.ts",
@@ -33,6 +35,8 @@
     "scripts/video-fixtures.ts",
     "scripts/prepare-video-fixtures.ts",
     "scripts/probe-anonymous-video.ts",
-    "scripts/probe-trial-media.ts"
+    "scripts/probe-trial-media.ts",
+    "scripts/prepare-fish-previews.ts",
+    "fixtures/fish-voice-worker.ts"
   ]
 }

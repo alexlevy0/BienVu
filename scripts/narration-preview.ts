@@ -3,9 +3,9 @@ import {measureVoiceWav} from '../packages/voice/src/audio';
 // Écoute opérateur des pistes selon le timing calculé ; aucun rendu vidéo.
 export function narrationPreview(clips: Uint8Array[], frames: number[]): Uint8Array {
   if (clips.length !== frames.length || clips.length < 4 || clips.length > 6) throw new Error('PREVIEW_INVALID');
-  const measurements = clips.map(measureVoiceWav), first = measurements[0];
+  const measurements = clips.map(clip=>measureVoiceWav(clip)), first = measurements[0];
   const totalFrames = frames.reduce((sum, value) => sum + value, 0);
-  if (totalFrames < 600 || totalFrames > 1050 || frames.some((n,i)=>!Number.isInteger(n)||n<measurements[i].durationFrames)
+  if (totalFrames < 600 || totalFrames > 1200 || frames.some((n,i)=>!Number.isInteger(n)||n<measurements[i].durationFrames)
     || measurements.some(m=>m.channels!==first.channels||m.sampleRate!==first.sampleRate)) throw new Error('PREVIEW_INVALID');
   const sampleFrames = Math.ceil(totalFrames * first.sampleRate / 30), block = first.channels * 2;
   const result = new Uint8Array(44 + sampleFrames * block), view = new DataView(result.buffer);
@@ -26,5 +26,5 @@ export function narrationPreview(clips: Uint8Array[], frames: number[]): Uint8Ar
     }
     elapsedFrames+=frames[index];
   }
-  measureVoiceWav(result);return result;
+  measureVoiceWav(result,40000);return result;
 }

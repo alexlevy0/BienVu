@@ -48,12 +48,14 @@ test('API anonyme : cookie sécurisé, prévisualisation isolée, master protég
   assert.match(cookie,/__Host-bienvu-trial=/);for(const part of ['HttpOnly','Secure','SameSite=Lax','Path=/','Max-Age=2592000'])assert.ok(cookie.includes(part));
   const headers={Cookie:cookie.split(';')[0],Origin:base,'Content-Type':'application/json','Idempotency-Key':'trial-api-idempotency-key','cf-connecting-ip':'203.0.113.5'};
   let verifications=0;const verify:typeof verifyTrialBot=async()=>{verifications++;return 'c'.repeat(64);};
-  const request=()=>new Request(base+'/api/trial',{method:'POST',headers,body:JSON.stringify({url,subtitlesEnabled:false,turnstileToken:'fixture-token'})});
+  const request=()=>new Request(base+'/api/trial',{method:'POST',headers,body:JSON.stringify({url,subtitlesEnabled:false,voiceEnabled:false,durationSeconds:40,turnstileToken:'fixture-token'})});
   await assert.rejects(startTrial(new Request(base+'/api/trial',{method:'POST',headers:{...headers,Origin:'https://attacker.test'},body:JSON.stringify({url})}),env,true,verify),/FORBIDDEN/);
   const first=await (await startTrial(request(),env,true,verify)).json() as {id:string};
   await startTrial(request(),env,true,verify);assert.equal(verifications,1);
   const session=(await anonymousSession(DB,headers.Cookie.split('=')[1]))!,row=(await findGeneration(DB,session.scopeId,first.id))!;
-  assert.equal(JSON.parse(row.input).subtitlesEnabled,false);
+  assert.equal(JSON.parse(row.input).subtitlesEnabled,false);assert.equal(JSON.parse(row.input).voiceEnabled,false);
+  assert.equal(JSON.parse(row.input).durationSeconds,40);
+  await assert.rejects(startTrial(new Request(base+'/api/trial',{method:'POST',headers,body:JSON.stringify({url,subtitlesEnabled:false,voiceEnabled:false,durationSeconds:30})}),env,true,verify),/CONFLICT/);
   await assert.rejects(startTrial(new Request(base+'/api/trial',{method:'POST',headers,body:JSON.stringify({url,subtitlesEnabled:true})}),env,true,verify),/CONFLICT/);
   assert.equal(verifications,1);
   assert.equal(generationView(row,Date.now(),'anonymous').downloadUrl,null);

@@ -1,6 +1,32 @@
 # Rendu vidéo privé — sprint 06
 
-Le modèle `BienVuListing` assemble les photos, la voix mesurée au sprint 05, les sous-titres par phrase et la marque enregistrée. Il exporte un MP4 vertical 1080 × 1920, 30 fps, H.264/AAC, de 20 à 35 secondes. Le parcours public de génération, le Workflow et la consommation finale du quota restent au sprint 07/08. Ce service ne remplace pas ce parcours et n'ouvre pas les générations sur bienvu.online.
+Le modèle `BienVuListing` assemble les photos, la voix mesurée au sprint 05, les sous-titres par phrase et la marque enregistrée. Il exporte un MP4 vertical 1080 × 1920 ou horizontal 1920 × 1080, 30 fps, H.264/AAC lorsque la voix est activée, de 20 à 40 secondes. Le parcours public de génération, le Workflow et la consommation finale du quota ont été intégrés aux sprints 07/08.
+
+## Format vertical ou horizontal — 2 octobre 2026
+
+Le bouton **Vertical 9:16** bascule vers **Horizontal 16:9**, puis revient en vertical au clic suivant. Le vertical reste sélectionné par défaut. La préférence est conservée dans l’onglet et transmise aux générations URL, manuelles et anonymes ; le bouton est bloqué pendant une génération. Les aperçus de Personnaliser, la conversation, les lecteurs de Mes vidéos et les pages publiques respectent le format choisi.
+
+`aspectRatio?: '9:16' | '16:9'` appartient à l’entrée immuable. Le nouveau modèle `bienvu-horizontal/1` possède un véritable canevas 1920 × 1080 et un habillage adapté dans les trois styles : titres, sous-titres, marque et carte finale. Les photos et clips remplissent ce canevas par recadrage au centre, sans ajout d’image. La voix, les durées 20/30/40 secondes et la galerie complète suivent les règles existantes. Les rapports du master et de l’aperçu filigrané doivent avoir les dimensions du manifeste.
+
+Les nouvelles animations Runway utilisent `1280:720` pour une sortie horizontale, avec le même modèle et cinq secondes par clip. Une ancienne animation verticale déjà payée peut être réutilisée et recadrée dans un manifeste horizontal. Les anciennes demandes sans `aspectRatio`, les empreintes et les vidéos terminées restent inchangées ; aucune conversion automatique des anciens MP4.
+
+[Recette, publication et limites](preuves/maintenance/FORMAT-HORIZONTAL-02-10.md).
+
+## Durée choisie et boutons barrés — 2 octobre 2026
+
+Le compositeur propose **20, 30 ou 40 secondes**, avec **20 secondes par défaut**. Le menu se trouve à droite des options ; sa valeur est conservée dans l’onglet et transmise aux créations URL, manuelles et anonymes. Personnaliser utilise la même durée pour son aperçu indicatif. Changer ce réglage ne déclenche aucune génération ni appel fournisseur.
+
+La demande, la narration préparée et le manifeste portent le champ facultatif `durationSeconds`. Le serveur impose exactement `durationSeconds × 30` frames, avec ou sans voix. Les WAV restent complets : une narration automatique trop longue utilise l’unique raccourcissement déjà prévu ; une narration personnalisée trop longue échoue plutôt que de couper ses phrases. Le temps supplémentaire est réparti sur la visite, avec une courte marge finale. Les entrées historiques sans ce champ conservent leur rythme automatique et leurs empreintes.
+
+« Voix off » et « Sous-titres » sont barrés lorsqu’ils sont désactivés. Couper la voix coupe toujours les sous-titres et bloque leur réactivation jusqu’au retour de la voix. Le format choisi reste affiché comme activé. [Recette et publication](preuves/maintenance/DUREE-VIDEO-02-10.md).
+
+## Voix facultative — 1 octobre 2026
+
+Le bouton « Voix off » de la saisie principale et la case « Activer la voix off » dans Personnaliser partagent le même réglage. Ils sont activés par défaut. Désactiver la voix coupe immédiatement les sous-titres et empêche leur réactivation tant que la voix reste coupée. Le choix est conservé dans l'onglet ; réactiver la voix laisse les sous-titres désactivés jusqu'à une nouvelle sélection.
+
+Ce choix s'applique aux imports URL, annonces manuelles et essais anonymes. Le serveur impose aussi l'absence de sous-titres lorsque `voiceEnabled` vaut `false`. La préparation conserve les textes du montage et les photos, sans synthèse Google ni fichiers WAV ; le master et l'aperçu filigrané sont des MP4 H.264 sans piste audio. Les vidéos anciennes et déjà terminées conservent leur rendu. Les entrées historiques sans ce champ gardent la voix et leur empreinte d'origine.
+
+La recette comprend un véritable MP4 local de 20 secondes et un aperçu filigrané produit avec le FFmpeg de l'image Linux, sur une annonce fictive et un clip Runway déjà payé. Aucun nouvel appel fournisseur n'est nécessaire. Le nouveau parcours complet en production reste à observer sur la prochaine génération utilisateur. [Commandes, résultats et limites](preuves/maintenance/VOIX-OFF-01-10.md).
 
 ## Manifeste et droits
 
@@ -14,7 +40,7 @@ La migration **0012_video_manifests.sql** fige le JSON, les sources et son empre
 
 Les nouvelles vidéos incluent **toutes les photos distinctes de l'annonce normalisée**, dans leur ordre d'import, jusqu'au plafond produit existant de **12 photos**. Une annonce dont les huit photos sont importées donne huit photos à l'écran ; une saisie manuelle suit la même règle. Les images indisponibles, invalides ou dupliquées ne sont pas des photos importées. Les limites réseau de l'import (50 Mio, 20 requêtes, 60 s) et les refus des portails restent applicables : aucune promesse de récupérer toute galerie inaccessible ou de taille illimitée.
 
-La nouvelle propriété facultative `photoTimeline` est figée côté serveur : un passage par photo, ordre identique à `photos`, au moins 30 frames par passage et somme égale à la durée de la narration. Les 4–6 scènes parlées ne sélectionnent plus un sous-ensemble de la galerie. Les frames sont réparties régulièrement sur les 20–35 secondes, sans trou ni image omise : huit photos dans 20 secondes restent environ 2,5 secondes chacune. Le nombre d'appels OpenAI/TTS n'augmente pas avec le nombre de photos ; le transfert privé et le décodage concernent davantage d'images, dans les limites existantes.
+La nouvelle propriété facultative `photoTimeline` est figée côté serveur : un passage par photo, ordre identique à `photos`, au moins 30 frames par passage et somme égale à la durée de la narration. Les 4–6 scènes parlées ne sélectionnent plus un sous-ensemble de la galerie. Les frames sont réparties régulièrement sur les 20–40 secondes, sans trou ni image omise : huit photos dans 20 secondes restent environ 2,5 secondes chacune. Le nombre d'appels OpenAI/TTS n'augmente pas avec le nombre de photos ; le transfert privé et le décodage concernent davantage d'images, dans les limites existantes.
 
 Le fond plein écran suit cette timeline indépendante, avec zoom léger et fondu de huit frames ; les textes, sous-titres, voix et carte de contact suivent les scènes parlées. Les anciens manifestes sans cette propriété gardent leur rendu et leur empreinte ; les MP4 déjà produits ne sont pas recalculés. Sources et médias complets sont vérifiés avant le rendu, y compris ceux absents du plan de narration. [Recette et publication](preuves/maintenance/GALERIE-COMPLETE-01-10.md).
 

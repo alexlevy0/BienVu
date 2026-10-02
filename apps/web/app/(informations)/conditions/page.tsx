@@ -22,7 +22,7 @@ const contents = [
 export default function Page() {
   return <LegalDocument kind="conditions" title="Conditions d’utilisation" introduction="Les règles pour créer, retrouver et partager vos vidéos immobilières avec BienVu." contents={contents}>
     <LegalSection {...contents[0]}>
-      <p>BienVu transforme les informations et les photos d’un bien en une vidéo verticale 9:16, avec une voix off française et, pour les comptes disposant d’une charte, l’identité de leur agence. Vous pouvez partir d’un lien d’annonce compatible ou préparer une annonce manuellement. Le service ne propose pas d’éditeur vidéo.</p>
+      <p>BienVu transforme les informations et les photos d’un bien en une vidéo verticale 9:16 ou horizontale 16:9, avec une voix off française facultative et, pour les comptes disposant d’une charte, l’identité de leur agence. Vous pouvez partir d’un lien d’annonce compatible ou préparer une annonce manuellement. Le service ne propose pas d’éditeur vidéo.</p>
       <p>BienVu est le nom du projet, actuellement en accès anticipé, sans société constituée à ce jour. Vous pouvez joindre son équipe à <a href="mailto:contact@bienvu.online">contact@bienvu.online</a>.</p>
       <div className="legal-callout">Le service évolue encore. Les créations peuvent être limitées par les quotas, les contrôles de sécurité et la capacité disponible. Les abonnements payants ne sont pas encore ouverts à la souscription.</div>
     </LegalSection>

@@ -28,6 +28,7 @@ export async function cleanupAnonymousTrials(env:{DB:D1Database;MEDIA:R2Bucket},
       env.DB.prepare('DELETE FROM generation_previews WHERE job_id=?').bind(job.id),
       env.DB.prepare('DELETE FROM generation_artifacts WHERE job_id=?').bind(job.id),
       env.DB.prepare('UPDATE narration_calls SET result_json=NULL,object_key=NULL WHERE job_id=?').bind(job.id),
+      env.DB.prepare('UPDATE photo_animations SET animation_json=NULL WHERE job_id=?').bind(job.id),
       env.DB.prepare("UPDATE narration_runs SET snapshot_json='{}',script_json=NULL,result_json=NULL,lock_id=NULL,lock_until=NULL WHERE job_id=?").bind(job.id),
       env.DB.prepare("UPDATE generation_runs SET input_json='{}',brand_json='{}',ip_hmac=NULL,turnstile_hash=NULL WHERE job_id=?").bind(job.id),
     ]);

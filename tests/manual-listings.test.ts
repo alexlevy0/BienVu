@@ -44,7 +44,7 @@ test('saisie et uploads : D1/R2 réels locaux, images synthétiques réellement 
   await t.test('idempotence concurrente et source déclarée, aucune propriété d’agence cliente', async () => {
     const replies = await Promise.all(Array.from({length:4}, () => createManualListing(env, 'manual-a', key, input)));
     assert.ok(replies.every(row => row.id === draft.id)); assert.equal(draft.sourceKind,'manual'); assert.equal(draft.sourceUrl,null);
-    assert.equal((await DB.prepare('SELECT sum(attempts) n FROM import_usage').first<{n:number}>())?.n,1);
+    assert.equal((await DB.prepare('SELECT coalesce(sum(attempts),0) n FROM import_usage').first<{n:number}>())?.n,0);
     await assert.rejects(createManualListing(env,'manual-a',key,{...input,title:'Autre bien'}),errorCode('CONFLICT'));
     await assert.rejects(createManualListing(env,'manual-a','invalid-fixture-key',{...input,agencyId:'manual-b'}),errorCode('VALIDATION_ERROR'));
     await assert.rejects(manualDraft(DB,'manual-b',draft.id),errorCode('NOT_FOUND'));
@@ -93,11 +93,11 @@ test('saisie et uploads : D1/R2 réels locaux, images synthétiques réellement 
     assert.equal(await purgeImport(env,'manual-a',row.id,now+1_300_000),true);
     assert.equal(await findImport(DB,'manual-a',row.id),null);
   });
-  await t.test('expiration et purge : écriture tardive impossible, compteur conservé', async () => {
+  await t.test('expiration et purge : écriture tardive impossible, aucun quota de scraping consommé', async () => {
     const abandoned = await createManualListing(env,'manual-a','manual-abandoned-key-001',input);
     await DB.prepare('UPDATE listing_imports SET lease_until=? WHERE id=?').bind(new Date(now-1_000_000).toISOString(),abandoned.id).run();
     await assert.rejects(uploadManualPhoto(env,'manual-a',abandoned.id,0,files[0],'image/png',normalizePhoto,signal()),errorCode('CONFLICT'));
     assert.equal(await purgeImport(env,'manual-a',abandoned.id),true);
-    assert.equal((await DB.prepare('SELECT sum(attempts) n FROM import_usage').first<{n:number}>())?.n,3);
+    assert.equal((await DB.prepare('SELECT coalesce(sum(attempts),0) n FROM import_usage').first<{n:number}>())?.n,0);
   });
 });

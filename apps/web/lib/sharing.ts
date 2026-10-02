@@ -25,7 +25,7 @@ function publicView(row: SharedRow) {
   const report = VideoReport.parse(JSON.parse(row.report));
   return {id: row.id, title: row.title, locality: row.locality, propertyType: row.propertyType,
     agency: row.agencyName, publishedAt: row.publishedAt,
-    expiresAt: row.expiresAt, durationSeconds: report.durationSeconds,
+    expiresAt: row.expiresAt, durationSeconds: report.durationSeconds,aspectRatio:report.width>report.height?'16:9':'9:16',
     posterUrl: `/api/explorer/${row.id}/poster`, videoUrl: `/api/explorer/${row.id}/video`,
     pageUrl: `/explorer/${row.id}`};
 }

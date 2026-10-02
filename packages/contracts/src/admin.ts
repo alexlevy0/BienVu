@@ -47,11 +47,11 @@ export const AdminTrafficQuery=z.object({section:z.literal('traffic'),days:z.enu
 export type AdminTraffic={at:string;days:number;enabled:boolean;firstDay:string|null;total:number;
   daily:{day:string;views:number}[];countries:{country:string;views:number}[];pages:{page:string;views:number}[]};
 export type AdminVideoDetail = {
-  video:AdminRow;events:AdminRow[];reports:AdminRow[];calls:AdminNarrationCall[];
+  video:AdminRow;events:AdminRow[];reports:AdminRow[];calls:AdminNarrationCall[];animations?:AdminRow[];
 };
 export type AdminNarrationCall = {
-  id:string;provider:'openai'|'google';mode:'real'|'mock';state:'pending'|'done'|'failed';error:string|null;reservedCents:number;at:string;step:string;
+  id:string;provider:'openai'|'google'|'fish';mode:'real'|'mock';state:'pending'|'done'|'failed';error:string|null;reservedCents:number;at:string;step:string;
   model:string|null;voice:string|null;requestId:string|null;providerRequestId:string|null;responseId:string|null;requestDurationMs:number|null;
-  inputTokens:number|null;outputTokens:number|null;cachedInputTokens:number|null;inputCharacters:number|null;
+  inputTokens:number|null;outputTokens:number|null;cachedInputTokens:number|null;inputCharacters:number|null;inputUtf8Bytes:number|null;
   currency:'USD'|null;priceDate:string|null;estimatedMicros:number|null;
 };

@@ -18,7 +18,7 @@ export type ImportView = {id: string; sourceKind: 'url' | 'manual'; sourceUrl: s
 const message = (code?: PublicErrorCode | null) => code && code in publicErrors ? publicErrors[code][1] : 'L’import n’a pas abouti. Réessayez.';
 export function GenerationForm() {
   const {me, loading} = useAccount();
-  const {subtitlesEnabled}=useSubtitlePreference();
+  const {subtitlesEnabled,voiceEnabled,durationSeconds,aspectRatio}=useSubtitlePreference();
   const [url, setUrl] = useState(''), [feedback, setFeedback] = useState(''), [busy, setBusy] = useState(false);
   const [imports, setImports] = useState<ImportView[]>([]), [result, setResult] = useState<ImportView | null>(null);
   const [manualOpen, setManualOpen] = useState(false), [manualBusy, setManualBusy] = useState(false);
@@ -43,7 +43,7 @@ export function GenerationForm() {
     } catch (error) {setFeedback(error instanceof Error ? error.message : message());}
   }
   async function generate(input:GenerationRequest) {
-    setJob(await requestGeneration(me!.agency.id,{...input,subtitlesEnabled}));
+    setJob(await requestGeneration(me!.agency.id,{...input,subtitlesEnabled,voiceEnabled,durationSeconds,aspectRatio}));
   }
   async function generateSaved(id:string){if(working)return;setBusy(true);setFeedback('');try{await generate({listingId:id});}catch(error){setFeedback(error instanceof Error?error.message:message());}finally{setBusy(false);}}
   async function submit(event: FormEvent) {

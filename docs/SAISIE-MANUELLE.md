@@ -4,11 +4,13 @@ Décision d’Alex du **28 septembre 2026** : permettre la saisie d’un bien et
 
 ## Utilisation
 
-Sur Cloudflare : ouvrir [bienvu.online/generer](https://bienvu.online/generer) après connexion ; aucun serveur local nécessaire. Les plafonds de recette sont partagés avec les imports URL.
+Sur Cloudflare : ouvrir [bienvu.online](https://bienvu.online/) ; aucun serveur local nécessaire. Les photos peuvent être préparées sans compte. Après connexion, elles sont envoyées immédiatement au brouillon privé. Le budget financier reste partagé avec les imports URL.
 
 En local : Après `pnpm db:migrate` et `pnpm build:web`, lancer `pnpm preview` et `pnpm dev:imports` dans deux terminaux. Se connecter sur `http://localhost:8787/generer`, puis cliquer sur **Saisir mon annonce manuellement** sous l’import URL.
 
 Renseigner le titre, le type de bien et la localisation, choisir vente ou location, puis ajouter si disponibles prix, surface, pièces et description. Un loyer renseigné exige de préciser si les charges sont comprises. Ajouter 3 à 12 photos du bien ; les aperçus permettent de retirer un fichier avant envoi. Le formulaire conserve les champs lorsqu’il est replié ou qu’un envoi échoue.
+
+La coche de l'onglet **Détails** indique qu'au moins une information de cette section est renseignée et que ses valeurs respectent les règles du formulaire. Une section vide, passée, ou contenant une valeur invalide reste sans coche. Les détails restent facultatifs : prix, surface et pièces ne deviennent pas obligatoires.
 
 **Enregistrer mon annonce** envoie les fichiers, vérifie les images et sauvegarde l’annonce. Le résultat porte la mention « Informations et photos fournies par votre agence » et peut être retrouvé dans **Vos dernières annonces** après rechargement. L’enregistrement ne crée aucune vidéo et ne consomme aucun crédit ou essai.
 
@@ -18,7 +20,7 @@ Renseigner le titre, le type de bien et la localisation, choisir vente ou locati
 - Décodage complet : minimum 640×360 pixels, maximum 16 millions de pixels ; JPEG réencodé jusqu’à 2 048 pixels par côté, ratio et orientation conservés, métadonnées retirées. SVG, HEIC, animation, fichiers corrompus et faux MIME sont refusés.
 - Titre/localisation : 200 caractères maximum. Description : 20 000 caractères, paragraphes conservés, affichage en texte brut. Surface positive jusqu’à 100 000 m², 1 à 100 pièces, prix positif jusqu’à 1 milliard d’euros. Prix et autres champs facultatifs laissés vides restent absents.
 - `sourceKind: manual`, sources web de l’annonce et des photos à `null`. Faits renseignés `user_provided`, provenance `manual.champ`. Ils ne sont pas présentés comme des faits vérifiés sur un site. Le texte et les photos du formulaire ne constituent pas une preuve de compatibilité d’un importeur.
-- Plafonds techniques de recette communs : 5 créations par jour UTC, 30 par mois, 30 dossiers par agence ; un rejeu identique ne crée pas de nouvelle tentative. Aucun quota d’abonnement n’est consommé. La saisie manuelle ne contourne pas ces plafonds de stockage/test.
+- Les **imports par lien** sont limités à **20 tentatives par jour UTC et 60 par mois** depuis la migration `0029` du 02/10/2026. Depuis la migration `0028`, ajouter ses propres photos ou créer une copie personnalisable d’une annonce n’utilise plus ce compteur de scraping. Les compteurs historiques restent conservés. Les saisies manuelles gardent la limite de **30 dossiers par agence**, la réservation financière de **0,50 € par dossier hébergé**, ainsi que 12 photos / 50 Mio / 48 requêtes par dossier. Le quota vidéo n’est utilisé qu’à la génération.
 
 ## API, persistance et reprise
 

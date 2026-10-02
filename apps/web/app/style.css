@@ -1221,3 +1221,5 @@ h1{
 .generated-video {display:block;width:min(100%,360px);max-height:70vh;aspect-ratio:9/16;background:#14261e;border-radius:12px;margin:20px 0;}
 .generation-history {max-width:900px;}
 @media(max-width:600px){.generation-progress{padding:16px}.generation-steps li{font-size:.8rem;padding:6px 10px}}
+
+.generated-video.is-horizontal,.trial-result .generated-video.is-horizontal {width:min(100%,720px);height:auto;aspect-ratio:16/9;object-fit:contain}

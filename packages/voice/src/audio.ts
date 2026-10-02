@@ -1,8 +1,9 @@
-import {VoiceFailure} from '@bienvu/contracts';
+import {VoiceFailure,VideoDuration} from '@bienvu/contracts';
 
 // Chirp LINEAR16 retourne un WAV PCM. Mesure des échantillons, pas une durée
 // déduite du texte ou d'un seul champ d'en-tête. Web APIs uniquement ; appelé par Node et le pipeline Workers.
-export function measureVoiceWav(input: Uint8Array) {
+export function measureVoiceWav(input: Uint8Array,maximumDurationMs:35000|40000=35000) {
+  if(![35000,40000].includes(maximumDurationMs))throw new VoiceFailure('VOICE_AUDIO_INVALID');
   if (input.byteLength < 44 || input.byteLength > 7 * 1024 * 1024) throw new VoiceFailure('VOICE_AUDIO_INVALID');
   const data = new DataView(input.buffer, input.byteOffset, input.byteLength);
   const tag = (offset: number) => String.fromCharCode(...input.subarray(offset, offset + 4));
@@ -31,7 +32,7 @@ export function measureVoiceWav(input: Uint8Array) {
   }
   if (!format || !pcm || pcm.bytes === 0 || pcm.bytes % format.blockAlign !== 0) throw new VoiceFailure('VOICE_AUDIO_INVALID');
   const durationMs = Math.ceil(pcm.bytes / format.blockAlign / format.sampleRate * 1000);
-  if (durationMs > 35000) throw new VoiceFailure('VOICE_DURATION_EXCEEDED');
+  if (durationMs > maximumDurationMs) throw new VoiceFailure('VOICE_DURATION_EXCEEDED');
   let sum = 0, peak = 0;
   for (let index = pcm.offset; index < pcm.offset + pcm.bytes; index += 2) {
     const sample = data.getInt16(index, true) / 32768;
@@ -44,11 +45,25 @@ export function measureVoiceWav(input: Uint8Array) {
     measurement: 'decoded_pcm16_samples' as const};
 }
 
-export function voiceSceneTiming(durationsMs: readonly number[]) {
+export function voiceSceneTiming(durationsMs: readonly number[],durationSeconds?:VideoDuration) {
   if (durationsMs.length < 4 || durationsMs.length > 6
     || durationsMs.some(value => !Number.isInteger(value) || value <= 0 || value > 35000)) throw new VoiceFailure('VOICE_AUDIO_INVALID');
   const frames = durationsMs.map(value => Math.ceil(value * 30 / 1000) + 6);
   const minimumFrames = frames.reduce((sum, value) => sum + value, 0);
+  if(durationSeconds!==undefined){
+    if(!VideoDuration.safeParse(durationSeconds).success)throw new VoiceFailure('VOICE_AUDIO_INVALID');
+    const targetFrames=durationSeconds*30;
+    if(minimumFrames>targetFrames)throw new VoiceFailure('VOICE_DURATION_EXCEEDED');
+    // Keep the WAVs intact. Reserve a short contact tail and distribute the
+    // rest over the visit, rather than holding the final card for 20 seconds.
+    const tail=Math.min(30,targetFrames-minimumFrames),extra=targetFrames-minimumFrames-tail;
+    const visitWeight=frames.slice(0,-1).reduce((n,f)=>n+f,0);let at=0;
+    const result=frames.map((f,index)=>{
+      if(index===frames.length-1)return f+tail;
+      const before=at;at+=f;return f+Math.floor(at*extra/visitWeight)-Math.floor(before*extra/visitWeight);
+    });
+    return result;
+  }
   if (minimumFrames > 1050) throw new VoiceFailure('VOICE_DURATION_EXCEEDED');
   // 0,3 s entre les pistes, environ 1,2 s après le contact. Si le minimum de
   // 20 s exige plus de temps, le réserver à la carte finale : ne pas hacher

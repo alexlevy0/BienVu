@@ -19,7 +19,7 @@ export function LegalDocument({kind, title, introduction, contents, children}: {
         <p className="legal-kicker">BIENVU · INFORMATIONS</p>
         <h1>{title}</h1>
         <p className="legal-introduction">{introduction}</p>
-        <p className="legal-updated">Dernière mise à jour : <time dateTime="2026-09-30">30 septembre 2026</time></p>
+        <p className="legal-updated">Dernière mise à jour : <time dateTime={kind==='confidentialite'?'2026-10-02':'2026-09-30'}>{kind==='confidentialite'?'2 octobre 2026':'30 septembre 2026'}</time></p>
         <nav className="legal-tabs" aria-label="Documents BienVu">
           <Link href="/conditions" aria-current={kind === 'conditions' ? 'page' : undefined}>Conditions d’utilisation</Link>
           <Link href="/confidentialite" aria-current={kind === 'confidentialite' ? 'page' : undefined}>Politique de confidentialité</Link>

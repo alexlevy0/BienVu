@@ -12,12 +12,13 @@
   },
   "dependencies": {
     "@bienvu/contracts": "workspace:*",
-    "@bienvu/importers": "workspace:*",
-    "@cloudflare/playwright": "1.3.6",
-    "@cloudflare/containers": "0.3.7",
-    "image-size": "2.0.3",
     "@bienvu/db": "workspace:*",
+    "@bienvu/importers": "workspace:*",
     "@bienvu/narration": "workspace:*",
-    "@bienvu/voice": "workspace:*"
+    "@bienvu/voice": "workspace:*",
+    "@cloudflare/containers": "0.3.7",
+    "@cloudflare/playwright": "1.3.6",
+    "@runwayml/sdk": "4.20.1",
+    "image-size": "2.0.3"
   }
 }

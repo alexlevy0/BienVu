@@ -92,6 +92,8 @@ export async function uploadCreationPhoto(env:Env,agencyId:string,id:string,inde
   if(!Number.isInteger(index)||index<0||index>11||!/^[-a-zA-Z0-9_]{16,64}$/.test(uploadId)||
     !['image/jpeg','image/png','image/webp'].includes(mime)||!bytes.length||bytes.length>10*1024*1024)throw new RequestFailure('INVALID_PHOTO');
   const row=await findImport(env.DB,agencyId,id);required(row);
+  if(await env.DB.prepare('SELECT id FROM creation_upload_cancellations WHERE id=? AND agency_id=? AND import_id=?')
+    .bind(uploadId,agencyId,id).first())throw new RequestFailure('CONFLICT');
   const saved=photoList(row!);const existing=saved.find(photo=>photo.id===uploadId);
   if(existing){const head=await env.MEDIA.head(existing.objectKey);if(head?.size===existing.sizeBytes&&head.customMetadata?.sha256===existing.contentHash)return existing;}
   if(saved.some(photo=>photo.sourceOrder===index&&photo.id!==uploadId)||saved.length>=12&&!existing)throw new RequestFailure('CONFLICT');
@@ -128,8 +130,10 @@ export async function removeCreationPhoto(env:Env,agencyId:string,id:string,uplo
   await env.DB.prepare(`INSERT INTO creation_upload_cancellations(id,agency_id,import_id,created_at) VALUES(?,?,?,?) ON CONFLICT(id) DO NOTHING`)
     .bind(uploadId,agencyId,id,new Date().toISOString()).run();
   const photo=photoList((await findImport(env.DB,agencyId,id))!).find(item=>item.id===uploadId);
-  if(photo){await env.DB.prepare('DELETE FROM import_objects WHERE id=? AND agency_id=? AND import_id=?').bind(uploadId,agencyId,id).run();
-    await env.MEDIA.delete(photo.objectKey);}
+  // Retain the journal if R2 fails so a retry (or the draft cleanup) still knows
+  // which object to delete. The tombstone already prevents late/replayed PUTs.
+  if(photo){await env.MEDIA.delete(photo.objectKey);
+    await env.DB.prepare('DELETE FROM import_objects WHERE id=? AND agency_id=? AND import_id=?').bind(uploadId,agencyId,id).run();}
 }
 const fact=<T,U extends string>(value:T|null,unit:U,source:'import'|'ai'|'user'|undefined,evidence:string|null)=>value===null
   ? {status:'missing' as const,value:null,unit,sourcePath:null,rawEvidence:null}

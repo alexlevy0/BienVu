@@ -1,4 +1,4 @@
-import {EntityId, GenerationRequest, PreparedNarration, VideoAsset, VideoManifest, VideoFailure, videoAssets, videoManifestHash, videoPresentation, videoPhotoTimeline} from '@bienvu/contracts';
+import {EntityId, GenerationRequest, PreparedNarration, PhotoAnimation, VideoAsset, VideoManifest, VideoFailure, videoAssets, videoManifestHash, videoPresentation, videoPhotoTimeline,videoDimensions} from '@bienvu/contracts';
 import {findNarration, type Database} from '@bienvu/db';
 import {scriptContext, validateScript, type ScriptContext} from '@bienvu/narration';
 import type {NarrationBucket} from './narration';
@@ -38,7 +38,8 @@ export async function prepareJobVideo(env: {DB: Database; MEDIA: NarrationBucket
     const narration=await findNarration(env.DB,agency,job);
     if(!narration||narration.state!=='prepared'||narration.jobAttempt!==entitlement.attempt||narration.expiresAt<=new Date().toISOString())fail('VIDEO_NARRATION_NOT_READY');
     const snapshot=JSON.parse(narration.snapshot) as {listing:unknown;brand:unknown;contact:ScriptContext['contact'];copyVersion?:ScriptContext['copyVersion'];customNarration?:string[]};
-    const context=await scriptContext(snapshot.listing,snapshot.brand,snapshot.contact,snapshot.copyVersion??'factual-copy/1',snapshot.customNarration);
+    const input=entitlement.generationInput?GenerationRequest.parse(JSON.parse(entitlement.generationInput)):undefined;
+    const context=await scriptContext(snapshot.listing,snapshot.brand,snapshot.contact,snapshot.copyVersion??'factual-copy/1',snapshot.customNarration,input?.durationSeconds);
     if(context.listing.agencyId!==agency||context.listing.id!==entitlement.listingId||context.brand.id!==agency)fail('VIDEO_SCOPE_INVALID');
     const prepared=PreparedNarration.parse(JSON.parse(narration.result!));
     validateScript(context,prepared.script);
@@ -65,15 +66,29 @@ export async function prepareJobVideo(env: {DB: Database; MEDIA: NarrationBucket
       sources.push({id:a.id,key:a.objectKey});
       return VideoAsset.parse({id:a.id,objectKey:a.objectKey,sha256:a.sha256,sizeBytes:a.sizeBytes,mime:'audio/wav',durationMs:a.durationMs});
     });
-    const customization=entitlement.generationInput?GenerationRequest.parse(JSON.parse(entitlement.generationInput)).customization:undefined;
-    const manifest=VideoManifest.parse({schemaVersion:2,templateVersion:'bienvu-vertical/2',agencyId:agency,jobId:job,listingId:context.listing.id,
-      brand:context.brand,contact:context.contact,logo,width:1080,height:1920,fps:30,disclosure:prepared.script.disclosure,
+    const customization=input?.customization;
+    if((prepared.voiceEnabled!==false)!==(input?.voiceEnabled!==false))fail('VIDEO_SCOPE_INVALID');
+    if(prepared.durationSeconds!==input?.durationSeconds)fail('VIDEO_SCOPE_INVALID');
+    const animations:PhotoAnimation[]=[];
+    if(customization?.runwayClips){
+      const rows=await env.DB.prepare("SELECT json_group_array(json(animation_json)) AS data FROM (SELECT animation_json FROM photo_animations WHERE agency_id=? AND job_id=? AND state='ready' ORDER BY slot)")
+        .bind(agency,job).first<{data:string}>();
+      for(const row of JSON.parse(rows?.data??'[]')){const animation=PhotoAnimation.parse(row);
+        const original=photos.find(p=>p.id===animation.photoAssetId&&p.sha256===animation.sourceSha256);
+        if(!original)fail('VIDEO_SCOPE_INVALID');
+        animations.push(animation);sources.push({id:animation.asset.id,key:animation.asset.objectKey});}
+    }
+    const manifest=VideoManifest.parse({schemaVersion:2,templateVersion:input?.aspectRatio==='16:9'?'bienvu-horizontal/1':'bienvu-vertical/2',agencyId:agency,jobId:job,listingId:context.listing.id,
+      brand:context.brand,contact:context.contact,logo,...videoDimensions(input?.aspectRatio),fps:30,disclosure:prepared.script.disclosure,
       rights:entitlement.kind==='anonymous'?{kind:'anonymous',watermarked:false,previewProvisionCents:entitlement.previewProvisionCents}:{kind:entitlement.kind,allocationId:entitlement.allocationId,watermarked:entitlement.kind==='trial'},photos,audio,
-      scenes:prepared.script.scenes.map((s,i)=>({...s,audioAssetId:audio[i].id,durationFrames:prepared.durationFrames[i]})),
-      photoTimeline:videoPhotoTimeline(photos,prepared.durationFrames.reduce((n,frames)=>n+frames,0)),
+      scenes:prepared.script.scenes.map((s,i)=>({...s,audioAssetId:audio[i]?.id??null,durationFrames:prepared.durationFrames[i]})),
+      photoTimeline:videoPhotoTimeline(photos,prepared.durationFrames.reduce((n,frames)=>n+frames,0),animations.map(a=>a.photoAssetId)),
       presentation:videoPresentation(context.listing),
-      subtitlesEnabled:entitlement.generationInput?GenerationRequest.parse(JSON.parse(entitlement.generationInput)).subtitlesEnabled??true:true,
-      ...(customization?{visualStyle:customization.style,photoMotion:customization.photoMotion,photoTransition:customization.transition}:{})});
+      subtitlesEnabled:input?.voiceEnabled===false?false:input?.subtitlesEnabled??true,
+      ...(input?.voiceEnabled===false?{voiceEnabled:false}:{}),
+      ...(input?.durationSeconds!==undefined?{durationSeconds:input.durationSeconds}:{}),
+      ...(customization?{visualStyle:customization.style,photoMotion:customization.photoMotion,photoTransition:customization.transition}:{visualStyle:'cinematic'}),
+      ...(animations.length?{photoAnimations:animations}:{})});
     const at=new Date().toISOString(),hash=await videoManifestHash(manifest);
     await env.DB.prepare(`INSERT INTO video_manifests(job_id,agency_id,job_attempt,manifest_hash,manifest_json,sources_json,state,created_at,expires_at)
       SELECT ?,?,?,?,?,?,'preparing',?,? WHERE EXISTS(SELECT 1 FROM jobs j JOIN reservations r ON r.id=j.reservation_id AND r.agency_id=j.agency_id

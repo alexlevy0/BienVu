@@ -5,13 +5,15 @@ import {authorized,json} from './auth';
 import {VideoRenderer} from './video-worker';
 import {getJobVideo,prepareJobVideo} from './video-manifest';
 import {prepareJobNarration} from './narration';
-import {realProviders} from './narration-worker';
+import {realProviders,type FishVoiceEnv} from './narration-worker';
 import {cleanupAnonymousTrials} from './trial-cleanup';
 import {extractDescription,EXTRACTION_TEXT_MAX} from '@bienvu/narration';
 import {loadGenerationListing} from './generation-import';
+import {prepareJobAnimations} from './photo-animations';
 export {VideoRenderer};
-export type GenerationEnv=VideoEnv&Pick<NarrationEnv,'GOOGLE_SERVICE_ACCOUNT_JSON'|'GOOGLE_CLOUD_PROJECT'|'GOOGLE_TTS_VOICE'|'OPENAI_API_KEY'|'SCRIPT_MODEL'>&{
+export type GenerationEnv=VideoEnv&Pick<NarrationEnv,'GOOGLE_SERVICE_ACCOUNT_JSON'|'GOOGLE_CLOUD_PROJECT'|'GOOGLE_TTS_VOICE'|'OPENAI_API_KEY'|'SCRIPT_MODEL'>&FishVoiceEnv&{
   GENERATIONS_ENABLED:string;GENERATION_TOKEN:string;IMPORT_TOKEN:string;IMPORT_SERVICE:Fetcher;GENERATION_WORKFLOW:Workflow<{agencyId:string;jobId:string}>;
+  RUNWAY_ENABLED?:string;RUNWAYML_API_SECRET?:string;RUNWAY_TEST_AGENCY_ID?:string;
 };
 const diagnosticCode=(error:unknown)=>{
   if(error&&typeof error==='object'&&'code' in error&&typeof error.code==='string'&&/^[A-Z_]{3,80}$/.test(error.code))return error.code;
@@ -73,7 +75,8 @@ export async function reconcileGeneration(env:GenerationEnv,row:GenerationRow,co
 }
 export class GenerationWorkflow extends WorkflowEntrypoint<GenerationEnv,{agencyId:string;jobId:string}>{
   protected diagnostic(_error:unknown){}
-  protected providers(voiceName?:string){return realProviders(this.env,voiceName);}
+  protected providers(voiceName?:string,voiceEnabled=true){return realProviders(this.env,voiceName,voiceEnabled);}
+  protected animations(agencyId:string,jobId:string){return prepareJobAnimations(this.env,agencyId,jobId);}
   async run(event:WorkflowEvent<{agencyId:string;jobId:string}>,step:WorkflowStep){
     const {agencyId,jobId}=event.payload;
     const once={retries:{limit:0,delay:'1 second' as const},timeout:'10 minutes' as const};
@@ -82,12 +85,17 @@ export class GenerationWorkflow extends WorkflowEntrypoint<GenerationEnv,{agency
         return loadGenerationListing(this.env,row);});
       await step.do('script-and-voice-checkpoints',once,async()=>{
         const row=await active(this.env,agencyId,jobId);await setGenerationStage(this.env.DB,row,'scripting');
-        const providers=await this.providers(GenerationRequest.parse(JSON.parse(row.input)).customization?.voice),guard=()=>active(this.env,agencyId,jobId);
+        const input=GenerationRequest.parse(JSON.parse(row.input));
+        const providers=await this.providers(input.customization?.voice,input.voiceEnabled!==false),guard=()=>active(this.env,agencyId,jobId);
         const source=providers.script,voice=providers.voice;
         providers.script={...source,plan:async(...args)=>{await guard();return source.plan(...args);}};
         providers.voice={...voice,synthesize:async text=>{await guard();return voice.synthesize(text);}};
         await prepareJobNarration(this.env,agencyId,jobId,providers,{brand:JSON.parse(row.brand),onVoicing:()=>setGenerationStage(this.env.DB,row,'voicing')});
         return {prepared:true};
+      });
+      await step.do('animate-selected-photos',{...once,timeout:'6 minutes'},async()=>{
+        await active(this.env,agencyId,jobId);
+        return this.animations(agencyId,jobId);
       });
       const render=await step.do('prepare-and-submit-render',once,async()=>{
         const row=await active(this.env,agencyId,jobId),frozen=await prepareJobVideo(this.env,agencyId,jobId);
