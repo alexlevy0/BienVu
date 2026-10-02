@@ -14,7 +14,8 @@ export async function trialHistoryResponse(request:Request,env:TrialEnv) {
   const session=await sessionFromRequest(request,env);
   // Reading history creates neither a session nor a generation, even when admissions are paused.
   const page=session?await listAnonymousGenerationPage(env.DB,session,new URL(request.url).searchParams.get('cursor')??undefined):{rows:[],nextCursor:null};
-  return Response.json({jobs:page.rows.map(row=>generationView(row,Date.now(),'anonymous')),nextCursor:page.nextCursor});
+  return Response.json({jobs:page.rows.map(row=>generationView(row,Date.now(),'anonymous')),nextCursor:page.nextCursor,
+    creditsRemaining:session?Math.max(0,(session.creditsGranted??1)-(session.creditsReserved??0)-(session.creditsConsumed??session.successes)):1});
 }
 export async function trialSessionResponse(request:Request,env:TrialEnv) {
   if(new URL(request.url).origin!==authOrigin(env)||request.headers.get('sec-fetch-site')==='cross-site')throw new RequestFailure('FORBIDDEN');
@@ -26,7 +27,8 @@ export async function trialSessionResponse(request:Request,env:TrialEnv) {
   const row=session?await trialForSession(env.DB,session):null;
   const intent=session?await env.DB.prepare('SELECT claim_job_id AS id FROM anonymous_sessions WHERE id=?').bind(session.id).first<{id:string|null}>():null;
   return Response.json({enabled:configured(env)&&policy.enabled===1,siteKey:configured(env)?env.TURNSTILE_SITE_KEY:null,
-    hasIntent:Boolean(intent?.id),used:session?session.successes>=policy.successes:false,job:row?generationView(row,Date.now(),'anonymous'):null},
+    hasIntent:Boolean(intent?.id),creditsRemaining:session?Math.max(0,(session.creditsGranted??1)-(session.creditsReserved??0)-(session.creditsConsumed??session.successes)):1,
+    used:session?session.successes>=policy.successes:false,job:row?generationView(row,Date.now(),'anonymous'):null},
     {headers:cookie?{'Set-Cookie':cookie}:{}});
 }
 export async function ipFingerprint(request:Request,env:TrialEnv,trustedCloudflare:boolean){

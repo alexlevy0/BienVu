@@ -93,7 +93,7 @@ export class GenerationWorkflow extends WorkflowEntrypoint<GenerationEnv,{agency
         await prepareJobNarration(this.env,agencyId,jobId,providers,{brand:JSON.parse(row.brand),onVoicing:()=>setGenerationStage(this.env.DB,row,'voicing')});
         return {prepared:true};
       });
-      await step.do('animate-selected-photos',{...once,timeout:'6 minutes'},async()=>{
+      await step.do('animate-selected-photos',{...once,timeout:'10 minutes'},async()=>{
         await active(this.env,agencyId,jobId);
         return this.animations(agencyId,jobId);
       });

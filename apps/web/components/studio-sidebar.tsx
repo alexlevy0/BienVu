@@ -11,6 +11,13 @@ export function StudioSidebar({active}: {active: 'create' | 'videos' | 'explore'
   const {me, loading} = useAccount();
   const [menuOpen, setMenuOpen] = useState(false);
   const store=useGenerationStore();
+  const [guestCredits,setGuestCredits]=useState(1);
+  useEffect(()=>{if(me||loading)return;const controller=new AbortController();
+    void fetch('/api/trial/history',{cache:'no-store',signal:controller.signal}).then(async response=>{
+      if(!response.ok)return;const data=await response.json() as {creditsRemaining?:number};
+      if(Number.isInteger(data.creditsRemaining))setGuestCredits(data.creditsRemaining!);
+    }).catch(()=>{});return()=>controller.abort();
+  },[me?.agency.id,loading,store.jobs.map(job=>`${job.id}:${job.status}`).join(',')]);
   const recent=[...store.jobs.map(job=>({kind:'job' as const,createdAt:job.createdAt,job})),
     ...store.drafts.map(draft=>({kind:'draft' as const,createdAt:draft.createdAt,draft}))]
     .sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
@@ -63,7 +70,7 @@ export function StudioSidebar({active}: {active: 'create' | 'videos' | 'explore'
           </Link>{me&&<DraftActions draft={item.draft} agencyId={me.agency.id}/>}</div>)}
         {!recent.length && <p className="home-recents-empty">{loading||store.loading ? 'Chargement de votre espace…' : store.unavailable ? 'Vos créations sont disponibles dans Mes vidéos.' : me ? 'Vos prochaines créations apparaîtront ici.' : 'Vos essais apparaîtront ici.'}</p>}
       </section>
-      <div className="home-sidebar-bottom"><div className="home-plan"><span aria-live="polite">{loading?'Chargement de votre quota…':me?`${me.rights.developmentRemaining} vidéo${me.rights.developmentRemaining>1?'s':''} disponible${me.rights.developmentRemaining>1?'s':''}`:'Accès anticipé'}</span><Link href="/abonnement" className={active === 'offers' ? 'home-plan-link-active' : undefined} aria-current={active === 'offers' ? 'page' : undefined}>Découvrir les offres <HomeIcon name="arrow" size={17}/></Link></div>
+      <div className="home-sidebar-bottom"><div className="home-plan"><span aria-live="polite">{loading?'Chargement de vos crédits…':me?`${me.rights.developmentRemaining} crédit${me.rights.developmentRemaining>1?'s':''} disponible${me.rights.developmentRemaining>1?'s':''}`:`${guestCredits} crédit d’essai disponible`}</span>{Boolean(me?.rights.creditReserved)&&<small>{me!.rights.creditReserved} crédit(s) réservé(s)</small>}<Link href="/abonnement" className={active === 'offers' ? 'home-plan-link-active' : undefined} aria-current={active === 'offers' ? 'page' : undefined}>Découvrir les offres <HomeIcon name="arrow" size={17}/></Link></div>
         {me ? <details className="home-account"><summary><span className="home-avatar">{initials}</span><span>{accountName}</span><HomeIcon name="chevron" size={17}/></summary><div className="home-account-menu"><span>{me.agency.name}</span><Link href="/agence">Mon agence</Link><Link href="/abonnement">Mon abonnement</Link>{me.isSuperAdmin&&<Link href="/admin" aria-current={active==='admin'?'page':undefined}>Super admin</Link>}<SignOut/></div></details> : <Link className="home-guest-account" href="/connexion"><span className="home-avatar"><HomeIcon name="user" size={20}/></span><span>Se connecter</span><HomeIcon name="arrow" size={17}/></Link>}
       </div>
     </aside>

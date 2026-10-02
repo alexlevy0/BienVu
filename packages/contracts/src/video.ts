@@ -52,7 +52,7 @@ export const VideoManifest = z.object({schemaVersion: z.literal(2), templateVers
   voiceEnabled:z.boolean().optional(),
   durationSeconds:VideoDuration.optional(),
   visualStyle:VideoStyle.optional(),photoMotion:z.boolean().optional(),photoTransition:z.enum(['fade','cut']).optional(),
-  photoAnimations:z.array(PhotoAnimation).max(2).optional(),
+  photoAnimations:z.array(PhotoAnimation).max(12).optional(),
 }).strict().superRefine((m, ctx) => {
   const fail = (message: string) => ctx.addIssue({code: 'custom', message});
   if(m.voiceEnabled===false?m.audio.length!==0:m.audio.length<4)fail('Médias audio incompatibles avec le choix de voix.');
@@ -98,7 +98,9 @@ export type VideoManifest = z.infer<typeof VideoManifest>;
 export function videoPhotoTimeline(photos: Pick<VideoAsset, 'id'>[], frames: number, animatedIds:string[]=[]): NonNullable<VideoManifest['photoTimeline']> {
   if (photos.length < 3 || photos.length > 12 || !Number.isInteger(frames) || frames < 600 || frames > 1200)
     throw new Error('VIDEO_PHOTO_TIMELINE_INVALID');
-  if(animatedIds.length>2||new Set(animatedIds).size!==animatedIds.length||animatedIds.some(id=>!photos.some(p=>p.id===id)))throw new Error('VIDEO_PHOTO_TIMELINE_INVALID');
+  if(animatedIds.length>photos.length||new Set(animatedIds).size!==animatedIds.length||animatedIds.some(id=>!photos.some(p=>p.id===id)))throw new Error('VIDEO_PHOTO_TIMELINE_INVALID');
+  if(animatedIds.length>2)return photos.map((photo,i)=>({photoAssetId:photo.id,
+    durationFrames:Math.floor((i+1)*frames/photos.length)-Math.floor(i*frames/photos.length)}));
   if(animatedIds.length){
     // Play each paid five-second clip completely, while retaining every photo
     // and the exact narration duration. Even 12 photos retain at least 1 s.

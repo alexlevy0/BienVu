@@ -1,5 +1,5 @@
 import {EntityId,VideoReport,publicErrors,type PublicErrorCode} from '@bienvu/contracts';
-import {findOwnedGeneration,generationEvent,GenerationFailure,listGenerations,type GenerationRow} from '@bienvu/db';
+import {findOwnedGeneration,generationEvent,generationMasterUnlocked,GenerationFailure,listGenerations,type GenerationRow} from '@bienvu/db';
 import {RequestFailure} from './http';
 export async function callGeneration(env:CloudflareEnv&{GENERATION_SERVICE?:Fetcher;GENERATION_TOKEN?:string},agencyId:string,path:string,body:unknown,key=''){
   if(!env.GENERATION_SERVICE||!env.GENERATION_TOKEN)throw new RequestFailure('GENERATIONS_PAUSED');
@@ -23,7 +23,7 @@ export async function generationHistory(env:Pick<CloudflareEnv,'DB'>,agencyId:st
 export async function generationVideo(request:Request,env:Pick<CloudflareEnv,'DB'|'MEDIA'>,agencyId:string,id:string){
   const row=await ownGeneration(env,agencyId,id);
   if(row.status!=='ready'||row.retention!=='available'||row.expiresAt<=new Date().toISOString())throw new RequestFailure('NOT_FOUND');
-  if(row.creditStatus!=='consumed')throw new RequestFailure('QUOTA_EXHAUSTED');
+  if(!generationMasterUnlocked(row))throw new RequestFailure('QUOTA_EXHAUSTED');
   const response=await streamGenerationMedia(request,env,row,'master');
   if(new URL(request.url).searchParams.get('download')==='1'&&response.ok)await generationEvent(env.DB,id,'download');
   return response;
@@ -34,7 +34,7 @@ export async function generationPreview(request:Request,env:Pick<CloudflareEnv,'
 export async function streamGenerationMedia(request:Request,env:Pick<CloudflareEnv,'MEDIA'>,row:GenerationRow,variant:'master'|'preview') {
   const id=row.jobId,key=variant==='preview'?row.previewKey:row.objectKey,raw=variant==='preview'?row.previewReport:row.report;
   if(row.status!=='ready'||row.retention!=='available'||!key||!raw||row.expiresAt<=new Date().toISOString())throw new RequestFailure('NOT_FOUND');
-  if(variant==='master'&&(!row.ownerAgencyId||row.creditStatus!=='consumed'))throw new RequestFailure('NOT_FOUND');
+  if(variant==='master'&&!generationMasterUnlocked(row))throw new RequestFailure('NOT_FOUND');
   if(!key.startsWith(`agencies/${row.agencyId}/jobs/${id}/`))throw new RequestFailure('NOT_FOUND');
   const report=VideoReport.parse(JSON.parse(raw)),head=await env.MEDIA.head(key);
   if(variant==='preview'&&!report.watermarked)throw new RequestFailure('NOT_FOUND');

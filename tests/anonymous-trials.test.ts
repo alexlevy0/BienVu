@@ -1,8 +1,11 @@
+import {admitLegacyAnonymous as admitAnonymous} from './legacy-trial-fixture';
+// These claim/debit scenarios cover pre-rollout trials. New gifts are covered
+// by product-credits, trial-api and trial-workflow tests.
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import {migrateNarrationProbe} from '../scripts/narration-fixtures';
-import {createAnonymousSession,admitAnonymous,claimTrial,fundOwnedTrial,creditGrant,creditPeriod,ensureAgency,findGeneration,
+import {createAnonymousSession,claimTrial,fundOwnedTrial,creditGrant,creditPeriod,ensureAgency,findGeneration,
   findOwnedGeneration,failGeneration,trialForSession,listGenerations,generationView,anonymousSession} from '../packages/db/src/index';
 import {trialInput} from '../packages/db/src/anonymous';
 const input={url:'https://www.century21.fr/trouver_logement/detail/123456789/'};

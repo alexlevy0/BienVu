@@ -1,10 +1,11 @@
 'use client';
 import {useEffect,useRef,useState,type CSSProperties} from 'react';
-import {CustomNarration,videoStyles,frenchVoices,type VideoCustomization,type VideoDuration,type VideoAspectRatio} from '@bienvu/contracts';
+import {CustomNarration,videoStyles,frenchVoices,requestedAnimations,generationCreditCost,selectedAnimationIndices,type VideoCustomization,type VideoDuration,type VideoAspectRatio} from '@bienvu/contracts';
 import {suggestedNarration,narrationWordLimit,wordCount} from '@bienvu/narration/suggestion';
 import type {ManualDraftFields} from '../lib/listing-draft';
 import {HomeIcon} from './home-icons';
 import {VoicePreview} from './voice-preview';
+import {useAccount} from './account';
 
 export type CustomizerPhoto={id:string;preview:string;slot:number;state:string;file?:File|null;error?:string;removing?:boolean};
 export {suggestedNarration};
@@ -12,6 +13,7 @@ type Props={settings:VideoCustomization;onChange(value:VideoCustomization):void;
   agencyName:string;durationSeconds?:VideoDuration;aspectRatio?:VideoAspectRatio;voiceEnabled?:boolean;onVoice?(value:boolean):void;subtitlesEnabled:boolean;onSubtitles(value:boolean):void;onBack():void;onAdd(files:FileList|null):void;
   busy:boolean;ready:boolean;onEdit():void;saved:boolean;sourceUrl?:string;onRetry?(id:string):void;onRemove?(id:string):void};
 export function VideoCustomizer(p:Props){
+  const {me}=useAccount();
   const duration=p.durationSeconds??20;
   const [tab,setTab]=useState<'photos'|'style'|'voice'>('photos'),[drag,setDrag]=useState<number|null>(null),
     [playing,setPlaying]=useState(false),[time,setTime]=useState(0);
@@ -21,9 +23,11 @@ export function VideoCustomizer(p:Props){
   const ordered=[...order.map(slot=>p.photos.find(photo=>photo.slot===slot)).filter((photo):photo is CustomizerPhoto=>!!photo),
     ...p.photos.filter(photo=>!order.includes(photo.slot))];
   const chosen=ordered.filter(photo=>order.includes(photo.slot));
+  const animated=p.settings.runwayPhotos??selectedAnimationIndices(order,p.settings).map(index=>order[index]);
   const narration=p.settings.narration??(p.sourceUrl?['','','','']:suggestedNarration(p.fields,p.agencyName,duration)),validNarration=CustomNarration.safeParse(narration);
   const patch=(next:Partial<VideoCustomization>)=>p.onChange({...p.settings,...next});
-  function toggle(slot:number){patch({photoOrder:order.includes(slot)?order.filter(s=>s!==slot):[...order,slot]});}
+  function toggle(slot:number){patch({photoOrder:order.includes(slot)?order.filter(s=>s!==slot):[...order,slot],runwayClips:undefined,runwayPhotos:animated.filter(s=>s!==slot)});}
+  function animate(slot:number){patch({runwayClips:undefined,runwayPhotos:animated.includes(slot)?animated.filter(s=>s!==slot):[...animated,slot]});}
   function move(slot:number,target:number){const next=order.filter(s=>s!==slot);next.splice(Math.max(0,Math.min(next.length,target)),0,slot);patch({photoOrder:next});}
   useEffect(()=>{setPlaying(false);setTime(0);},[duration]);
   useEffect(()=>{if(!playing)return;const timer=setInterval(()=>setTime(t=>{if(t>=duration-.2){setPlaying(false);return duration;}return t+.1;}),100);return()=>clearInterval(timer);},[playing,duration]);
@@ -50,6 +54,7 @@ export function VideoCustomizer(p:Props){
           onDrop={event=>{if(drag!==null&&selected){event.preventDefault();move(drag,at);setDrag(null);}}}>
           <img src={photo.preview} alt={`Photo ${photo.slot+1}`} draggable={false}/>{selected&&<span className="customizer-photo-number">{at+1}</span>}
           <button type="button" className="customizer-photo-check" aria-pressed={selected} aria-label={`${selected?'Désélectionner':'Sélectionner'} la photo ${photo.slot+1}`} onClick={()=>toggle(photo.slot)} disabled={p.busy||photo.removing||photo.state!=='ready'}>{selected?'✓':'+'}</button>
+          {selected&&<button type="button" className={`customizer-photo-animate${animated.includes(photo.slot)?' is-active':''}`} aria-pressed={animated.includes(photo.slot)} aria-label={`Animer la photo ${photo.slot+1} avec Runway`} disabled={!me||p.busy||photo.removing||photo.state!=='ready'} title={!me?'Connectez-vous pour utiliser Runway':'1 crédit supplémentaire'} onClick={()=>animate(photo.slot)}>{animated.includes(photo.slot)?'✓ Animée':'Animer'} · 1 crédit</button>}
           {at===0&&<span className="customizer-first-photo">Première image</span>}{photo.state!=='ready'&&<span className="customizer-photo-state">{photo.state==='error'?'Envoi interrompu':'Envoi…'}</span>}
           {photo.error&&<p className="customizer-photo-error" role="alert">{photo.error}</p>}
           {(p.onRemove||photo.state==='error'&&p.onRetry&&photo.file)&&<div className="customizer-photo-actions">
@@ -67,10 +72,10 @@ export function VideoCustomizer(p:Props){
           <strong>{style.name}<span>{p.settings.style===style.id?'✓':''}</span></strong><small>{style.description}</small></button>)}</div>
         <div className="customizer-colors">{([['primaryColor','Couleur principale'],['secondaryColor','Couleur secondaire']] as const).map(([key,label])=><label key={key}>{label}<span><input type="color" value={p.settings[key]} onChange={event=>patch({[key]:event.target.value})} disabled={p.busy}/>{p.settings[key].toUpperCase()}</span></label>)}</div><p className="customizer-hint">Ces couleurs s’appliquent à cette vidéo. Votre charte d’agence est conservée.</p>
         <div className="customizer-animation"><div className="customizer-section-title"><strong>Donnez vie aux photos</strong><p>Une visite plus immersive, avec des mouvements de caméra doux.</p></div>
-          <label>Animation des photos<select aria-label="Animation Runway" value={p.settings.runwayClips??0} disabled={p.busy} onChange={event=>patch({runwayClips:Number(event.target.value)})}>
-            <option value="0">Mouvements de caméra · Sans IA vidéo</option><option value="1">Runway · Animer la première photo</option><option value="2">Runway · Animer deux photos</option></select></label>
-          <p className="customizer-hint">{p.settings.runwayClips?`${p.settings.runwayClips} photo${p.settings.runwayClips>1?'s':''} animée${p.settings.runwayClips>1?'s':''} pendant 5 secondes chacune. Animation créée à la génération. Si le service est indisponible, la photo est conservée avec un mouvement doux.`:'Zooms et translations fluides, sans appel Runway.'}</p>
-          {Boolean(p.settings.runwayClips)&&<p className="customizer-hint">Les images sont envoyées à Runway pour l’animation. Vérifiez le rendu avant de partager votre vidéo.</p>}
+          <div className="customizer-animation-actions"><button type="button" className="customizer-add" disabled={p.busy||!me||!order.length} onClick={()=>patch({runwayClips:undefined,runwayPhotos:[...order]})}>Animer toutes les photos</button><button type="button" className="customizer-reset" disabled={p.busy} onClick={()=>patch({runwayClips:undefined,runwayPhotos:[]})}>Mouvements classiques</button></div>
+          <p className="customizer-hint">{!me?'Connectez-vous pour animer les photos avec Runway. Les zooms et translations sont inclus dans votre essai.':requestedAnimations(p.settings)?`${requestedAnimations(p.settings)} photo(s) animée(s). Choisissez chaque photo dans l’onglet Photos. Durée à l’écran adaptée au montage.`:'Zooms et translations inclus. Choisissez les photos à animer dans l’onglet Photos.'}</p>
+          {Boolean(requestedAnimations(p.settings))&&<p className="customizer-hint">Les images sont envoyées à Runway. Une animation non utilisée est remboursée en crédits. Vérifiez le rendu avant de partager.</p>}
+          <p className="customizer-credit-total" role="status">Coût prévu : <strong>{generationCreditCost(p.settings)} crédit{generationCreditCost(p.settings)>1?'s':''}</strong> · 1 vidéo{requestedAnimations(p.settings)?` + ${requestedAnimations(p.settings)} animation(s)`:''}{me?` · ${me.rights.developmentRemaining} disponible(s)`:''}</p>
         </div>
       </>}
       {tab==='voice'&&<><div className="customizer-voice-options"><div className="customizer-voice-choice"><label htmlFor="customizer-selected-voice">Voix française</label><div className="customizer-voice-choice-row"><select id="customizer-selected-voice" value={p.settings.voice} onChange={event=>patch({voice:event.target.value as VideoCustomization['voice']})} disabled={p.busy||p.voiceEnabled===false}>{frenchVoices.map(voice=><option key={voice.id} value={voice.id}>{voice.name} · {voice.provider}</option>)}</select><VoicePreview key={p.settings.voice} voice={p.settings.voice} disabled={p.busy||p.voiceEnabled===false}/></div></div>

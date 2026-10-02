@@ -24,7 +24,7 @@ export function GenerationDetail({id}:{id:string}){
     {loading?<p role="status">Chargement de votre espace…</p>:job?<>
       {me?<GenerationProgress job={job}/>:<AnonymousTrialResult key={job.id} job={job}/>}
       {me&&job.masterAccess==='locked'&&job.status!=='failed'&&job.retention==='available'&&new Date(job.expiresAt).getTime()>Date.now()&&<div className="trial-locked"><h2>Votre vidéo est enregistrée et privée.</h2><p>Le téléchargement sans filigrane nécessite un crédit. {me.rights.renewalAt?`Votre quota se renouvelle le ${new Date(me.rights.renewalAt).toLocaleString('fr-FR')}.`:'Vous pouvez utiliser un crédit disponible sur votre compte.'}</p><p>{me.rights.developmentRemaining} crédit{me.rights.developmentRemaining>1?'s':''} disponible{me.rights.developmentRemaining>1?'s':''}.</p><button className="home-primary-button" disabled={busy||me.rights.developmentRemaining===0} onClick={()=>void unlock()}>{busy?'Vérification…':'Utiliser un crédit pour cette vidéo'}</button></div>}
-      {job.downloadUrl&&<p>Cette vidéo utilise un seul crédit. Les téléchargements suivants n’utilisent aucun crédit supplémentaire.</p>}
+      {job.downloadUrl&&<p>Cette vidéo a utilisé {job.creditsUsed} crédit{job.creditsUsed>1?'s':''}. {job.creditsRefunded>0?`${job.creditsRefunded} crédit(s) restitué(s). `:''}Les téléchargements suivants sont inclus.</p>}
       {['ready','failed'].includes(job.status)&&<ProblemReport key={job.id} jobId={job.id} anonymous={!me}/>}
     </>:!failure&&<p role="status">Chargement de la vidéo…</p>}{failure&&<p role="alert">{failure}</p>}</section>;
 }

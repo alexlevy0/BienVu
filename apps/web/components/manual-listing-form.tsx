@@ -1,6 +1,6 @@
 'use client';
 import {useEffect, useImperativeHandle, useRef, useState, type ChangeEvent, type FormEvent, type Ref} from 'react';
-import {defaultVideoCustomization,VideoCustomization,GenerationCustomization,DESCRIPTION_MAX_CHARACTERS, ManualListingInput, MANUAL_PHOTO_LIMITS, publicErrors, type PublicErrorCode,
+import {generationCreditCost,defaultVideoCustomization,VideoCustomization,GenerationCustomization,DESCRIPTION_MAX_CHARACTERS, ManualListingInput, MANUAL_PHOTO_LIMITS, publicErrors, type PublicErrorCode,
   type CreationDraftData, type CreationDraftView, type NormalizedListing,type VideoDuration,type VideoAspectRatio} from '@bienvu/contracts';
 import {HomeIcon} from './home-icons';
 import type {ImportView} from './generation-form';
@@ -18,6 +18,7 @@ class FormFailure extends Error {}
 const labels: Record<string, string> = {title: 'titre', locality: 'localisation', propertyType: 'type de bien', description: 'description',
   priceCents: 'prix', charges: 'charges', area: 'surface', rooms: 'nombre de pièces', photos: 'photos'};
 type Props = {busy: boolean; generate?: boolean; setBusy(value: boolean): void;guided?:Guided;ref?:Ref<ManualListingFormHandle>;
+  onCreditCost?(value:number):void;
   customizing?:boolean;onCloseCustomizer?():void;brand?:{name:string;primaryColor:string;secondaryColor:string};
   initialCustomization?:VideoCustomization;
   subtitlesEnabled?:boolean;onSubtitles?(value:boolean):void;voiceEnabled?:boolean;onVoice?(value:boolean):void;
@@ -43,6 +44,7 @@ export function ManualListingForm(props: Props) {
   const uploads=useRef(new Set<string>()),removals=useRef(new Set<string>());
   const receivedBatches=useRef(new Set<string>()),photoLock=useRef(false),mounted=useRef(true);
   const [customization,setCustomization]=useState<VideoCustomization|undefined>(),[settingsSaved,setSettingsSaved]=useState(false);
+  useEffect(()=>{props.onCreditCost?.(generationCreditCost(customization));},[customization,props.onCreditCost]);
   const customizationRef=useRef<VideoCustomization|undefined>(undefined),settingsVersion=useRef(0),customInitialized=useRef(false),settingsWrite=useRef<Promise<void>|null>(null);
   customizationRef.current=customization;
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
@@ -248,7 +250,7 @@ export function ManualListingForm(props: Props) {
     }finally{removals.current.delete(photo.id);}
     if(photo.file)URL.revokeObjectURL(photo.preview);
     selected.current=selected.current.filter(p=>p.id!==photo.id);setPhotos(selected.current);
-    setCustomization(current=>current?{...current,photoOrder:current.photoOrder?.filter(slot=>slot!==photo.slot)}:current);setErrors(current=>({...current,photos:''}));
+    setCustomization(current=>current?{...current,photoOrder:current.photoOrder?.filter(slot=>slot!==photo.slot),runwayPhotos:current.runwayPhotos?.filter(slot=>slot!==photo.slot)}:current);setErrors(current=>({...current,photos:''}));
   }
   function focusError(name:string){requestAnimationFrame(()=>formRef.current?.querySelector<HTMLElement>(name==='photos'?'#manual-photos':`[name="${name}"]`)?.focus());}
   async function nextStep(){

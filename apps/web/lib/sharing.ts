@@ -16,7 +16,7 @@ const publicColumns = `s.id,g.owner_agency_id AS agencyId,s.job_id AS jobId,s.pu
   json_extract(i.result_json,'$.facts.propertyType.value') AS propertyType`;
 const publicJoins = `FROM generation_shares s JOIN generation_runs g ON g.job_id=s.job_id AND g.agency_id=s.agency_id
   JOIN jobs j ON j.id=s.job_id AND j.agency_id=s.agency_id
-  JOIN reservations r ON r.job_id=j.id AND r.agency_id=j.agency_id AND r.status='consumed'
+  JOIN reservations r ON r.job_id=j.id AND r.agency_id=j.agency_id AND (r.status='consumed' OR g.credit_version=1 AND g.anonymous_session_id IS NOT NULL AND g.owner_agency_id IS NOT NULL)
   JOIN generation_artifacts a ON a.job_id=j.id JOIN agencies ag ON ag.id=g.owner_agency_id
   LEFT JOIN listing_imports i ON i.id=j.listing_id AND i.agency_id=j.agency_id`;
 const visible = `g.retention='available' AND s.revoked_at IS NULL AND j.status='ready' AND g.expires_at>?`;
@@ -45,7 +45,7 @@ export async function ownerShares(db: Database, agencyId: string) {
 export async function publishGeneration(env: Env, agencyId: string, jobId: string) {
   const row = await ownGeneration(env, agencyId, jobId);
   if (row.status !== 'ready' || row.expiresAt <= new Date().toISOString()) throw new RequestFailure('NOT_FOUND');
-  // Une vidéo publiable doit encore exister et appartenir à la réservation consommée.
+  // Verify the owned master before making an explicit public share.
   await generationVideo(new Request('https://bienvu.invalid/video', {method: 'HEAD'}), env, agencyId, jobId);
   const existing = await env.DB.prepare('SELECT id FROM generation_shares WHERE agency_id=? AND job_id=? AND revoked_at IS NULL')
     .bind(row.agencyId, jobId).first<{id: string}>();
@@ -54,7 +54,7 @@ export async function publishGeneration(env: Env, agencyId: string, jobId: strin
   try {
     await env.DB.prepare(`INSERT INTO generation_shares(id,agency_id,job_id,published_at)
       SELECT ?,j.agency_id,j.id,? FROM jobs j JOIN generation_runs g ON g.job_id=j.id AND g.agency_id=j.agency_id
-      JOIN reservations r ON r.job_id=j.id AND r.agency_id=j.agency_id AND r.status='consumed'
+      JOIN reservations r ON r.job_id=j.id AND r.agency_id=j.agency_id AND (r.status='consumed' OR g.credit_version=1 AND g.anonymous_session_id IS NOT NULL AND g.owner_agency_id IS NOT NULL)
       JOIN generation_artifacts a ON a.job_id=j.id
       WHERE g.owner_agency_id=? AND j.id=? AND g.retention='available' AND j.status='ready' AND g.expires_at>?`)
       .bind(id, new Date().toISOString(), agencyId, jobId, new Date().toISOString()).run();

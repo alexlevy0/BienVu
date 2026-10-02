@@ -70,7 +70,7 @@ export async function prepareJobVideo(env: {DB: Database; MEDIA: NarrationBucket
     if((prepared.voiceEnabled!==false)!==(input?.voiceEnabled!==false))fail('VIDEO_SCOPE_INVALID');
     if(prepared.durationSeconds!==input?.durationSeconds)fail('VIDEO_SCOPE_INVALID');
     const animations:PhotoAnimation[]=[];
-    if(customization?.runwayClips){
+    if(customization?.runwayClips||customization?.runwayPhotos?.length){
       const rows=await env.DB.prepare("SELECT json_group_array(json(animation_json)) AS data FROM (SELECT animation_json FROM photo_animations WHERE agency_id=? AND job_id=? AND state='ready' ORDER BY slot)")
         .bind(agency,job).first<{data:string}>();
       for(const row of JSON.parse(rows?.data??'[]')){const animation=PhotoAnimation.parse(row);

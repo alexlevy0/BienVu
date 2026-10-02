@@ -22,6 +22,8 @@ test('budget mensuel D1 : migration sans effacement, ouverture explicite, audit 
   assert.equal((await db.prepare("SELECT enabled FROM generation_control WHERE id='generations'").first<{enabled:number}>())!.enabled,0,'Le journal copié ne réexécute aucune ancienne action');
   assert.deepEqual(await db.prepare('SELECT * FROM hosted_import_budget').first(),{month:older,baseline_cents:3080,ceiling_cents:4500,paused:0});
   assert.equal(await db.prepare('SELECT * FROM narration_budget').first(),null);
+  // Continue against the current schema after verifying the historical upgrade.
+  for(const file of (await readdir('packages/db/migrations')).filter(f=>f.endsWith('.sql')&&f>'0025_monthly_budget.sql').sort())await migrate(file);
   const open={action:'monthly_budget' as const,month,envelopeCents:10000,ceilingCents:9000,openingCents:800,paused:false,expected:null,reason:'Ouverture du mois pour la recette'};
   assert.equal(AdminAction.safeParse({...open,envelopeCents:10001}).success,false);
   assert.equal(AdminAction.safeParse({...open,ceilingCents:9600}).success,false);

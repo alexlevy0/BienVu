@@ -1,5 +1,7 @@
 # BienVu — budget des tests et hypothèses commerciales
 
+**Crédits BienVu — 02/10 :** barème produit 1 crédit par vidéo + 1 par photo Runway ; Gratuit 3/mois, Plus 40/mois à 19 € HT, Pro 120/mois à 49 € HT. La migration et publication utilisent les ressources existantes : **45,35 € engagés avant/après**, aucun appel fournisseur, nouvelle vidéo ou achat pour cette recette. Les crédits clients sont séparés des crédits API Runway et du budget en euros ; une restitution client n’efface jamais une dépense fournisseur. [Preuve et limites](preuves/maintenance/CREDITS-02-10.md).
+
 **Préécoute des voix — 02/10 :** trois extraits Chirp 3 HD enregistrés une seule fois, **117 caractères par voix**, sans nouvelle synthèse lors des écoutes sur le site. Provision globale **0,20 €** ajoutée avant les appels : base octobre **30,25 → 30,45 €** + imports **6,50 €** = **36,95 €**, marge **53,05 €** avant la coupure 90 € et **63,05 €** sur l'enveloppe 100 €. Trois sous-réservations de 0,05 € incluses dans les 0,20 € ; aucun double comptage. Estimation brute **0,010530 USD avant gratuité**, tarif officiel revérifié le 02/10 ; facture/change et gratuité restante inconnus. Aucun OpenAI/Runway, nouvelle vidéo, achat ou quota client consommé. [Preuve et limites](preuves/maintenance/PREECOUTE-VOIX-02-10.md).
 
 **Plafond actuel du pilote, doublé par Alex le 01/10/2026 : 100 € par mois, hébergement et API compris ; coupure préventive à 90 €.** Réglages dans Super admin → Service & budget, avec un plafond autorisé de 100 € et une marge minimale de 5 €. Alex a retenu le budget mensuel seul, sans enveloppe par session. Les relevés datés conservent les anciennes enveloppes de 30 €, 40 € et 50 €.
@@ -127,16 +129,18 @@ Le troisième e-mail réel valide le domaine actuel, réception et parcours conf
 
 ## Offres confirmées pour la présentation, vente non ouverte
 
-Alex a confirmé le 30/09/2026 les prix et quotas de la maquette « Découvrir les offres ». L'ancienne hypothèse Découverte 29 €/10, Agence 59 €/30 et Volume 99 €/60 est remplacée pour la présentation commerciale. Les prix payants ci-dessous sont mensuels HT ; la facturation réelle reste à implémenter et à valider avant toute souscription.
+Alex a confirmé le 02/10/2026 le passage aux crédits BienVu. Une vidéo coûte **1 crédit**, plus **1 crédit par photo animée avec Runway**. Les mouvements classiques, la voix et les sous-titres restent inclus. Le coût maximum est affiché avant génération et réservé atomiquement. Une réussite ne consomme que 1 + les animations réellement intégrées au manifeste ; les autres suppléments sont restitués. Un échec vidéo restitue toute la réservation à sa période d’origine, sans effacer les dépenses fournisseurs.
 
-| Code | Offre | Prix mensuel | Vidéos par période |
-|---|---|---:|---:|
-| `gratuit` | Gratuit | 0 € | 3 |
-| `plus` | Plus | 19 € HT | 20 |
-| `pro` | Pro | 49 € HT | 60 |
+| Offre | Prix mensuel | Crédits par mois |
+| --- | --- | --- |
+| Gratuit | 0 € | 3 |
+| Plus | 19 € HT | 40 |
+| Pro | 49 € HT | 120 |
 
-Chaque palier conserve la même qualité vidéo et l'identité d'agence. Depuis le 29/09, un essai anonyme abouti par session avec aperçu filigrané ; trois vidéos par mois sur le compte gratuit, dont l’essai récupéré. Un crédit et la connexion débloquent le master existant, sans nouvel export. Les anciens essais `trial` conservent leurs fichiers et droits historiques. Pas d'offre annuelle, de dépassement automatique, de report de crédits ou de packs supplémentaires dans cette version.
+Sans report mensuel. Un compte confirmé reçoit sa période gratuite à partir de son inscription. L’essai anonyme dispose d’**1 crédit offert**, sans Runway, avec aperçu filigrané ; sa récupération après connexion ne débite pas le compte. Les anciens essais conservent leurs règles et leurs réservations initiales. Les allocations existantes ne sont pas remises à zéro.
 
-La page publique présente cette grille confirmée, mais ses CTA payants restent inactifs : il n'existe encore ni Checkout ni achat. Les identifiants et quotas des futures allocations serveur, les prix TTC applicables et les textes contractuels doivent être préparés au sprint 08 avant l'ouverture des paiements. Les anciennes fixtures Stripe ne deviennent pas des offres de production du seul fait de cette maquette.
+Les crédits BienVu sont des unités produit, distinctes des crédits API Runway et du budget mensuel réel du service. `gen4_turbo` utilise 25 crédits API pour un clip de 5 secondes (0,25 USD avant taxes, [tarif officiel](https://docs.dev.runwayml.com/guides/pricing/)). Le stock API prépayé et les provisions fournisseurs restent protégés, même si un crédit produit est restitué. Aucun achat automatique.
+
+La page publique présente cette grille confirmée, mais les paiements restent fermés : aucun Checkout ni abonnement commercial actif. Le renouvellement et les allocations payantes restent à relier aux événements de facturation au sprint 08 ; aucun quota payant ne résulte d’un simple choix dans l’interface. Les identifiants de tarifs Stripe et les prix TTC devront être validés avant l’ouverture.
 
 Pour vérifier la viabilité, chiffrer au quota entièrement utilisé : revenu net après taxes et paiement, moins frais fixes alloués, générations réussies et ratées, essais gratuits, stockage et support. Ne pas déduire une marge garantie à partir du seul prix du TTS.

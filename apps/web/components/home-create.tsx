@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import {useEffect, useLayoutEffect, useRef, useState, type DragEvent, type FormEvent} from 'react';
-import {VideoDuration,ImportUrl, GenerationView, defaultVideoCustomization,GenerationCustomization,publicErrors, type VideoCustomization, type CreationDraftData, type CreationDraftView, type GenerationRequest} from '@bienvu/contracts';
+import {VideoDuration,ImportUrl, GenerationView, defaultVideoCustomization,GenerationCustomization,publicErrors,generationCreditCost, type VideoCustomization, type CreationDraftData, type CreationDraftView, type GenerationRequest} from '@bienvu/contracts';
 import {useAnonymousTrial, TrialChallenge} from './anonymous-trial';
 import {useAccount} from './account';
 import {HomeIcon} from './home-icons';
@@ -40,6 +40,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   const {me, loading} = useAccount();
   const {subtitlesEnabled,setSubtitlesEnabled,voiceEnabled,setVoiceEnabled,durationSeconds,setDurationSeconds,aspectRatio,setAspectRatio}=useSubtitlePreference();
   const [screen, setScreen] = useState<Screen>({kind: 'landing'});
+  const [manualCredits,setManualCredits]=useState(1);
   const [customizing,setCustomizing]=useState(false),[guestSettings,setGuestSettings]=useState<VideoCustomization|undefined>();
   const pendingCustomization=useRef<{id:string;key:string}|null>(null);
   const [url, setUrl] = useState(''), [description, setDescription] = useState(''), [step, setStep] = useState(0);
@@ -66,7 +67,8 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   const activeOtherJob = Boolean(currentJob && generationActive(currentJob) && screen.kind !== 'job');
   const busy = screen.kind === 'sending' || screen.kind==='extracting' || manualBusy;
   const canGenerate = Boolean(me?.rights.generationEnabled);
-  const noCredits = canGenerate && me?.rights.developmentRemaining === 0;
+  const creditCost=screen.kind==='manual'?manualCredits:generationCreditCost(guestSettings);
+  const noCredits = canGenerate && (me?.rights.developmentRemaining??0)<creditCost;
   const importPaused = Boolean(me?.rights.importRetryAt);
   const manual = screen.kind === 'manual';
   const inConversation = screen.kind !== 'landing' && screen.kind !== 'error';
@@ -260,8 +262,14 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     finally{if(interactionVersion.current===version){lock.current=false;guestPending.current=null;
       trial.setToken('');trial.setChallenge(false);trial.setWidgetVersion(n=>n+1);}}
   }
+  function closeCustomization(){
+    previousComposer.current=composerDock.current?.getBoundingClientRect()??null;
+    setCustomizing(false);
+    if(screen.kind==='guest-customizing')setScreen({kind:'landing'});
+  }
   async function personalize(){
     if(loading||busy||lock.current||activeOtherJob)return;
+    if(customizing||screen.kind==='guest-customizing'){closeCustomization();return;}
     if(manual){setCustomizing(true);scrollRegion.current?.scrollTo({top:0,behavior:'smooth'});return;}
     if(composerPhotos.length){openWithPhotos();setCustomizing(true);return;}
     const parsed=ImportUrl.safeParse(url.trim());
@@ -407,18 +415,18 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     : Boolean(noCredits)||Boolean(importPaused&&ImportUrl.safeParse(url.trim()).success)||activeOtherJob||screen.kind==='job'&&
       (generationActive(selectedJob)||resultReady&&!url.trim()));
   const contextNote = !me ? 'Essayez gratuitement. Connectez-vous pour télécharger sans filigrane.' : canGenerate
-    ? ''
+    ? (noCredits?'Crédits insuffisants pour ce montage. Réduisez les animations ou consultez vos crédits.':'')
     : 'Accès anticipé · Préparez votre annonce';
   return <div className={`home-create${inConversation ? ' home-create-conversation' : ''}${customizing||screen.kind==='guest-customizing'?' home-create-customizing':''}`}>
     <div ref={scrollRegion} className="home-conversation-scroll">
-    {screen.kind==='guest-customizing'&&<VideoCustomizer sourceUrl={screen.url} settings={guestSettings??defaultVideoCustomization()} onChange={value=>{const {photoOrder,...settings}=value;setGuestSettings(settings);}} photos={[]} fields={{title:'Votre annonce',propertyType:'',transaction:'',locality:'',description:'',priceCents:'',charges:'',area:'',rooms:''}} agencyName="" subtitlesEnabled={subtitlesEnabled} onSubtitles={setSubtitlesEnabled} voiceEnabled={voiceEnabled} onVoice={setVoiceEnabled} durationSeconds={durationSeconds} aspectRatio={aspectRatio} onBack={()=>setScreen({kind:'landing'})} onAdd={files=>{if(files){setIncomingPhotos({id:crypto.randomUUID(),files:Array.from(files)});openManual();setCustomizing(true);}}} busy={busy} ready onEdit={()=>{openManual();}} saved={false}/> }
+    {screen.kind==='guest-customizing'&&<VideoCustomizer sourceUrl={screen.url} settings={guestSettings??defaultVideoCustomization()} onChange={value=>{const {photoOrder,runwayPhotos,...settings}=value;setGuestSettings(settings);}} photos={[]} fields={{title:'Votre annonce',propertyType:'',transaction:'',locality:'',description:'',priceCents:'',charges:'',area:'',rooms:''}} agencyName="" subtitlesEnabled={subtitlesEnabled} onSubtitles={setSubtitlesEnabled} voiceEnabled={voiceEnabled} onVoice={setVoiceEnabled} durationSeconds={durationSeconds} aspectRatio={aspectRatio} onBack={closeCustomization} onAdd={files=>{if(files){setIncomingPhotos({id:crypto.randomUUID(),files:Array.from(files)});openManual();setCustomizing(true);}}} busy={busy} ready onEdit={()=>{openManual();}} saved={false}/> }
     {manual && <div className="home-conversation-manual"><div className="home-request-bubble" style={customizing?{display:'none'}:undefined}><HomeIcon name={importDraft?.sourceUrl?'link':'pencil'} size={21}/>
       <strong>{importDraft?.sourceUrl??importDraft?.data.originalText??guestExtraction?.originalText??(description.trim()||'Je souhaite ajouter mon annonce manuellement.')}</strong></div>
       <p className="home-conversation-lead" style={customizing?{display:'none'}:undefined}>Décrivons votre bien, étape par étape.</p>
       <div className="home-manual-panel">
-        {!me ? <ManualListingForm ref={manualForm} key="guest" initialCustomization={guestSettings} customizing={customizing} onCloseCustomizer={()=>setCustomizing(false)} subtitlesEnabled={subtitlesEnabled} onSubtitles={setSubtitlesEnabled} voiceEnabled={voiceEnabled} onVoice={setVoiceEnabled} durationSeconds={durationSeconds} aspectRatio={aspectRatio} prepareGuest incomingPhotos={incomingPhotos} onPhotosReceived={receivePhotos} guided={{step,setStep,description,setDescription,initialData:guestExtraction,onCancel:()=>{previousComposer.current=composerDock.current?.getBoundingClientRect()??null;setCustomizing(false);setScreen({kind:'landing'});},
+        {!me ? <ManualListingForm onCreditCost={setManualCredits} ref={manualForm} key="guest" initialCustomization={guestSettings} customizing={customizing} onCloseCustomizer={closeCustomization} subtitlesEnabled={subtitlesEnabled} onSubtitles={setSubtitlesEnabled} voiceEnabled={voiceEnabled} onVoice={setVoiceEnabled} durationSeconds={durationSeconds} aspectRatio={aspectRatio} prepareGuest incomingPhotos={incomingPhotos} onPhotosReceived={receivePhotos} guided={{step,setStep,description,setDescription,initialData:guestExtraction,onCancel:()=>{previousComposer.current=composerDock.current?.getBoundingClientRect()??null;setCustomizing(false);setScreen({kind:'landing'});},
           onReadyChange:(ready,reason)=>{setManualReady(ready);setManualReason(reason);}}} busy={manualBusy} setBusy={setManualBusy} onPrepared={() => window.location.assign('/connexion?mode=signup')}/>
-          : <ManualListingForm ref={manualForm} customizing={customizing} onCloseCustomizer={()=>setCustomizing(false)} brand={me.agency} subtitlesEnabled={subtitlesEnabled} onSubtitles={setSubtitlesEnabled} voiceEnabled={voiceEnabled} onVoice={setVoiceEnabled} durationSeconds={durationSeconds} aspectRatio={aspectRatio} key={`agency:${me.agency.id}:${importDraft?.id??'manual'}`} incomingPhotos={incomingPhotos} onPhotosReceived={receivePhotos} generate={canGenerate} guided={{step,setStep,description,setDescription,agencyId:me.agency.id,initialDraft:importDraft,
+          : <ManualListingForm onCreditCost={setManualCredits} ref={manualForm} customizing={customizing} onCloseCustomizer={closeCustomization} brand={me.agency} subtitlesEnabled={subtitlesEnabled} onSubtitles={setSubtitlesEnabled} voiceEnabled={voiceEnabled} onVoice={setVoiceEnabled} durationSeconds={durationSeconds} aspectRatio={aspectRatio} key={`agency:${me.agency.id}:${importDraft?.id??'manual'}`} incomingPhotos={incomingPhotos} onPhotosReceived={receivePhotos} generate={canGenerate} guided={{step,setStep,description,setDescription,agencyId:me.agency.id,initialDraft:importDraft,
             onReadyChange:(ready,reason)=>{setManualReady(ready);setManualReason(reason);},onDraftChange:()=>void refreshDrafts(),
             onCancel:()=>{previousComposer.current=composerDock.current?.getBoundingClientRect()??null;setCustomizing(false);setScreen({kind:'landing'});}}} busy={manualBusy} setBusy={setManualBusy} onCreated={async value => {
             void refreshDrafts();
@@ -454,11 +462,11 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
         <button type="button" className={subtitlesEnabled?'home-subtitles-pill is-active':'home-subtitles-pill'} aria-pressed={subtitlesEnabled} aria-label="Sous-titres de la voix off"
           title={voiceEnabled?"Afficher ou masquer les sous-titres de la voix off":"Activez la voix off pour ajouter des sous-titres"} disabled={!voiceEnabled||loading||busy||screen.kind==='job'&&generationActive(selectedJob)}
           onClick={()=>setSubtitlesEnabled(!subtitlesEnabled)}><HomeIcon name="subtitles" size={20}/><span className="home-option-label">Sous-titres</span></button>
-        <button type="button" className={manual?'home-mode-pill is-active':'home-mode-pill'} aria-pressed={manual} disabled={busy || photoChecking || Boolean(incomingPhotos) || screen.kind==='job' && generationActive(selectedJob)} onClick={()=>{if(manual)void manualForm.current?.cancel();else if(composerPhotos.length)openWithPhotos();else openManual();}}><HomeIcon name="pencil" size={20}/>Saisie manuelle</button>
-        <label className="home-duration-pill"><select aria-label="Durée de la vidéo" value={durationSeconds} title="Durée de la vidéo"
+        <label className="home-duration-pill"><HomeIcon name="clock" size={20}/><select aria-label="Durée de la vidéo" value={durationSeconds} title="Durée de la vidéo"
           disabled={loading||busy||screen.kind==='job'&&generationActive(selectedJob)} onChange={event=>setDurationSeconds(VideoDuration.parse(Number(event.target.value)))}>
-          <option value={20}>20 s</option><option value={30}>30 s</option><option value={40}>40 s</option></select></label></div>
-        <div className="home-composer-actions"><button type="button" className="home-customize-button" aria-pressed={customizing||screen.kind==='guest-customizing'} disabled={loading||busy||photoChecking||activeOtherJob||screen.kind==='job'&&generationActive(selectedJob)} onClick={()=>void personalize()}><HomeIcon name="settings" size={21}/>Personnaliser</button>
+          <option value={20}>20 s</option><option value={30}>30 s</option><option value={40}>40 s</option></select></label>
+        <button type="button" className={manual?'home-mode-pill is-active':'home-mode-pill'} aria-pressed={manual} disabled={busy || photoChecking || Boolean(incomingPhotos) || screen.kind==='job' && generationActive(selectedJob)} onClick={()=>{if(manual)void manualForm.current?.cancel();else if(composerPhotos.length)openWithPhotos();else openManual();}}><HomeIcon name="pencil" size={20}/>Saisie manuelle</button></div>
+        <div className="home-composer-actions"><span className="home-credit-cost" aria-live="polite">{creditCost} crédit{creditCost>1?'s':''}</span><button type="button" className="home-customize-button" aria-pressed={customizing||screen.kind==='guest-customizing'} disabled={loading||busy||photoChecking||activeOtherJob||screen.kind==='job'&&generationActive(selectedJob)} onClick={()=>void personalize()}><HomeIcon name="settings" size={21}/>Personnaliser</button>
         <button type="submit" className="home-primary-button" disabled={composerDisabled} aria-describedby={manual&&!manualReady?'home-manual-action-note':undefined}>
           {incomingPhotos?'Ajout des photos…':composerPhotos.length?'Compléter mon annonce':screen.kind==='sending'||manualBusy?'Envoi en cours':screen.kind==='job'&&generationActive(selectedJob)?'Génération en cours':manual&&me&&!canGenerate?'Enregistrer mon annonce':'Créer ma vidéo'}<HomeIcon name="arrow" size={20}/></button></div></div>
     </form>

@@ -17,7 +17,7 @@ type Dialog = 'help' | 'explore' | 'example' | null;
 
 function ExampleCard({example, onPlay}: {example: Example; onPlay(example: Example): void}) {
   return <article className="home-example"><button type="button" className="home-example-cover" onClick={() => onPlay(example)} aria-label={`Lire l’aperçu : ${example.title}`} aria-haspopup="dialog">
-    <img src={`/images/studio-home/${example.id}.webp`} width="768" height="1024" alt={example.alt} decoding="async"/>
+    <img src={`/images/studio-home/${example.id}.webp`} width="768" height="1024" alt={example.alt} decoding="async" loading="lazy"/>
     <span className="home-example-shade"/><span className="home-duration">0:{example.duration}</span><span className="home-play"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 11 7-11 7V5Z"/></svg></span><h3>{example.title}</h3>
   </button><div className="home-example-agency"><AgencySeal kind={example.id}/><span>{example.agency}</span></div></article>;
 }
@@ -36,12 +36,26 @@ export function LandingPage() {
     return () => {element?.close(); document.body.style.overflow = previous; trigger?.focus();};
   }, [modalOpen]);
   const play = (example: Example) => {setSelected(example); setDialog('example');};
-  return <div className="home-studio">
+  return <div className="home-studio home-studio-home">
     <a className="home-skip" href="#home-content">Aller au contenu</a>
     <StudioSidebar active="create"/>
     <div className="home-workspace"><header className="home-topbar"><span>Votre studio immobilier</span><button type="button" onClick={() => setDialog('help')}>Aide</button></header>
       <main className={`home-content${conversationActive ? ' home-content-conversation' : ''}`} id="home-content" tabIndex={-1}>
-        <section className="home-hero" aria-label={conversationActive?'Créer votre vidéo':undefined} aria-labelledby={conversationActive?undefined:'home-title'}><div className={`home-hero-intro${conversationActive?' home-hero-intro-leaving':''}`} inert={conversationActive}><h1 id="home-title">Une annonce.<br/>Une vidéo qui <em>donne envie.</em></h1><p className="home-intro">Collez le lien de votre annonce. BienVu s’occupe du reste.</p></div><HomeCreate onLayoutChange={setConversationActive}/></section>
+        <section className={`home-hero${conversationActive?'':' home-hero-dashboard'}`} aria-label={conversationActive?'Créer votre vidéo':undefined} aria-labelledby={conversationActive?undefined:'home-title'}>
+          <div className={`home-hero-intro${conversationActive?' home-hero-intro-leaving':''}`} inert={conversationActive}><h1 id="home-title">Une annonce.<br/>Une vidéo qui <em>donne envie.</em></h1><p className="home-intro">Collez le lien de votre annonce. BienVu s’occupe du reste.</p></div>
+          <HomeCreate onLayoutChange={setConversationActive}/>
+          <aside className="home-hero-showcase" hidden={conversationActive} aria-label="Un aperçu de votre prochaine vidéo">
+            <p>Votre prochain coup de cœur, en vidéo.</p>
+            <button type="button" className="home-hero-demo" onClick={()=>play(examples[0])} aria-label="Lire la démonstration Lumière sur Paris" aria-haspopup="dialog">
+              <img src="/images/studio-home/paris.webp" width="768" height="1024" alt="Salon lumineux avec moulures et grandes fenêtres ouvertes sur la ville" fetchPriority="high" decoding="async"/>
+              <span className="home-hero-demo-shade"/>
+              <span className="home-duration">0:28</span>
+              <span className="home-hero-demo-heading"><strong>Paris</strong><span>Un nouveau regard<br/>sur votre bien</span></span>
+              <span className="home-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 5 11 7-11 7V5Z"/></svg></span>
+              <span className="home-hero-demo-facts"><span><HomeIcon name="house" size={18}/>65 m² · 3 pièces</span><strong>385 000 €</strong></span>
+            </button>
+          </aside>
+        </section>
         {!conversationActive && <section id="explorer" className="home-discover" aria-labelledby="home-discover-title"><div className="home-discover-heading"><div><h2 id="home-discover-title">À découvrir sur BienVu</h2><p>Des inspirations pour donner une autre dimension à vos biens.</p></div><button type="button" className="home-explore-link" onClick={() => {setCategory('Tous'); setDialog('explore');}}>Tout explorer <HomeIcon name="external" size={17}/></button></div><div className="home-example-grid">{examples.map(example => <ExampleCard key={example.id} example={example} onPlay={play}/>)}</div><p className="home-demo-note">Démonstrations visuelles sans son · Biens et agences fictifs · Images générées</p></section>}
       </main>
       <footer className="home-footer"><span>BienVu · L’immobilier, en mouvement.</span><nav aria-label="Informations"><a href="mailto:contact@bienvu.online">Contact</a><Link href="/confidentialite">Confidentialité</Link><Link href="/conditions">Conditions</Link></nav></footer>

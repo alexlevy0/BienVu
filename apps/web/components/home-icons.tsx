@@ -21,6 +21,7 @@ const shapes = {
   refresh: <><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6 7a7 7 0 0 1 12-1l2 6M4 12l2 6a7 7 0 0 0 12-1"/></>,
   external: <path d="M6 18 18 6M6 6h12v12"/>,
   chevron: <path d="m6 9 6 6 6-6"/>,
+  clock: <><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></>,
   close: <path d="m5 5 14 14M5 19 19 5"/>,
   menu: <path d="M3 5h18M3 12h18M3 19h18"/>,
   more: <><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></>,

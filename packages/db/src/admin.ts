@@ -13,7 +13,7 @@ async function rows(db:Database,sql:string,bindings:(string|number|null)[]=[]):P
 async function selectRows(db:Database,select:string,fields:string[],bindings:(string|number|null)[]=[]){
   return rows(db,fields.map(key=>`'${key}',${key}`).join(',')+'/*fields*/FROM ('+select+')',bindings);
 }
-const videoFields=['id','sortKey','createdAt','updatedAt','agencyId','agency','email','audience','status','stage','progress','attempt','error','title','locality','sourceUrl','sourceKind','retention','expiresAt','credit','public','duration','master','preview'];
+const videoFields=['id','sortKey','createdAt','updatedAt','agencyId','agency','email','audience','status','stage','progress','attempt','error','title','locality','sourceUrl','sourceKind','retention','expiresAt','credit','creditsReserved','creditsUsed','creditsRefunded','creditGift','animationsRequested','public','duration','master','preview'];
 const videos=`SELECT j.id,j.created_at AS sortKey,j.created_at AS createdAt,j.updated_at AS updatedAt,
   coalesce(g.owner_agency_id,j.agency_id) AS agencyId,coalesce(a.name,'Espace interne') AS agency,u.email,
   CASE WHEN g.anonymous_session_id IS NOT NULL AND g.owner_agency_id IS NULL THEN 'anonymous' WHEN u.id IS NOT NULL THEN 'account' ELSE 'internal' END AS audience,
@@ -21,9 +21,13 @@ const videos=`SELECT j.id,j.created_at AS sortKey,j.created_at AS createdAt,j.up
   coalesce(json_extract(l.facts_json,'$.title.value'),json_extract(i.result_json,'$.facts.title.value'),'Vidéo archivée') AS title,
   coalesce(json_extract(l.facts_json,'$.locality.value'),json_extract(i.result_json,'$.facts.locality.value')) AS locality,
   j.source_url AS sourceUrl,coalesce(i.source_kind,l.source_kind,'url') AS sourceKind,g.retention,g.expires_at AS expiresAt,r.status AS credit,
+  r.credit_amount AS creditsReserved,
+  IIF(g.credit_version=1 AND g.anonymous_session_id IS NOT NULL,IIF(j.status='ready',1,0),r.credit_used) AS creditsUsed,
+  IIF(j.status IN ('ready','failed'),r.credit_amount-IIF(g.credit_version=1 AND g.anonymous_session_id IS NOT NULL,IIF(j.status='ready',1,0),r.credit_used),0) AS creditsRefunded,
+  (g.credit_version=1 AND g.anonymous_session_id IS NOT NULL) AS creditGift,g.animations_requested AS animationsRequested,
   EXISTS(SELECT 1 FROM generation_shares s WHERE s.job_id=j.id AND s.revoked_at IS NULL) AS public,
   json_extract(v.report_json,'$.durationSeconds') AS duration,
-  IIF(j.status='ready' AND g.retention='available' AND g.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now') AND v.object_key IS NOT NULL AND g.owner_agency_id IS NOT NULL AND r.status='consumed',1,0) AS master,
+  IIF(j.status='ready' AND g.retention='available' AND g.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now') AND v.object_key IS NOT NULL AND g.owner_agency_id IS NOT NULL AND (r.status='consumed' OR g.credit_version=1 AND g.anonymous_session_id IS NOT NULL),1,0) AS master,
   IIF(j.status='ready' AND g.retention='available' AND g.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now') AND p.object_key IS NOT NULL,1,0) AS preview
   FROM jobs j LEFT JOIN generation_runs g ON g.job_id=j.id LEFT JOIN agencies a ON a.id=coalesce(g.owner_agency_id,j.agency_id)
   LEFT JOIN auth_user u ON u.id=a.owner_user_id LEFT JOIN reservations r ON r.job_id=j.id

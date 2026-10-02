@@ -35,24 +35,35 @@ test('animation : coûts bornés, URL privées refusées et caméra sans bords v
   assert.deepEqual(cameraMotion(120,300,2,false),{scale:1,x:0,y:0});
 });
 
-async function setup(t:{after(fn:()=>Promise<void>):void},label:string,clips=2){
+async function setup(t:{after(fn:()=>Promise<void>):void},label:string,clips:number|number[]=2){
   const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:'export default {fetch(){return new Response("fixture")}}',compatibilityDate:'2026-09-27',d1Databases:['DB'],r2Buckets:['MEDIA']}));
   t.after(()=>mf.dispose());const env=await mf.getBindings<{DB:D1Database;MEDIA:R2Bucket}>();await migrateNarrationProbe(env.DB);
   const seed=await seedNarrationFixture(env.DB,label,true);await env.DB.prepare("UPDATE jobs SET status='failed',error_code='FIXTURE',lease_until=NULL WHERE id=?").bind(seed.jobId).run();
   const month=new Date().toISOString().slice(0,7),at=new Date().toISOString();
   await env.DB.prepare('INSERT INTO hosted_import_budget(month,baseline_cents,ceiling_cents,paused) VALUES(?,0,9000,0)').bind(month).run();
-  await env.DB.exec('UPDATE generation_control SET enabled=1');await env.DB.prepare('INSERT INTO generation_access(agency_id,allocation_id,enabled) VALUES(?,?,1)').bind(seed.agencyId,`allocation-${label}`).run();
+  await env.DB.exec("UPDATE generation_control SET enabled=1; UPDATE allocations SET kind='paid',quota_limit=40");await env.DB.prepare('INSERT INTO generation_access(agency_id,allocation_id,enabled) VALUES(?,?,1)').bind(seed.agencyId,`allocation-${label}`).run();
   const listing=JSON.parse((await findImport(env.DB,seed.agencyId,`listing-${label}`))!.result!),fixture=await videoFixture('paid');
   for(const [i,p] of listing.photos.entries()){const asset=fixture.manifest.photos[i];Object.assign(p,{contentHash:asset.sha256,sizeBytes:asset.sizeBytes,width:asset.width,height:asset.height});await env.MEDIA.put(p.objectKey,fixture.files.get(asset.id)!);}
   await env.DB.prepare('UPDATE listing_imports SET result_json=? WHERE id=?').bind(JSON.stringify(listing),listing.id).run();
   const lines=['Découvrez cet appartement à Lyon.','Son prix et sa surface sont présentés dans cette annonce.','La visite se poursuit en images.','Contactez votre agence pour en savoir plus.'];
-  const job=await admitGeneration(env.DB,seed.agencyId,'runway-fixture-key-001',{listingId:listing.id,customization:{...defaultVideoCustomization(),runwayClips:clips,narration:lines}},'true');
+  const job=await admitGeneration(env.DB,seed.agencyId,'runway-fixture-key-001',{listingId:listing.id,customization:{...defaultVideoCustomization(),...(Array.isArray(clips)?{runwayPhotos:clips}:{runwayClips:clips}),narration:lines}},'true');
   await env.DB.prepare("UPDATE jobs SET status='scripting',stage='scripting',listing_id=? WHERE id=?").bind(listing.id,job.jobId).run();
   const config=GoogleVoiceConfig.parse({projectId:'runway-fixture',voice:'fr-FR-Chirp3-HD-Aoede'});
   const google=googleTts(config,async()=> 'fixture-token-never-networked',{fetch:async()=>Response.json({audioContent:Buffer.from(toneFixture(5000)).toString('base64')})});
   await prepareJobNarration(env,seed.agencyId,job.jobId,{mode:'mock',script:{model:DEFAULT_SCRIPT_MODEL,plan:async()=>{throw Error('NO_TEXT_CALL');}},voice:{config,synthesize:google.synthesize}});
   return {env,job: (await findGeneration(env.DB,seed.agencyId,job.jobId))!,month,at,listing};
 }
+test('sélection par photo : trois animations, ordre exact et manifeste sans limite historique de deux',async t=>{
+  const {env,job,listing}=await setup(t,'runway-three',[2,0,1]);
+  let calls=0;const provider:AnimationProvider={mode:'mock',generate:async(_bytes,_mime,checkpoint)=>{calls++;await checkpoint(taskId);return clip;},resume:async()=>{throw Error('NO_RESUME');}};
+  assert.deepEqual(await prepareJobAnimations(env,job.agencyId,job.jobId,provider),{requested:3,ready:3});
+  const rows=(await env.DB.prepare('SELECT photo_id FROM photo_animations ORDER BY slot').all<{photo_id:string}>()).results;
+  assert.deepEqual(rows.map(r=>r.photo_id),[listing.photos[2].id,listing.photos[0].id,listing.photos[1].id]);
+  await prepareJobAnimations(env,job.agencyId,job.jobId,provider);assert.equal(calls,3);
+  const prepared=await prepareJobVideo(env,job.agencyId,job.jobId);
+  assert.equal(prepared.manifest.photoAnimations?.length,3);
+  assert.equal(prepared.manifest.photoTimeline?.reduce((sum,p)=>sum+p.durationFrames,0),prepared.manifest.scenes.reduce((sum,s)=>sum+s.durationFrames,0));
+});
 test('Runway : images exactes, reprise sans deuxième appel, manifeste privé et coût prépayé unique',async t=>{
   const {env,job,month,at,listing}=await setup(t,'runway-success');
   await env.DB.prepare('INSERT INTO runway_budget(month,prepaid_cents,api_credits,paused,created_at) VALUES(?,1000,1000,0,?)').bind(month,at).run();

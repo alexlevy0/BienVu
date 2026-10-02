@@ -1,74 +1,33 @@
 'use client';
-
 import Link from 'next/link';
+import {useEffect,useRef,useState} from 'react';
+import {creditPlans,CreditHistory} from '@bienvu/contracts';
 import {useAccount} from './account';
 import {HomeIcon} from './home-icons';
-
-const benefits = [
-  'Import par lien ou saisie manuelle',
-  'Voix off française',
-  'Formats vertical 9:16 et horizontal 16:9',
-  'Téléchargement sans filigrane avec un crédit',
-  'Logo et couleurs de votre agence',
-];
-
-const plans = [
-  {code: 'gratuit', name: 'Gratuit', description: 'Pour découvrir BienVu', price: '0', quota: 3},
-  {code: 'plus', name: 'Plus', description: 'Pour publier régulièrement', price: '19', quota: 20},
-  {code: 'pro', name: 'Pro', description: 'Pour toutes vos annonces', price: '49', quota: 60},
-] as const;
-
-export function Offers() {
-  const {me} = useAccount();
-  const freeCurrent = me?.rights.creditKind === 'free';
-
-  return <div className="offers-page">
-    <Link className="offers-back" href="/"><span aria-hidden="true">←</span> Retour au studio</Link>
-    <header className="offers-heading">
-      <p className="offers-kicker">ABONNEMENTS</p>
-      <h1>Des vidéos à <em>votre rythme.</em></h1>
-      <p>Choisissez le nombre de vidéos dont votre agence a besoin.</p>
-      <span>Une même qualité vidéo pour chaque offre.</span>
-    </header>
-
-    <div className="offers-cards">
-      {plans.map(plan => <section className={`offers-card offers-card-${plan.code}`} key={plan.code} aria-labelledby={`offers-${plan.code}`}>
-        {plan.code === 'plus' && <span className="offers-recommended">Recommandé</span>}
-        <h2 id={`offers-${plan.code}`}>{plan.name}</h2>
-        <p className="offers-card-description">{plan.description}</p>
-        <div className="offers-price"><strong>{plan.price} €</strong><span>{plan.code === 'gratuit' ? '/ mois' : 'HT / mois'}</span></div>
-        <p className="offers-quota"><strong>{plan.quota} vidéos par mois</strong></p>
-        {plan.code === 'gratuit'
-          ? freeCurrent
-            ? <span className="offers-action offers-action-current">Votre offre actuelle</span>
-            : <Link className="offers-action offers-action-outline" href="/">Créer ma vidéo <HomeIcon name="arrow" size={17}/></Link>
-          : <button className={`offers-action ${plan.code === 'plus' ? 'offers-action-primary' : 'offers-action-outline'}`} type="button" disabled title="Les abonnements payants ne sont pas encore ouverts">
-              Passer à {plan.name} <HomeIcon name="arrow" size={17}/>
-            </button>}
-        <ul className="offers-benefits">
-          {benefits.map(benefit => <li key={benefit}><span aria-hidden="true">✓</span>{benefit}</li>)}
-        </ul>
-      </section>)}
-    </div>
-    <p className="offers-rollover">Les quotas se renouvellent chaque mois. Les abonnements payants arrivent bientôt.</p>
-
-    <section className="offers-comparison" aria-labelledby="offers-compare-title">
-      <h2 id="offers-compare-title">Comparez les offres</h2>
-      <div className="offers-table-scroll"><table>
-        <thead><tr><th scope="col">Fonctionnalités</th><th scope="col">Gratuit</th><th scope="col">Plus</th><th scope="col">Pro</th></tr></thead>
-        <tbody>
-          <tr><th scope="row">Vidéos par mois</th><td>3</td><td>20</td><td>60</td></tr>
-          <tr><th scope="row">Voix off française</th><td>✓</td><td>✓</td><td>✓</td></tr>
-          <tr><th scope="row">Téléchargement sans filigrane avec un crédit</th><td>✓</td><td>✓</td><td>✓</td></tr>
-        </tbody>
-      </table></div>
-    </section>
-
-    <section className="offers-faq" aria-labelledby="offers-faq-title">
-      <h2 id="offers-faq-title">Une question ?</h2>
-      <details><summary>Que se passe-t-il si j’atteins mon quota ?</summary><p>Vous pouvez toujours consulter vos vidéos. Les nouvelles créations attendent le renouvellement de votre quota ; une création échouée ne consomme pas de crédit.</p></details>
-      <details><summary>Puis-je changer ou arrêter mon abonnement ?</summary><p>La souscription payante n’est pas encore ouverte. Ses modalités de changement et de résiliation seront présentées avant tout paiement.</p></details>
-    </section>
-    <footer className="offers-footer"><nav aria-label="Informations"><Link href="/conditions">Conditions</Link><Link href="/confidentialite">Confidentialité</Link><a href="mailto:contact@bienvu.online">Nous contacter</a></nav><span>Abonnements payants en préparation</span></footer>
+const benefits=['Import par lien ou saisie manuelle','Voix et sous-titres au choix','Formats vertical et horizontal','Téléchargement sans filigrane après connexion','Logo et couleurs de votre agence','Runway au choix : + 1 crédit par photo'];
+export function Offers(){
+  const {me}=useAccount();const owner=useRef(me?.agency.id);owner.current=me?.agency.id;
+  const [photos,setPhotos]=useState(0),[history,setHistory]=useState<CreditHistory|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
+  useEffect(()=>{setHistory(null);setError('');if(!me)return;const controller=new AbortController();
+    void fetch('/api/credits',{cache:'no-store',signal:controller.signal}).then(async response=>{
+      if(!response.ok)throw Error();const data=CreditHistory.parse(await response.json());if(!controller.signal.aborted)setHistory(data);
+    }).catch(()=>{if(!controller.signal.aborted)setError('Historique momentanément indisponible.');});return()=>controller.abort();
+  },[me?.agency.id,me?.rights.developmentRemaining,me?.rights.creditReserved]);
+  async function more(){if(!history?.nextCursor||busy)return;setBusy(true);const agency=owner.current;
+    try{const response=await fetch('/api/credits?cursor='+encodeURIComponent(history.nextCursor),{cache:'no-store'});if(!response.ok)throw Error();
+      const data=CreditHistory.parse(await response.json());if(owner.current===agency)setHistory(current=>current?{...data,entries:[...current.entries,...data.entries]}:data);
+    }catch{if(owner.current===agency)setError('La suite de votre historique est momentanément indisponible.');}finally{setBusy(false);}}
+  const cost=1+photos,date=(at:string)=>new Intl.DateTimeFormat('fr-FR',{dateStyle:'medium'}).format(new Date(at));
+  return <div className="offers-page"><Link className="offers-back" href="/">← Retour au studio</Link>
+    <header className="offers-heading"><p className="offers-kicker">CRÉDITS & ABONNEMENTS</p><h1>Vos vidéos, <em>à votre rythme.</em></h1><p>Des crédits pour créer et donner vie à vos photos.</p><span>1 vidéo = 1 crédit · 1 photo animée avec Runway = 1 crédit supplémentaire</span></header>
+    {me&&<section className="offers-wallet" aria-label="Vos crédits"><div><h2>Vos crédits</h2><strong>{me.rights.developmentRemaining}</strong> disponibles</div><div>{me.rights.creditReserved} réservé(s) · {me.rights.creditConsumed} utilisé(s)<p>{me.rights.renewalAt?'Renouvellement le '+date(me.rights.renewalAt):'Votre période de crédits'} · sans report</p></div><a href="#credit-history">Voir mon historique ↓</a></section>}
+    <section className="offers-calculator" aria-label="Calcul du coût"><div><h2>Combien coûte votre vidéo ?</h2><p>Les zooms, translations, la voix et les sous-titres sont inclus.</p></div><label>Photos animées avec Runway <select aria-label="Nombre de photos animées" value={photos} onChange={e=>setPhotos(Number(e.target.value))}>{Array.from({length:13},(_,n)=><option key={n} value={n}>{n} photo{n>1?'s':''}</option>)}</select></label><p className="offers-calculated-cost" role="status"><strong>{cost} crédit{cost>1?'s':''}</strong><span>1 vidéo + {photos} animation(s)</span></p></section>
+    <div className="offers-cards">{creditPlans.map(plan=><section className={'offers-card offers-card-'+plan.code} key={plan.code} aria-labelledby={'offers-'+plan.code}>{plan.code==='plus'&&<span className="offers-recommended">Recommandé</span>}<h2 id={'offers-'+plan.code}>{plan.name}</h2><p className="offers-card-description">{plan.description}</p><div className="offers-price"><strong>{plan.price} €</strong><span>{plan.price?'HT / mois':'/ mois'}</span></div><p className="offers-quota"><strong>{plan.credits} crédits par mois</strong></p><p className="offers-equivalent" aria-live="polite">{Math.floor(plan.credits/cost)>0?'Jusqu’à '+Math.floor(plan.credits/cost)+' vidéo(s) avec '+photos+' photo(s) animée(s)':'Réduisez les animations pour cette offre.'}</p>
+      {plan.code==='gratuit'?me?.rights.creditKind==='free'?<span className="offers-action offers-action-current">Votre offre actuelle</span>:<Link className="offers-action offers-action-outline" href={me?'/':'/connexion'}>{me?'Créer ma vidéo':'Obtenir mes crédits'}<HomeIcon name="arrow" size={17}/></Link>:<button className={'offers-action '+(plan.code==='plus'?'offers-action-primary':'offers-action-outline')} type="button" disabled title="Les paiements en ligne ne sont pas encore ouverts">Passer à {plan.name}<HomeIcon name="arrow" size={17}/></button>}
+      <ul className="offers-benefits">{benefits.map(benefit=><li key={benefit}><span aria-hidden="true">✓</span>{benefit}</li>)}</ul></section>)}</div><p className="offers-rollover">Crédits renouvelés chaque mois, sans cumul. Les abonnements payants sont en préparation.</p>
+    <section className="offers-trial-note"><strong>Essayez sans compte</strong><p>1 crédit offert pour une vidéo avec les mouvements classiques et un aperçu filigrané. Après connexion, récupérez-la sans filigrane : cet essai ne décompte pas vos 3 crédits mensuels.</p><Link href="/">Essayer gratuitement →</Link></section>
+    <section className="offers-comparison"><h2>Comparez les offres</h2><div className="offers-table-scroll"><table><thead><tr><th scope="col">Fonctionnalités</th>{creditPlans.map(plan=><th key={plan.code} scope="col">{plan.name}</th>)}</tr></thead><tbody><tr><th scope="row">Crédits mensuels</th>{creditPlans.map(plan=><td key={plan.code}>{plan.credits}</td>)}</tr><tr><th scope="row">Coût d’une vidéo</th><td>1 crédit</td><td>1 crédit</td><td>1 crédit</td></tr><tr><th scope="row">Photo animée avec Runway</th><td>+ 1 crédit</td><td>+ 1 crédit</td><td>+ 1 crédit</td></tr><tr><th scope="row">Voix, sous-titres et mouvements classiques</th><td>Inclus</td><td>Inclus</td><td>Inclus</td></tr></tbody></table></div></section>
+    {me&&<section className="offers-credit-history" id="credit-history"><h2>Historique de vos crédits</h2><p>Les crédits sont réservés au lancement. Seules les animations utilisées dans une vidéo terminée sont débitées.</p>{error&&<p role="alert">{error}</p>}{!history&&!error?<p>Chargement…</p>:history?.entries.length?<><div className="offers-table-scroll"><table><thead><tr><th scope="col">Création</th><th scope="col">État</th><th scope="col">Réservés</th><th scope="col">Utilisés</th><th scope="col">Restitués</th></tr></thead><tbody>{history.entries.map(entry=><tr key={entry.id}><th scope="row"><Link href={'/historique/'+entry.id}>{entry.title}</Link><small>{date(entry.at)}</small></th><td>{entry.gift?'Essai offert':entry.status==='ready'?'Terminée':entry.status==='failed'?'Échouée':'En préparation'}</td><td>{entry.reserved}</td><td>{entry.gift?'Offert':entry.used}</td><td>{entry.refunded}</td></tr>)}</tbody></table></div>{history.nextCursor&&<button className="offers-action offers-action-outline offers-history-more" type="button" disabled={busy} onClick={()=>void more()}>{busy?'Chargement…':'Voir la suite'}</button>}</>:history&&<p>Votre première création apparaîtra ici.</p>}</section>}
+    <section className="offers-faq"><h2>Une question ?</h2><details><summary>Comment mes crédits sont-ils décomptés ?</summary><p>Une vidéo coûte 1 crédit pour 20, 30 ou 40 secondes. Chaque photo animée avec Runway ajoute 1 crédit. Le coût maximum est affiché avant le lancement. Télécharger ou revoir une vidéo ne coûte rien.</p></details><details><summary>Et si une création échoue ?</summary><p>Si la vidéo échoue, tous ses crédits sont restitués. Si une animation échoue, la photo garde un mouvement classique et son supplément est restitué. Seules les animations utilisées dans le montage final sont débitées.</p></details><details><summary>Les crédits gratuits se renouvellent-ils ?</summary><p>Un compte confirmé reçoit 3 crédits chaque mois à partir de son inscription, sans report. L’essai sans compte offre 1 crédit par visiteur. La vérification humaine et les limites du service restent applicables.</p></details><details><summary>Puis-je changer ou arrêter mon abonnement ?</summary><p>Les paiements ne sont pas encore ouverts. Les modalités de souscription, de changement et de résiliation seront présentées avant tout paiement.</p></details></section><footer className="offers-footer"><nav aria-label="Informations"><Link href="/conditions">Conditions</Link><Link href="/confidentialite">Confidentialité</Link><a href="mailto:contact@bienvu.online">Nous contacter</a></nav><span>Abonnements payants en préparation</span></footer>
   </div>;
 }

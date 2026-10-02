@@ -1,4 +1,5 @@
 import type {Database} from './index';
+import {CreditHistory,CreditEntry,EntityId,Timestamp} from '@bienvu/contracts';
 
 // Anchor every boundary to signup, rather than the previous (possibly clamped)
 // month: January 31 -> February 28/29 -> March 31, at the same UTC time.
@@ -15,6 +16,31 @@ export function creditPeriod(signup:number|string,now=Date.now()) {
   let n=(date.getUTCFullYear()-anchor.getUTCFullYear())*12+date.getUTCMonth()-anchor.getUTCMonth();
   if(boundary(n)>now)n--;
   return {from:new Date(boundary(n)).toISOString(),until:new Date(boundary(n+1)).toISOString()};
+}
+export async function creditBalance(db:Database,agencyId:string,now=Date.now()){
+  EntityId.parse(agencyId);const grant=await creditGrant(db,agencyId,now);
+  const usage=grant?await db.prepare('SELECT quota_limit AS total,reserved,consumed FROM allocations WHERE id=? AND agency_id=?')
+    .bind(grant.id,agencyId).first<{total:number;reserved:number;consumed:number}>():null;
+  return {available:usage?Math.max(0,usage.total-usage.reserved-usage.consumed):0,reserved:usage?.reserved??0,consumed:usage?.consumed??0,total:usage?.total??0,renewalAt:grant?.renewalAt??null,kind:grant?.kind??null};
+}
+export async function creditHistory(db:Database,agencyId:string,cursor?:string,now=Date.now()){
+  EntityId.parse(agencyId);let time='9999',id='~';
+  if(cursor){try{if(cursor.length>512)throw 0;const parts=JSON.parse(atob(cursor));if(!Array.isArray(parts)||parts.length!==2)throw 0;
+    time=Timestamp.parse(parts[0]);id=EntityId.parse(parts[1]);}catch{throw Error('INVALID_CREDIT_CURSOR');}}
+  const result=await db.prepare(`SELECT json_group_array(json(record)) AS data FROM
+    (SELECT json_object('id',g.job_id,'title',coalesce(json_extract(i.result_json,'$.facts.title.value'),'Votre annonce'),
+      'at',g.created_at,'status',j.status,'reserved',r.credit_amount,
+      'used',IIF(g.credit_version=1 AND g.anonymous_session_id IS NOT NULL,IIF(j.status='ready',1,0),r.credit_used),
+      'refunded',IIF(j.status IN ('ready','failed'),r.credit_amount-IIF(g.credit_version=1 AND g.anonymous_session_id IS NOT NULL,IIF(j.status='ready',1,0),r.credit_used),0),
+      'animations',max(0,r.credit_used-1),'gift',IIF(g.credit_version=1 AND g.anonymous_session_id IS NOT NULL,json('true'),json('false'))) AS record
+      FROM generation_runs g JOIN jobs j ON j.id=g.job_id JOIN reservations r ON r.job_id=g.job_id
+      LEFT JOIN listing_imports i ON i.id=j.listing_id AND i.agency_id=g.agency_id
+      WHERE g.owner_agency_id=? AND (g.created_at<? OR (g.created_at=? AND g.job_id<?)) ORDER BY g.created_at DESC,g.job_id DESC LIMIT 21)`)
+    .bind(agencyId,time,time,id).first<{data:string}>();
+  // SQLite IIF strips JSON's subtype; normalize the explicit gift scalar here.
+  const data=(JSON.parse(result?.data??'[]') as Record<string,unknown>[]).map(row=>CreditEntry.parse({...row,gift:row.gift===true||row.gift==='true'||row.gift===1}));
+  const page=data.slice(0,20),last=page.at(-1);
+  return CreditHistory.parse({balance:await creditBalance(db,agencyId,now),entries:page,nextCursor:data.length>20&&last?btoa(JSON.stringify([last.at,last.id])):null});
 }
 export type CreditGrant={id:string;kind:'trial'|'paid'|'free';remaining:number;renewalAt:string;enabled:number};
 export async function creditGrant(db:Database,agencyId:string,now=Date.now()):Promise<CreditGrant|null> {

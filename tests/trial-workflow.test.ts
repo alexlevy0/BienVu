@@ -31,13 +31,13 @@ test('Workflow anonyme complet workerd : import/voix/rendu simulés une fois, cl
   assert.equal(status,'rendering');assert.equal(imports,4);
   assert.equal((await getJobVideo(env.DB,session.scopeId,pending.jobId))!.manifest.subtitlesEnabled,false);
   const user={id:'workflow-trial-owner',email:'owner@example.com'};await env.DB.prepare('INSERT INTO auth_user VALUES(?,?,?,1,NULL,?,?)').bind(user.id,'Owner',user.email,Date.now()-1000,Date.now()).run();const agency=await ensureAgency(env.DB,user);
-  assert.equal((await claimTrial(env.DB,session,agency.id,pending.jobId)).creditStatus,'reserved');
+  assert.equal((await claimTrial(env.DB,session,agency.id,pending.jobId)).creditStatus,'unfunded');
   const before=(await env.DB.prepare('SELECT count(*) AS n FROM narration_calls').first<{n:number}>())!.n;assert.ok(before>4);
   await mf.dispose();mf=new Miniflare(options);env=await mf.getBindings<{DB:D1Database;MEDIA:R2Bucket}>();
   await mf.dispatchFetch(`https://test/reconcile/${pending.jobId}`,{headers});
-  const done=(await findOwnedGeneration(env.DB,agency.id,pending.jobId))!;assert.equal(done.status,'ready');assert.equal(done.creditStatus,'consumed');assert.ok(done.previewKey);assert.ok(done.objectKey);
+  const done=(await findOwnedGeneration(env.DB,agency.id,pending.jobId))!;assert.equal(done.status,'ready');assert.equal(done.creditStatus,'unfunded');assert.ok(done.previewKey);assert.ok(done.objectKey);
   const [a,b]=await Promise.all([1,2].map(()=>claimTrial(env.DB,session,agency.id,pending.jobId)));assert.equal(a.jobId,b.jobId);
-  assert.equal((await creditGrant(env.DB,agency.id))!.remaining,2);assert.equal((await listGenerations(env.DB,agency.id)).jobs.length,1);
+  assert.equal((await creditGrant(env.DB,agency.id))!.remaining,3);assert.equal((await listGenerations(env.DB,agency.id)).jobs.length,1);
   assert.equal((await env.DB.prepare('SELECT count(*) AS n FROM narration_calls').first<{n:number}>())!.n,before);assert.equal(imports,4);
   const {RENDERER}=await mf.getBindings<{RENDERER:DurableObjectNamespace}>();assert.equal((await (await RENDERER.get(RENDERER.idFromName('generation-single-slot-v1')).fetch('https://fixture/count')).json() as {starts:number}).starts,1);
   const master=await generationVideo(new Request('https://test?download=1'),env,agency.id,pending.jobId);assert.deepEqual(new Uint8Array(await master.arrayBuffer()),new Uint8Array([1,2,3,4]));

@@ -78,3 +78,11 @@
   .offers-card {padding:23px}
   .offers-footer {flex-wrap:wrap}
 }
+.offers-wallet,.offers-calculator {display:flex;align-items:center;justify-content:space-between;gap:22px;padding:22px 25px;border:1px solid #d4decc;border-radius:13px;background:#edf2e7;margin:24px 0 20px}
+.home-studio .offers-wallet h2,.home-studio .offers-calculator h2 {font-size:18px;margin:0 0 7px;font-weight:600}
+.offers-wallet strong {font:500 43px/1 'Instrument Serif',Georgia,serif}.offers-wallet p,.offers-calculator p {font-size:13px;color:#657060;margin:5px 0 0}.offers-wallet a {font-size:13px;text-decoration:underline;text-underline-offset:4px}
+.offers-calculator {background:#fbfaf7;flex-wrap:wrap}.offers-calculator label {display:grid;gap:7px;font-size:13px}.offers-calculator select {padding:9px 30px 9px 12px;background:#fff;border:1px solid #cdd5c6;border-radius:8px;font:inherit;color:#293829}
+.home-studio .offers-calculated-cost {display:grid;gap:4px;margin:0;min-width:160px}.offers-calculated-cost strong {font-size:26px;color:#233b2b}.offers-calculated-cost span {font-size:12px}.home-studio .offers-equivalent {font-size:12px;color:#6c7468;min-height:32px;margin:0 0 12px}
+.offers-trial-note {border-left:3px solid #8eaa80;padding:5px 18px;margin:25px 0}.offers-trial-note p {font-size:14px;color:#626b60}.offers-trial-note a {font-size:14px;text-decoration:underline;text-underline-offset:4px}
+.offers-credit-history {margin:28px 0}.home-studio .offers-credit-history h2 {font:500 31px/1.1 'Instrument Serif',Georgia,serif;margin:0 0 9px}.offers-credit-history p {font-size:13px;color:#626b60}.offers-credit-history table {border-collapse:collapse;width:100%;min-width:650px;font-size:13px}.offers-credit-history th,.offers-credit-history td {padding:12px;text-align:left;border-bottom:1px solid #d8d9d5}.offers-credit-history th {font-weight:500}.offers-credit-history small {display:block;color:#7a8175;margin-top:4px}.offers-credit-history a:hover {text-decoration:underline}.offers-history-more {width:auto;display:flex;margin:15px auto 0}
+@media(max-width:700px){.offers-wallet,.offers-calculator {padding:18px;gap:15px}.offers-wallet {flex-wrap:wrap}.offers-wallet>div:first-child {min-width:140px}.offers-calculator>div:first-child {width:100%}}

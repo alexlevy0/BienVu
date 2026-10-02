@@ -2,7 +2,7 @@
 import type {VideoCustomization,VideoDuration,VideoAspectRatio} from '@bienvu/contracts';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import Link from 'next/link';
-import {GenerationView,publicErrors,type PublicErrorCode} from '@bienvu/contracts';
+import {GenerationView,publicErrors,requestedAnimations,type PublicErrorCode} from '@bienvu/contracts';
 import {generationActive} from './generation-progress';
 import {anonymousGenerationScope,useGenerationStore} from './generation-store';
 // The token lives only in memory. The HttpOnly session is the ownership proof.
@@ -27,6 +27,7 @@ export function useAnonymousTrial(enabled:boolean) {
   useEffect(()=>{if(!enabled||!job||!generationActive(job)||job.ownership==='owned')return;const timer=setInterval(()=>void refresh(),4000);return()=>clearInterval(timer);},[enabled,job?.id,job?.status,job?.ownership,refresh]);
   async function start(url:string,verifiedToken?:string,subtitlesEnabled=true,customization?:VideoCustomization,voiceEnabled=true,durationSeconds:VideoDuration=20,aspectRatio:VideoAspectRatio='9:16') {
     if(lock.current)return;setFailure('');
+    if(requestedAnimations(customization)){setFailure(publicErrors.RUNWAY_LOGIN_REQUIRED[1]);return;}
     if(!loaded){setFailure('Votre navigateur est en cours de vérification. Réessayez dans un instant.');return;}
     if(!available){setFailure(publicErrors.ANONYMOUS_UNAVAILABLE[1]);return;}
     if(used){setFailure(publicErrors.TRIAL_USED[1]);return;}

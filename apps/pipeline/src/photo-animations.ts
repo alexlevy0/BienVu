@@ -1,4 +1,4 @@
-import {GenerationRequest,PreparedNarration,PhotoAnimation,type NormalizedListing} from '@bienvu/contracts';
+import {GenerationRequest,PreparedNarration,PhotoAnimation,requestedAnimations,selectedAnimationIndices,type NormalizedListing} from '@bienvu/contracts';
 import {findNarration,findGeneration,type Database} from '@bienvu/db';
 import {scriptContext} from '@bienvu/narration';
 import type {NarrationBucket} from './narration';
@@ -13,7 +13,7 @@ const select=`SELECT id,photo_id AS photoId,source_sha256 AS sourceSha256,state,
 export function animationIndices(count:number,clips:number){return clips===2?[0,Math.floor(count/2)]:clips===1?[0]:[];}
 export async function prepareJobAnimations(env:AnimationEnv,agencyId:string,jobId:string,provider?:AnimationProvider){
   const job=await findGeneration(env.DB,agencyId,jobId);if(!job||['ready','failed'].includes(job.status)||job.retention!=='available')throw Error('RUNWAY_JOB_INACTIVE');
-  const input=GenerationRequest.parse(JSON.parse(job.input)),settings=input.customization,requested=settings?.runwayClips??0;
+  const input=GenerationRequest.parse(JSON.parse(job.input)),settings=input.customization,requested=requestedAnimations(settings);
   if(!requested)return {requested,ready:0};
   if(env.RUNWAY_TEST_AGENCY_ID&&env.RUNWAY_TEST_AGENCY_ID!==agencyId)return {requested,ready:0,reason:'RUNWAY_DISABLED'};
   if(!provider&&(env.RUNWAY_ENABLED!=='true'||!env.RUNWAYML_API_SECRET))return {requested,ready:0,reason:'RUNWAY_DISABLED'};
@@ -23,7 +23,7 @@ export async function prepareJobAnimations(env:AnimationEnv,agencyId:string,jobI
   PreparedNarration.parse(JSON.parse(narration.result!));
   if(context.listing.agencyId!==agencyId||context.listing.id!==job.listingId)throw Error('RUNWAY_SCOPE_INVALID');
   const adapter=provider??runwayProvider(env.RUNWAYML_API_SECRET!),photos=context.listing.photos;
-  for(const [slot,index] of animationIndices(photos.length,requested).entries()){
+  for(const [slot,index] of selectedAnimationIndices(settings?.photoOrder??photos.map(p=>p.sourceOrder),settings).entries()){
     const photo=photos[index];let row=await env.DB.prepare(select+' AND slot=?').bind(agencyId,jobId,slot).first<AnimationRow>();
     if(row&&(row.photoId!==photo.id||row.sourceSha256!==photo.contentHash||row.mode!==adapter.mode))throw Error('RUNWAY_SCOPE_INVALID');
     if(row?.state==='ready'||row?.state==='failed'||row?.state==='uncertain')continue;

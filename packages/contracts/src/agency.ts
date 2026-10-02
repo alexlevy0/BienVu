@@ -22,7 +22,7 @@ export const Me = z.object({
   isSuperAdmin: z.boolean().default(false),
   user: z.object({id: EntityId, name: z.string(), email: z.email()}).strict(),
   agency: AgencyProfile,
-  rights: z.object({renewalAt: Timestamp.nullable().default(null), creditKind: z.enum(['trial','paid','free']).nullable().default(null), generationEnabled: z.boolean(), developmentRemaining: z.number().int().nonnegative().default(0), importRetryAt: Timestamp.nullable().default(null), trial: z.enum(['eligible', 'used']), watermarked: z.boolean()}).strict(),
+  rights: z.object({renewalAt: Timestamp.nullable().default(null), creditKind: z.enum(['trial','paid','free']).nullable().default(null), generationEnabled: z.boolean(), developmentRemaining: z.number().int().nonnegative().default(0), creditReserved:z.number().int().nonnegative().default(0),creditConsumed:z.number().int().nonnegative().default(0),creditTotal:z.number().int().nonnegative().default(0), importRetryAt: Timestamp.nullable().default(null), trial: z.enum(['eligible', 'used']), watermarked: z.boolean()}).strict(),
 }).strict();
 export type Me = z.infer<typeof Me>;
 export const LOGO_MAX_BYTES = 2 * 1024 * 1024;

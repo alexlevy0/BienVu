@@ -85,3 +85,10 @@
 .customizer-preview.is-horizontal .customizer-poster-agency {bottom:4%;font-size:10px}
 .customizer-preview.is-horizontal .customizer-poster-location {font-size:10px;top:7%}
 @media(max-width:700px){.customizer-panel.is-horizontal {grid-template-columns:minmax(0,1fr)}.customizer-preview.is-horizontal {max-width:520px}.customizer-preview.is-horizontal .customizer-poster-copy h2 {font-size:22px}}
+.customizer-photo-animate {position:absolute;bottom:35px;left:7px;border:1px solid #c5d0bb;background:#fffef4ed;color:#31442e;padding:6px 9px;border-radius:6px;font-size:11px;cursor:pointer;max-width:calc(100% - 14px)}
+.customizer-photo-animate.is-active {background:#dbe8cc;border-color:#78966d;font-weight:600}.customizer-photo-animate:disabled {cursor:not-allowed;opacity:.6}.customizer-photo:has(.customizer-photo-actions) .customizer-photo-animate {position:static;margin:5px 7px 0}
+.customizer-animation-actions {display:flex;flex-wrap:wrap;gap:12px;align-items:center}.home-studio .customizer-credit-total {background:#edf3e7;border-radius:8px;padding:12px;font-size:13px;color:#304429;margin-top:14px}
+.home-credit-cost {font-size:12px;white-space:nowrap;color:#52654b;align-self:center}.home-plan>small {display:block;font-size:11px;color:#727b6c;margin:4px 0}
+@media(max-width:700px){.home-composer-actions {flex-wrap:wrap}.home-credit-cost {width:100%;text-align:right}.customizer-photo-animate {font-size:10px;bottom:33px;padding:5px 7px}}
+
+.customizer-first-photo {bottom:auto;top:38px}

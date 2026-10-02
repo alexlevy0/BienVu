@@ -1,3 +1,4 @@
+import {admitLegacyAnonymous} from './legacy-trial-fixture';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
@@ -42,7 +43,7 @@ test('API anonyme : cookie sécurisé, prévisualisation isolée, master protég
   await migrateNarrationProbe(DB);await DB.exec('UPDATE trial_policy SET enabled=1,free_enabled=1; UPDATE generation_control SET enabled=1');
   await DB.prepare('INSERT INTO hosted_import_budget VALUES(?,0,2500,0)').bind(new Date().toISOString().slice(0,7)).run();
   const noSession=await trialHistoryResponse(new Request(base+'/api/trial/history'),env);
-  assert.deepEqual(await noSession.json(),{jobs:[],nextCursor:null});assert.equal(noSession.headers.has('set-cookie'),false);
+  assert.deepEqual(await noSession.json(),{jobs:[],nextCursor:null,creditsRemaining:1});assert.equal(noSession.headers.has('set-cookie'),false);
   assert.equal((await DB.prepare('SELECT count(*) AS n FROM anonymous_sessions').first<{n:number}>())!.n,0);
   const response=await trialSessionResponse(new Request(base+'/api/trial'),env),cookie=response.headers.get('set-cookie')!;
   assert.match(cookie,/__Host-bienvu-trial=/);for(const part of ['HttpOnly','Secure','SameSite=Lax','Path=/','Max-Age=2592000'])assert.ok(cookie.includes(part));
@@ -94,15 +95,15 @@ test('API anonyme : cookie sécurisé, prévisualisation isolée, master protég
   await trialLoginIntent(new Request(base,{method:'POST',headers}),env,row.jobId);
   assert.equal((await DB.prepare('SELECT claim_job_id AS id FROM anonymous_sessions WHERE id=?').bind(session.id).first<{id:string}>())!.id,row.jobId);
   const user={id:'api-owner',email:'owner@example.com'};await DB.prepare('INSERT INTO auth_user VALUES(?,?,?,1,NULL,?,?)').bind(user.id,'Owner',user.email,Date.now()-1000,Date.now()).run();const agency=await ensureAgency(DB,user);
-  const owned=await claimTrial(DB,session,agency.id,row.jobId);assert.equal(owned.creditStatus,'consumed');assert.equal((await creditGrant(DB,agency.id))!.remaining,2);
+  const owned=await claimTrial(DB,session,agency.id,row.jobId);assert.equal(owned.creditStatus,'unfunded');assert.equal((await creditGrant(DB,agency.id))!.remaining,3);
   assert.deepEqual(await history(),[]);assert.equal((await listGenerations(DB,agency.id)).jobs[0].id,row.jobId);
   for(let i=0;i<2;i++){const downloaded=await generationVideo(new Request(base+'?download=1'),env,agency.id,row.jobId);assert.deepEqual(new Uint8Array(await downloaded.arrayBuffer()),master);}
-  assert.equal((await creditGrant(DB,agency.id))!.remaining,2);assert.equal((await generationPreview(new Request(base),env,agency.id,row.jobId)).status,200);
+  assert.equal((await creditGrant(DB,agency.id))!.remaining,3);assert.equal((await generationPreview(new Request(base),env,agency.id,row.jobId)).status,200);
   await assert.rejects(trialPreview(new Request(base,{headers}),env,row.jobId),/NOT_FOUND/);
   await assert.rejects(generationVideo(new Request(base),env,'another-user',row.jobId),/NOT_FOUND/);
-  // A new anonymous session cannot bypass a depleted account's actual credit.
+  // Legacy trials still require the credit promised at their creation.
   const grant=(await creditGrant(DB,agency.id))!;await DB.prepare('UPDATE allocations SET consumed=quota_limit WHERE id=?').bind(grant.id).run();
-  const second=await admitAnonymous(DB,other.session,'locked-trial-api-key',{url},{ipHmac:'f'.repeat(64),turnstileHash:'e'.repeat(64)},'true');
+  const second=await admitLegacyAnonymous(DB,other.session,'locked-trial-api-key',{url},{ipHmac:'f'.repeat(64),turnstileHash:'e'.repeat(64)},'true');
   const secondKey=`agencies/${other.session.scopeId}/jobs/${second.jobId}/video/master.mp4`,secondPreview=secondKey.replace('master','preview');
   await env.MEDIA.put(secondKey,master,{customMetadata:{sha256:report.sha256}});await env.MEDIA.put(secondPreview,preview,{customMetadata:{sha256:previewReport.sha256}});
   await DB.batch([DB.prepare('INSERT INTO generation_artifacts VALUES(?,?,?,?)').bind(second.jobId,secondKey,JSON.stringify(report),at),DB.prepare('INSERT INTO generation_previews VALUES(?,?,?,?)').bind(second.jobId,secondPreview,JSON.stringify(previewReport),at),DB.prepare("UPDATE jobs SET status='ready',lease_until=NULL,updated_at=? WHERE id=?").bind(new Date().toISOString(),second.jobId)]);

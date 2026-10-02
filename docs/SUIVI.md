@@ -515,3 +515,27 @@ Recette isolée sur la description de l’annonce : **un OpenAI + six Manon rée
 Contrôles : 61 tests distincts narration, Workflows workerd, durée, personnalisation et voix (deux échecs initiaux revérifiés avec 6/6 tests ciblés réussis), TypeScript complet, frontières 197 fichiers, build OpenNext et deux dry-runs Wrangler. Les fixtures Workflows emploient des API/renderer simulés ; les WAV Manon sont réels. Interface Voix et texte vérifiée en local et sur la version publiée à 1536/390 px : plafond par champ 500, conseil 120 mots à 40 s, description utilisée, aucun débordement ou appel fournisseur.
 
 Publication : génération **`363a79d2-ebd2-486e-8e3a-532d4a368121`**, web **`66d99024-5b40-4b12-8727-8fcd3f967649`**, chacun à 100 %. **28/25 bindings et compatibilité conservés** ; renderer 13 et image `9ba35b60…48bcdc` inchangés (`--containers-rollout none`). Accueil/connexion 200, admin anonyme 401, vidéo historique toujours prête avec son artifact. Provision de campagne 0,80 € réservée avant API : **44,05 → 44,85 € engagés**, plafond mensuel autorisé 100 €, coupure 90 €. Sept réservations API de 0,05 € déjà incluses, estimation OpenAI 0,003481 USD, Fish free estimé 0 USD ; facture non rapprochée. Aucun achat. [Preuve, limites et mesures](preuves/maintenance/NARRATION-COUVERTURE-02-10.md). Traces privées ignorées : `evidence/local/narration-coverage/`.
+
+### 02/10/2026 — Crédits vidéo et animations par photo
+
+Barème confirmé : **1 crédit vidéo + 1 par photo Runway**, mouvements classiques inclus ; offres **3 / 40 / 120 crédits mensuels**, prix **0 / 19 / 49 € HT**, sans report. Essai anonyme **1 crédit**, sans Runway, récupérable après connexion sans débit mensuel. Paiements Plus/Pro encore fermés.
+
+Sélection Runway par photo, coût avant lancement, compteur de crédits latéral, portefeuille/calculateur/historique dans les offres et détails Super admin. Migration 0031 : réservations pondérées atomiques, restitution totale sur échec et partielle pour animations absentes du montage final ; compatibilité des anciennes requêtes et périodes. Journaux API et budget financier séparés du solde client.
+
+Validation : 264 tests de la suite générale, **262 réussis puis 15/15 ciblés réussis** après deux erreurs locales de transport sous forte charge ; types/frontières/build OpenNext/bundle/dry-run réussis. Tests de rendu Linux avec trois clips réutilisés, captures inspectées. Interface sur vrais assets publiés à 1536/390/320 px avec APIs interceptées, sans génération réelle ; offres relues dans le HTML réel. Aucun nouveau fournisseur ni crédit utilisateur dépensé.
+
+Publication à 100 % : génération **`2f629984-6ae4-42fa-a1de-eca2b89a0e06`**, web **`08c8c53f-c071-4ba6-b6f8-5336608d980a`**, renderer **14** digest `38e9be45…feea53`, rollout terminé. Sauvegarde D1, **259 lignes / 13 tables historiques inchangées**, zéro défaut de clé étrangère, **28/25 bindings conservés**, générations rétablies. Budget engagé **45,35 € avant/après** sur enveloppe 100 €, coupure 90 €. La première génération complète avec débit pondéré en production reste à observer sur le prochain essai utilisateur. [Recette et limites](preuves/maintenance/CREDITS-02-10.md).
+
+### 02/10/2026 — Accueil conforme à la nouvelle maquette
+
+Grand bloc vert pastel, titre aligné à gauche sur trois lignes, formulaire blanc et démonstration cliquable à droite. Réglages regroupés avec horloge pour la durée, actions séparées et coût en crédits conservé. Inspirations compactes avec titre en sérif ; mobile sur une colonne. Les médias Paris existants servent à la démonstration sans génération supplémentaire.
+
+TypeScript web, build OpenNext, dry-run et diff réussis. Chrome local puis publié à **1536/390/320 px** : captures inspectées, lecture réelle de la démo 28 s, aucun débordement, saisie manuelle/annulation sans remonter l’input, personnalisation et crédits vérifiés sur API simulées. Aucune génération ou requête fournisseur réelle.
+
+Publication web **`4a57fdb2-cc6e-4c51-835f-54e47f5d58c0`** à **100 %**, **25 bindings et compatibilité conservés**. Accueil/connexion/abonnement 200, API crédits/admin anonymes 401. Jobs et budget inchangés (**45,35 €**). [Recette et limites](preuves/maintenance/ACCUEIL-REDESIGN-02-10.md).
+
+### 02/10/2026 — En-tête, ombre et bascule de personnalisation
+
+La ligne sous « Votre studio immobilier » est retirée de l’accueil ; le formulaire principal reçoit une ombre légère, conservée avec son focus. Un second clic sur Personnaliser ferme les réglages comme Retour, avec conservation des champs, photos, style, voix et durée ; la réouverture d’un brouillon ne relance pas l’import.
+
+TypeScript web, build OpenNext, dry-run et diff réussis. Quatre scénarios Chrome (connecté/anonyme à **1536/390 px**) passent en local puis sur assets publiés, avec API simulées et écritures distantes bloquées. Publication web **`e3f39d18-d241-49ad-88ef-bb1376f7b7b5`** à **100 %**, **25 bindings conservés**, feuille CSS distante identique au build. Budget **45,35 €** et jobs inchangés ; aucun appel fournisseur. [Recette](preuves/maintenance/ACCUEIL-REGLAGES-02-10.md).
