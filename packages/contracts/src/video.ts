@@ -10,6 +10,7 @@ export const VideoAsset = z.object({id: EntityId, objectKey: ObjectKey, sha256: 
   mime: z.enum(['image/jpeg', 'image/png', 'image/webp', 'audio/wav', 'video/mp4']),
   width: z.number().int().positive().max(12000).optional(), height: z.number().int().positive().max(12000).optional(),
   durationMs: z.number().int().positive().max(40000).optional(),
+  normalizationGain:z.number().min(.1).max(4).optional(),
 }).strict();
 export type VideoAsset = z.infer<typeof VideoAsset>;
 export const PhotoAnimation=z.object({photoAssetId:EntityId,sourceSha256:Sha256,

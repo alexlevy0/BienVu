@@ -5,12 +5,12 @@ import {assertSameOrigin, boundedJson, RequestFailure, respond} from '../../../l
 export const dynamic = 'force-dynamic';
 export async function PUT(request: Request) {
   return respond(async () => {
-    const {env, user} = await requireOwner(request);
+    const {env, user,agency} = await requireOwner(request);
     assertSameOrigin(request, env);
     if (!await allowAgencyWrite(env.DB, user.id, 'brand')) throw new RequestFailure('RATE_LIMITED');
     const parsed = AgencyUpdate.safeParse(await boundedJson(request));
     if (!parsed.success) throw new RequestFailure('VALIDATION_ERROR', Object.fromEntries(parsed.error.issues.map(issue =>
       [String(issue.path[0] ?? 'form'), issue.code === 'unrecognized_keys' ? 'Ce champ ne peut pas être modifié.' : issue.message])));
-    return Response.json({agency: await updateAgency(env.DB, user.id, parsed.data)});
+    return Response.json({agency: await updateAgency(env.DB, agency.ownerUserId, parsed.data)});
   });
 }

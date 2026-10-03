@@ -8,6 +8,7 @@ export * from './creation-draft';
 export * from './customization';
 export * from './editor';
 export * from './editor-voice';
+export * from './editor-quality';
 export * from './credits';
 export * from './import-sources';
 export * from './voice';
@@ -59,3 +60,6 @@ export const VideoFixture = z.object({
 export type VideoFixture = z.infer<typeof VideoFixture>;
 export * from './auth';
 export * from './admin';
+export * from './agency-template';
+
+export * from './access';

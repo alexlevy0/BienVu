@@ -124,3 +124,10 @@ test('D1 : fiche Figaro sans photos conservée, reprise sans réseau, prix et de
   assert.equal(await findImport(DB,'other-agency',row.id),null);
   assert.equal(await DB.prepare('SELECT id FROM jobs').first(),null);
 });
+
+test('une seule image lente ne monopolise plus le délai de toute la galerie',async t=>{
+ const originalTimeout=AbortSignal.timeout.bind(AbortSignal);let imageTimeouts=0;const base=fixtureImportTransport();
+ t.mock.method(AbortSignal,'timeout',(ms:number)=>ms===8000&&++imageTimeouts===1?AbortSignal.abort(new DOMException('Image trop lente','TimeoutError')):originalTimeout(ms));
+ const result=await importListing('https://fixtures.bienvu.example/vente',{agencyId:'a',importId:'b'},{transport:base,store:async()=>{}},{allowPartial:true});
+ assert.equal(result.listing.photos.length,2);assert.equal(result.listing.facts.price.value?.amountCents,28000000);assert.equal(result.diagnostics.rejected[0].reason,'IMPORT_TIMEOUT');
+});

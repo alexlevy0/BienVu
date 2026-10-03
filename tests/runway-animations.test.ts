@@ -154,3 +154,26 @@ test('SDK Runway réel, transport fixture : upload privé, contrat exact, tâche
   assert.equal(paths.filter(p=>p==='/v1/image_to_video').length,1);
   }
 });
+
+test('Animations conservées : échec du montage, retouche sans nouvel appel ni second débit, format et purge',async t=>{
+ const {env,job,month,at,listing}=await setup(t,'runway-reuse',1);await env.DB.prepare('INSERT INTO runway_budget(month,prepaid_cents,api_credits,paused,created_at) VALUES(?,1000,1000,0,?)').bind(month,at).run();
+ let calls=0;const provider:AnimationProvider={mode:'real',generate:async(_bytes,_mime,checkpoint)=>{calls++;await checkpoint(taskId);return clip;},resume:async()=>{throw Error('NO_RESUME');}};
+ await prepareJobAnimations(env,job.agencyId,job.jobId,provider);await failGeneration(env.DB,job,'GENERATION_FAILED');
+ const {creditBalance,retainedAnimations}=await import('../packages/db/src/index');
+ assert.equal((await creditBalance(env.DB,job.agencyId)).consumed,1,'L’animation réussie est conservée et débitée une seule fois, le crédit vidéo est libéré');
+ const settings={...defaultVideoCustomization(),runwayPhotos:[0],narration:['Découvrez cet appartement à Lyon.','Son prix et sa surface sont présentés dans cette annonce.','La visite se poursuit en images.','Contactez votre agence pour en savoir plus.']};
+ const reused=await retainedAnimations(env.DB,job.agencyId,listing,settings);assert.equal(reused.length,1);assert.equal((await retainedAnimations(env.DB,job.agencyId,listing,settings,'16:9')).length,0);
+ await assert.rejects(retainedAnimations(env.DB,'other-agency',listing,settings),/SCOPE/);
+ assert.equal((await retainedAnimations(env.DB,job.agencyId,listing,{...defaultVideoCustomization(),photoOrder:[2,1,0],runwayClips:1})).length,0,'La première animation classique suit l’ordre sélectionné, sans réutiliser une autre pièce');
+ const next=await admitGeneration(env.DB,job.agencyId,'runway-reuse-next-001',{listingId:listing.id,customization:settings},'true');assert.equal(next.creditsReserved,1);
+ await env.DB.prepare("UPDATE jobs SET status='scripting',stage='scripting',listing_id=? WHERE id=?").bind(listing.id,next.jobId).run();
+ const config=GoogleVoiceConfig.parse({projectId:'runway-fixture',voice:'fr-FR-Chirp3-HD-Aoede'}),google=googleTts(config,async()=> 'fixture-token-never-networked',{fetch:async()=>Response.json({audioContent:Buffer.from(toneFixture(5000)).toString('base64')})});
+ await prepareJobNarration(env,job.agencyId,next.jobId,{mode:'mock',script:{model:DEFAULT_SCRIPT_MODEL,plan:async()=>{throw Error('NO_TEXT_CALL');}},voice:{config,synthesize:google.synthesize}});
+ await prepareJobAnimations(env,job.agencyId,next.jobId,provider);assert.equal(calls,1);assert.equal((await env.DB.prepare('SELECT count(*) n FROM photo_animations').first<{n:number}>())!.n,1);
+ await env.DB.prepare('UPDATE animation_library SET expires_at=?').bind(new Date(Date.now()-1).toISOString()).run();
+ const {cleanupAnimations}=await import('../apps/pipeline/src/animation-cleanup');assert.equal((await cleanupAnimations(env)).removed,0,'Un clip admis reste disponible jusqu’à sa copie dans le montage');
+ const frozen=await prepareJobVideo(env,job.agencyId,next.jobId);assert.equal(frozen.manifest.photoAnimations!.length,1);assert.equal(frozen.manifest.photoAnimations![0].sourceSha256,listing.photos[0].contentHash);
+ await failGeneration(env.DB,next,'GENERATION_FAILED');assert.equal((await creditBalance(env.DB,job.agencyId)).consumed,1);
+ const original=(await env.DB.prepare('SELECT animation_json AS data FROM photo_animations').first<{data:string}>())!.data;assert.equal((await cleanupAnimations(env)).removed,1);
+ assert.ok(await env.MEDIA.head(JSON.parse(original).asset.objectKey),'Le clip original du job n’est pas purgé');assert.ok(await env.MEDIA.head(frozen.manifest.photoAnimations![0].asset.objectKey),'La copie exportée reste indépendante');
+});

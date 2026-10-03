@@ -20,9 +20,11 @@ export const AgencyProfile = AgencyBrand.safeExtend({city: z.string().trim().min
 export type AgencyProfile = z.infer<typeof AgencyProfile>;
 export const Me = z.object({
   isSuperAdmin: z.boolean().default(false),
+  role:z.enum(['owner','admin','editor','viewer']).optional(),
+  memberships:z.array(z.object({id:EntityId,name:z.string(),role:z.enum(['owner','admin','editor','viewer'])}).strict()).max(20).optional(),
   user: z.object({id: EntityId, name: z.string(), email: z.email()}).strict(),
   agency: AgencyProfile,
-  rights: z.object({renewalAt: Timestamp.nullable().default(null), creditKind: z.enum(['trial','paid','free']).nullable().default(null), generationEnabled: z.boolean(), developmentRemaining: z.number().int().nonnegative().default(0), creditReserved:z.number().int().nonnegative().default(0),creditConsumed:z.number().int().nonnegative().default(0),creditTotal:z.number().int().nonnegative().default(0), importRetryAt: Timestamp.nullable().default(null), trial: z.enum(['eligible', 'used']), watermarked: z.boolean()}).strict(),
+  rights: z.object({renewalAt: Timestamp.nullable().default(null), creditKind: z.enum(['trial','paid','free']).nullable().default(null), generationEnabled: z.boolean(), developmentRemaining: z.number().int().nonnegative().default(0), creditReserved:z.number().int().nonnegative().default(0),creditConsumed:z.number().int().nonnegative().default(0),creditTotal:z.number().int().nonnegative().default(0),creditPurchased:z.number().int().nonnegative().optional(),creditMonthly:z.number().int().nonnegative().optional(), importRetryAt: Timestamp.nullable().default(null), trial: z.enum(['eligible', 'used']), watermarked: z.boolean()}).strict(),
 }).strict();
 export type Me = z.infer<typeof Me>;
 export const LOGO_MAX_BYTES = 2 * 1024 * 1024;

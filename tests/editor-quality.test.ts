@@ -1,0 +1,30 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {audioNormalizationGain,editorMusicGain,editorPhotoMotion,editorQuality,createEditorDocument,EditorDocument} from '../packages/contracts/src/index';
+test('Mixage : baisse sur la voix, remontée dans les silences, fondus et décalage musical',()=>{
+ const doc=createEditorDocument([{sourceOrder:0},{sourceOrder:1},{sourceOrder:2}],{});
+ doc.music={assetId:'music',durationMs:20000,name:'Test',volume:.4,startFrame:30,trimFromFrame:60,normalizationGain:2};
+ const voice=[{startFrame:120,durationMs:1000}];
+ assert.equal(editorMusicGain(doc,29,voice),0);assert.equal(editorMusicGain(doc,30,voice),0);
+ assert.equal(editorMusicGain(doc,100,voice),.8);assert.equal(editorMusicGain(doc,130,voice),.2);
+ assert.ok(editorMusicGain(doc,117,voice)<.8&&editorMusicGain(doc,117,voice)>.2);
+ assert.ok(editorMusicGain(doc,155,voice)<.8&&editorMusicGain(doc,155,voice)>.2);
+ assert.equal(editorMusicGain(doc,170,voice),.8);assert.equal(editorMusicGain(doc,570,voice),0);
+ assert.ok(editorMusicGain(doc,569,voice)<.1);assert.equal(editorMusicGain({...doc,voiceEnabled:false,subtitlesEnabled:false},130,voice),.8);
+ assert.equal(audioNormalizationGain(-40,1),.8);assert.equal(audioNormalizationGain(-40,.01),4);
+ const {audioMix,...legacy}=doc;assert.equal(EditorDocument.parse(legacy).audioMix,undefined);
+ assert.equal(editorMusicGain(legacy,130,voice),.4,'Ancien mixage inchangé');
+});
+test('Caméra : mouvement fluide, bordures protégées, cadrage fixe et alertes ciblées',()=>{
+ const camera={motion:'pan-left' as const,intensity:'dynamic' as const,start:{x:50,y:50,scale:1},end:{x:50,y:50,scale:1.1}};
+ const before=editorPhotoMotion(0,120,0,true,camera),after=editorPhotoMotion(119,120,0,true,camera);
+ assert.notEqual(before.translate,after.translate);assert.equal(before.scale,after.scale);
+ const fixed={...camera,motion:'still' as const,start:{x:23,y:72,scale:1.2}};
+ assert.deepEqual(editorPhotoMotion(0,120,0,true,fixed),editorPhotoMotion(119,120,0,true,fixed));
+ assert.equal(editorPhotoMotion(80,120,0,true,fixed).objectPosition,'23% 72%');
+ const doc=createEditorDocument([{sourceOrder:0},{sourceOrder:1},{sourceOrder:2}],{title:'Texte long '.repeat(20)});
+ doc.layers[0].y=2;doc.music={assetId:'music',durationMs:1000,name:'Test',volume:.7,startFrame:0,trimFromFrame:0};delete doc.audioMix;
+ const issues=editorQuality(doc,[{sourceOrder:0,width:400,height:400},{sourceOrder:1,width:1200,height:1000}],null);
+ assert.ok(issues.some(i=>i.targetId==='photo-2'&&i.level==='error'));
+ assert.ok(issues.some(i=>i.kind==='audio'));assert.ok(issues.some(i=>i.targetId==='title'));
+});

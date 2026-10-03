@@ -3,7 +3,7 @@ import {isPublicIp} from './safety';
 
 export const IMPORT_LIMITS = {htmlBytes: 2 * 1024 * 1024, imageBytes: 10 * 1024 * 1024,
   totalBytes: 50 * 1024 * 1024, photos: 12, candidates: 24, redirects: 3, requests: 20, durationMs: 60_000,
-  photoDurationMs: 50_000} as const;
+  photoDurationMs: 50_000,imageDurationMs:8_000} as const;
 
 export function publicUrl(value: string): URL {
   const parsed = ListingUrl.safeParse(value);

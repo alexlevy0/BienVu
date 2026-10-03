@@ -1,6 +1,7 @@
 import {AdminQuery,AdminTrafficQuery,AdminAction,EntityId} from '@bienvu/contracts';
 import {adminPage,adminOverview,adminTraffic,adminAction,adminVideoDetail,findGeneration} from '@bienvu/db';
 import type {AuthEnvironment} from './auth';
+import {commercialSummary} from './commercial';
 import {requireAdmin} from './admin-access';
 import {assertSameOrigin,boundedJson,RequestFailure,respond} from './http';
 import {streamGenerationMedia} from './generations';
@@ -18,6 +19,7 @@ export async function adminRequest(request:Request,env:AdminEnvironment){
     }
     if(request.method!=='GET')throw new RequestFailure('FORBIDDEN');
     const params=new URL(request.url).searchParams;
+    if(params.get('section')==='commercial'){if([...params.keys()].some(k=>k!=='section'))throw new RequestFailure('VALIDATION_ERROR');return Response.json(await commercialSummary(env.DB));}
     if(params.get('section')==='traffic'){
       const query=AdminTrafficQuery.safeParse(Object.fromEntries(params));if(!query.success)throw new RequestFailure('VALIDATION_ERROR');
       return Response.json(await adminTraffic(env.DB,Number(query.data.days) as 7|30,env.TRAFFIC_ENABLED==='true'));

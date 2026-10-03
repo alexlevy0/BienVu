@@ -64,7 +64,7 @@ export async function admitAnonymous(db:Database,session:AnonymousSession,key:st
   const brand=AgencyBrand.parse({id:session.scopeId,ownerUserId:session.id,name:'BienVu',neutral:true,logoAssetId:null,
     primaryColor:'#E1E8D9',secondaryColor:'#171714',phone:null,email:null,website:null,createdAt:at});
   try {await db.prepare(`INSERT INTO generation_runs(job_id,agency_id,allocation_id,reservation_id,idempotency_key,input_hash,input_json,brand_json,created_at,deadline,expires_at,month,
-    anonymous_session_id,ip_hmac,turnstile_hash,preview_provision_cents,credit_version) VALUES(?,?,'unfunded',?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    anonymous_session_id,ip_hmac,turnstile_hash,preview_provision_cents,credit_version,financial_mode) VALUES(?,?,'unfunded',?,?,?,?,?,?,?,?,?,?,?,?,?, ?,(SELECT mode FROM credit_payment_policy WHERE id=1))`)
     .bind(id,session.scopeId,crypto.randomUUID(),key,old.hash,old.body,JSON.stringify(brand),at,deadline,deadline,at.slice(0,7),session.id,proof.ipHmac,proof.turnstileHash,policy.preview_provision_cents,CREDIT_PRICING_VERSION).run();
   }catch(error){const winner=await priorTrial(db,session,key,input);if(winner.row)return winner.row;
     const message=error instanceof Error?error.message:'';
@@ -84,7 +84,7 @@ export async function claimTrial(db:Database,session:AnonymousSession,agencyId:s
   // A lost response replays this statement and sees the same reservation.
   await db.prepare(`UPDATE generation_runs SET owner_agency_id=?,claimed_at=?,funding_candidate=?,expires_at=?
     WHERE job_id=? AND anonymous_session_id=? AND (owner_agency_id IS NULL OR owner_agency_id=?) AND retention='available' AND expires_at>?`)
-    .bind(agencyId,at,grant&&(grant.kind==='free'||grant.enabled===1)?grant.id:null,row.ownerAgencyId?row.expiresAt:new Date(Math.max(now,grant?Date.parse(grant.renewalAt):now)+7*86400_000).toISOString(),jobId,session.id,agencyId,at).run();
+    .bind(agencyId,at,grant&&(grant.kind==='free'||grant.enabled===1)?grant.id:null,row.ownerAgencyId?row.expiresAt:new Date(Math.max(now,grant?.renewalAt?Date.parse(grant.renewalAt):now)+7*86400_000).toISOString(),jobId,session.id,agencyId,at).run();
   const owned=await findOwnedGeneration(db,agencyId,jobId);
   if(!owned)throw new GenerationFailure('TRIAL_EXPIRED');return owned;
 }

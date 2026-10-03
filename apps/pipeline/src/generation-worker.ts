@@ -6,6 +6,7 @@ import {VideoRenderer} from './video-worker';
 import {getJobVideo,prepareJobVideo} from './video-manifest';
 import {prepareJobNarration} from './narration';
 import {realProviders,type FishVoiceEnv} from './narration-worker';
+import {cleanupAnimations} from './animation-cleanup';
 import {cleanupAnonymousTrials} from './trial-cleanup';
 import {extractDescription,EXTRACTION_TEXT_MAX} from '@bienvu/narration';
 import {loadGenerationListing} from './generation-import';
@@ -179,5 +180,5 @@ export default {
       return json({error:'NOT_FOUND'},404);
     }catch(error){const code=error instanceof GenerationFailure?error.code:'INTERNAL_ERROR';return json({error:code},publicErrors[code][0]);}
   },
-  scheduled(_event:ScheduledController,env:GenerationEnv,ctx:ExecutionContext){ctx.waitUntil(reconcileBatch(env).then(()=>cleanupAnonymousTrials(env)));},
+  scheduled(_event:ScheduledController,env:GenerationEnv,ctx:ExecutionContext){ctx.waitUntil(reconcileBatch(env).then(()=>cleanupAnonymousTrials(env)).then(()=>cleanupAnimations(env)));},
 };

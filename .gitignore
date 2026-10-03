@@ -12,6 +12,7 @@ out/
 !.env.script.example
 !.env.runway.example
 !.env.fish.example
+!.env.billing.example
 .dev.vars
 .dev.vars.*
 !.dev.vars.example

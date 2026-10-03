@@ -6,7 +6,7 @@ import {runwayProvider,runwayError,type AnimationProvider} from './runway';
 import {videoBytesHash} from './video-manifest';
 
 type AnimationRow={id:string;photoId:string;sourceSha256:string;state:string;taskId:string|null;animation:string|null;mode:'real'|'mock';updatedAt:string};
-type AnimationEnv={DB:Database;MEDIA:NarrationBucket;RUNWAY_ENABLED?:string;RUNWAYML_API_SECRET?:string;RUNWAY_TEST_AGENCY_ID?:string};
+type AnimationEnv={DB:D1Database;MEDIA:NarrationBucket;RUNWAY_ENABLED?:string;RUNWAYML_API_SECRET?:string;RUNWAY_TEST_AGENCY_ID?:string};
 const select=`SELECT id,photo_id AS photoId,source_sha256 AS sourceSha256,state,task_id AS taskId,animation_json AS animation,mode,updated_at AS updatedAt FROM photo_animations WHERE agency_id=? AND job_id=?`;
 // Always start with the first photo; use a different photo halfway through the
 // selected order for the second clip. The original images remain available.
@@ -14,6 +14,8 @@ export function animationIndices(count:number,clips:number){return clips===2?[0,
 export async function prepareJobAnimations(env:AnimationEnv,agencyId:string,jobId:string,provider?:AnimationProvider){
   const job=await findGeneration(env.DB,agencyId,jobId);if(!job||['ready','failed'].includes(job.status)||job.retention!=='available')throw Error('RUNWAY_JOB_INACTIVE');
   const input=GenerationRequest.parse(JSON.parse(job.input)),settings=input.customization,requested=requestedAnimations(settings);
+  const reuseRow=await env.DB.prepare('SELECT animation_reuses_json AS data FROM generation_runs WHERE agency_id=? AND job_id=?').bind(agencyId,jobId).first<{data:string}>();
+  const reused=JSON.parse(reuseRow?.data??'[]') as {photoId:string}[];
   if(!requested)return {requested,ready:0};
   if(env.RUNWAY_TEST_AGENCY_ID&&env.RUNWAY_TEST_AGENCY_ID!==agencyId)return {requested,ready:0,reason:'RUNWAY_DISABLED'};
   if(!provider&&(env.RUNWAY_ENABLED!=='true'||!env.RUNWAYML_API_SECRET))return {requested,ready:0,reason:'RUNWAY_DISABLED'};
@@ -24,7 +26,8 @@ export async function prepareJobAnimations(env:AnimationEnv,agencyId:string,jobI
   if(context.listing.agencyId!==agencyId||context.listing.id!==job.listingId)throw Error('RUNWAY_SCOPE_INVALID');
   const adapter=provider??runwayProvider(env.RUNWAYML_API_SECRET!),photos=context.listing.photos;
   for(const [slot,index] of selectedAnimationIndices(settings?.photoOrder??photos.map(p=>p.sourceOrder),settings).entries()){
-    const photo=photos[index];let row=await env.DB.prepare(select+' AND slot=?').bind(agencyId,jobId,slot).first<AnimationRow>();
+    const photo=photos[index];if(reused.some(r=>r.photoId===photo.id))continue;
+    let row=await env.DB.prepare(select+' AND slot=?').bind(agencyId,jobId,slot).first<AnimationRow>();
     if(row&&(row.photoId!==photo.id||row.sourceSha256!==photo.contentHash||row.mode!==adapter.mode))throw Error('RUNWAY_SCOPE_INVALID');
     if(row?.state==='ready'||row?.state==='failed'||row?.state==='uncertain')continue;
     const deadline=Date.parse(job.deadline);
@@ -59,8 +62,12 @@ export async function prepareJobAnimations(env:AnimationEnv,agencyId:string,jobI
       const animation=PhotoAnimation.parse({photoAssetId:photo.id,sourceSha256:photo.contentHash,provider:'runway',model:'gen4_turbo',
         asset:{id:row.id,objectKey,sha256:hash,sizeBytes:bytes.length,mime:'video/mp4',width:input.aspectRatio==='16:9'?1280:720,height:input.aspectRatio==='16:9'?720:1280,durationMs:5000}});
       await env.MEDIA.put(objectKey,bytes,{httpMetadata:{contentType:'video/mp4'},customMetadata:{sha256:hash,sourceSha256:photo.contentHash}});
-      await env.DB.prepare("UPDATE photo_animations SET state='ready',animation_json=?,updated_at=? WHERE id=? AND state='submitted'")
-        .bind(JSON.stringify(animation),new Date().toISOString(),row.id).run();
+      const libraryKey=`agencies/${agencyId}/imports/animation-library/${hash}.mp4`,asset={...animation.asset,objectKey:libraryKey},at=new Date().toISOString();
+      await env.MEDIA.put(libraryKey,bytes,{httpMetadata:{contentType:'video/mp4'},customMetadata:{sha256:hash,sourceSha256:photo.contentHash}});
+      await env.DB.batch([env.DB.prepare("UPDATE photo_animations SET state='ready',animation_json=?,updated_at=? WHERE id=? AND state='submitted' AND EXISTS(SELECT 1 FROM jobs WHERE id=? AND status NOT IN ('ready','failed'))")
+        .bind(JSON.stringify(animation),at,row.id,jobId),env.DB.prepare(`INSERT INTO animation_library(id,agency_id,source_sha256,aspect_ratio,model,mode,origin_job_id,asset_json,created_at,expires_at)
+        SELECT ?,?,?,?,'gen4_turbo',?,?,?,?,? WHERE EXISTS(SELECT 1 FROM photo_animations WHERE id=? AND state='ready') ON CONFLICT(agency_id,source_sha256,aspect_ratio,model,mode) DO UPDATE SET asset_json=excluded.asset_json,origin_job_id=excluded.origin_job_id,expires_at=excluded.expires_at WHERE animation_library.state='available'`)
+        .bind(row.id,agencyId,photo.contentHash,input.aspectRatio??'9:16',adapter.mode,jobId,JSON.stringify(asset),at,new Date(Date.now()+90*86400_000).toISOString(),row.id)]);
     }catch(error){const code=runwayError(error);
       await env.DB.prepare("UPDATE photo_animations SET state=?,error_code=?,updated_at=? WHERE id=? AND state IN ('submitting','submitted')")
         .bind(code==='RUNWAY_UNCERTAIN'?'uncertain':'failed',code,new Date().toISOString(),row.id).run();

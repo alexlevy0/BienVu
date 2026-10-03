@@ -1,5 +1,6 @@
-import {EntityId, GenerationRequest, PreparedNarration, PhotoAnimation, VideoAsset, VideoManifest, VideoFailure, videoAssets, videoManifestHash, videoPresentation, videoPhotoTimeline,videoDimensions} from '@bienvu/contracts';
-import {findNarration, type Database} from '@bienvu/db';
+import {EntityId, GenerationRequest, PreparedNarration, PhotoAnimation, VideoAsset, VideoManifest, VideoFailure, videoAssets, videoManifestHash, videoPresentation, videoPhotoTimeline,videoDimensions,audioNormalizationGain} from '@bienvu/contracts';
+import {measureVoiceWav} from '@bienvu/voice';
+import {findNarration,retainedAnimation,type AnimationReuse, type Database} from '@bienvu/db';
 import {scriptContext, validateScript, type ScriptContext} from '@bienvu/narration';
 import type {NarrationBucket} from './narration';
 
@@ -61,11 +62,19 @@ export async function prepareJobVideo(env: {DB: Database; MEDIA: NarrationBucket
       logo={...source,objectKey:`${prefix}brand/${source.sha256}.${source.mime==='image/png'?'png':source.mime==='image/jpeg'?'jpg':'webp'}`};
       sources.push({id:logo.id,key:source.objectKey});
     }
-    const audio=prepared.audio.map(a=>{
+    const audio=await Promise.all(prepared.audio.map(async a=>{
       if(!a.objectKey.startsWith(`${prefix}audio/`))fail('VIDEO_SCOPE_INVALID');
       sources.push({id:a.id,key:a.objectKey});
-      return VideoAsset.parse({id:a.id,objectKey:a.objectKey,sha256:a.sha256,sizeBytes:a.sizeBytes,mime:'audio/wav',durationMs:a.durationMs});
-    });
+      let normalizationGain:number|undefined;
+      if(input?.customization?.editor?.audioMix?.normalize){
+        const object=await env.MEDIA.get(a.objectKey);
+        if(!object||object.size!==a.sizeBytes)fail('VIDEO_ASSET_MISSING');
+        const bytes=new Uint8Array(await object.arrayBuffer());
+        if(await videoBytesHash(bytes)!==a.sha256)fail('VIDEO_ASSET_HASH_MISMATCH');
+        const measured=measureVoiceWav(bytes,40000);normalizationGain=audioNormalizationGain(measured.rmsDbfs,measured.peak);
+      }
+      return VideoAsset.parse({id:a.id,objectKey:a.objectKey,sha256:a.sha256,sizeBytes:a.sizeBytes,mime:'audio/wav',durationMs:a.durationMs,...(normalizationGain!==undefined?{normalizationGain}:{})});
+    }));
     const customization=input?.customization;
     let editor=customization?.editor,music:VideoManifest['music'];
     if(editor){
@@ -83,6 +92,14 @@ export async function prepareJobVideo(env: {DB: Database; MEDIA: NarrationBucket
     if((prepared.voiceEnabled!==false)!==(input?.voiceEnabled!==false))fail('VIDEO_SCOPE_INVALID');
     if(prepared.durationSeconds!==input?.durationSeconds)fail('VIDEO_SCOPE_INVALID');
     const animations:PhotoAnimation[]=[];
+    const reused=await env.DB.prepare('SELECT animation_reuses_json AS data FROM generation_runs WHERE agency_id=? AND job_id=?').bind(agency,job).first<{data:string}>();
+    for(const reuse of JSON.parse(reused?.data??'[]') as AnimationReuse[]){
+      const cached=await retainedAnimation(env.DB,agency,reuse.libraryId,true),photo=photos.find(p=>p.id===reuse.photoId&&p.sha256===reuse.sha256);
+      if(!cached||!photo||cached.sha256!==photo.sha256)fail('VIDEO_ASSET_MISSING');
+      const asset={...cached.asset,objectKey:`${prefix}animations/${cached.asset.sha256}.mp4`};
+      animations.push(PhotoAnimation.parse({photoAssetId:photo.id,sourceSha256:photo.sha256,provider:'runway',model:'gen4_turbo',asset}));
+      sources.push({id:asset.id,key:cached.asset.objectKey});
+    }
     if(customization?.runwayClips||customization?.runwayPhotos?.length){
       const rows=await env.DB.prepare("SELECT json_group_array(json(animation_json)) AS data FROM (SELECT animation_json FROM photo_animations WHERE agency_id=? AND job_id=? AND state='ready' ORDER BY slot)")
         .bind(agency,job).first<{data:string}>();

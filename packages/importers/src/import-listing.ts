@@ -80,12 +80,14 @@ export async function importListing(url: string, context: {agencyId: string; imp
       signal.throwIfAborted();
       if (photoTimeout.aborted) {extracted.warnings.push('Téléchargement des photos interrompu : les informations déjà récupérées sont conservées.'); break;}
       let resource;
-      try {resource = await load(candidate, 'image', photoSignal);} catch (error) {
+      const imageSignal=AbortSignal.any([photoSignal,AbortSignal.timeout(IMPORT_LIMITS.imageDurationMs)]);
+      try {resource = await load(candidate, 'image', imageSignal);} catch (error) {
         if (signal.aborted || error instanceof ImportFailure && error.code === 'UNSAFE_URL') throw error;
         if (photoTimeout.aborted) {
           diagnostics.rejected.push({order, reason: 'IMPORT_TIMEOUT'});
           extracted.warnings.push('Téléchargement des photos interrompu : les informations déjà récupérées sont conservées.'); break;
         }
+        if(imageSignal.aborted){diagnostics.rejected.push({order,reason:'IMPORT_TIMEOUT'});continue;}
         if (!(error instanceof ImportFailure)) throw error;
         diagnostics.rejected.push({order, reason: error.code}); continue;
       }
@@ -105,6 +107,8 @@ export async function importListing(url: string, context: {agencyId: string; imp
       signal.throwIfAborted(); photos.push(photo); diagnostics.storedBytes += resource.bytes.length;
     }
     signal.throwIfAborted();
+    const unavailable=diagnostics.rejected.filter(p=>p.reason!=='MEDIA_HOST_UNSUPPORTED').length;
+    if(unavailable)extracted.warnings.push(`${unavailable} photo(s) n’ont pas pu être récupérées. Les autres photos et les informations du bien sont conservées.`);
     if (photos.length < 3 && !options.allowPartial) throw new ImportFailure('INSUFFICIENT_PHOTOS', 'Moins de trois photos distinctes et décodées.');
     if (photos.length < 3) extracted.warnings.push('Les informations du bien ont été récupérées. Ajoutez au moins trois photos pour créer la vidéo.');
     const {photoUrls: _sourceCandidates, ...data} = extracted;

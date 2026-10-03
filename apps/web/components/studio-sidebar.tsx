@@ -7,7 +7,7 @@ import {useGenerationStore} from './generation-store';
 import {DraftActions} from './draft-actions';
 
 
-export function StudioSidebar({active}: {active: 'create' | 'videos' | 'explore' | 'agency' | 'offers' | 'admin' | 'editor'}) {
+export function StudioSidebar({active}: {active: 'create' | 'videos' | 'explore' | 'agency' | 'offers' | 'projects' | 'admin' | 'editor'}) {
   const {me, loading} = useAccount();
   const [menuOpen, setMenuOpen] = useState(false);
   const store=useGenerationStore();
@@ -57,6 +57,7 @@ export function StudioSidebar({active}: {active: 'create' | 'videos' | 'explore'
         {item('/explorer', 'Explorer', 'compass', 'explore')}
         {item('/agence', 'Mon agence', 'house', 'agency')}
         {item('/editeur', 'Éditeur', 'clapper', 'editor')}
+        {item('/projets', 'Dossiers & modèles', 'house', 'projects')}
       </nav>
       <section className="home-recents" aria-labelledby="home-recents-title"><h2 id="home-recents-title">RÉCENTES</h2>
         {recent.map(item => item.kind==='job'?<Link className="home-recent-link" key={`job:${item.job.id}`}
@@ -72,7 +73,7 @@ export function StudioSidebar({active}: {active: 'create' | 'videos' | 'explore'
         {!recent.length && <p className="home-recents-empty">{loading||store.loading ? 'Chargement de votre espace…' : store.unavailable ? 'Vos créations sont disponibles dans Mes vidéos.' : me ? 'Vos prochaines créations apparaîtront ici.' : 'Vos essais apparaîtront ici.'}</p>}
       </section>
       <div className="home-sidebar-bottom"><div className="home-plan"><span aria-live="polite">{loading?'Chargement de vos crédits…':me?`${me.rights.developmentRemaining} crédit${me.rights.developmentRemaining>1?'s':''} disponible${me.rights.developmentRemaining>1?'s':''}`:`${guestCredits} crédit d’essai disponible`}</span>{Boolean(me?.rights.creditReserved)&&<small>{me!.rights.creditReserved} crédit(s) réservé(s)</small>}<Link href="/abonnement" className={active === 'offers' ? 'home-plan-link-active' : undefined} aria-current={active === 'offers' ? 'page' : undefined}>Découvrir les offres <HomeIcon name="arrow" size={17}/></Link></div>
-        {me ? <details className="home-account"><summary><span className="home-avatar">{initials}</span><span>{accountName}</span><HomeIcon name="chevron" size={17}/></summary><div className="home-account-menu"><span>{me.agency.name}</span><Link href="/agence">Mon agence</Link><Link href="/abonnement">Mon abonnement</Link>{me.isSuperAdmin&&<Link href="/admin" aria-current={active==='admin'?'page':undefined}>Super admin</Link>}<SignOut/></div></details> : <Link className="home-guest-account" href="/connexion"><span className="home-avatar"><HomeIcon name="user" size={20}/></span><span>Se connecter</span><HomeIcon name="arrow" size={17}/></Link>}
+        {me ? <details className="home-account"><summary><span className="home-avatar">{initials}</span><span>{accountName}</span><HomeIcon name="chevron" size={17}/></summary><div className="home-account-menu"><span>{me.agency.name}</span><Link href="/agence">Mon agence</Link><Link href="/abonnement">Mon abonnement</Link><Link href="/equipe">Mon équipe</Link>{me.isSuperAdmin&&<Link href="/admin" aria-current={active==='admin'?'page':undefined}>Super admin</Link>}<SignOut/></div></details> : <Link className="home-guest-account" href="/connexion"><span className="home-avatar"><HomeIcon name="user" size={20}/></span><span>Se connecter</span><HomeIcon name="arrow" size={17}/></Link>}
       </div>
     </aside>
   </>;

@@ -72,6 +72,10 @@ test('migration 0029 : historique conservé, 20/jour et 60/mois, droits synchron
   await assert.rejects(beginImport(DB, 'double-quota', source, 'before-doubled-limits', now), /IMPORT_LIMIT/);
   await migrate('0029_double_import_limits.sql');
   assert.deepEqual(await usage(), before);
+  // The current rights API also reads the billing ledger. Upgrade the remaining
+  // schema before calling it, while proving both upgrades preserve old usage.
+  for (const file of (await readdir(directory)).filter(f => f.endsWith('.sql') && f > '0029_double_import_limits.sql').sort()) await migrate(file);
+  assert.deepEqual(await usage(), before);
   assert.equal((await generationRights(DB, 'double-quota', 'true', now)).importRetryAt, null);
   // Attempts 11–20 are usable immediately; failures and idempotent replays
   // neither refund nor consume additional scraping attempts.

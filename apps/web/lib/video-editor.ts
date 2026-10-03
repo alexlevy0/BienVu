@@ -1,4 +1,4 @@
-import {CreationDraftData,EditorDocument,GenerationRequest,GeneratableListing,VideoAsset,VideoManifest,defaultVideoCustomization,createEditorDocument,selectedAnimationIndices,
+import {CreationDraftData,EditorDocument,GenerationRequest,GeneratableListing,VideoAsset,VideoManifest,defaultVideoCustomization,createEditorDocument,selectedAnimationIndices,audioNormalizationGain,
   type CreationDraftView,type VideoCustomization} from '@bienvu/contracts';
 import {findCreationDraft,findImport,draftFromListing,updateCreationDraft,beginManualImport,startCreationDraft,blankCreationDraft,ImportStateFailure,type Database} from '@bienvu/db';
 import {measureVoiceWav} from '../../../packages/voice/src/audio';
@@ -14,11 +14,11 @@ export async function putEditorMusic(env:Env,agencyId:string,importId:string,id:
   if(!draft||draft.expiresAt<=new Date().toISOString())throw new RequestFailure('NOT_FOUND');
   if(!/^[a-zA-Z0-9_-]{16,64}$/.test(id)||bytes.length>3*1024*1024)throw new RequestFailure('VALIDATION_ERROR');
   if(draft.photos.some(photo=>photo.id===id))throw new RequestFailure('CONFLICT');
-  let durationMs:number;
-  try{durationMs=measureVoiceWav(bytes,40000).durationMs;}catch{throw new RequestFailure('VALIDATION_ERROR',{music:'Utilisez une piste audio non silencieuse de 0,5 à 40 secondes.'});}
+  let durationMs:number,normalizationGain:number;
+  try{const metrics=measureVoiceWav(bytes,40000);durationMs=metrics.durationMs;normalizationGain=audioNormalizationGain(metrics.rmsDbfs,metrics.peak,-24);}catch{throw new RequestFailure('VALIDATION_ERROR',{music:'Utilisez une piste audio non silencieuse de 0,5 à 40 secondes.'});}
   if(durationMs<500)throw new RequestFailure('VALIDATION_ERROR');
   const sha256=await contentHash(new Uint8Array(bytes)),asset=VideoAsset.parse({id,objectKey:`agencies/${agencyId}/imports/${importId}/music/${id}-${sha256}.wav`,
-    sha256,sizeBytes:bytes.length,mime:'audio/wav',durationMs});
+    sha256,sizeBytes:bytes.length,mime:'audio/wav',durationMs,normalizationGain});
   const previous=await env.DB.prepare('SELECT asset_json AS asset FROM editor_music_assets WHERE id=? AND agency_id=? AND import_id=?').bind(id,agencyId,importId).first<{asset:string}>();
   if(previous&&JSON.parse(previous.asset).sha256!==sha256)throw new RequestFailure('CONFLICT');
   const inserted=await env.DB.prepare(`INSERT INTO editor_music_assets(id,agency_id,import_id,asset_json,object_key,created_at)
@@ -29,7 +29,7 @@ export async function putEditorMusic(env:Env,agencyId:string,importId:string,id:
   await env.MEDIA.put(asset.objectKey,bytes,{httpMetadata:{contentType:'audio/wav',cacheControl:'private, no-store'},customMetadata:{agencyId,importId,sha256}});
   const after=await findCreationDraft(env.DB,agencyId,importId);
   if(!after||after.expiresAt<=new Date().toISOString()){await env.MEDIA.delete(asset.objectKey);throw new RequestFailure('CONFLICT');}
-  return {assetId:id,durationMs};
+  return {assetId:id,durationMs,normalizationGain};
 }
 export async function privateEditorMusic(env:Env,agencyId:string,importId:string,id:string,request:Request){
   const row=await findImport(env.DB,agencyId,importId);
@@ -68,6 +68,19 @@ async function copyMusic(env:Env,agencyId:string,draftId:string,asset:VideoAsset
   const id=(await contentHash(new TextEncoder().encode(`${draftId}:${asset.id}`))).slice(0,32);
   return putEditorMusic(env,agencyId,draftId,id,bytes);
 }
+async function retainOriginalAnimations(env:Env,agencyId:string,m:VideoManifest,signal:AbortSignal){
+  for(const clip of m.photoAnimations??[]){
+    signal.throwIfAborted();const asset=clip.asset;
+    if(!asset.objectKey.startsWith(`agencies/${m.agencyId}/jobs/${m.jobId}/animations/`))throw new RequestFailure('NOT_FOUND');
+    const existing=await env.DB.prepare("SELECT 1 FROM animation_library WHERE agency_id=? AND source_sha256=? AND aspect_ratio=? AND mode='real' AND expires_at>?").bind(agencyId,clip.sourceSha256,m.width===1920?'16:9':'9:16',new Date().toISOString()).first();if(existing)continue;
+    const real=await env.DB.prepare("SELECT 1 FROM photo_animations WHERE job_id=? AND photo_id=? AND mode='real' AND state='ready'").bind(m.jobId,clip.photoAssetId).first();if(!real)continue;
+    const object=await env.MEDIA.get(asset.objectKey);if(!object||object.size!==asset.sizeBytes)throw new RequestFailure('NOT_FOUND');const bytes=new Uint8Array(await object.arrayBuffer());
+    if(await contentHash(bytes)!==asset.sha256)throw new RequestFailure('NOT_FOUND');const objectKey=`agencies/${agencyId}/imports/animation-library/${asset.sha256}.mp4`,at=new Date().toISOString();
+    await env.MEDIA.put(objectKey,bytes,{httpMetadata:{contentType:'video/mp4'},customMetadata:{sha256:asset.sha256,sourceSha256:clip.sourceSha256}});
+    await env.DB.prepare("INSERT INTO animation_library(id,agency_id,source_sha256,aspect_ratio,model,mode,origin_job_id,asset_json,created_at,expires_at) VALUES(?,?,?,?,'gen4_turbo','real',?,?,?,?) ON CONFLICT(agency_id,source_sha256,aspect_ratio,model,mode) DO UPDATE SET asset_json=excluded.asset_json,expires_at=excluded.expires_at WHERE animation_library.state='available'")
+      .bind(crypto.randomUUID(),agencyId,clip.sourceSha256,m.width===1920?'16:9':'9:16',m.jobId,JSON.stringify({...asset,objectKey}),at,new Date(Date.now()+90*86400_000).toISOString()).run();
+  }
+}
 export async function editExistingVideo(env:Env,agencyId:string,jobId:string,key:string,signal:AbortSignal){
   const job=await ownGeneration(env,agencyId,jobId);
   if(job.status!=='ready'||job.retention!=='available'||job.expiresAt<=new Date().toISOString())throw new RequestFailure('NOT_FOUND');
@@ -76,6 +89,7 @@ export async function editExistingVideo(env:Env,agencyId:string,jobId:string,key
   if(!stored)throw new RequestFailure('NOT_FOUND');
   const m=VideoManifest.parse(JSON.parse(stored.manifest)),input=GenerationRequest.parse(JSON.parse(job.input));
   if(m.jobId!==jobId||m.agencyId!==job.agencyId)throw new RequestFailure('NOT_FOUND');
+  await retainOriginalAnimations(env,agencyId,m,signal);
   let draft=await startManualCreationDraft(env.DB,agencyId,key,`Version de la vidéo ${jobId}`);
   const seconds=([20,30,40] as const).find(s=>s*30>=m.scenes.reduce((n,scene)=>n+scene.durationFrames,0))??40;
   const sourceVoice=input.customization?.voice??'fr-FR-Chirp3-HD-Aoede';

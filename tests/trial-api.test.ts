@@ -107,7 +107,7 @@ test('API anonyme : cookie sécurisé, prévisualisation isolée, master protég
   const secondKey=`agencies/${other.session.scopeId}/jobs/${second.jobId}/video/master.mp4`,secondPreview=secondKey.replace('master','preview');
   await env.MEDIA.put(secondKey,master,{customMetadata:{sha256:report.sha256}});await env.MEDIA.put(secondPreview,preview,{customMetadata:{sha256:previewReport.sha256}});
   await DB.batch([DB.prepare('INSERT INTO generation_artifacts VALUES(?,?,?,?)').bind(second.jobId,secondKey,JSON.stringify(report),at),DB.prepare('INSERT INTO generation_previews VALUES(?,?,?,?)').bind(second.jobId,secondPreview,JSON.stringify(previewReport),at),DB.prepare("UPDATE jobs SET status='ready',lease_until=NULL,updated_at=? WHERE id=?").bind(new Date().toISOString(),second.jobId)]);
-  const locked=await claimTrial(DB,other.session,agency.id,second.jobId);assert.equal(locked.creditStatus,'unfunded');assert.ok(locked.expiresAt>grant.renewalAt);
+  const locked=await claimTrial(DB,other.session,agency.id,second.jobId);assert.equal(locked.creditStatus,'unfunded');assert.ok(grant.renewalAt);assert.ok(locked.expiresAt>grant.renewalAt);
   for(const method of ['GET','HEAD'])await assert.rejects(generationVideo(new Request(base+'?download=1&variant=master',{method,headers:{Range:'bytes=0-1'}}),env,agency.id,second.jobId),/QUOTA_EXHAUSTED/);
   assert.deepEqual(new Uint8Array(await (await generationPreview(new Request(base),env,agency.id,second.jobId)).arrayBuffer()),preview);
   assert.equal((await DB.prepare('SELECT count(*) AS n FROM generation_shares').first<{n:number}>())!.n,0);

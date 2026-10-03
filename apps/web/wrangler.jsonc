@@ -12,6 +12,8 @@
   },
   "vars": {
     "TRAFFIC_ENABLED": "false",
+    "BILLING_MODE": "disabled",
+    "STRIPE_AUTOMATIC_TAX": "false",
     "SUPER_ADMIN_EMAIL": "",
     "PROBE_MODE": "local",
     "GENERATIONS_ENABLED": "false",

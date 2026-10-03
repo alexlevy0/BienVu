@@ -8,7 +8,7 @@ export const EditorVoicePreview=z.object({id,voice:z.string().min(1).max(64),
   durationSeconds:z.union([z.literal(20),z.literal(30),z.literal(40)]),
   clips:z.array(z.object({assetId:id,startFrame:z.number().int().min(0).max(1199),
     durationMs:z.number().int().positive().max(35000),text:z.string().min(1).max(500),
-    waveform:z.array(z.number().min(0).max(1)).length(64)}).strict()).min(4).max(6),
+    waveform:z.array(z.number().min(0).max(1)).length(64),normalizationGain:z.number().min(.1).max(4).optional()}).strict()).min(4).max(6),
 }).strict().superRefine((value,ctx)=>{
   const total=value.durationSeconds*30;
   if(new Set(value.clips.map(c=>c.assetId)).size!==value.clips.length||value.clips[0].startFrame!==0||

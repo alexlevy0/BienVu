@@ -3,13 +3,15 @@ import {useEffect,useRef,useState,type FormEvent} from 'react';
 import {useAccount} from './account';
 import {HomeIcon} from './home-icons';
 import type {AdminSection,AdminRow,AdminPage,AdminOverview,AdminAction,AdminVideoDetail,AdminNarrationCall,AdminTraffic} from '@bienvu/contracts';
+import {AdminCommercial} from './admin-commercial';
+import {AdminFinance,AdminVideoProfit} from './admin-finance';
 import {AdminBudgetSettings} from './admin-budget-settings';
 import {AdminAttention,AdminPerformance,AdminMonthlyCosts,AdminTrafficView,type AdminTarget} from './admin-insights';
 
-type View=AdminSection|'overview'|'system'|'traffic'|'performance'|'costs';
+type View=AdminSection|'overview'|'system'|'traffic'|'performance'|'costs'|'commercial'|'finance';
 const tabs:{id:View;label:string}[]=[{id:'overview',label:'Vue d’ensemble'},{id:'videos',label:'Vidéos'},{id:'agencies',label:'Agences'},{id:'users',label:'Comptes'},
   {id:'subscriptions',label:'Abonnements'},{id:'quotas',label:'Crédits'},{id:'imports',label:'Imports & brouillons'},
-  {id:'reports',label:'Signalements'},{id:'traffic',label:'Fréquentation'},{id:'performance',label:'Performance'},{id:'costs',label:'Coûts mensuels'},{id:'system',label:'Service & budget'},{id:'audit',label:'Journal'}];
+  {id:'reports',label:'Signalements'},{id:'traffic',label:'Fréquentation'},{id:'performance',label:'Performance'},{id:'costs',label:'Coûts mensuels'},{id:'commercial',label:'Conversion & recettes'},{id:'finance',label:'Rentabilité'},{id:'system',label:'Service & budget'},{id:'audit',label:'Journal'}];
 const labels:Record<string,string>={ready:'Prête',failed:'Échec',active:'Actif',queued:'En attente',importing:'Import',scripting:'Rédaction',voicing:'Voix',rendering:'Assemblage',retry_wait:'Nouvel essai',
   account:'Compte',anonymous:'Anonyme',internal:'Test interne',available:'Disponible',unavailable:'Indisponible',expired:'Expiré',expiring:'Purge en cours',consumed:'Consommé',reserved:'Réservé',released:'Libéré',unfunded:'Non débité',
   new:'Nouveau',reviewing:'En traitement',closed:'Clos',free:'Gratuit',paid:'Payant',trial:'Essai',current:'Période en cours',none:'Sans abonnement',verified:'Vérifié',unverified:'Non vérifié',
@@ -63,6 +65,7 @@ export function AdminPanel(){
   useEffect(()=>{
     const controller=new AbortController(),version=++loadVersion.current;setPage(null);setFailure('');setBusy(true);setSelected(null);setDetail(null);setPending(null);setOverview(null);setTraffic(null);
     if(!accountId){setBusy(false);return()=>controller.abort();}
+    if(view==='commercial'||view==='finance'){setBusy(false);return()=>controller.abort();}
     if(from&&to&&from>to){setFailure('La date de fin doit suivre la date de début.');setBusy(false);return()=>controller.abort();}
     const aggregate=['overview','system','performance','costs'].includes(view);
     const url=view==='traffic'?'/api/admin?section=traffic&days='+trafficDays:aggregate?'/api/admin?section=overview':endpoint();
@@ -98,12 +101,12 @@ export function AdminPanel(){
     }catch(error){setActionError(error instanceof Error?error.message:'Modification interrompue.');}finally{setSaving(false);}
   }
   if(!loading&&!accountId)return <div className="admin-shell"><h1>Accès réservé</h1><p>Connectez-vous avec votre compte administrateur.</p></div>;
-  const recordView=!['overview','system','traffic','performance','costs'].includes(view)?view as AdminSection:null;
+  const recordView=!['overview','system','traffic','performance','costs','commercial','finance'].includes(view)?view as AdminSection:null;
   const selectedColumns=recordView?columns[recordView]:[];
   return <div className="admin-shell">
     <header className="admin-heading"><div><span className="admin-eyebrow">PILOTAGE DE BIENVU</span><h1>Super admin<span>.</span></h1><p>Votre activité, vos agences et votre service, au même endroit.</p></div><span className="admin-access"><span/>Accès privé</span></header>
     <nav className="admin-tabs" aria-label="Rubriques d’administration">{tabs.map(tab=><button key={tab.id} type="button" aria-current={view===tab.id?'page':undefined} onClick={()=>choose(tab.id)}>{tab.label}</button>)}</nav>
-    <div className="admin-section-heading"><div><h2>{tabs.find(tab=>tab.id===view)?.label}</h2><p>{view==='videos'?'Toutes les générations enregistrées, y compris les échecs, essais anonymes et tests internes.':view==='subscriptions'?'Les abonnements enregistrés par Stripe. Les paiements en ligne ne sont pas encore ouverts.':view==='quotas'?'Périodes de crédits des agences. Un crédit « Payant » ne constitue pas une preuve de paiement.':view==='imports'?'Annonces et brouillons encore conservés ; les imports purgés restent comptés dans l’usage.':view==='audit'?'Modifications administratives horodatées, avec leur auteur et leur motif.':view==='reports'?'Retours des utilisateurs et suivi de leur traitement.':overview?'Données relues le '+date(overview.at):'Données de l’application.'}</p></div><button className="admin-button" type="button" disabled={busy||loading} onClick={()=>setRevision(n=>n+1)}><HomeIcon name="refresh" size={17}/>Actualiser</button></div>
+    <div className="admin-section-heading"><div><h2>{tabs.find(tab=>tab.id===view)?.label}</h2><p>{view==='videos'?'Toutes les générations enregistrées, y compris les échecs, essais anonymes et tests internes.':view==='subscriptions'?'Abonnements synchronisés par Stripe. Les recettes de test sont séparées des recettes réelles dans Conversion & recettes.':view==='quotas'?'Périodes de crédits des agences. Un crédit « Payant » ne constitue pas une preuve de paiement.':view==='imports'?'Annonces et brouillons encore conservés ; les imports purgés restent comptés dans l’usage.':view==='audit'?'Modifications administratives horodatées, avec leur auteur et leur motif.':view==='reports'?'Retours des utilisateurs et suivi de leur traitement.':overview?'Données relues le '+date(overview.at):'Données de l’application.'}</p></div><button className="admin-button" type="button" disabled={busy||loading} onClick={()=>setRevision(n=>n+1)}><HomeIcon name="refresh" size={17}/>Actualiser</button></div>
     {message&&<p role="status" className="admin-notice">{message}</p>}
     {view==='traffic'&&<div className="admin-period" aria-label="Période de fréquentation">{([7,30] as const).map(days=><button type="button" key={days} aria-pressed={trafficDays===days} onClick={()=>setTrafficDays(days)}>{days} jours</button>)}<span>Dates UTC · chargements HTML</span></div>}
     {recordView&&<form className="admin-filters" onSubmit={event=>event.preventDefault()}><label className="admin-search"><span className="sr-only">Rechercher</span><HomeIcon name="search" size={20}/><input type="search" value={query} onChange={event=>setQuery(event.target.value)} placeholder="Rechercher une vidéo, une agence, un e-mail…" maxLength={100}/></label>
@@ -111,6 +114,8 @@ export function AdminPanel(){
       <label><span>Du (UTC)</span><input type="date" value={from} onChange={event=>setFrom(event.target.value)}/></label><label><span>Au (UTC)</span><input type="date" value={to} onChange={event=>setTo(event.target.value)}/></label>
       {agency&&<button type="button" className="admin-button" onClick={()=>setAgency('')}>Toutes les agences ×</button>}
     </form>}
+    {view==='commercial'&&accountId&&<AdminCommercial key={revision}/>}
+    {view==='finance'&&accountId&&<AdminFinance key={revision}/>}
     {failure&&<p role="alert" className="admin-error">{failure}</p>}
     {busy||loading?<div className="admin-loading" role="status"><span className="admin-spinner"/>Lecture des données…</div>:<>
       {overview&&view==='overview'&&<><AdminAttention data={overview} onFocus={focus}/><Overview data={overview} choose={choose}/></>}
@@ -128,6 +133,7 @@ export function AdminPanel(){
         {view==='videos'&&detail&&<><div className="admin-video-detail">{Number(detail.video.master)||Number(detail.video.preview)?<video controls playsInline preload="metadata" src={'/api/admin/jobs/'+encodeURIComponent(String(selected.id))+'/video?variant='+(Number(detail.video.master)?'master':'preview')}/>:<div className="admin-video-unavailable">Fichier indisponible ou expiré.<br/>L’historique de génération reste conservé.</div>}
           <div><Badge value={detail.video.status}/><Facts row={detail.video} keys={[{key:'id',label:'ID'},{key:'email',label:'Compte'},{key:'audience',label:'Origine'},{key:'stage',label:'Étape'},{key:'error',label:'Erreur'},{key:'attempt',label:'Tentative'},{key:'credit',label:'Réservation'},{key:'creditsReserved',label:'Crédits BienVu réservés'},{key:'creditsUsed',label:'Crédits BienVu utilisés'},{key:'creditsRefunded',label:'Crédits restitués'},{key:'creditGift',label:'Essai offert'},{key:'animationsRequested',label:'Animations demandées'},{key:'createdAt',label:'Création'},{key:'expiresAt',label:'Expiration'},{key:'sourceUrl',label:'Source'}]}/></div></div>
           <h3>Événements enregistrés</h3>{detail.events.length?<ol className="admin-timeline">{detail.events.map((e,i)=><li key={i}><strong>{text(e.event)}</strong><time>{date(e.at)}</time></li>)}</ol>:<p className="admin-muted">Aucun événement détaillé pour cette ancienne génération.</p>}
+          <AdminVideoProfit jobId={String(selected.id)}/>
           <NarrationCosts calls={detail.calls}/>
           {!!detail.animations?.length&&<><h3>Animation des photos · Runway</h3><p className="admin-muted">25 crédits / clip de 5 secondes, soit 0,25 USD estimé avant taxes. Les provisions sont consommées dans les crédits prépayés, déjà comptés au budget du service. Les échecs et résultats incertains restent provisionnés.</p>
             <div className="admin-table-scroll"><table className="admin-table"><thead><tr><th>Photo</th><th>Modèle</th><th>État</th><th>Crédits API Runway</th><th>Provision</th><th>Tâche API</th><th>Erreur</th></tr></thead><tbody>{detail.animations.map(a=><tr key={String(a.id)}><td>{text(a.photoId)}</td><td>{text(a.model)} · {a.mode==='mock'?'Fixture':'Réel'}</td><td>{text(a.state)}</td><td>{a.mode==='mock'?'Simulé':num(a.credits)}</td><td>{euro(Number(a.reservedCents))}</td><td>{text(a.taskId)}</td><td>{text(a.error)}</td></tr>)}</tbody></table></div></>}

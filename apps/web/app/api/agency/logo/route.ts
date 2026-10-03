@@ -27,12 +27,12 @@ export async function POST(request: Request) {
     // ancien objet : un manifeste créé avant la sauvegarde garde son apparence.
     try {
       await env.DB.prepare('UPDATE agencies SET logo_asset_id=?,updated_at=?,brand_version=brand_version+1 WHERE id=? AND owner_user_id=?')
-        .bind(id, now, agency.id, user.id).run();
+        .bind(id, now, agency.id, agency.ownerUserId).run();
     } catch {
       // Un résultat D1 ambigu ne justifie pas d'effacer un objet potentiellement
       // référencé. Le rapprochement des orphelins est documenté, sans purge aveugle.
       throw new RequestFailure('INTERNAL_ERROR');
     }
-    return Response.json({agency: await agencyForUser(env.DB, user.id)}, {status: 201});
+    return Response.json({agency: await agencyForUser(env.DB, agency.ownerUserId)}, {status: 201});
   });
 }

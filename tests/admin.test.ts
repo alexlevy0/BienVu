@@ -6,6 +6,7 @@ import {migrateNarrationProbe,seedNarrationFixture} from '../scripts/narration-f
 import {adminPage,adminOverview,adminAction,adminVideoDetail,ensureAgency,admitGeneration,findGeneration} from '../packages/db/src/index';
 import {AdminQuery,Me,VideoReport} from '../packages/contracts/src/index';
 import {isSuperAdmin,requireAdmin} from '../apps/web/lib/admin-access';
+import {financeRequest} from '../apps/web/lib/profitability';
 import {adminRequest,adminJobRequest} from '../apps/web/lib/admin';
 import {createAuth} from '../apps/web/lib/auth';
 import {videoFixture,videoReport} from '../fixtures/video';
@@ -40,7 +41,7 @@ test('Admin avec Better Auth/D1/R2 locaux : isolation, pagination globale, actio
   const req=(path:string,cookie=cookies[0],options:RequestInit={})=>new Request(env.BETTER_AUTH_URL+path,{...options,headers:{cookie,...options.headers}});
   await t.test('toutes les routes privées refusent anonyme, autre compte et adresse non vérifiée',async()=>{
     for(const [cookie,expected] of [['',401],[cookies[1],403],[cookies[2],401]] as const){
-      for(const response of [await adminRequest(req('/api/admin?section=overview',cookie),env),await adminRequest(req('/api/admin?section=traffic',cookie),env),await adminRequest(req('/api/admin',cookie,{method:'POST',headers:{origin:env.BETTER_AUTH_URL,'Content-Type':'application/json'},body:JSON.stringify({action:'generation_gate',expected:true,enabled:false,reason:'Fixture'})}),env),await adminJobRequest(req('/api/admin/jobs/missing',cookie),env,'missing'),await adminJobRequest(req('/api/admin/jobs/missing/video',cookie),env,'missing',true)]){
+      for(const response of [await financeRequest(req('/api/admin/finance?mode=test',cookie),env),await financeRequest(req('/api/admin/finance',cookie,{method:'POST',headers:{origin:env.BETTER_AUTH_URL,'Content-Type':'application/json'},body:JSON.stringify({action:'stripe_sync'})}),env),await adminRequest(req('/api/admin?section=overview',cookie),env),await adminRequest(req('/api/admin?section=traffic',cookie),env),await adminRequest(req('/api/admin',cookie,{method:'POST',headers:{origin:env.BETTER_AUTH_URL,'Content-Type':'application/json'},body:JSON.stringify({action:'generation_gate',expected:true,enabled:false,reason:'Fixture'})}),env),await adminJobRequest(req('/api/admin/jobs/missing',cookie),env,'missing'),await adminJobRequest(req('/api/admin/jobs/missing/video',cookie),env,'missing',true)]){
         assert.equal(response.status,expected);assert.equal(response.headers.get('cache-control'),'private, no-store');}
     }
     await assert.rejects(requireAdmin(req('/api/admin'),{...env,SUPER_ADMIN_EMAIL:''}),e=>e instanceof RequestFailure&&e.code==='FORBIDDEN');

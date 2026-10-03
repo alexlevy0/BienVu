@@ -27,3 +27,12 @@ TURNSTILE_SITE_KEY=
 TURNSTILE_SECRET_KEY=
 TRIAL_IP_HMAC_SECRET=
 # Au moins 32 caractères aléatoires, distincts du secret Better Auth.
+# Paiement : disabled, test ou live. Le webhook est obligatoire.
+BILLING_MODE=disabled
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+STRIPE_AUTOMATIC_TAX=false
+
+STRIPE_TOPUP_PRICE_10=
+STRIPE_TOPUP_PRICE_30=
+STRIPE_TOPUP_PRICE_100=

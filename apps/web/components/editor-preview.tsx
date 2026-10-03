@@ -3,8 +3,17 @@ import {useEffect,useRef,useState,type CSSProperties,type PointerEvent} from 're
 import {editorActiveClip,editorClipStarts,editorLayerStyle,editorPhotoMotion,editorCaptionStyle,editorVoiceCaption,type EditorVoicePreview,type EditorDocument,type EditorLayer,type PhotoAsset} from '@bienvu/contracts';
 import {HomeIcon} from './home-icons';
 export const editorTime=(frames:number)=>`${Math.floor(frames/30/60).toString().padStart(2,'0')}:${Math.floor(frames/30%60).toString().padStart(2,'0')}`;
+function RetainedClip(p:{url:string;frame:number;playing:boolean;style:CSSProperties}){
+ const ref=useRef<HTMLVideoElement>(null),[error,setError]=useState(false);
+ useEffect(()=>{const player=ref.current;if(!player)return;const elapsed=Math.min(4.96,Math.max(0,p.frame/30));
+  const sync=()=>{if(player.readyState>0&&Math.abs(player.currentTime-elapsed)>.12)player.currentTime=elapsed;
+   if(p.playing&&p.frame>=0&&p.frame<149)void player.play().catch(()=>setError(true));else player.pause();};
+  sync();player.addEventListener('loadedmetadata',sync);return()=>player.removeEventListener('loadedmetadata',sync);
+ },[p.frame,p.playing]);
+ return <>{error&&<span className="editor-media-unavailable" role="alert">Ce clip ne peut pas être lu. Rechargez l’aperçu.</span>}<video ref={ref} src={p.url} muted playsInline preload="metadata" style={p.style} onError={()=>setError(true)}/></>;
+}
 export function EditorPreview(p:{doc:EditorDocument;voice?:EditorVoicePreview|null;photos:PhotoAsset[];draftId:string;logoId?:string|null;frame:number;playing:boolean;zoom:number;
-  photoMotion:boolean;transition:'fade'|'cut';
+  photoMotion:boolean;transition:'fade'|'cut';animations?:{slot:number;url:string}[];
   selected:string|null;onSelect(id:string):void;onSeek(frame:number):void;onPlay():void;onMove(layer:EditorLayer):void;onCheckpoint():void}){
   const stage=useRef<HTMLDivElement>(null),canvas=useRef<HTMLDivElement>(null),[scale,setScale]=useState(.25),
     width=p.doc.aspectRatio==='16:9'?1920:1080,height=p.doc.aspectRatio==='16:9'?1080:1920,total=p.doc.durationSeconds*30,
@@ -22,8 +31,11 @@ export function EditorPreview(p:{doc:EditorDocument;voice?:EditorVoicePreview|nu
     element.addEventListener('pointermove',move);element.addEventListener('pointerup',end);element.addEventListener('pointercancel',end);
   }
   function photo(clip:typeof active,i:number){if(!clip)return null;const source=p.photos.find(photo=>photo.sourceOrder===clip.photoSlot);
+    const animation=p.animations?.find(a=>a.slot===clip.photoSlot);
+    const elapsed=p.frame-(('startFrame' in clip?clip.startFrame:0) as number),opacity=p.transition==='fade'&&clip===active&&previous?Math.min(1,elapsed/12):1;
+    if(animation)return <RetainedClip key={clip.id} url={animation.url} frame={elapsed} playing={p.playing} style={{position:'absolute',width:'100%',height:'100%',objectFit:'cover',opacity}}/>;
     return source?<img src={`/api/imports/${p.draftId}/photos/${source.id}`} alt="" draggable={false} style={{position:'absolute',width:'100%',height:'100%',objectFit:'cover',
-      ...editorPhotoMotion(Math.max(0,p.frame-(('startFrame' in clip?clip.startFrame:0) as number)),clip.durationFrames,i,p.photoMotion),
+      ...editorPhotoMotion(Math.max(0,p.frame-(('startFrame' in clip?clip.startFrame:0) as number)),clip.durationFrames,i,p.photoMotion,clip.camera),
       opacity:p.transition==='fade'&&clip===active&&previous?Math.min(1,(p.frame-('startFrame' in clip?Number(clip.startFrame):0))/12):1}}/>:null;}
   return <section className="editor-canvas-area" aria-label="Aperçu du montage">
     <div className="editor-stage" ref={stage}><div className="editor-canvas-frame" style={{width:width*scale,height:height*scale}}>

@@ -1,4 +1,4 @@
-import {NarrationAudio,type VideoManifest} from '@bienvu/contracts';
+import {NarrationAudio,audioNormalizationGain,type VideoManifest} from '@bienvu/contracts';
 import {EditorVoiceSource,findEditorVoiceSource,type Database} from '@bienvu/db';
 import {measureVoiceWav} from '../../../packages/voice/src/audio';
 import {contentHash} from './manual-listings';
@@ -41,7 +41,7 @@ export async function restoreVideoVoice(env:Env,agencyId:string,importId:string,
     const assetId=(await contentHash(new TextEncoder().encode(`${id}:${original.id}`))).slice(0,32);
     audio.push(NarrationAudio.parse({id:assetId,cacheKey:sha,objectKey:`agencies/${agencyId}/imports/${importId}/voice/${assetId}-${sha}.wav`,
       sha256:sha,sizeBytes:bytes.length,durationMs:metrics.durationMs,sampleRate:metrics.sampleRate,channels:metrics.channels,rmsDbfs:metrics.rmsDbfs}));buffers.push(bytes);
-    clips.push({assetId,startFrame:at,durationMs:metrics.durationMs,text:scene.narrationText,waveform:waveform(bytes)});at+=scene.durationFrames;
+    clips.push({assetId,startFrame:at,durationMs:metrics.durationMs,text:scene.narrationText,waveform:waveform(bytes),normalizationGain:audioNormalizationGain(metrics.rmsDbfs,metrics.peak)});at+=scene.durationFrames;
   }
   const durationFrames=m.scenes.map(s=>s.durationFrames);durationFrames[durationFrames.length-1]+=seconds*30-at;
   const source=EditorVoiceSource.parse({preview:{id,voice,durationSeconds:seconds,clips},originJobId:m.jobId,audio,durationFrames});

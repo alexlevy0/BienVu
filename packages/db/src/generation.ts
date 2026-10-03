@@ -3,6 +3,7 @@ import type {Database} from './index';
 import {creditGrant,creditBalance} from './credits';
 import {findImport} from './imports';
 import {findEditorVoiceSource} from './editor-voice';
+import {retainedAnimations} from './animation-library';
 
 export class GenerationFailure extends Error {constructor(public code:PublicErrorCode){super(code);}}
 export type GenerationRow={ownerAgencyId:string|null;anonymousSessionId:string|null;retention:'available'|'expiring'|'expired';creditStatus:'unfunded'|'reserved'|'consumed'|'released';previewKey:string|null;previewReport:string|null;jobId:string;agencyId:string;inputHash:string;input:string;brand:string;deadline:string;expiresAt:string;
@@ -58,7 +59,7 @@ export async function generationRights(db:Database,agencyId:string,flag:string|u
   const nextMonth=Date.UTC(new Date(now).getUTCFullYear(),new Date(now).getUTCMonth()+1,1);
   const importRetryAt=usage&&usage.month>=60?new Date(nextMonth).toISOString():usage&&usage.day>=20?new Date(nextDay).toISOString():null;
   const balance=await creditBalance(db,agencyId,now);
-  return {generationEnabled:flag==='true'&&grant?.enabled===1&&gate?.enabled===1,developmentRemaining:balance.available,creditReserved:balance.reserved,creditConsumed:balance.consumed,creditTotal:balance.total,renewalAt:grant?.renewalAt??null,creditKind:grant?.kind??null,importRetryAt};
+  return {generationEnabled:flag==='true'&&grant?.enabled===1&&gate?.enabled===1,developmentRemaining:balance.available,creditReserved:balance.reserved,creditConsumed:balance.consumed,creditTotal:balance.total,creditPurchased:balance.purchasedAvailable,creditMonthly:balance.monthlyAvailable,renewalAt:balance.renewalAt,creditKind:grant?.kind??null,importRetryAt};
 }
 export async function admitGeneration(db:Database,agencyId:string,key:string,input:unknown,flag:string|undefined,now=Date.now(),verifyPhotos?:(listing:NormalizedListing)=>Promise<void>) {
   const parsed=GenerationRequest.safeParse(input);
@@ -71,10 +72,11 @@ export async function admitGeneration(db:Database,agencyId:string,key:string,inp
   const control=await db.prepare("SELECT enabled FROM generation_control WHERE id='generations'").first<{enabled:number}>();
   if(control?.enabled!==1)throw new GenerationFailure('GENERATIONS_PAUSED');
   if('url' in parsed.data&&(await generationRights(db,agencyId,flag,now)).importRetryAt)throw new GenerationFailure('IMPORT_LIMIT');
-  let saved:NormalizedListing|undefined;
+  let saved:NormalizedListing|undefined,sourceListing:NormalizedListing|undefined;
   if('listingId' in parsed.data){const row=await findImport(db,agencyId,parsed.data.listingId);
     if(!row||row.status!=='ready'||row.expiresAt<=new Date(now+600_000).toISOString()||!row.result)throw new GenerationFailure('NOT_FOUND');
     saved=GeneratableListing.parse(JSON.parse(row.result));if(saved.agencyId!==agencyId||saved.id!==parsed.data.listingId)throw new GenerationFailure('NOT_FOUND');
+    sourceListing=saved;
     try{saved=customizedListing(saved,parsed.data.customization);}catch{throw new GenerationFailure('VALIDATION_ERROR');}
     const voiceSourceId=parsed.data.customization?.voiceSourceId;
     if(voiceSourceId&&!await findEditorVoiceSource(db,agencyId,parsed.data.listingId,voiceSourceId))throw new GenerationFailure('VALIDATION_ERROR');
@@ -88,15 +90,16 @@ export async function admitGeneration(db:Database,agencyId:string,key:string,inp
     secondary_color AS secondaryColor,phone,email,website,created_at AS createdAt FROM agencies WHERE id=?`).bind(agencyId).first();
   const brand=AgencyBrand.safeParse(brandRow);if(!brand.success)throw new GenerationFailure('VALIDATION_ERROR');
   const grant=await creditGrant(db,agencyId,now);
-  const credits=generationCreditCost(parsed.data.customization),animations=requestedAnimations(parsed.data.customization);
+  const reuses=sourceListing?await retainedAnimations(db,agencyId,sourceListing,parsed.data.customization,parsed.data.aspectRatio??'9:16',now):[];
+  const credits=generationCreditCost(parsed.data.customization)-reuses.length,animations=requestedAnimations(parsed.data.customization);
   if(!grant||grant.remaining<credits)throw new GenerationFailure('QUOTA_EXHAUSTED');
   if(saved)try{selectedAnimationIndices((parsed.data.customization?.photoOrder??saved.photos.map(p=>p.sourceOrder)),parsed.data.customization);}catch{throw new GenerationFailure('VALIDATION_ERROR');}
   if(saved&&verifyPhotos)await verifyPhotos(saved);
   const id=crypto.randomUUID(),at=new Date(now).toISOString();
   try {await db.prepare(`INSERT INTO generation_runs(job_id,agency_id,allocation_id,reservation_id,idempotency_key,input_hash,input_json,brand_json,
-    created_at,deadline,expires_at,month,credit_version,credits_total,animations_requested) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    created_at,deadline,expires_at,month,credit_version,credits_total,animations_requested,reuse_pricing,animations_reused,animation_reuses_json,funding_version,financial_mode) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,1,(SELECT mode FROM credit_payment_policy WHERE id=1))`)
     .bind(id,agencyId,grant.id,crypto.randomUUID(),key,hash,body,JSON.stringify(brand.data),at,new Date(now+900_000).toISOString(),
-      new Date(now+7*86400_000).toISOString(),at.slice(0,7),CREDIT_PRICING_VERSION,credits,animations).run();
+      new Date(now+7*86400_000).toISOString(),at.slice(0,7),CREDIT_PRICING_VERSION,credits,animations,reuses.length,JSON.stringify(reuses)).run();
   }catch(error){
     // Une course sur la même clé doit converger, même si le trigger voit le slot occupé.
     const winner=await db.prepare('SELECT job_id AS id,input_hash AS hash FROM generation_runs WHERE agency_id=? AND idempotency_key=?')

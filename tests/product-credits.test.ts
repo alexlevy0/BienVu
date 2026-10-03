@@ -21,6 +21,9 @@ async function finish(DB:D1Database,id:string,animations:number){const at=new Da
   const row=(await findGeneration(DB,(await DB.prepare('SELECT agency_id agencyId FROM generation_runs WHERE job_id=?').bind(id).first<{agencyId:string}>())!.agencyId,id))!;
   await DB.prepare("INSERT INTO video_manifests(job_id,agency_id,job_attempt,manifest_hash,manifest_json,sources_json,state,created_at,expires_at) VALUES(?,?,1,?,?,'[]','prepared',?,?)")
     .bind(id,row.agencyId,'a'.repeat(64),JSON.stringify({photoAnimations:Array.from({length:animations},()=>({}))}),at,row.expiresAt).run();
+  const requested=JSON.parse(row.input).customization?.runwayPhotos??[];
+  const listing=requested.length?JSON.parse((await DB.prepare('SELECT result_json data FROM listing_imports WHERE id=?').bind(JSON.parse(row.input).listingId).first<{data:string}>())!.data):null;
+  for(const [slot,index] of requested.slice(0,animations).entries()){const photo=listing.photos[index];await DB.prepare("INSERT INTO photo_animations(id,agency_id,job_id,photo_id,source_sha256,slot,month,mode,model,credits,reserved_cents,state,created_at,updated_at) VALUES(?,?,?,?,?,?,?,'mock','gen4_turbo',25,0,'ready',?,?)").bind('credit-animation-'+id+'-'+slot,row.agencyId,id,photo.id,photo.contentHash,slot,at.slice(0,7),at,at).run();}
   await DB.prepare('INSERT INTO generation_artifacts VALUES(?,?,?,?)').bind(id,'master-'+id,'{}',at).run();
   if(row.anonymousSessionId)await DB.prepare('INSERT INTO generation_previews VALUES(?,?,?,?)').bind(id,'preview-'+id,'{}',at).run();
   await DB.prepare("UPDATE jobs SET status='ready',lease_until=NULL,updated_at=? WHERE id=?").bind(at,id).run();
@@ -37,7 +40,7 @@ test('barème partagé : 1 vidéo + 1/photo, choix exact malgré réordonnanceme
 test('réservation atomique, réponse rejouée, animations partielles remboursées et règlement unique',async t=>{
   const {DB,agencyId,listing}=await setup(t,'credit-reserve');const input={listingId:listing.id,durationSeconds:40 as const,customization:settings([0,2,4,6])};
   const [a,b]=await Promise.all([1,2].map(()=>admitGeneration(DB,agencyId,'credit-reserve-key-001',input,'true')));assert.equal(a.jobId,b.jobId);
-  assert.deepEqual(await creditBalance(DB,agencyId),{available:35,reserved:5,consumed:0,total:40,renewalAt:(await creditBalance(DB,agencyId)).renewalAt,kind:'paid'});
+  assert.deepEqual(await creditBalance(DB,agencyId),{available:35,reserved:5,consumed:0,total:40,renewalAt:(await creditBalance(DB,agencyId)).renewalAt,kind:'paid',purchasedAvailable:0,monthlyAvailable:35});
   await finish(DB,a.jobId,2);assert.equal((await creditBalance(DB,agencyId)).available,37);assert.equal((await creditBalance(DB,agencyId)).consumed,3);
   await DB.prepare("UPDATE jobs SET status='ready' WHERE id=?").bind(a.jobId).run();assert.equal((await creditBalance(DB,agencyId)).consumed,3);
   const history=await creditHistory(DB,agencyId);assert.equal(history.entries[0].reserved,5);assert.equal(history.entries[0].used,3);assert.equal(history.entries[0].refunded,2);

@@ -5,7 +5,11 @@ import {z} from 'zod';
 const id=z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/);
 const frame=z.number().int().min(0).max(1199);
 const duration=z.number().int().min(15).max(1200);
-export const EditorClip=z.object({id,photoSlot:z.number().int().min(0).max(11),durationFrames:duration}).strict();
+export const EditorCamera=z.object({motion:z.enum(['still','zoom-in','zoom-out','pan-left','pan-right','custom']),
+  intensity:z.enum(['subtle','normal','dynamic']),start:z.object({x:z.number().min(0).max(100),y:z.number().min(0).max(100),scale:z.number().min(1).max(1.4)}).strict(),
+  end:z.object({x:z.number().min(0).max(100),y:z.number().min(0).max(100),scale:z.number().min(1).max(1.4)}).strict()}).strict();
+export type EditorCamera=z.infer<typeof EditorCamera>;
+export const EditorClip=z.object({id,photoSlot:z.number().int().min(0).max(11),durationFrames:duration,camera:EditorCamera.optional()}).strict();
 export type EditorClip=z.infer<typeof EditorClip>;
 export const EditorLayer=z.object({id,kind:z.enum(['text','logo']),text:z.string().max(240),
   startFrame:frame,durationFrames:duration,x:z.number().min(2).max(98),y:z.number().min(2).max(98),
@@ -19,8 +23,9 @@ export const EditorDocument=z.object({version:z.literal(1),aspectRatio:z.enum(['
   clips:z.array(EditorClip).max(24),layers:z.array(EditorLayer).max(16),
   photosVisible:z.boolean(),textsVisible:z.boolean(),voiceEnabled:z.boolean(),subtitlesEnabled:z.boolean(),
   voiceVolume:z.number().min(0.05).max(1),
+  audioMix:z.object({ducking:z.boolean(),normalize:z.boolean(),duckLevel:z.number().min(.05).max(.8),fadeInFrames:z.number().int().min(0).max(90),fadeOutFrames:z.number().int().min(0).max(90)}).strict().optional(),
   music:z.object({assetId:id,name:z.string().min(1).max(100),durationMs:z.number().int().min(500).max(40000),
-    volume:z.number().min(0).max(1),startFrame:frame,trimFromFrame:frame}).strict().nullable(),
+    volume:z.number().min(0).max(1),startFrame:frame,trimFromFrame:frame,normalizationGain:z.number().min(.1).max(4).optional()}).strict().nullable(),
 }).strict().superRefine((doc,ctx)=>{
   const total=doc.durationSeconds*30;
   if(new Set(doc.clips.map(c=>c.id)).size!==doc.clips.length||new Set(doc.layers.map(l=>l.id)).size!==doc.layers.length)
@@ -82,7 +87,7 @@ export function createEditorDocument(photos:{sourceOrder:number}[],fields:{title
     ...(options.logo?[{...newEditorLayer('logo','Logo de l’agence',total,'logo'),y:91,x:15,width:15}]:[])];
   return EditorDocument.parse({version:1,aspectRatio:options.aspectRatio??'9:16',durationSeconds,clips,layers,
     photosVisible:true,textsVisible:true,voiceEnabled:options.voiceEnabled!==false,subtitlesEnabled:options.voiceEnabled!==false&&options.subtitlesEnabled!==false,
-    voiceVolume:1,music:null});
+    voiceVolume:1,music:null,audioMix:{ducking:true,normalize:true,duckLevel:.25,fadeInFrames:15,fadeOutFrames:30}});
 }
 export function resizeEditorDocument(doc:EditorDocument,seconds:20|30|40):EditorDocument{
   const ratio=seconds/doc.durationSeconds,total=seconds*30;
@@ -105,7 +110,14 @@ export function resizeEditorClip(doc:EditorDocument,id:string,frames:number):Edi
 export function editorHasAudio(m:{voiceEnabled?:boolean;editor?:EditorDocument;music?:{asset:unknown}|null}){
   return m.voiceEnabled!==false||Boolean(m.music&&m.editor?.music&&(m.editor.music.volume>0));
 }
-export function editorPhotoMotion(at:number,durationFrames:number,index:number,enabled=true){
+export function editorPhotoMotion(at:number,durationFrames:number,index:number,enabled=true,camera?:EditorCamera){
   const progress=Math.max(0,Math.min(1,at/Math.max(1,durationFrames-1)));
+  if(camera){const ease=progress*progress*(3-2*progress),amount={subtle:.04,normal:.08,dynamic:.14}[camera.intensity];
+    let start=camera.start,end=camera.end;
+    if(camera.motion!=='custom'&&camera.motion!=='still'){const scale=1+amount;start={x:50,y:50,scale:camera.motion==='zoom-out'?scale:1};end={x:50,y:50,scale:camera.motion==='zoom-in'?scale:1};
+      if(camera.motion.startsWith('pan-')){start={x:camera.motion==='pan-left'?65:35,y:50,scale};end={x:100-start.x,y:50,scale};}}
+    if(!enabled||camera.motion==='still')end=start;
+    const scale=start.scale+(end.scale-start.scale)*ease,x=start.x+(end.x-start.x)*ease,y=start.y+(end.y-start.y)*ease;
+    return {scale,translate:`${(50-x)*(scale-1)}% ${(50-y)*(scale-1)}%`,objectPosition:`${x}% ${y}%`};}
   return {scale:enabled?1.035+progress*.045:1,translate:enabled?`${(index%2?-1:1)*(progress-.5)*18}px 0px`:'0px 0px'};
 }
