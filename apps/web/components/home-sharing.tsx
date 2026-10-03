@@ -45,7 +45,6 @@ export function HomeSharing({onPlay, onCreate}: {onPlay(): void; onCreate(): voi
         <div className="home-share-caption"><h3>Sur votre site</h3><p>Enrichissez vos annonces avec une visite en vidéo.</p></div>
       </article>
     </div>
-    <p className="home-share-example-note">Exemples de présentation · Bien, agence et destinataire fictifs</p>
     <div className="home-share-download">
       <span className="home-share-download-icon"><HomeIcon name="download" size={38}/></span>
       <div className="home-share-download-copy"><h3>Un fichier vidéo, prêt à partager.</h3><p>Votre logo, vos informations et votre voix off réunis dans une vidéo.</p></div>

@@ -123,7 +123,7 @@ export function HomeEditorShowcase({paused, onCreate}: {paused: boolean; onCreat
         <label className="home-editor-demo-seek"><span className="sr-only">Position de lecture de la démonstration</span><input type="range" min={0} max={total} step={.1} value={time} onChange={event => {setPlaying(false); setTime(Number(event.target.value));}}/></label>
       </div>
     </div>
-    <div className="home-editor-demo-caption"><p>Visuels d’exemple · Modifications locales à la démonstration · Lecture sans son</p><span><svg viewBox="0 0 66 44" fill="none" aria-hidden="true"><path d="M61 37C31 37 20 25 8 9m-1 9 1-9 11 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>Votre touche, en quelques ajustements.</span></div>
+    <div className="home-editor-demo-caption"><span><svg viewBox="0 0 66 44" fill="none" aria-hidden="true"><path d="M61 37C31 37 20 25 8 9m-1 9 1-9 11 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>Votre touche, en quelques ajustements.</span></div>
     <div className="home-editor-demo-features">
       <article><span className="home-editor-demo-feature-icon"><HomeIcon name="image" size={29}/></span><div><h3>Réorganisez vos photos</h3><p>Changez l’ordre, retirez ou ajoutez des photos pour mettre en valeur les bons espaces.</p></div></article>
       <article><span className="home-editor-demo-feature-icon" aria-hidden="true">Tt</span><div><h3>Placez vos textes</h3><p>Ajoutez les informations essentielles de votre bien et choisissez leur style pour un rendu harmonieux.</p></div></article>

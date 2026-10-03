@@ -34,8 +34,7 @@
 .home-life-voice-mini .home-life-waveform {height:23px;stroke:#9396a5;stroke-width:3}
 .home-life-waveform.is-playing line {animation:home-life-voice 1s ease-in-out infinite}
 @keyframes home-life-voice {0%,100%{opacity:.4}50%{opacity:1}}
-.home-studio .home-life-demo-note {margin:22px 0 16px;font-size:10px;line-height:1.4;text-align:right;color:#8b8c84}
-.home-life-features {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding:24px 0 28px;border-top:1px solid var(--home-line);border-bottom:1px solid var(--home-line)}
+.home-life-features {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin-top:32px;padding:24px 0 28px;border-top:1px solid var(--home-line);border-bottom:1px solid var(--home-line)}
 .home-life-features article {display:grid;grid-template-columns:51px minmax(0,1fr);align-content:start;column-gap:13px;padding:0 22px}
 .home-life-features article:first-child {padding-left:0}
 .home-life-features article:last-child {padding-right:0}
@@ -122,7 +121,6 @@
  .home-life-video-facts span {font-size:14px}
  .home-life-video-facts b {font-size:23px}
  .home-life-video-play {width:52px;height:52px}
- .home-life-demo-note {margin-top:23px}
  .home-life-features {padding:21px 0;gap:0}
  .home-life-features article {grid-template-columns:1fr;gap:9px;padding-inline:13px}
  .home-life-features h3 {font-size:24px;margin-top:0}

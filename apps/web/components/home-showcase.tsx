@@ -87,7 +87,6 @@ export function HomeShowcase({paused, onCreate}: {paused: boolean; onCreate(): v
       </div>
     </div>
     {videoError && <p className="home-life-media-error" role="alert">La démonstration n’a pas pu être lue. Cliquez sur Lecture pour réessayer.</p>}
-    <p className="home-life-demo-note">Exemple de présentation · Bien fictif</p>
     <div className="home-life-features">{features.map(feature => <article key={feature.title}>
       <span className="home-life-feature-icon"><HomeIcon name={feature.icon} size={29}/></span>
       <div><h3>{feature.title}</h3><p className="home-life-feature-subtitle">{feature.subtitle}</p><p>{feature.text}</p></div>

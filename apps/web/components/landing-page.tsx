@@ -64,7 +64,7 @@ export function LandingPage() {
             </button>
           </aside>
         </section>
-        {!conversationActive && <section id="explorer" className="home-discover" aria-labelledby="home-discover-title"><div className="home-discover-heading"><div><h2 id="home-discover-title">À découvrir sur BienVu</h2><p>Des inspirations pour donner une autre dimension à vos biens.</p></div><button type="button" className="home-explore-link" onClick={() => {setCategory('Tous'); setDialog('explore');}}>Tout explorer <HomeIcon name="external" size={17}/></button></div><div className="home-example-grid">{examples.map(example => <ExampleCard key={example.id} example={example} onPlay={play}/>)}</div><p className="home-demo-note">Démonstrations visuelles sans son · Biens et agences fictifs · Images générées</p></section>}
+        {!conversationActive && <section id="explorer" className="home-discover" aria-labelledby="home-discover-title"><div className="home-discover-heading"><div><h2 id="home-discover-title">À découvrir sur BienVu</h2><p>Des inspirations pour donner une autre dimension à vos biens.</p></div><button type="button" className="home-explore-link" onClick={() => {setCategory('Tous'); setDialog('explore');}}>Tout explorer <HomeIcon name="external" size={17}/></button></div><div className="home-example-grid">{examples.map(example => <ExampleCard key={example.id} example={example} onPlay={play}/>)}</div></section>}
         {!conversationActive && <HomeShowcase paused={modalOpen} onCreate={focusComposer}/>}
         {!conversationActive && <HomeSharing onPlay={() => play(examples[0])} onCreate={focusComposer}/>}
         {!conversationActive && <HomeEditorShowcase paused={modalOpen} onCreate={focusComposer}/>}
