@@ -1,4 +1,4 @@
-import {admitAnonymous,anonymousSession,createAnonymousSession,generationEvent,generationView,GenerationFailure,listAnonymousGenerationPage,opaqueHash,priorTrial,trialForSession,trialPolicy,type AnonymousSession} from '@bienvu/db';
+import {admitAnonymous,anonymousSession,createAnonymousSession,generationEvent,generationView,generationRetained,GenerationFailure,listAnonymousGenerationPage,opaqueHash,priorTrial,trialForSession,trialPolicy,type AnonymousSession} from '@bienvu/db';
 import {authOrigin} from './auth';
 import {assertSameOrigin,boundedJson,RequestFailure} from './http';
 import {callGeneration,streamGenerationMedia} from './generations';
@@ -72,7 +72,7 @@ export async function startTrial(request:Request,env:TrialEnv,trustedCloudflare:
 export async function ownAnonymousJob(request:Request,env:TrialEnv,id:string){
   const session=await requireTrial(request,env),row=await trialForSession(env.DB,session,id);
   if(!row||row.ownerAgencyId)throw new RequestFailure('NOT_FOUND');
-  if(row.retention!=='available'||row.expiresAt<=new Date().toISOString())throw new RequestFailure('TRIAL_EXPIRED');return row;
+  if(!generationRetained(row))throw new RequestFailure('TRIAL_EXPIRED');return row;
 }
 export async function trialPreview(request:Request,env:TrialEnv,id:string){
   const row=await ownAnonymousJob(request,env,id);return streamGenerationMedia(request,env,row,'preview');

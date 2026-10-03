@@ -7,7 +7,7 @@ import {AgencySeal, HomeIcon} from './home-icons';
 type Category = 'all' | 'apartments' | 'houses' | 'exceptional';
 type Sort = 'newest' | 'oldest';
 type PublicVideo = {id: string; title: string; locality: string; propertyType: 'apartment' | 'house' | 'other' | null;
-  agency: string; publishedAt: string; expiresAt: string; durationSeconds: number; posterUrl: string; pageUrl: string};
+  agency: string; publishedAt: string; expiresAt: string|null; durationSeconds: number; posterUrl: string; pageUrl: string};
 type Demo = {id: 'paris' | 'sud' | 'lyon' | 'bordeaux'; title: string; agency: string; locality: string;
   category: 'apartments' | 'houses'; exceptional: boolean; durationSeconds: number};
 

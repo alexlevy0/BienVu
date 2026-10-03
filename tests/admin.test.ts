@@ -105,7 +105,7 @@ test('Admin avec Better Auth/D1/R2 locaux : isolation, pagination globale, actio
     assert.equal((await adminPage(db,AdminQuery.parse({section:'videos',q:'Élysée',cursor:unicode.nextCursor!}))).rows.length,5);
     assert.ok(await adminVideoDetail(db,fixture.jobId));assert.equal(await adminVideoDetail(db,'unknown-job'),null);
   });
-  await t.test('lecture MP4 privée par admin, range/HEAD et fichier expiré',async()=>{
+  await t.test('lecture MP4 privée par admin, range/HEAD et conservation sans expiration',async()=>{
     await db.prepare('INSERT INTO generation_access(agency_id,allocation_id,enabled) VALUES(?,?,1)').bind(fixture.agencyId,'allocation-admin-test').run();
     const ready=await admitGeneration(db,fixture.agencyId,'admin-media-ready-123456',{listingId:'listing-admin-test'},'true');
     const f=await videoFixture(),bytes=new Uint8Array([1,2,3,4,5,6]),report=videoReport('a'.repeat(64),f.manifest,bytes),key=`agencies/${fixture.agencyId}/jobs/${ready.jobId}/video/output.mp4`;
@@ -118,8 +118,8 @@ test('Admin avec Better Auth/D1/R2 locaux : isolation, pagination globale, actio
     assert.equal((await adminJobRequest(req(path,cookies[1]),env,ready.jobId,true)).status,403);
     assert.equal((await adminJobRequest(req(path+'?variant=other'),env,ready.jobId,true)).status,422);
     await db.prepare("UPDATE generation_runs SET expires_at=? WHERE job_id=?").bind(new Date(Date.now()-1000).toISOString(),ready.jobId).run();
-    assert.equal((await adminJobRequest(req(path),env,ready.jobId,true)).status,404);
-    assert.ok(await adminVideoDetail(db,ready.jobId));
+    assert.equal((await adminJobRequest(req(path),env,ready.jobId,true)).status,200);
+    assert.equal((await adminVideoDetail(db,ready.jobId))?.video.expiresAt,null);
   });
   await t.test('CSRF, champs supplémentaires et conflits refusés ; audit et contrôle atomiques',async()=>{
     const action={action:'generation_gate',enabled:false,expected:true,reason:'Pause de recette'};

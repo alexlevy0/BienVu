@@ -79,9 +79,19 @@ test('Retouche : retrouve tous les clips, la voix et leurs timings après réord
   const original=await prepareJobVideo(env,job.agencyId,job.jobId);
   await env.DB.batch([env.DB.prepare('INSERT INTO generation_artifacts VALUES(?,?,?,?)').bind(job.jobId,`agencies/${job.agencyId}/jobs/${job.jobId}/video/output.mp4`,JSON.stringify(videoReport(original.hash,original.manifest)),at),
     env.DB.prepare("UPDATE jobs SET status='ready',lease_until=NULL WHERE id=?").bind(job.jobId)]);
-  // Older jobs must also recover from the retained export when the library journal is absent.
-  await env.DB.exec('DELETE FROM animation_library');
+  // Recreate an old missing journal, from before permanent storage protected it.
+  // The separate retention tests verify that production deletions are fenced.
+  await env.DB.exec('DROP TRIGGER animation_library_delete_guard; DELETE FROM animation_library');
+  const past=new Date(Date.now()-86400_000).toISOString();
+  await env.DB.batch([
+    env.DB.prepare('UPDATE generation_runs SET expires_at=? WHERE job_id=?').bind(past,job.jobId),
+    env.DB.prepare('UPDATE video_manifests SET expires_at=? WHERE job_id=?').bind(past,job.jobId),
+    env.DB.prepare('UPDATE narration_runs SET expires_at=? WHERE job_id=?').bind(past,job.jobId),
+  ]);
   let draft=await editExistingVideo(env,job.agencyId,job.jobId,'editor-retained-copy-001',AbortSignal.timeout(20000));
+  await env.DB.prepare('UPDATE animation_library SET expires_at=?').bind(past).run();
+  const {cleanupAnimations}=await import('../apps/pipeline/src/animation-cleanup');
+  assert.deepEqual(await cleanupAnimations(env,Date.now()+365*86400_000),{removed:0});
   const source=await findEditorVoiceSource(env.DB,job.agencyId,draft.id,draft.data.videoCustomization!.voiceSourceId!);assert.ok(source);
   assert.equal(editorCanReuseVoice(draft.data.videoCustomization!,source.preview),true);
   let atFrame=0;assert.deepEqual(source.preview.clips.map(c=>c.startFrame),original.manifest.scenes.map(s=>{const start=atFrame;atFrame+=s.durationFrames;return start;}));

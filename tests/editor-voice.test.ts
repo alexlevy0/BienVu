@@ -50,6 +50,12 @@ test('Voix d’éditeur D1/R2 : WAV privés retrouvés, timings identiques à l�
   const frozen=await prepareJobVideo(env,agencyId,original.jobId),key=`agencies/${agencyId}/jobs/${original.jobId}/video/output.mp4`;
   await env.DB.batch([env.DB.prepare('INSERT INTO generation_artifacts VALUES(?,?,?,?)').bind(original.jobId,key,JSON.stringify(videoReport(frozen.hash,frozen.manifest)),at),env.DB.prepare("UPDATE jobs SET status='ready',lease_until=NULL WHERE id=?").bind(original.jobId)]);
   const before=(await generationRights(env.DB,agencyId,'true')).developmentRemaining;
+  const past=new Date(Date.now()-86400_000).toISOString();
+  await env.DB.batch([
+    env.DB.prepare('UPDATE generation_runs SET expires_at=? WHERE job_id=?').bind(past,original.jobId),
+    env.DB.prepare('UPDATE video_manifests SET expires_at=? WHERE job_id=?').bind(past,original.jobId),
+    env.DB.prepare('UPDATE narration_runs SET expires_at=? WHERE job_id=?').bind(past,original.jobId),
+  ]);
   let cloned=await editExistingVideo(env,agencyId,original.jobId,'voice-editor-copy-001',AbortSignal.timeout(20000));
   const sourceId=cloned.data.videoCustomization!.voiceSourceId!;assert.ok(sourceId);assert.equal((await generationRights(env.DB,agencyId,'true')).developmentRemaining,before);
   const preview=await editorVoicePreview(env,agencyId,cloned.id,sourceId);assert.equal(editorCanReuseVoice(cloned.data.videoCustomization!,preview),true);

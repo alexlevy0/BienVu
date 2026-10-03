@@ -4,14 +4,15 @@ import {creditGrant,creditBalance} from './credits';
 import {findImport} from './imports';
 import {findEditorVoiceSource} from './editor-voice';
 import {retainedAnimations} from './animation-library';
+import {generationRetained} from './retention';
 
 export class GenerationFailure extends Error {constructor(public code:PublicErrorCode){super(code);}}
-export type GenerationRow={ownerAgencyId:string|null;anonymousSessionId:string|null;retention:'available'|'expiring'|'expired';creditStatus:'unfunded'|'reserved'|'consumed'|'released';previewKey:string|null;previewReport:string|null;jobId:string;agencyId:string;inputHash:string;input:string;brand:string;deadline:string;expiresAt:string;
+export type GenerationRow={ownerAgencyId:string|null;anonymousSessionId:string|null;retention:'available'|'expiring'|'expired';creditStatus:'unfunded'|'reserved'|'consumed'|'released';previewKey:string|null;previewReport:string|null;jobId:string;agencyId:string;inputHash:string;input:string;brand:string;deadline:string;expiresAt:string|null;
   status:GenerationView['status'];stage:GenerationView['stage'];progressPercent:number;attempt:number;errorCode:string|null;narrationErrorCode?:string|null;createdAt:string;updatedAt:string;sourceKind:'url'|'manual'|null;
   workflowId:string;listingId:string|null;objectKey:string|null;report:string|null;launchStatus:string;title:string;locality:string|null;
   creditVersion?:number;creditsReserved?:number;creditsUsed?:number;animationsRequested?:number};
 const columns=`g.owner_agency_id AS ownerAgencyId,g.anonymous_session_id AS anonymousSessionId,g.retention,r.status AS creditStatus,p.object_key AS previewKey,p.report_json AS previewReport,g.job_id AS jobId,g.agency_id AS agencyId,g.input_hash AS inputHash,g.input_json AS input,g.brand_json AS brand,
-  g.deadline,g.expires_at AS expiresAt,j.status,j.stage,j.progress_percent AS progressPercent,j.attempt,j.error_code AS errorCode,n.error_code AS narrationErrorCode,j.created_at AS createdAt,j.updated_at AS updatedAt,
+  g.deadline,CASE WHEN g.storage_permanent=1 THEN NULL ELSE g.expires_at END AS expiresAt,j.status,j.stage,j.progress_percent AS progressPercent,j.attempt,j.error_code AS errorCode,n.error_code AS narrationErrorCode,j.created_at AS createdAt,j.updated_at AS updatedAt,
   j.workflow_id AS workflowId,j.listing_id AS listingId,a.object_key AS objectKey,a.report_json AS report,l.status AS launchStatus,
   coalesce(json_extract(i.result_json,'$.facts.title.value'),'Votre annonce') AS title,
   json_extract(i.result_json,'$.facts.locality.value') AS locality,
@@ -32,7 +33,7 @@ export function generationMasterUnlocked(row:GenerationRow){
   return Boolean(row.ownerAgencyId)&&(row.creditStatus==='consumed'||row.creditVersion===1&&Boolean(row.anonymousSessionId));
 }
 export function generationView(row:GenerationRow,now=Date.now(),audience:'owner'|'anonymous'='owner'):GenerationView {
-  const available=row.retention==='available'&&row.status==='ready'&&Boolean(row.objectKey)&&row.expiresAt>new Date(now).toISOString();
+  const available=generationRetained(row,now)&&row.status==='ready'&&Boolean(row.objectKey);
   const gift=row.creditVersion===1&&Boolean(row.anonymousSessionId);
   const unlocked=audience==='owner'&&generationMasterUnlocked(row);
   const preview=available&&Boolean(row.previewKey);

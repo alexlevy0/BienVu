@@ -95,7 +95,7 @@ test('quota épuisé : claim privé verrouillé, réallocation idempotente, gard
   const paid=await owner(DB,'paid-user');await DB.prepare("INSERT INTO subscriptions(agency_id,stripe_customer_id,stripe_subscription_id,plan_code,status,updated_at) VALUES(?,?,?,'existing','active',?)").bind(paid.id,'cus-test','sub-test',new Date().toISOString()).run();
   assert.equal(await creditGrant(DB,paid.id),null);
 });
-test('limites persistantes, succès/session, budget, expiration contre claim',async t=>{
+test('limites persistantes, succès/session, budget et conservation pendant un claim',async t=>{
   const {DB}=await setup(t),{session}=await createAnonymousSession(DB);
   await assert.rejects(admitAnonymous(DB,session,'invalid-source-key-123',{url:'https://127.0.0.1/private'},proof(),'true'),/INVALID_URL|TRIAL_SOURCE_UNSUPPORTED/);
   for(let i=0;i<3;i++){
@@ -106,11 +106,10 @@ test('limites persistantes, succès/session, budget, expiration contre claim',as
   const fresh=await createAnonymousSession(DB),a=await admitAnonymous(DB,fresh.session,'fresh-session-key',input,proof(5),'true');await ready(DB,a.jobId);
   await assert.rejects(admitAnonymous(DB,fresh.session,'second-success-key',input,proof(6),'true'),/TRIAL_USED/);
   const user=await owner(DB,'expiry-owner');
-  // Competing transitions: only the transaction winning ownership may retain media.
+  // Even an older cleanup worker must not purge a successful anonymous video.
   await Promise.allSettled([claimTrial(DB,fresh.session,user.id,a.jobId),DB.prepare("UPDATE generation_runs SET retention='expiring' WHERE job_id=? AND owner_agency_id IS NULL AND retention='available'").bind(a.jobId).run()]);
   const result=(await findGeneration(DB,fresh.session.scopeId,a.jobId))!;
-  if(result.ownerAgencyId){assert.equal(result.retention,'available');assert.equal(result.creditStatus,'consumed');}
-  else {assert.equal(result.retention,'expiring');await assert.rejects(claimTrial(DB,fresh.session,user.id,a.jobId),/TRIAL_EXPIRED/);}
+  assert.equal(result.ownerAgencyId,user.id);assert.equal(result.retention,'available');assert.equal(result.creditStatus,'consumed');assert.equal(result.expiresAt,null);
 });
 
 test('deux propriétaires concurrents : un seul débit et aucune réattribution',async t=>{

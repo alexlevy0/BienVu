@@ -1,6 +1,6 @@
 import {EntityId, GenerationRequest, PreparedNarration, PhotoAnimation, VideoAsset, VideoManifest, VideoFailure, videoAssets, videoManifestHash, videoPresentation, videoPhotoTimeline,videoDimensions,audioNormalizationGain} from '@bienvu/contracts';
 import {measureVoiceWav} from '@bienvu/voice';
-import {findNarration,retainedAnimation,type AnimationReuse, type Database} from '@bienvu/db';
+import {findNarration,retainedAnimation,generationStoredPermanently,type AnimationReuse, type Database} from '@bienvu/db';
 import {scriptContext, validateScript, type ScriptContext} from '@bienvu/narration';
 import type {NarrationBucket} from './narration';
 
@@ -15,7 +15,7 @@ const row = (db: Database, agency: string, job: string) => db.prepare(`SELECT ma
 export async function getJobVideo(db: Database, agency: string, job: string): Promise<FrozenVideo | null> {
   EntityId.parse(agency); EntityId.parse(job);
   const stored=await row(db,agency,job); if(!stored)return null;
-  if(stored.expires<=new Date().toISOString())fail('VIDEO_EXPIRED');
+  if(stored.expires<=new Date().toISOString()&&!await generationStoredPermanently(db,agency,job))fail('VIDEO_EXPIRED');
   const manifest=VideoManifest.parse(JSON.parse(stored.manifest));
   if(manifest.agencyId!==agency||manifest.jobId!==job||await videoManifestHash(manifest)!==stored.hash)fail('VIDEO_MANIFEST_INVALID');
   return {manifest,hash:stored.hash,state:stored.state};
@@ -37,7 +37,7 @@ export async function prepareJobVideo(env: {DB: Database; MEDIA: NarrationBucket
   let stored=await row(env.DB,agency,job);
   if(!stored) {
     const narration=await findNarration(env.DB,agency,job);
-    if(!narration||narration.state!=='prepared'||narration.jobAttempt!==entitlement.attempt||narration.expiresAt<=new Date().toISOString())fail('VIDEO_NARRATION_NOT_READY');
+    if(!narration||narration.state!=='prepared'||narration.jobAttempt!==entitlement.attempt||narration.expiresAt<=new Date().toISOString()&&!await generationStoredPermanently(env.DB,agency,job))fail('VIDEO_NARRATION_NOT_READY');
     const snapshot=JSON.parse(narration.snapshot) as {listing:unknown;brand:unknown;contact:ScriptContext['contact'];copyVersion?:ScriptContext['copyVersion'];customNarration?:string[]};
     const input=entitlement.generationInput?GenerationRequest.parse(JSON.parse(entitlement.generationInput)):undefined;
     const context=await scriptContext(snapshot.listing,snapshot.brand,snapshot.contact,snapshot.copyVersion??'factual-copy/1',snapshot.customNarration,input?.durationSeconds);

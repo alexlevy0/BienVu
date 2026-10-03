@@ -1,6 +1,6 @@
 import {z} from 'zod';
 import {EntityId,NormalizedListing,SocialConnection,SocialPublication,SocialPublicationRequest,VideoReport,type SocialPlatform} from '@bienvu/contracts';
-import {findOwnedGeneration,generationMasterUnlocked} from '@bienvu/db';
+import {findOwnedGeneration,generationMasterUnlocked,generationRetained} from '@bienvu/db';
 import {demoByteRange} from './editor-demo-media';
 import {MetaChoice,MetaSocial,safeSocialPermalink} from './meta-social';
 import {openSocial,sealSocial,randomSocialToken,socialConfigured,socialOrigin,socialHash,graphVersion,
@@ -130,7 +130,7 @@ export async function createSocialPublication(env:SocialEnv,agency:string,user:s
   if(previous?.prepared)return socialPublication(env,agency,previous.id);
   const scheduledAt=socialScheduleDate(body.scheduledAt,body.timezone);
   const job=await findOwnedGeneration(env.DB,agency,body.jobId);
-  if(!job||job.status!=='ready'||job.retention!=='available'||job.expiresAt<=at||!generationMasterUnlocked(job)||!job.report||!job.objectKey)throw new SocialFailure('SOCIAL_EXPIRED');
+  if(!job||job.status!=='ready'||!generationRetained(job)||!generationMasterUnlocked(job)||!job.report||!job.objectKey)throw new SocialFailure('SOCIAL_EXPIRED');
   const report=VideoReport.parse(JSON.parse(job.report));
   if(report.watermarked||!job.objectKey.startsWith(`agencies/${job.agencyId}/jobs/${job.jobId}/`))throw new SocialFailure('SOCIAL_EXPIRED');
   const connections:SocialConnectionRow[]=[];

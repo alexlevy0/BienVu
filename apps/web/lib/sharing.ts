@@ -1,16 +1,16 @@
 import {EntityId, VideoManifest, VideoReport} from '@bienvu/contracts';
-import {findOwnedGeneration, type Database} from '@bienvu/db';
+import {findOwnedGeneration,generationRetained, type Database} from '@bienvu/db';
 import {RequestFailure} from './http';
 import {generationVideo, ownGeneration} from './generations';
 
 type Env = Pick<CloudflareEnv, 'DB' | 'MEDIA'>;
 type SharedRow = {id: string; agencyId: string; jobId: string; title: string; locality: string;
   propertyType: 'apartment' | 'house' | 'other' | null; agencyName: string;
-  publishedAt: string; expiresAt: string; report: string};
+  publishedAt: string; expiresAt: string|null; report: string};
 type PublicFilters = {query?: string; category?: 'all' | 'apartments' | 'houses' | 'exceptional';
   sort?: 'newest' | 'oldest'};
 const publicColumns = `s.id,g.owner_agency_id AS agencyId,s.job_id AS jobId,s.published_at AS publishedAt,
-  g.expires_at AS expiresAt,a.report_json AS report,ag.name AS agencyName,
+  CASE WHEN g.storage_permanent=1 THEN NULL ELSE g.expires_at END AS expiresAt,a.report_json AS report,ag.name AS agencyName,
   coalesce(json_extract(i.result_json,'$.facts.title.value'),'Votre annonce') AS title,
   coalesce(json_extract(i.result_json,'$.facts.locality.value'),'') AS locality,
   json_extract(i.result_json,'$.facts.propertyType.value') AS propertyType`;
@@ -19,7 +19,7 @@ const publicJoins = `FROM generation_shares s JOIN generation_runs g ON g.job_id
   JOIN reservations r ON r.job_id=j.id AND r.agency_id=j.agency_id AND (r.status='consumed' OR g.credit_version=1 AND g.anonymous_session_id IS NOT NULL AND g.owner_agency_id IS NOT NULL)
   JOIN generation_artifacts a ON a.job_id=j.id JOIN agencies ag ON ag.id=g.owner_agency_id
   LEFT JOIN listing_imports i ON i.id=j.listing_id AND i.agency_id=j.agency_id`;
-const visible = `g.retention='available' AND s.revoked_at IS NULL AND j.status='ready' AND g.expires_at>?`;
+const visible = `g.retention='available' AND s.revoked_at IS NULL AND j.status='ready' AND (g.storage_permanent=1 OR g.expires_at>?)`;
 
 function publicView(row: SharedRow) {
   const report = VideoReport.parse(JSON.parse(row.report));
@@ -36,7 +36,7 @@ export async function ownerShares(db: Database, agencyId: string) {
     (SELECT json_object('jobId',s.job_id,'id',s.id) AS record FROM generation_shares s
     JOIN generation_runs g ON g.job_id=s.job_id AND g.agency_id=s.agency_id
     JOIN jobs j ON j.id=s.job_id AND j.agency_id=s.agency_id
-    WHERE g.owner_agency_id=? AND s.revoked_at IS NULL AND g.expires_at>? AND j.status='ready'
+    WHERE g.owner_agency_id=? AND s.revoked_at IS NULL AND g.retention='available' AND (g.storage_permanent=1 OR g.expires_at>?) AND j.status='ready'
     ORDER BY s.published_at DESC LIMIT 500)`)
     .bind(agencyId, new Date().toISOString()).first<{data: string}>();
   return JSON.parse(row?.data ?? '[]') as {jobId: string; id: string}[];
@@ -44,7 +44,7 @@ export async function ownerShares(db: Database, agencyId: string) {
 
 export async function publishGeneration(env: Env, agencyId: string, jobId: string) {
   const row = await ownGeneration(env, agencyId, jobId);
-  if (row.status !== 'ready' || row.expiresAt <= new Date().toISOString()) throw new RequestFailure('NOT_FOUND');
+  if (row.status !== 'ready' || !generationRetained(row)) throw new RequestFailure('NOT_FOUND');
   // Verify the owned master before making an explicit public share.
   await generationVideo(new Request('https://bienvu.invalid/video', {method: 'HEAD'}), env, agencyId, jobId);
   const existing = await env.DB.prepare('SELECT id FROM generation_shares WHERE agency_id=? AND job_id=? AND revoked_at IS NULL')
@@ -56,7 +56,7 @@ export async function publishGeneration(env: Env, agencyId: string, jobId: strin
       SELECT ?,j.agency_id,j.id,? FROM jobs j JOIN generation_runs g ON g.job_id=j.id AND g.agency_id=j.agency_id
       JOIN reservations r ON r.job_id=j.id AND r.agency_id=j.agency_id AND (r.status='consumed' OR g.credit_version=1 AND g.anonymous_session_id IS NOT NULL AND g.owner_agency_id IS NOT NULL)
       JOIN generation_artifacts a ON a.job_id=j.id
-      WHERE g.owner_agency_id=? AND j.id=? AND g.retention='available' AND j.status='ready' AND g.expires_at>?`)
+      WHERE g.owner_agency_id=? AND j.id=? AND g.retention='available' AND j.status='ready' AND (g.storage_permanent=1 OR g.expires_at>?)`)
       .bind(id, new Date().toISOString(), agencyId, jobId, new Date().toISOString()).run();
   } catch (error) {
     const winner = await env.DB.prepare('SELECT id FROM generation_shares WHERE agency_id=? AND job_id=? AND revoked_at IS NULL')
@@ -120,10 +120,10 @@ export async function listPublic(db: D1Database, cursor?: string, filters: Publi
 // Les vignettes sont des photos du manifeste figé, jamais une URL fournie par le navigateur.
 export async function generationPoster(env: Env, agencyId: string, jobId: string) {
   const job = await ownGeneration(env, agencyId, jobId);
-  if (job.status === 'failed' || job.expiresAt <= new Date().toISOString()) throw new RequestFailure('NOT_FOUND');
+  if (job.status === 'failed' || !generationRetained(job)) throw new RequestFailure('NOT_FOUND');
   const stored = await env.DB.prepare(`SELECT manifest_json AS manifest,manifest_hash AS hash,state
-    FROM video_manifests WHERE agency_id=? AND job_id=? AND expires_at>?`)
-    .bind(job.agencyId, jobId, new Date().toISOString()).first<{manifest: string; hash: string; state: string}>();
+    FROM video_manifests WHERE agency_id=? AND job_id=? AND (?=1 OR expires_at>?)`)
+    .bind(job.agencyId, jobId, job.expiresAt===null?1:0, new Date().toISOString()).first<{manifest: string; hash: string; state: string}>();
   if (!stored || stored.state !== 'prepared') throw new RequestFailure('NOT_FOUND');
   const manifest = VideoManifest.parse(JSON.parse(stored.manifest));
   if (manifest.agencyId !== job.agencyId || manifest.jobId !== jobId) throw new RequestFailure('NOT_FOUND');

@@ -1,6 +1,6 @@
 import {CreationDraftData,EditorDocument,GenerationRequest,GeneratableListing,VideoAsset,VideoManifest,defaultVideoCustomization,createEditorDocument,selectedAnimationIndices,audioNormalizationGain,generationCreditCost,
   MUSIC_LIMITS,type CreationDraftView,type VideoCustomization} from '@bienvu/contracts';
-import {findCreationDraft,findImport,draftFromListing,updateCreationDraft,beginManualImport,startCreationDraft,blankCreationDraft,retainedAnimations,ImportStateFailure,type Database} from '@bienvu/db';
+import {findCreationDraft,findImport,draftFromListing,updateCreationDraft,beginManualImport,startCreationDraft,blankCreationDraft,retainedAnimations,generationRetained,retainedAnimationLibrarySql,ImportStateFailure,type Database} from '@bienvu/db';
 import {measureMusicWav} from '../../../packages/voice/src/audio';
 import {contentHash} from './manual-listings';
 import {startManualCreationDraft,uploadCreationPhoto,finishCreationDraft} from './creation-drafts';
@@ -92,18 +92,18 @@ async function retainOriginalAnimations(env:Env,agencyId:string,m:VideoManifest,
   for(const clip of m.photoAnimations??[]){
     signal.throwIfAborted();const asset=clip.asset;
     if(!asset.objectKey.startsWith(`agencies/${m.agencyId}/jobs/${m.jobId}/animations/`))throw new RequestFailure('NOT_FOUND');
-    const existing=await env.DB.prepare("SELECT 1 FROM animation_library WHERE agency_id=? AND source_sha256=? AND aspect_ratio=? AND mode='real' AND expires_at>?").bind(agencyId,clip.sourceSha256,m.width===1920?'16:9':'9:16',new Date().toISOString()).first();if(existing)continue;
+    const existing=await env.DB.prepare(`SELECT 1 FROM animation_library l WHERE agency_id=? AND source_sha256=? AND aspect_ratio=? AND mode='real' AND state='available' AND (expires_at>? OR ${retainedAnimationLibrarySql})`).bind(agencyId,clip.sourceSha256,m.width===1920?'16:9':'9:16',new Date().toISOString()).first();if(existing)continue;
     const real=await env.DB.prepare("SELECT 1 FROM photo_animations WHERE job_id=? AND photo_id=? AND mode='real' AND state='ready'").bind(m.jobId,clip.photoAssetId).first();if(!real)continue;
     const object=await env.MEDIA.get(asset.objectKey);if(!object||object.size!==asset.sizeBytes)throw new RequestFailure('NOT_FOUND');const bytes=new Uint8Array(await object.arrayBuffer());
     if(await contentHash(bytes)!==asset.sha256)throw new RequestFailure('NOT_FOUND');const objectKey=`agencies/${agencyId}/imports/animation-library/${asset.sha256}.mp4`,at=new Date().toISOString();
     await env.MEDIA.put(objectKey,bytes,{httpMetadata:{contentType:'video/mp4'},customMetadata:{sha256:asset.sha256,sourceSha256:clip.sourceSha256}});
-    await env.DB.prepare("INSERT INTO animation_library(id,agency_id,source_sha256,aspect_ratio,model,mode,origin_job_id,asset_json,created_at,expires_at) VALUES(?,?,?,?,'gen4_turbo','real',?,?,?,?) ON CONFLICT(agency_id,source_sha256,aspect_ratio,model,mode) DO UPDATE SET asset_json=excluded.asset_json,expires_at=excluded.expires_at WHERE animation_library.state='available'")
+    await env.DB.prepare("INSERT INTO animation_library(id,agency_id,source_sha256,aspect_ratio,model,mode,origin_job_id,asset_json,created_at,expires_at) VALUES(?,?,?,?,'gen4_turbo','real',?,?,?,?) ON CONFLICT(agency_id,source_sha256,aspect_ratio,model,mode) DO UPDATE SET asset_json=excluded.asset_json,origin_job_id=excluded.origin_job_id,expires_at=excluded.expires_at WHERE animation_library.state='available'")
       .bind(crypto.randomUUID(),agencyId,clip.sourceSha256,m.width===1920?'16:9':'9:16',m.jobId,JSON.stringify({...asset,objectKey}),at,new Date(Date.now()+90*86400_000).toISOString()).run();
   }
 }
 export async function editExistingVideo(env:Env,agencyId:string,jobId:string,key:string,signal:AbortSignal){
   const job=await ownGeneration(env,agencyId,jobId);
-  if(job.status!=='ready'||job.retention!=='available'||job.expiresAt<=new Date().toISOString())throw new RequestFailure('NOT_FOUND');
+  if(job.status!=='ready'||!generationRetained(job))throw new RequestFailure('NOT_FOUND');
   const stored=await env.DB.prepare("SELECT manifest_json AS manifest FROM video_manifests WHERE agency_id=? AND job_id=? AND state='prepared'")
     .bind(job.agencyId,jobId).first<{manifest:string}>();
   if(!stored)throw new RequestFailure('NOT_FOUND');
@@ -149,7 +149,7 @@ export async function recoverDraftVoice(env:Env,agencyId:string,id:string,signal
   if(!draft.data.videoCustomization?.editor||draft.data.videoCustomization.voiceSourceId)return draft;
   const row=await findImport(env.DB,agencyId,id),sourceHash=row?.input?JSON.parse(row.input).sourceHash:null;
   if(typeof sourceHash!=='string')return draft;
-  const jobs=await env.DB.prepare("SELECT json_group_array(json_object('id',id,'input',input)) AS items FROM (SELECT j.id,g.input_json AS input FROM jobs j JOIN generation_runs g ON g.job_id=j.id AND g.agency_id=j.agency_id WHERE g.owner_agency_id=? AND j.status='ready' AND g.retention='available' AND g.expires_at>? ORDER BY j.created_at DESC LIMIT 500)")
+  const jobs=await env.DB.prepare("SELECT json_group_array(json_object('id',id,'input',input)) AS items FROM (SELECT j.id,g.input_json AS input FROM jobs j JOIN generation_runs g ON g.job_id=j.id AND g.agency_id=j.agency_id WHERE g.owner_agency_id=? AND j.status='ready' AND g.retention='available' AND (g.storage_permanent=1 OR g.expires_at>?) ORDER BY j.created_at DESC LIMIT 500)")
     .bind(agencyId,new Date().toISOString()).first<{items:string}>();
   for(const job of JSON.parse(jobs?.items??'[]') as {id:string;input:string}[]){signal.throwIfAborted();
     if(await contentHash(new TextEncoder().encode(`Version de la vidéo ${job.id}`))!==sourceHash)continue;

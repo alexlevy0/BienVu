@@ -1,5 +1,5 @@
 import {GoogleVoiceConfig,FishVoiceConfig, NarrationFailure, PreparedNarration, VoiceFailure} from '@bienvu/contracts';
-import {findNarration} from '@bienvu/db';
+import {findNarration,generationStoredPermanently} from '@bienvu/db';
 import {openaiScripts} from '@bienvu/narration';
 import {googleServiceAccountAccess, googleTts,fishTts} from '@bienvu/voice';
 import {prepareJobNarration, readNarrationAudio, type NarrationProviders} from './narration';
@@ -85,9 +85,11 @@ export async function handleNarrationRequest(request: Request, env: Env, factory
     }
     if (request.method !== 'GET') return reply({error: 'NOT_FOUND'}, 404);
     const run = await findNarration(env.DB, scope.agencyId, scope.jobId);
-    if (!run || run.expiresAt <= new Date().toISOString()) return reply({error: 'NOT_FOUND'}, 404);
+    if (!run) return reply({error: 'NOT_FOUND'}, 404);
+    const permanent=await generationStoredPermanently(env.DB,scope.agencyId,scope.jobId);
+    if (!permanent&&run.expiresAt <= new Date().toISOString()) return reply({error: 'NOT_FOUND'}, 404);
     const result = run.result ? PreparedNarration.parse(JSON.parse(run.result)) : null;
-    if (!route[3]) return reply({state: run.state, errorCode: run.errorCode, expiresAt: run.expiresAt, result});
+    if (!route[3]) return reply({state: run.state, errorCode: run.errorCode, expiresAt: permanent?null:run.expiresAt, result});
     if (!route[4] || run.state !== 'prepared' || !result) return reply({error: 'NOT_FOUND'}, 404);
     const asset = result.audio.find(item => item.id === route[4]);
     if (!asset) return reply({error: 'NOT_FOUND'}, 404);

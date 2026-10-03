@@ -103,7 +103,7 @@ function EditorProject({initial,agency,guest}:{initial:CreationDraftView;agency:
     selectedAnimations=new Set(selectedAnimationIndices(model.settings.photoOrder??[],model.settings).map(index=>model.settings.photoOrder![index])),
     previewAnimations=availableAnimations.filter(a=>selectedAnimations.has(a.slot)),
     recoverableAnimations=availableAnimations.filter(a=>model.settings.photoOrder?.includes(a.slot)&&!model.settings.runwayPhotos?.includes(a.slot)),
-    existingExport=fullPreview?.version===draft.version&&saveState==='saved'&&fullPreview.job&&fullPreview.job.status!=='failed'&&fullPreview.job.retention==='available'&&Date.parse(fullPreview.job.expiresAt)>Date.now(),cost=existingExport?0:generationCreditCost(model.settings)-(currentResources?previewAnimations.length:0),selectedLayer=selection?.kind==='text'?doc.layers.find(l=>l.id===selection.id)??null:null,
+    existingExport=fullPreview?.version===draft.version&&saveState==='saved'&&fullPreview.job&&fullPreview.job.status!=='failed'&&fullPreview.job.retention==='available'&&(fullPreview.job.expiresAt===null||Date.parse(fullPreview.job.expiresAt)>Date.now()),cost=existingExport?0:generationCreditCost(model.settings)-(currentResources?previewAnimations.length:0),selectedLayer=selection?.kind==='text'?doc.layers.find(l=>l.id===selection.id)??null:null,
     selectedClip=selection?.kind==='photo'?editorClipStarts(doc).find(c=>c.id===selection.id)??null:null,
     selectedClipLabel=previewAnimations.some(a=>a.slot===selectedClip?.photoSlot)?'Vidéo IA':'Photo';
   const restoredVoice=useEditorVoice(draft.id,model.settings,guest?.voice),voice=restoredVoice.voice;

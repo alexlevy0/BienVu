@@ -1,5 +1,5 @@
-// Only terminal jobs are purged. reconcileBatch must first confirm renderer
-// cancellation for timed-out jobs; a claim and expiry compete in one D1 write.
+// Failed anonymous attempts can be purged after renderer cancellation.
+// Successful videos stay stored; claims and cleanup still share a D1 fence.
 export async function cleanupAnonymousTrials(env:{DB:D1Database;MEDIA:R2Bucket},now=Date.now()) {
   const at=new Date(now).toISOString();
   await env.DB.prepare(`UPDATE generation_runs SET ip_hmac=NULL,turnstile_hash=NULL
@@ -8,10 +8,10 @@ export async function cleanupAnonymousTrials(env:{DB:D1Database;MEDIA:R2Bucket},
   await env.DB.prepare('UPDATE anonymous_sessions SET proof_hash=NULL,claim_job_id=NULL WHERE expires_at<=? AND proof_hash IS NOT NULL').bind(at).run();
   const expired=await env.DB.prepare(`SELECT g.job_id AS id,g.agency_id AS scope FROM generation_runs g JOIN jobs j ON j.id=g.job_id
     WHERE g.anonymous_session_id IS NOT NULL AND g.owner_agency_id IS NULL AND g.retention!='expired'
-    AND g.expires_at<=? AND j.status IN ('ready','failed') ORDER BY g.expires_at LIMIT 10`).bind(at).all<{id:string;scope:string}>();
+    AND g.storage_permanent=0 AND g.expires_at<=? AND j.status IN ('ready','failed') ORDER BY g.expires_at LIMIT 10`).bind(at).all<{id:string;scope:string}>();
   for(const job of expired.results){
     const winner=await env.DB.prepare(`UPDATE generation_runs SET retention='expiring' WHERE job_id=? AND owner_agency_id IS NULL
-      AND retention IN ('available','expiring') AND expires_at<=? RETURNING job_id`).bind(job.id,at).first();
+      AND storage_permanent=0 AND retention IN ('available','expiring') AND expires_at<=? RETURNING job_id`).bind(job.id,at).first();
     if(!winner)continue;
     // Scope IDs are server-generated and never change on claim. No bucket-wide
     // deletion or shared agency prefix: only this exact job's private objects.

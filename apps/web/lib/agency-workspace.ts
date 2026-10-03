@@ -1,6 +1,6 @@
 import {z} from 'zod';
 import {EntityId,AgencyTemplate,captureAgencyTemplate,VideoReport,VideoAsset} from '@bienvu/contracts';
-import {findCreationDraft,findOwnedGeneration,generationMasterUnlocked} from '@bienvu/db';
+import {findCreationDraft,findOwnedGeneration,generationMasterUnlocked,generationRetained} from '@bienvu/db';
 import {RequestFailure} from './http';
 import {contentHash} from './manual-listings';
 import {streamGenerationMedia} from './generations';
@@ -44,10 +44,10 @@ export async function workspaceAction(env:Env,agency:string,input:unknown){
  if(action.action==='delete-template'){await env.DB.prepare('DELETE FROM agency_templates WHERE agency_id=? AND id=?').bind(agency,action.id).run();return {ok:true};}
  if(action.action==='revoke-review'){await env.DB.prepare("UPDATE client_reviews SET status='revoked' WHERE agency_id=? AND id=?").bind(agency,action.id).run();return {ok:true};}
  const job=await findOwnedGeneration(env.DB,agency,action.jobId);
- if(!job||job.status!=='ready'||job.retention!=='available'||!generationMasterUnlocked(job)||job.expiresAt<=at)throw new RequestFailure('NOT_FOUND');
+ if(!job||job.status!=='ready'||!generationRetained(job)||!generationMasterUnlocked(job))throw new RequestFailure('NOT_FOUND');
  const manifest=await env.DB.prepare('SELECT manifest_hash AS hash FROM video_manifests WHERE agency_id=? AND job_id=?').bind(job.agencyId,job.jobId).first<{hash:string}>();if(!manifest)throw new RequestFailure('NOT_FOUND');
  const n=await env.DB.prepare("SELECT count(*) n FROM client_reviews WHERE agency_id=? AND created_at>=? AND status!='revoked'").bind(agency,new Date(Date.now()-86400_000).toISOString()).first<{n:number}>();if((n?.n??0)>=50)throw new RequestFailure('RATE_LIMITED');
- const token=Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>b.toString(16).padStart(2,'0')).join(''),expiresAt=new Date(Math.min(Date.parse(job.expiresAt),Date.now()+7*86400_000)).toISOString();
+ const token=Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>b.toString(16).padStart(2,'0')).join(''),expiresAt=new Date(Math.min(job.expiresAt?Date.parse(job.expiresAt):Infinity,Date.now()+7*86400_000)).toISOString();
  await env.DB.prepare("INSERT INTO client_reviews(id,agency_id,job_id,manifest_hash,token_hash,status,expires_at,created_at) VALUES(?,?,?,?,?,'pending',?,?)").bind(id,agency,job.jobId,manifest.hash,await contentHash(new TextEncoder().encode(token)),expiresAt,at).run();
  return {id,url:`/validation/${token}`,expiresAt};
 }
@@ -56,7 +56,7 @@ export async function findReview(env:Env,token:string){
  const review=await env.DB.prepare("SELECT id,agency_id AS agencyId,job_id AS jobId,manifest_hash AS hash,status,expires_at AS expiresAt FROM client_reviews WHERE token_hash=? AND status!='revoked' AND expires_at>?").bind(await contentHash(new TextEncoder().encode(token)),new Date().toISOString()).first<{id:string;agencyId:string;jobId:string;hash:string;status:string;expiresAt:string}>();
  if(!review)throw new RequestFailure('NOT_FOUND');const job=await findOwnedGeneration(env.DB,review.agencyId,review.jobId);
  const manifest=job?await env.DB.prepare("SELECT manifest_hash AS hash FROM video_manifests WHERE agency_id=? AND job_id=?").bind(job.agencyId,job.jobId).first<{hash:string}>():null;
- if(!job||!manifest||manifest.hash!==review.hash||job.retention!=='available'||job.status!=='ready'||job.expiresAt<=new Date().toISOString()||!job.report||!job.objectKey)throw new RequestFailure('NOT_FOUND');
+ if(!job||!manifest||manifest.hash!==review.hash||!generationRetained(job)||job.status!=='ready'||!job.report||!job.objectKey)throw new RequestFailure('NOT_FOUND');
  return {review,job};
 }
 export async function reviewView(env:Env,token:string){const {review,job}=await findReview(env,token);

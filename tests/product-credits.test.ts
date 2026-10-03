@@ -20,7 +20,9 @@ async function setup(t:{after(fn:()=>Promise<void>):void},label:string){
 async function finish(DB:D1Database,id:string,animations:number){const at=new Date().toISOString();
   const row=(await findGeneration(DB,(await DB.prepare('SELECT agency_id agencyId FROM generation_runs WHERE job_id=?').bind(id).first<{agencyId:string}>())!.agencyId,id))!;
   await DB.prepare("INSERT INTO video_manifests(job_id,agency_id,job_attempt,manifest_hash,manifest_json,sources_json,state,created_at,expires_at) VALUES(?,?,1,?,?,'[]','prepared',?,?)")
-    .bind(id,row.agencyId,'a'.repeat(64),JSON.stringify({photoAnimations:Array.from({length:animations},()=>({}))}),at,row.expiresAt).run();
+    // The rendering checkpoint keeps its cleanup timestamp; the successful
+    // video's public expiry is independently null for permanent storage.
+    .bind(id,row.agencyId,'a'.repeat(64),JSON.stringify({photoAnimations:Array.from({length:animations},()=>({}))}),at,new Date(Date.now()+30*86400_000).toISOString()).run();
   const requested=JSON.parse(row.input).customization?.runwayPhotos??[];
   const listing=requested.length?JSON.parse((await DB.prepare('SELECT result_json data FROM listing_imports WHERE id=?').bind(JSON.parse(row.input).listingId).first<{data:string}>())!.data):null;
   for(const [slot,index] of requested.slice(0,animations).entries()){const photo=listing.photos[index];await DB.prepare("INSERT INTO photo_animations(id,agency_id,job_id,photo_id,source_sha256,slot,month,mode,model,credits,reserved_cents,state,created_at,updated_at) VALUES(?,?,?,?,?,?,?,'mock','gen4_turbo',25,0,'ready',?,?)").bind('credit-animation-'+id+'-'+slot,row.agencyId,id,photo.id,photo.contentHash,slot,at.slice(0,7),at,at).run();}

@@ -64,13 +64,13 @@ const steps:Record<GenerationView['status'],string>={queued:'Votre vidéo attend
 export function AnonymousTrialResult({job}:{job:GenerationView}) {
   const [failure,setFailure]=useState(''),[busy,setBusy]=useState(false);
   async function connect(){setBusy(true);setFailure('');try{await value(await fetch(`/api/trial/${job.id}/login`,{method:'POST'}));window.location.assign('/connexion?trial=1');}catch(e){setFailure(e instanceof Error?e.message:'Réessayez.');setBusy(false);}}
-  const expired=job.retention!=='available'||new Date(job.expiresAt).getTime()<=Date.now();
-  return <section className="trial-result" aria-label="Votre essai"><h3 aria-live="polite">{expired?'Cet essai a expiré':steps[job.status]}</h3>
-    {expired?<p>Votre aperçu n’est plus disponible. Aucun nouveau traitement n’a été lancé.</p>:job.ownership==='owned'?<p>Cette vidéo a été enregistrée dans un compte. <Link href="/essai/recuperer">Retrouver ma vidéo</Link></p>:<>
+  const unavailable=job.retention!=='available'||job.expiresAt!==null&&new Date(job.expiresAt).getTime()<=Date.now();
+  return <section className="trial-result" aria-label="Votre essai"><h3 aria-live="polite">{unavailable?'Cet aperçu n’est plus disponible':steps[job.status]}</h3>
+    {unavailable?<p>Votre aperçu n’est plus disponible. Aucun nouveau traitement n’a été lancé.</p>:job.ownership==='owned'?<p>Cette vidéo a été enregistrée dans un compte. <Link href="/essai/recuperer">Retrouver ma vidéo</Link></p>:<>
       {generationActive(job)&&<><ol className="generation-steps" aria-label="Étapes de création">{(['importing','scripting','voicing','rendering'] as const).map((s,i)=><li key={s} aria-current={job.stage===s?'step':undefined}>{i+1}. {['Annonce','Texte','Voix','Vidéo'][i]}</li>)}</ol><p>Vous pouvez revenir sur cette page depuis ce navigateur. Votre vidéo y sera conservée.</p><button type="button" className="text-button" disabled={busy} onClick={()=>void connect()}>Me connecter pendant la création</button></>}
       {job.status==='failed'&&<p role="alert">{publicErrors[job.errorCode as PublicErrorCode]?.[1]??publicErrors.GENERATION_FAILED[1]}</p>}
       {job.videoUrl&&<><video className={`generated-video${job.aspectRatio==='16:9'?' is-horizontal':''}`} src={job.videoUrl} controls playsInline preload="metadata" controlsList="nodownload" aria-label="Aperçu complet de votre vidéo avec filigrane"/>
-        <p className="field-help">Aperçu disponible jusqu’au {new Date(job.expiresAt).toLocaleString('fr-FR')}.</p><button className="home-primary-button" type="button" disabled={busy} onClick={()=>void connect()}>{busy?'Ouverture…':'Télécharger sans filigrane'}</button><p>Créez votre compte gratuitement pour récupérer votre vidéo.</p></>}
+        <button className="home-primary-button" type="button" disabled={busy} onClick={()=>void connect()}>{busy?'Ouverture…':'Télécharger sans filigrane'}</button><p>Créez votre compte gratuitement pour récupérer votre vidéo.</p></>}
     </>}{failure&&<p role="alert">{failure}</p>}
   </section>;
 }

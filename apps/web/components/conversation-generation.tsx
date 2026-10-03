@@ -59,7 +59,6 @@ export function ConversationGeneration({job,request,sending,anonymous,unavailabl
         {ready&&job?.ownership==='owned'&&job.masterAccess==='locked'&&!job.downloadUrl&&job.videoUrl&&<><p className="home-stage-note">La vidéo est privée. Un crédit est nécessaire pour télécharger le master sans filigrane.</p>
           {!anonymous&&<button type="button" className="home-primary-button" disabled={busy} onClick={()=>void act(`/api/generations/${job.id}/unlock`)}>Utiliser un crédit</button>}</>}
         {ready&&job?.ownership==='owned'&&anonymous&&<Link href="/essai/recuperer">Retrouver ma vidéo dans mon compte</Link>}
-        {ready&&<p className="home-stage-note">Disponible jusqu’au {new Date(job.expiresAt).toLocaleString('fr-FR')}.</p>}
         {ready&&!anonymous&&<p className="home-stage-note">{job.creditsUsed} crédit{job.creditsUsed>1?'s':''} utilisé{job.creditsUsed>1?'s':''}.{job.creditsRefunded>0?` ${job.creditsRefunded} crédit(s) restitué(s) pour les animations indisponibles.`:''}</p>}
         {ready&&!job.videoUrl&&<p className="home-stage-error" role="status">Cette vidéo n’est plus disponible dans votre espace. Consultez Mes vidéos pour connaître son état.</p>}
         {(active||sending)&&<p className="home-stage-note">Vous pouvez revenir plus tard. Retrouvez votre création dans <Link href="/historique">Mes vidéos</Link>{anonymous?' depuis ce navigateur':''}.</p>}

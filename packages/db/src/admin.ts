@@ -20,15 +20,15 @@ const videos=`SELECT j.id,j.created_at AS sortKey,j.created_at AS createdAt,j.up
   j.status,j.stage,j.progress_percent AS progress,j.attempt,j.error_code AS error,
   coalesce(json_extract(l.facts_json,'$.title.value'),json_extract(i.result_json,'$.facts.title.value'),'Vidéo archivée') AS title,
   coalesce(json_extract(l.facts_json,'$.locality.value'),json_extract(i.result_json,'$.facts.locality.value')) AS locality,
-  j.source_url AS sourceUrl,coalesce(i.source_kind,l.source_kind,'url') AS sourceKind,g.retention,g.expires_at AS expiresAt,r.status AS credit,
+  j.source_url AS sourceUrl,coalesce(i.source_kind,l.source_kind,'url') AS sourceKind,g.retention,CASE WHEN g.storage_permanent=1 THEN NULL ELSE g.expires_at END AS expiresAt,r.status AS credit,
   r.credit_amount AS creditsReserved,
   IIF(g.credit_version=1 AND g.anonymous_session_id IS NOT NULL,IIF(j.status='ready',1,0),r.credit_used) AS creditsUsed,
   IIF(j.status IN ('ready','failed'),r.credit_amount-IIF(g.credit_version=1 AND g.anonymous_session_id IS NOT NULL,IIF(j.status='ready',1,0),r.credit_used),0) AS creditsRefunded,
   (g.credit_version=1 AND g.anonymous_session_id IS NOT NULL) AS creditGift,g.animations_requested AS animationsRequested,
   EXISTS(SELECT 1 FROM generation_shares s WHERE s.job_id=j.id AND s.revoked_at IS NULL) AS public,
   json_extract(v.report_json,'$.durationSeconds') AS duration,
-  IIF(j.status='ready' AND g.retention='available' AND g.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now') AND v.object_key IS NOT NULL AND g.owner_agency_id IS NOT NULL AND (r.status='consumed' OR g.credit_version=1 AND g.anonymous_session_id IS NOT NULL),1,0) AS master,
-  IIF(j.status='ready' AND g.retention='available' AND g.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now') AND p.object_key IS NOT NULL,1,0) AS preview
+  IIF(j.status='ready' AND g.retention='available' AND (g.storage_permanent=1 OR g.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now')) AND v.object_key IS NOT NULL AND g.owner_agency_id IS NOT NULL AND (r.status='consumed' OR g.credit_version=1 AND g.anonymous_session_id IS NOT NULL),1,0) AS master,
+  IIF(j.status='ready' AND g.retention='available' AND (g.storage_permanent=1 OR g.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now')) AND p.object_key IS NOT NULL,1,0) AS preview
   FROM jobs j LEFT JOIN generation_runs g ON g.job_id=j.id LEFT JOIN agencies a ON a.id=coalesce(g.owner_agency_id,j.agency_id)
   LEFT JOIN auth_user u ON u.id=a.owner_user_id LEFT JOIN reservations r ON r.job_id=j.id
   LEFT JOIN listings l ON l.id=j.listing_id AND l.agency_id=j.agency_id LEFT JOIN listing_imports i ON i.id=j.listing_id AND i.agency_id=j.agency_id

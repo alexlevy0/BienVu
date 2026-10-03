@@ -46,9 +46,9 @@ export function importResult(row: Awaited<ReturnType<typeof findImport>>) {
   return {id: row.id, sourceKind: row.sourceKind, sourceUrl: row.sourceUrl, status: draft?'needs_input':row.status, errorCode: row.errorCode, createdAt: row.createdAt,
     expiresAt: row.expiresAt, listing: row.result ? GeneratableListing.parse(JSON.parse(row.result)) : null,draft};
 }
-export async function privateImportPhoto(env: {DB: Database; MEDIA: ImportBucket}, agencyId: string, id: string, photoId: string) {
+export async function privateImportPhoto(env: {DB: Database; MEDIA: ImportBucket}, agencyId: string, id: string, photoId: string, retainedByVideo=false) {
   const row = await findImport(env.DB, agencyId, id);
-  if (!row || row.expiresAt <= new Date().toISOString() || row.status!=='ready'&&!viewCreationDraft(row)) throw new RequestFailure('NOT_FOUND');
+  if (!row || (!retainedByVideo&&row.expiresAt <= new Date().toISOString()) || row.status!=='ready'&&!viewCreationDraft(row)) throw new RequestFailure('NOT_FOUND');
   const listing: NormalizedListing|null = row.result?GeneratableListing.parse(JSON.parse(row.result)):null;
   const photo = (listing?.photos??viewCreationDraft(row)?.photos??[]).find(p => p.id === photoId);
   if (!photo) throw new RequestFailure('NOT_FOUND');

@@ -2,6 +2,7 @@ import {AgencyBrand,EntityId,Timestamp,GenerationRequest,sourceForHost,sourceLis
 import type {Database} from './index';
 import {creditGrant} from './credits';
 import {findGeneration,findOwnedGeneration,GenerationFailure,type GenerationRow} from './generation';
+import {generationRetained} from './retention';
 export const opaqueHash=async(value:string)=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))].map(n=>n.toString(16).padStart(2,'0')).join('');
 export type TrialPolicy={enabled:number;free_enabled:number;free_monthly:number;session_days:number;successes:number;session_daily:number;ip_daily:number;global_daily:number;global_monthly:number;render_concurrency:number;retention_hours:number;active_minutes:number;preview_provision_cents:number;budget_ceiling_cents:number};
 export const trialPolicy=async(db:Database)=>(await db.prepare('SELECT * FROM trial_policy WHERE id=1').first<TrialPolicy>())!;
@@ -76,21 +77,20 @@ export async function claimTrial(db:Database,session:AnonymousSession,agencyId:s
   const row=await trialForSession(db,session,jobId),at=new Date(now).toISOString();
   if(!row)throw new GenerationFailure('NOT_FOUND');
   if(row.ownerAgencyId&&row.ownerAgencyId!==agencyId)throw new GenerationFailure('FORBIDDEN');
-  if(row.retention!=='available'||row.expiresAt<=at)throw new GenerationFailure('TRIAL_EXPIRED');
+  if(!generationRetained(row,now))throw new GenerationFailure('TRIAL_EXPIRED');
   const grant=await creditGrant(db,agencyId,now);
-  // Claimed trials survive at least seven days beyond the current credit period,
-  // so an exhausted free account can unlock at renewal without a new render.
-  // One statement with triggers: ownership, credit, expiry extension and event.
+  // One statement with triggers: ownership, credit and claim event. Stored
+  // videos stay available even when the account must wait for credit renewal.
   // A lost response replays this statement and sees the same reservation.
-  await db.prepare(`UPDATE generation_runs SET owner_agency_id=?,claimed_at=?,funding_candidate=?,expires_at=?
-    WHERE job_id=? AND anonymous_session_id=? AND (owner_agency_id IS NULL OR owner_agency_id=?) AND retention='available' AND expires_at>?`)
-    .bind(agencyId,at,grant&&(grant.kind==='free'||grant.enabled===1)?grant.id:null,row.ownerAgencyId?row.expiresAt:new Date(Math.max(now,grant?.renewalAt?Date.parse(grant.renewalAt):now)+7*86400_000).toISOString(),jobId,session.id,agencyId,at).run();
+  await db.prepare(`UPDATE generation_runs SET owner_agency_id=?,claimed_at=?,funding_candidate=?
+    WHERE job_id=? AND anonymous_session_id=? AND (owner_agency_id IS NULL OR owner_agency_id=?) AND retention='available' AND (storage_permanent=1 OR expires_at>?)`)
+    .bind(agencyId,at,grant&&(grant.kind==='free'||grant.enabled===1)?grant.id:null,jobId,session.id,agencyId,at).run();
   const owned=await findOwnedGeneration(db,agencyId,jobId);
   if(!owned)throw new GenerationFailure('TRIAL_EXPIRED');return owned;
 }
 export async function fundOwnedTrial(db:Database,agencyId:string,jobId:string,now=Date.now()) {
   const row=await findOwnedGeneration(db,agencyId,jobId);if(!row)throw new GenerationFailure('NOT_FOUND');
-  if(row.retention!=='available'||row.expiresAt<=new Date(now).toISOString())throw new GenerationFailure('TRIAL_EXPIRED');
+  if(!generationRetained(row,now))throw new GenerationFailure('TRIAL_EXPIRED');
   if(row.anonymousSessionId&&row.creditStatus==='unfunded'&&row.creditVersion!==CREDIT_PRICING_VERSION) {
     const grant=await creditGrant(db,agencyId,now);
     await db.prepare(`UPDATE generation_runs SET funding_candidate=?,claimed_at=? WHERE job_id=? AND owner_agency_id=? AND retention='available'`)

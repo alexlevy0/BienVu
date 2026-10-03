@@ -10,6 +10,7 @@ import {findImport} from '../packages/db/src/index';
 import {GeneratableListing} from '../packages/contracts/src/index';
 import {VideoManifest,videoManifestHash} from '../packages/contracts/src/video';
 import {videoReport,videoFixture} from '../fixtures/video';
+import {getJobVideo} from '../apps/pipeline/src/video-manifest';
 
 test('admission D1 atomique : idempotence, budget, isolation, quota et résultat tardif',async t=>{
   const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:'export default {fetch(){return new Response("fixture")}}',compatibilityDate:'2026-09-27',d1Databases:['DB'],r2Buckets:['MEDIA']}));t.after(()=>mf.dispose());
@@ -127,8 +128,17 @@ test('admission D1 atomique : idempotence, budget, isolation, quota et résultat
   assert.notEqual(republished.id,shared.id);
   await assert.rejects(findPublic(env.DB,shared.id),/NOT_FOUND/);
   await env.DB.prepare('UPDATE generation_runs SET expires_at=? WHERE job_id=?').bind(new Date(Date.now()-1000).toISOString(),ready.jobId).run();
-  assert.deepEqual((await listPublic(env.DB)).videos,[]);
-  await assert.rejects(findPublic(env.DB,republished.id),/NOT_FOUND/);
-  await assert.rejects(publishGeneration(env,agencyId,ready.jobId),/NOT_FOUND/);
-  await assert.rejects(generationPoster(env,agencyId,ready.jobId),/NOT_FOUND/);
+  await env.DB.prepare('UPDATE video_manifests SET expires_at=? WHERE job_id=?').bind(new Date(Date.now()-1000).toISOString(),ready.jobId).run();
+  await env.DB.prepare('UPDATE listing_imports SET expires_at=? WHERE id=?').bind(new Date(Date.now()-1000).toISOString(),'listing-admission').run();
+  const retained=(await findGeneration(env.DB,agencyId,ready.jobId))!;
+  assert.equal(retained.expiresAt,null);
+  assert.equal(generationView(retained,Date.now()+365*86400_000).downloadUrl,`/api/generations/${ready.jobId}/video?download=1`);
+  assert.equal((await listPublic(env.DB)).videos[0]?.id,republished.id);
+  assert.equal((await findPublic(env.DB,republished.id)).view.expiresAt,null);
+  assert.equal((await publishGeneration(env,agencyId,ready.jobId)).id,republished.id);
+  assert.equal((await generationVideo(new Request('https://test/video'),env,agencyId,ready.jobId)).status,200);
+  assert.equal((await generationPoster(env,agencyId,ready.jobId)).status,200);
+  assert.equal((await generationSourcePhoto(env,retained)).status,200);
+  assert.equal((await getJobVideo(env.DB,agencyId,ready.jobId))?.hash,hash);
+  await assert.rejects(env.DB.prepare('UPDATE generation_runs SET storage_permanent=0 WHERE job_id=?').bind(ready.jobId).run(),/FORBIDDEN/);
 });
