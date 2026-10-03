@@ -11,6 +11,10 @@
     "binding": "ASSETS"
   },
   "vars": {
+    "SOCIAL_ENABLED": "false",
+    "META_APP_ID": "",
+    "META_GRAPH_VERSION": "v25.0",
+    "META_LOGIN_CONFIG_ID": "",
     "TRAFFIC_ENABLED": "false",
     "BILLING_MODE": "disabled",
     "STRIPE_AUTOMATIC_TAX": "false",
@@ -59,7 +63,7 @@
       "head_sampling_rate": 0.01
     }
   },
-  "triggers": {"crons": ["23 3 * * *"]},
+  "triggers": {"crons": ["23 3 * * *", "* * * * *"]},
   "services": [
     {
       "binding": "IMPORT_SERVICE",

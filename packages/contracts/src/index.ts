@@ -64,3 +64,4 @@ export * from './admin';
 export * from './agency-template';
 
 export * from './access';
+export * from './social';

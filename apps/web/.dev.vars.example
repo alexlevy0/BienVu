@@ -36,3 +36,8 @@ STRIPE_AUTOMATIC_TAX=false
 STRIPE_TOPUP_PRICE_10=
 STRIPE_TOPUP_PRICE_30=
 STRIPE_TOPUP_PRICE_100=
+
+# Publication Instagram/Facebook : jetons conservés uniquement côté serveur.
+META_APP_SECRET=
+SOCIAL_TOKEN_ENCRYPTION_KEY=
+# Clé aléatoire de 32 octets encodée en base64url (43 caractères), distincte de Better Auth.

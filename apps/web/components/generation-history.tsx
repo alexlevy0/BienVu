@@ -8,6 +8,7 @@ import {HomeIcon} from './home-icons';
 import {anonymousGenerationScope,useGenerationStore} from './generation-store';
 import {ProblemReport} from './problem-report';
 import {DraftActions} from './draft-actions';
+import {SocialPublishDialog} from './social-publish-dialog';
 
 type Status = 'all' | 'ready' | 'active';
 type Sort = 'newest' | 'oldest';
@@ -37,6 +38,7 @@ export function GenerationHistory() {
   const [cursor, setCursor] = useState<string | null>(null), [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false), [feedback, setFeedback] = useState('');
   const [preview, setPreview] = useState<GenerationView | null>(null), [confirm, setConfirm] = useState<GenerationView | null>(null);
+  const [socialJob,setSocialJob]=useState<GenerationView|null>(null);
   const [action, setAction] = useState<string | null>(null), [revision, setRevision] = useState(0);
   const previewDialog = useRef<HTMLDialogElement>(null), shareDialog = useRef<HTMLDialogElement>(null), requestVersion = useRef(0);
   useEffect(() => {const timer = setTimeout(() => setSearch(query.trim()), 250); return () => clearTimeout(timer);}, [query]);
@@ -44,7 +46,7 @@ export function GenerationHistory() {
 
   useEffect(() => {
     const version = ++requestVersion.current, controller = new AbortController();
-    setJobs([]);setJobsOwner(null);setPreview(null);setConfirm(null);setShares({}); setCursor(null); setLoaded(false); setFeedback('');
+    setJobs([]);setJobsOwner(null);setPreview(null);setConfirm(null);setSocialJob(null);setShares({}); setCursor(null); setLoaded(false); setFeedback('');
     if (loading) return () => controller.abort();
     if (!me) {setJobsOwner(anonymousGenerationScope);void generationStore.refresh();return () => controller.abort();}
     void (async () => {
@@ -176,6 +178,7 @@ export function GenerationHistory() {
           {shared ? <div className="video-library-share"><Link href={`/explorer/${shared.id}`}>Voir la page publique <HomeIcon name="arrow" size={18}/></Link><button type="button" disabled={action===job.id} onClick={() => void unpublish(job)}>Retirer</button></div>
             : job.downloadUrl ? <button type="button" className="video-library-share-link" disabled={action===job.id} onClick={() => setConfirm(job)}>Publier dans Explorer <HomeIcon name="arrow" size={18}/></button>
               : me&&job.retryAllowed ? <button type="button" className="video-library-share-link" disabled={action===job.id} onClick={() => void retry(job)}>Relancer le démarrage <HomeIcon name="arrow" size={18}/></button> : null}
+          {me&&job.downloadUrl&&me.role!=='viewer'&&<button type="button" className="social-history-publish" onClick={()=>setSocialJob(job)}><HomeIcon name="calendar" size={18}/>Publier sur mes réseaux <HomeIcon name="arrow" size={17}/></button>}
           {['ready','failed'].includes(job.status)&&<ProblemReport jobId={job.id} anonymous={job.ownership==='anonymous'}/>}
         </article>;
       })}</div>
@@ -183,5 +186,6 @@ export function GenerationHistory() {
     </>}
     {visiblePreview && <dialog ref={previewDialog} className={`video-library-dialog${visiblePreview.aspectRatio==='16:9'?' is-horizontal':''}`} onCancel={() => setPreview(null)}><button className="video-library-close" type="button" onClick={() => setPreview(null)} aria-label="Fermer">×</button><h2>{visiblePreview.title}</h2><video src={visiblePreview.videoUrl!} controls autoPlay playsInline preload="metadata" poster={poster(visiblePreview)} aria-label={`Vidéo : ${visiblePreview.title}`}/><p>{visiblePreview.ownership==='anonymous'?'Aperçu avec filigrane':'Vidéo privée'} · Disponible jusqu’au {date(visiblePreview.expiresAt)}.</p></dialog>}
     {visibleConfirm && <dialog ref={shareDialog} className="video-library-dialog video-library-confirm" onCancel={() => setConfirm(null)}><button className="video-library-close" type="button" onClick={() => setConfirm(null)} aria-label="Fermer">×</button><h2>Publier cette vidéo ?</h2><p>« {visibleConfirm.title} » sera visible et lisible par tous dans Explorer, avec les photos du bien, votre identité et vos coordonnées d’agence. Le lien public restera actif jusqu’au {date(visibleConfirm.expiresAt)}, sauf si vous le retirez avant.</p><div><button type="button" onClick={() => setConfirm(null)}>Annuler</button><button type="button" className="video-library-create" onClick={() => void publish(visibleConfirm)}>Publier dans Explorer</button></div></dialog>}
+    {socialJob&&me&&jobsOwner===owner&&<SocialPublishDialog key={`${me.agency.id}:${socialJob.id}`} job={socialJob} onClose={()=>setSocialJob(null)}/>}
   </section>;
 }

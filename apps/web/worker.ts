@@ -2,6 +2,8 @@
 import openNext from './.open-next/worker.js';
 import {httpsRedirect} from './lib/https-redirect';
 import {collectTraffic,purgeTraffic} from './lib/traffic';
+import {runSocialBatch} from './lib/social-publisher';
+import {cleanupSocial} from './lib/social';
 
 export default {
   async fetch(request, env, ctx) {
@@ -9,7 +11,10 @@ export default {
     collectTraffic(request,response,env,ctx,request.cf?.country);
     return response;
   },
-  async scheduled(_controller,env){await purgeTraffic(env.DB);},
+  async scheduled(controller,env){
+    if(controller.cron==='23 3 * * *'){await purgeTraffic(env.DB);await cleanupSocial(env);}
+    else await runSocialBatch(env);
+  },
 } satisfies ExportedHandler<CloudflareEnv>;
 
 // @ts-ignore Exports OpenNext générés au build, conservés pour ses bindings internes.

@@ -13,6 +13,7 @@ out/
 !.env.runway.example
 !.env.fish.example
 !.env.billing.example
+!.env.social.example
 .dev.vars
 .dev.vars.*
 !.dev.vars.example

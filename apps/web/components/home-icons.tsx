@@ -1,6 +1,7 @@
 import type {ReactNode} from 'react';
 
 const shapes = {
+  calendar: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 2v6M17 2v6M3 11h18M7 15h2m6 0h2m-10 3h2m6 0h2"/></>,
   clapper: <><path d="M3 8h18v13H3V8Zm0-5 17-2 1 5-18 2-1-5Zm4-1 3 5m3-6 3 5"/></>,
   pause: <><path d="M8 5v14M16 5v14" strokeWidth="4"/></>,
   previous: <><path d="M5 5v14m14-14L8 12l11 7V5Z"/></>,

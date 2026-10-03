@@ -7,7 +7,7 @@ import {useGenerationStore} from './generation-store';
 import {DraftActions} from './draft-actions';
 
 
-export function StudioSidebar({active}: {active: 'create' | 'videos' | 'explore' | 'agency' | 'offers' | 'projects' | 'admin' | 'editor'}) {
+export function StudioSidebar({active}: {active: 'create' | 'videos' | 'explore' | 'agency' | 'offers' | 'projects' | 'admin' | 'editor' | 'social'}) {
   const {me, loading} = useAccount();
   const [menuOpen, setMenuOpen] = useState(false);
   const store=useGenerationStore();
@@ -41,7 +41,7 @@ export function StudioSidebar({active}: {active: 'create' | 'videos' | 'explore'
   const closeMenu = () => setMenuOpen(false);
   const initials = me?.user.name.trim().split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase() || 'BV';
   const accountName = me?.user.name.trim().split(/\s+/)[0] || 'Mon compte';
-  const item = (href: string, name: string, icon: 'plus' | 'video' | 'compass' | 'house' | 'clapper', section: typeof active) =>
+  const item = (href: string, name: string, icon: 'plus' | 'video' | 'compass' | 'house' | 'clapper' | 'calendar', section: typeof active) =>
     <Link className={`home-nav-item${active === section ? ' home-nav-active' : ''}`} href={href}
       aria-current={active === section ? 'page' : undefined} onClick={() => {closeMenu();if(active==='create'&&section==='create')window.dispatchEvent(new Event('bienvu:new-video'));}}>
       <HomeIcon name={icon} size={section === 'create' ? 28 : 26}/>{name}
@@ -58,6 +58,7 @@ export function StudioSidebar({active}: {active: 'create' | 'videos' | 'explore'
         {item('/agence', 'Mon agence', 'house', 'agency')}
         {item('/editeur', 'Éditeur', 'clapper', 'editor')}
         {item('/projets', 'Dossiers & modèles', 'house', 'projects')}
+        {item('/publications', 'Publications', 'calendar', 'social')}
       </nav>
       <section className="home-recents" aria-labelledby="home-recents-title"><h2 id="home-recents-title">RÉCENTES</h2>
         {recent.map(item => item.kind==='job'?<Link className="home-recent-link" key={`job:${item.job.id}`}
