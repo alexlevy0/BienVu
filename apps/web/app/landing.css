@@ -8,6 +8,8 @@
   --home-muted:#73747a;
   --home-line:#e3e2dc;
   --home-green:#dfe7d5;
+  --home-sidebar-width:256px;
+  --home-mobile-header-height:78px;
   color:var(--home-ink);
   background:var(--home-paper);
   font-family:Arial,Helvetica,sans-serif;
@@ -23,12 +25,14 @@
 .home-studio .sr-only {position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .home-skip {position:fixed;left:275px;top:-70px;background:#111;color:white;padding:12px 20px;border-radius:5px;z-index:100}
 .home-skip:focus {top:12px}
-.home-sidebar {position:fixed;inset:0 auto 0 0;width:256px;padding:30px 16px 24px;border-right:1px solid var(--home-line);display:flex;flex-direction:column;background:var(--home-paper);z-index:30;overflow-y:auto}
+.home-sidebar {position:fixed;inset:0 auto 0 0;width:var(--home-sidebar-width);padding:30px 16px 24px;border-right:1px solid var(--home-line);display:flex;flex-direction:column;background:var(--home-paper);z-index:30;overflow-y:auto}
 .home-wordmark {display:inline-flex;align-items:center;gap:20px;color:#050603;white-space:nowrap;font-family:'Inter Tight',Arial,sans-serif;font-size:46px;line-height:1;font-weight:850;letter-spacing:-3px}
 .home-wordmark>svg {width:40px;height:40px;flex:none}
 .home-brand-link {display:block;padding:1px 18px 0;margin-bottom:32px}
 .home-navigation {display:grid;gap:6px}
 .home-nav-item {min-height:54px;display:flex;align-items:center;gap:22px;padding:11px 18px;border-radius:9px;font-size:17px;line-height:1.3;color:#292c32;transition:background .15s}
+/* Reserve two lines for the longer label, including its active weight. */
+.home-nav-item[href="/projets"] {min-height:calc(2.6em + 22px)}
 .home-nav-item:hover {background:#eeeee7}
 .home-nav-active,.home-nav-active:hover {background:var(--home-green);color:#10120e;font-weight:550}
 .home-recents {border-top:1px solid var(--home-line);margin-top:25px;padding-top:25px;min-height:95px;flex:1;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
@@ -79,7 +83,7 @@
 .home-account-menu>a {display:block;font-size:14px;padding:12px 7px}
 .home-account-menu .button {width:100%;padding:9px;font-size:13px;min-height:38px}
 .home-account-menu .form-feedback {font-size:12px;margin:0}
-.home-workspace {margin-left:256px;min-width:0}
+.home-workspace {margin-left:var(--home-sidebar-width);min-width:0}
 .home-topbar {height:49px;margin:0 15px;padding:0 12px;border-bottom:1px solid var(--home-line);display:flex;align-items:center;justify-content:space-between;font-size:15px;color:#34363b}
 .home-topbar button {font-size:15px;background:none;border:0;padding:8px 0 8px 20px}
 .home-content {padding:0 27px;outline:none;max-width:1660px;margin:0 auto}
@@ -195,12 +199,12 @@
   .home-discover {margin-top:25px}
 }
 @media(max-width:1250px) and (min-width:901px) {
-  .home-sidebar {width:225px;padding-inline:12px}
+  .home-studio {--home-sidebar-width:225px}
+  .home-sidebar {padding-inline:12px}
   .home-brand-link {padding-inline:13px}
   .home-wordmark {font-size:44px;gap:12px}
   .home-wordmark>svg {width:35px;height:35px}
   .home-nav-item {font-size:15px;gap:20px;padding-inline:15px}
-  .home-workspace {margin-left:225px}
   .home-content {padding-inline:24px}
   .home-hero h1 {font-size:52px;letter-spacing:-2.6px}
   .home-hero h1 em {letter-spacing:-2.8px}
@@ -215,11 +219,12 @@
   .home-agency-seal {flex-basis:30px;width:30px;height:30px}
 }
 @media(max-width:900px) {
-  .home-mobile-header {display:flex;align-items:center;justify-content:space-between;padding:18px 24px;height:78px;border-bottom:1px solid var(--home-line)}
+  .home-studio {--home-sidebar-width:270px}
+  .home-mobile-header {display:flex;align-items:center;justify-content:space-between;padding:18px 24px;height:var(--home-mobile-header-height);border-bottom:1px solid var(--home-line)}
   .home-mobile-header .home-wordmark {font-size:37px;letter-spacing:-2px;gap:11px}
   .home-mobile-header .home-wordmark svg {width:31px;height:31px}
   .home-mobile-header>button {display:flex;align-items:center;justify-content:center;border:1px solid #dddfd5;background:transparent;border-radius:8px;width:40px;height:40px}
-  .home-sidebar {width:270px;transform:translateX(-105%);visibility:hidden;transition:transform .2s,visibility .2s;box-shadow:20px 0 80px #0b1a1020;padding-top:30px;z-index:50}
+  .home-sidebar {transform:translateX(-105%);visibility:hidden;transition:transform .2s,visibility .2s;box-shadow:20px 0 80px #0b1a1020;padding-top:30px;z-index:50}
   .home-sidebar-open {transform:translateX(0);visibility:visible}
   .home-sidebar .home-brand-link {margin-bottom:31px}
   .home-menu-backdrop {display:block;position:fixed;inset:0;z-index:40;border:0;border-radius:0;background:#1c2b195f;backdrop-filter:blur(3px)}
@@ -242,7 +247,8 @@
   .home-skip {left:20px}
 }
 @media(max-width:540px) {
-  .home-mobile-header {height:72px;padding:15px 20px}
+  .home-studio {--home-mobile-header-height:72px}
+  .home-mobile-header {padding:15px 20px}
   .home-mobile-header .home-wordmark {font-size:35px}
   .home-topbar {padding-inline:8px}
   .home-content {padding:0 18px}
@@ -469,13 +475,13 @@
 /* The landing preview surrounds the existing, continuously mounted composer. */
 .home-studio-home .home-topbar {border-bottom:0}
 .home-studio-home .home-content:not(.home-content-conversation) {padding:3px 20px 0}
-.home-hero-dashboard {max-width:none;display:grid;grid-template-columns:minmax(0,1fr) minmax(250px,29%);column-gap:28px;row-gap:14px;padding:28px 26px 24px;border-radius:19px;background:linear-gradient(120deg,#e6ecdf,#e1e9da 67%,#e4ecde);text-align:left;align-items:start}
+.home-hero-dashboard {max-width:none;display:grid;grid-template-columns:minmax(0,1fr) minmax(250px,29%);column-gap:28px;row-gap:14px;padding:28px 26px 16px;border-radius:19px;background:linear-gradient(120deg,#e6ecdf,#e1e9da 67%,#e4ecde);text-align:left;align-items:start}
 .home-hero-dashboard .home-hero-intro {grid-column:1;grid-row:1;min-width:0;padding:16px 12px 0}
 .home-hero-dashboard h1 {font-size:clamp(54px,5.2vw,82px);line-height:.88;letter-spacing:-3.3px;margin:0 0 25px;font-weight:600}
 .home-hero-dashboard h1 em {display:block;width:max-content;max-width:100%;letter-spacing:-3.4px}
 .home-hero-dashboard h1 em::after {height:7px;bottom:-11px;left:28%;right:-3%;background:#bfceaf;transform:rotate(-1deg)}
 .home-studio .home-hero-dashboard .home-intro {margin:0;font-size:22px;line-height:1.45;max-width:none}
-.home-hero-dashboard>.home-create {grid-column:1;grid-row:2;min-width:0}
+.home-hero-dashboard>.home-create {grid-column:1;grid-row:2;min-width:0;align-self:end}
 .home-hero-dashboard .home-composer {background:#fffefa;border:1px solid #ffffffb3;border-radius:17px;padding:22px 23px 20px;gap:18px;box-shadow:0 6px 22px #29362012,0 1px 5px #29362008}
 .home-hero-dashboard .home-composer:focus-within {border-color:#9cb08e;box-shadow:0 0 0 3px #9cac8630,0 6px 22px #29362012,0 1px 5px #29362008}
 .home-hero-dashboard .home-composer-invalid {border-color:#ad6953}
@@ -505,7 +511,7 @@
 .home-hero-demo-facts {position:absolute;left:21px;right:15px;bottom:16px;color:#fffefa;display:grid;gap:5px;text-shadow:0 1px 10px #15191050}
 .home-hero-demo-facts>span {display:flex;align-items:center;gap:8px;font-size:13px}
 .home-hero-demo-facts>strong {font-family:'Times New Roman',Times,serif;font-size:28px;line-height:1;font-weight:600}
-.home-studio-home .home-discover {margin:20px 18px 0;padding-top:0;border-top:0}
+.home-studio-home .home-discover {margin:12px 18px 0;padding-top:0;border-top:0}
 .home-studio-home .home-discover h2 {font-family:'Times New Roman',Times,serif;font-size:39px;letter-spacing:-1.35px;line-height:1.1}
 .home-studio-home .home-discover .home-example-cover {aspect-ratio:1.28}
 .home-studio-home .home-example-agency {min-height:49px;font-size:13px}
@@ -513,7 +519,7 @@
 .home-duration-pill>svg {position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none;color:#394639}
 .home-duration-pill select {padding-left:36px}
 @media(max-width:1250px) and (min-width:761px) {
- .home-hero-dashboard {grid-template-columns:minmax(0,1fr) minmax(220px,29%);padding:23px 20px;gap:17px 21px}
+ .home-hero-dashboard {grid-template-columns:minmax(0,1fr) minmax(220px,29%);padding:23px 20px 16px;gap:17px 21px}
  .home-hero-dashboard .home-hero-intro {padding:8px 3px 0}
  .home-hero-dashboard h1 {font-size:clamp(48px,5.1vw,65px);letter-spacing:-2.6px}
  .home-hero-dashboard h1 em {letter-spacing:-2.6px}
@@ -533,7 +539,7 @@
 }
 @media(max-width:760px) {
  .home-studio-home .home-content:not(.home-content-conversation) {padding:4px 16px 0}
- .home-hero-dashboard {grid-template-columns:minmax(0,1fr);padding:24px 20px 20px;gap:20px;max-width:600px;margin:auto;border-radius:17px}
+ .home-hero-dashboard {grid-template-columns:minmax(0,1fr);padding:24px 20px 16px;gap:12px;max-width:600px;margin:auto;border-radius:17px}
  .home-hero-dashboard .home-hero-intro {padding:0}
  .home-hero-dashboard h1 {font-size:clamp(40px,7.4vw,60px);line-height:.97;letter-spacing:-2.1px;margin-bottom:23px}
  .home-hero-dashboard h1 em {letter-spacing:-2.1px}
@@ -548,9 +554,9 @@
  .home-hero-dashboard .home-credit-cost {grid-column:1/-1;grid-row:1;font-size:11px}
  .home-hero-dashboard .home-customize-button {grid-column:1;grid-row:2;min-width:0;font-size:12px;min-height:46px;padding:10px;gap:7px}
  .home-hero-dashboard .home-primary-button {grid-column:2;grid-row:2;width:100%;min-width:0;font-size:13px!important;min-height:46px;padding:10px!important;gap:8px}
- .home-hero-showcase {grid-column:1;grid-row:3;justify-self:center;width:min(100%,310px);margin-top:4px}
+ .home-hero-showcase {grid-column:1;grid-row:3;justify-self:center;width:min(100%,310px);margin-top:0}
  .home-hero-demo-heading {top:27px}
- .home-studio-home .home-discover {margin:24px 3px 0}
+ .home-studio-home .home-discover {margin:16px 3px 0}
  .home-studio-home .home-discover h2 {font-size:30px}
  .home-studio-home .home-discover .home-example-cover {aspect-ratio:4/5}
  .home-duration-pill select {padding-left:34px}
@@ -558,7 +564,7 @@
 }
 @media(max-width:350px) {
  .home-studio-home .home-content:not(.home-content-conversation) {padding-inline:12px}
- .home-hero-dashboard {padding:21px 14px 16px}
+ .home-hero-dashboard {padding:21px 14px 12px}
  .home-hero-dashboard h1 {font-size:38px}
  .home-hero-dashboard .home-composer {padding-inline:11px}
  .home-hero-dashboard .home-customize-button {gap:5px;padding-inline:8px}

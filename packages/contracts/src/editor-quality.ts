@@ -5,9 +5,37 @@ export function audioNormalizationGain(rmsDbfs:number,peak:number,target=-20){
   if(!Number.isFinite(rmsDbfs)||!Number.isFinite(peak)||peak<=0)return 1;
   return Math.max(.1,Math.min(4,10**((target-rmsDbfs)/20),.8/peak));
 }
+export function editorMusicFrames(doc:EditorDocument){
+  const music=doc.music;if(!music)return 0;
+  return Math.min(doc.durationSeconds*30-music.startFrame,music.durationFrames??1200,
+    music.loop?1200:Math.floor(music.durationMs*30/1000)-music.trimFromFrame);
+}
+// Loop only the selected source excerpt, never alter playback speed.
+export function editorMusicSourceFrame(doc:EditorDocument,frame:number){
+  const music=doc.music,at=music?frame-music.startFrame:-1;
+  if(!music||at<0||at>=editorMusicFrames(doc))return null;
+  const available=Math.floor(music.durationMs*30/1000)-music.trimFromFrame;
+  return music.trimFromFrame+(music.loop?at%available:at);
+}
+export function fitEditorMusic(doc:EditorDocument):EditorDocument{
+  if(!doc.music)return doc;
+  return {...doc,music:{...doc.music,startFrame:0,durationFrames:doc.durationSeconds*30,
+    loop:Math.floor(doc.music.durationMs*30/1000)-doc.music.trimFromFrame<doc.durationSeconds*30}};
+}
+// Aggregate the actual source peaks into the visible, trimmed (or repeated) clip.
+export function editorMusicWaveform(doc:EditorDocument,count=128){
+  const music=doc.music,peaks=music?.waveform;if(!music||!peaks)return [];
+  const source=Math.floor(music.durationMs*30/1000),length=editorMusicFrames(doc),available=source-music.trimFromFrame;
+  return Array.from({length:count},(_,i)=>{let peak=0;
+    const from=Math.floor(i*length/count),to=Math.max(from+1,Math.ceil((i+1)*length/count));
+    for(let f=from;f<to;f++){const position=music.trimFromFrame+(music.loop?f%available:f);
+      const first=Math.floor(position/source*peaks.length),last=Math.ceil((position+1)/source*peaks.length);
+      for(let j=first;j<last;j++)peak=Math.max(peak,peaks[Math.min(peaks.length-1,j)]??0);}
+    return peak;
+  });
+}
 export function editorMusicGain(doc:EditorDocument,frame:number,intervals:{startFrame:number;durationMs:number}[]=[]){
-  const music=doc.music;if(!music)return 0;const total=doc.durationSeconds*30,
-    length=Math.min(total-music.startFrame,Math.floor(music.durationMs*30/1000)-music.trimFromFrame),at=frame-music.startFrame;
+  const music=doc.music;if(!music)return 0;const length=editorMusicFrames(doc),at=frame-music.startFrame;
   if(at<0||at>=length)return 0;
   const mix=doc.audioMix;const fadeIn=mix?.fadeInFrames??12,fadeOut=mix?.fadeOutFrames??18,
     fade=Math.max(0,Math.min(1,fadeIn?at/fadeIn:1,fadeOut?(length-at)/fadeOut:1));

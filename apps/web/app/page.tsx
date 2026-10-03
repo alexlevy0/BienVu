@@ -3,8 +3,8 @@ import './landing.css';
 import './customizer.css';
 
 export const metadata = {
-  title: 'BienVu — Une annonce. Une vidéo qui donne envie.',
-  description: 'Votre studio de vidéos immobilières. Un lien ou vos photos, une voix française et les couleurs de votre agence.',
+  title: 'BienVu — Vos annonces, en version vidéo.',
+  description: 'Collez votre annonce. L’IA crée votre vidéo, prête à partager.',
   alternates:{canonical:'/'},
 };
 export default function Page() {return <LandingPage/>;}

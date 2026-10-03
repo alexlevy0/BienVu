@@ -1,7 +1,7 @@
 import {CreationDraftData,EditorDocument,GenerationRequest,GeneratableListing,VideoAsset,VideoManifest,defaultVideoCustomization,createEditorDocument,selectedAnimationIndices,audioNormalizationGain,
-  type CreationDraftView,type VideoCustomization} from '@bienvu/contracts';
+  MUSIC_LIMITS,type CreationDraftView,type VideoCustomization} from '@bienvu/contracts';
 import {findCreationDraft,findImport,draftFromListing,updateCreationDraft,beginManualImport,startCreationDraft,blankCreationDraft,ImportStateFailure,type Database} from '@bienvu/db';
-import {measureVoiceWav} from '../../../packages/voice/src/audio';
+import {measureMusicWav} from '../../../packages/voice/src/audio';
 import {contentHash} from './manual-listings';
 import {startManualCreationDraft,uploadCreationPhoto,finishCreationDraft} from './creation-drafts';
 import {ownGeneration} from './generations';
@@ -12,10 +12,10 @@ type Env={DB:Database;MEDIA:Pick<R2Bucket,'put'|'head'|'get'|'delete'>};
 export async function putEditorMusic(env:Env,agencyId:string,importId:string,id:string,bytes:Uint8Array){
   const draft=await findCreationDraft(env.DB,agencyId,importId);
   if(!draft||draft.expiresAt<=new Date().toISOString())throw new RequestFailure('NOT_FOUND');
-  if(!/^[a-zA-Z0-9_-]{16,64}$/.test(id)||bytes.length>3*1024*1024)throw new RequestFailure('VALIDATION_ERROR');
+  if(!/^[a-zA-Z0-9_-]{16,64}$/.test(id)||bytes.length>MUSIC_LIMITS.bytes)throw new RequestFailure('VALIDATION_ERROR');
   if(draft.photos.some(photo=>photo.id===id))throw new RequestFailure('CONFLICT');
-  let durationMs:number,normalizationGain:number;
-  try{const metrics=measureVoiceWav(bytes,40000);durationMs=metrics.durationMs;normalizationGain=audioNormalizationGain(metrics.rmsDbfs,metrics.peak,-24);}catch{throw new RequestFailure('VALIDATION_ERROR',{music:'Utilisez une piste audio non silencieuse de 0,5 à 40 secondes.'});}
+  let durationMs:number,normalizationGain:number,waveform:number[];
+  try{const metrics=measureMusicWav(bytes);durationMs=metrics.durationMs;waveform=metrics.waveform;normalizationGain=audioNormalizationGain(metrics.rmsDbfs,metrics.peak,-24);}catch{throw new RequestFailure('VALIDATION_ERROR',{music:'Utilisez une piste audio non silencieuse de 0,5 seconde à 5 minutes.'});}
   if(durationMs<500)throw new RequestFailure('VALIDATION_ERROR');
   const sha256=await contentHash(new Uint8Array(bytes)),asset=VideoAsset.parse({id,objectKey:`agencies/${agencyId}/imports/${importId}/music/${id}-${sha256}.wav`,
     sha256,sizeBytes:bytes.length,mime:'audio/wav',durationMs,normalizationGain});
@@ -29,7 +29,7 @@ export async function putEditorMusic(env:Env,agencyId:string,importId:string,id:
   await env.MEDIA.put(asset.objectKey,bytes,{httpMetadata:{contentType:'audio/wav',cacheControl:'private, no-store'},customMetadata:{agencyId,importId,sha256}});
   const after=await findCreationDraft(env.DB,agencyId,importId);
   if(!after||after.expiresAt<=new Date().toISOString()){await env.MEDIA.delete(asset.objectKey);throw new RequestFailure('CONFLICT');}
-  return {assetId:id,durationMs,normalizationGain};
+  return {assetId:id,durationMs,normalizationGain,waveform};
 }
 export async function privateEditorMusic(env:Env,agencyId:string,importId:string,id:string,request:Request){
   const row=await findImport(env.DB,agencyId,importId);
@@ -40,6 +40,13 @@ export async function privateEditorMusic(env:Env,agencyId:string,importId:string
   if(!asset.objectKey.startsWith(`agencies/${agencyId}/imports/${importId}/music/`))throw new RequestFailure('NOT_FOUND');
   const head=await env.MEDIA.head(asset.objectKey);
   if(!head||head.size!==asset.sizeBytes||head.customMetadata?.sha256!==asset.sha256)throw new RequestFailure('NOT_FOUND');
+  if(new URL(request.url).searchParams.get('metadata')==='1'){
+    if(head.size>MUSIC_LIMITS.bytes)throw new RequestFailure('NOT_FOUND');
+    const object=await env.MEDIA.get(asset.objectKey);if(!object)throw new RequestFailure('NOT_FOUND');
+    const bytes=new Uint8Array(await object.arrayBuffer());if(await contentHash(bytes)!==asset.sha256)throw new RequestFailure('NOT_FOUND');
+    const metrics=measureMusicWav(bytes);
+    return Response.json({assetId:id,durationMs:metrics.durationMs,waveform:metrics.waveform,normalizationGain:asset.normalizationGain??audioNormalizationGain(metrics.rmsDbfs,metrics.peak,-24)});
+  }
   const headers=new Headers({'Content-Type':'audio/wav','Content-Length':String(head.size),'Accept-Ranges':'bytes'});
   const range=request.headers.get('range');let offset=0,length=head.size;
   if(range){const match=/^bytes=(\d*)-(\d*)$/.exec(range);const end=match?.[1]&&match[2]?Math.min(head.size-1,Number(match[2])):head.size-1;

@@ -1,6 +1,6 @@
 import React from 'react';
 import {AbsoluteFill,Audio,Img,OffthreadVideo,Freeze,Sequence,useCurrentFrame} from 'remotion';
-import {editorClipStarts,editorLayerStyle,editorPhotoMotion,editorCaptionStyle,editorMusicGain,type VideoManifest,type EditorCamera} from '@bienvu/contracts';
+import {editorClipStarts,editorLayerStyle,editorPhotoMotion,editorCaptionStyle,editorMusicGain,editorMusicFrames,type VideoManifest,type EditorCamera} from '@bienvu/contracts';
 import {subtitleGroups} from './layout';
 
 function EditorPhoto({m,media,slot,index,duration,camera}:{m:VideoManifest;media:Record<string,string>;slot:number;index:number;duration:number;camera?:EditorCamera}){
@@ -21,7 +21,7 @@ function EditorSpeech({m,media,index}:{m:VideoManifest;media:Record<string,strin
 export function EditorFilm({manifest:m,media}:{manifest:VideoManifest;media:Record<string,string>}){
   const doc=m.editor!,frame=useCurrentFrame(),total=doc.durationSeconds*30;let at=0;
   const music=doc.music&&m.music?{...doc.music,asset:m.music.asset}:null,
-    musicFrames=music?Math.min(total-music.startFrame,Math.floor(music.durationMs*30/1000)-music.trimFromFrame):0;
+    musicFrames=editorMusicFrames(doc);
   let speechAt=0;const intervals=m.scenes.map(scene=>{const startFrame=speechAt;speechAt+=scene.durationFrames;return {startFrame,durationMs:m.audio.find(a=>a.id===scene.audioAssetId)?.durationMs??0};});
   return <AbsoluteFill style={{background:'#151b16',overflow:'hidden'}}>
     {doc.photosVisible&&editorClipStarts(doc).map((clip,index)=><Sequence key={clip.id} from={clip.startFrame}
@@ -35,7 +35,8 @@ export function EditorFilm({manifest:m,media}:{manifest:VideoManifest;media:Reco
     {m.voiceEnabled!==false&&m.scenes.map((scene,index)=>{const from=at;at+=scene.durationFrames;return <Sequence key={scene.id}
       from={from} durationInFrames={scene.durationFrames} premountFor={30}><EditorSpeech m={m} media={media} index={index}/></Sequence>;})}
     {music&&music.volume>0&&musicFrames>0&&<Sequence from={music.startFrame} durationInFrames={musicFrames} premountFor={30}>
-      <Audio src={media[music.asset.id]} startFrom={music.trimFromFrame} volume={f=>editorMusicGain({...doc,music:{...music,normalizationGain:music.asset.normalizationGain??music.normalizationGain}},music.startFrame+f,intervals)}/>
+      <Audio src={media[music.asset.id]} trimBefore={music.trimFromFrame} trimAfter={Math.floor(music.durationMs*30/1000)} loop={music.loop??false} loopVolumeCurveBehavior="extend"
+        volume={f=>editorMusicGain({...doc,music:{...music,normalizationGain:music.asset.normalizationGain??music.normalizationGain}},music.startFrame+f,intervals)}/>
     </Sequence>}
     {m.rights.watermarked&&<div style={{position:'absolute',top:'45%',left:'15%',width:'70%',textAlign:'center',fontSize:42,color:'#fff',background:'#132a23d9',padding:24,
       transform:'rotate(-14deg)'}}>BIENVU · VIDÉO D’ESSAI</div>}

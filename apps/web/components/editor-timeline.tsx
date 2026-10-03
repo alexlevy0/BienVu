@@ -1,12 +1,18 @@
 'use client';
-import {useRef,useState,type PointerEvent,type DragEvent} from 'react';
-import {editorClipStarts,resizeEditorClip,splitEditorClip,type EditorVoicePreview,type EditorDocument,type EditorLayer,type PhotoAsset} from '@bienvu/contracts';
+import {useEffect,useMemo,useRef,useState,type PointerEvent,type DragEvent} from 'react';
+import {editorClipStarts,resizeEditorClip,splitEditorClip,editorMusicFrames,editorMusicWaveform,MUSIC_DRAG_TYPE,EntityId,type EditorVoicePreview,type EditorDocument,type EditorLayer,type PhotoAsset} from '@bienvu/contracts';
 import {HomeIcon} from './home-icons';
 import {editorTime} from './editor-preview';
-type Selection={kind:'text'|'photo';id:string}|null;
+import {MusicWaveform} from './music-waveform';
+type Selection={kind:'text'|'photo'|'music';id:string}|null;
 export function EditorTimeline(p:{doc:EditorDocument;voice?:EditorVoicePreview|null;voiceLoading?:boolean;voiceError?:boolean;photos:PhotoAsset[];draftId:string;frame:number;selected:Selection;
-  onSelect(selection:Selection):void;onSeek(frame:number):void;onChange(doc:EditorDocument,remember?:boolean):void;onCheckpoint():void;onAddPhoto(slot:number,index?:number):void}){
-  const [snap,setSnap]=useState(true),[zoom,setZoom]=useState(100),track=useRef<HTMLDivElement>(null),total=p.doc.durationSeconds*30,starts=editorClipStarts(p.doc);
+  musicBusy?:boolean;onAddMusic(id:string,startFrame:number):Promise<void>;onSelect(selection:Selection):void;onSeek(frame:number):void;onChange(doc:EditorDocument,remember?:boolean):void;onCheckpoint():void;onAddPhoto(slot:number,index?:number):void}){
+  const [snap,setSnap]=useState(true),[zoom,setZoom]=useState(100),[musicDrag,setMusicDrag]=useState(false),track=useRef<HTMLDivElement>(null),musicTrack=useRef<HTMLDivElement>(null),total=p.doc.durationSeconds*30,starts=editorClipStarts(p.doc),
+    musicPeaks=useMemo(()=>editorMusicWaveform(p.doc),[p.doc.music,p.doc.durationSeconds]);
+  useEffect(()=>{const reveal=()=>{const scroll=musicTrack.current?.closest('.editor-timeline-scroll');if(scroll)scroll.scrollTop=scroll.scrollHeight;};
+    const drag=(event:globalThis.DragEvent)=>{if(event.dataTransfer?.types.includes(MUSIC_DRAG_TYPE))reveal();};
+    document.addEventListener('dragstart',drag);if(p.doc.music)reveal();return()=>document.removeEventListener('dragstart',drag);
+  },[p.doc.music?.assetId]);
   const markers=Array.from({length:p.doc.durationSeconds/4+1},(_,i)=>i*120),selectedClip=p.selected?.kind==='photo'?starts.find(c=>c.id===p.selected!.id):null;
   function quantize(value:number){const rounded=Math.round(value);if(!snap)return rounded;
     const stops=[0,total,...starts.map(c=>c.startFrame),...p.doc.layers.flatMap(l=>[l.startFrame,l.startFrame+l.durationFrames])];
@@ -34,6 +40,18 @@ export function EditorTimeline(p:{doc:EditorDocument;voice?:EditorVoicePreview|n
       const [clip]=clips.splice(from,1);clips.splice(Math.min(index,clips.length),0,clip);p.onChange({...p.doc,clips});}
     else if(/^(?:[0-9]|1[01])$/.test(slot))p.onAddPhoto(Number(slot),index);
   }
+  function moveMusic(event:PointerEvent<HTMLElement>,edge:'move'|'start'|'end'){
+    const music=p.doc.music;if(!music)return;p.onSelect({kind:'music',id:music.assetId});
+    const length=editorMusicFrames(p.doc),end=music.startFrame+length,source=Math.floor(music.durationMs*30/1000);
+    gesture(event,delta=>{let startFrame=music.startFrame,durationFrames=length,trimFromFrame=music.trimFromFrame;
+      if(edge==='move')startFrame=Math.max(0,Math.min(total-length,quantize(startFrame+delta)));
+      if(edge==='start'){startFrame=Math.max(0,music.startFrame-music.trimFromFrame,Math.min(end-15,quantize(startFrame+delta)));
+        trimFromFrame=music.trimFromFrame+startFrame-music.startFrame;durationFrames=end-startFrame;}
+      if(edge==='end')durationFrames=Math.max(15,Math.min(total-startFrame,music.loop?total:source-trimFromFrame,quantize(end+delta)-startFrame));
+      durationFrames=Math.min(durationFrames,music.loop?total:source-trimFromFrame);
+      p.onChange({...p.doc,music:{...music,startFrame,durationFrames,trimFromFrame}},false);
+    });
+  }
   return <section className="editor-timeline" aria-label="Timeline de la vidéo">
     <div className="editor-timeline-toolbar"><h2>Timeline</h2><button type="button" aria-pressed={snap} onClick={()=>setSnap(v=>!v)}><HomeIcon name="magnet" size={17}/>Magnétisme <span className="editor-mini-switch"/></button>
       <button type="button" disabled={!selectedClip||p.doc.clips.length>=24||p.frame-selectedClip.startFrame<15||selectedClip.startFrame+selectedClip.durationFrames-p.frame<15}
@@ -43,6 +61,7 @@ export function EditorTimeline(p:{doc:EditorDocument;voice?:EditorVoicePreview|n
         <button type="button" aria-label="Agrandir la timeline" onClick={()=>setZoom(v=>Math.min(250,v+25))}>+</button></label><span>{p.doc.durationSeconds} s</span></div>
     <div className="editor-timeline-scroll"><div className="editor-timeline-sheet" style={{width:`${zoom}%`}}>
       <div className="editor-track-label editor-ruler-label"/><div className="editor-ruler" ref={track} onPointerDown={event=>{
+        event.preventDefault();
         const element=event.currentTarget,rect=element.getBoundingClientRect();element.setPointerCapture(event.pointerId);
         const seek=(x:number)=>p.onSeek(Math.max(0,Math.min(total-1,Math.round((x-rect.left)/rect.width*total))));seek(event.clientX);
         const move=(e:globalThis.PointerEvent)=>seek(e.clientX),end=()=>{element.removeEventListener('pointermove',move);element.removeEventListener('pointerup',end);element.removeEventListener('pointercancel',end);};
@@ -82,9 +101,22 @@ export function EditorTimeline(p:{doc:EditorDocument;voice?:EditorVoicePreview|n
         <i className="editor-playhead" style={{left:`${p.frame/total*100}%`}}/></div>
       <div className="editor-track-label"><button type="button" disabled={!p.doc.music} aria-label={p.doc.music?.volume?'Couper la musique':'Activer la musique'} aria-pressed={Boolean(p.doc.music?.volume)}
         onClick={()=>p.doc.music&&p.onChange({...p.doc,music:{...p.doc.music,volume:p.doc.music.volume?0:.15}})}><HomeIcon name="music" size={17}/></button><span>Musique</span></div>
-      <div className={`editor-track editor-audio-track${p.doc.music?.volume?'':' is-muted'}`}>
-        {p.doc.music?<div className="editor-music-clip" style={{left:`${p.doc.music.startFrame/total*100}%`,width:`${Math.min(total-p.doc.music.startFrame,Math.floor(p.doc.music.durationMs*30/1000)-p.doc.music.trimFromFrame)/total*100}%`}}>
-          <HomeIcon name="music" size={16}/><span>{p.doc.music.name} · {Math.round(p.doc.music.volume*100)} %</span></div>:<span className="editor-track-placeholder">Importez une musique dans l’onglet Audio</span>}
+      <div ref={musicTrack} data-music-track className={`editor-track editor-audio-track editor-music-track${p.doc.music&&p.doc.music.volume===0?' is-muted':''}${musicDrag?' is-drop-target':''}`}
+        onDragOver={event=>{if(event.dataTransfer.types.includes(MUSIC_DRAG_TYPE)&&!p.musicBusy){event.preventDefault();event.dataTransfer.dropEffect='copy';setMusicDrag(true);}}}
+        onDragLeave={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node))setMusicDrag(false);}}
+        onDrop={event=>{event.preventDefault();setMusicDrag(false);if(p.musicBusy)return;
+          const id=event.dataTransfer.getData(MUSIC_DRAG_TYPE);if(!EntityId.safeParse(id).success)return;
+          const rect=event.currentTarget.getBoundingClientRect(),at=Math.max(0,Math.min(total-15,quantize((event.clientX-rect.left)/rect.width*total)));
+          void p.onAddMusic(id,at);}}>
+        {p.doc.music?<button type="button" data-music-clip className={`editor-music-clip${p.selected?.kind==='music'?' is-selected':''}`} style={{left:`${p.doc.music.startFrame/total*100}%`,width:`${editorMusicFrames(p.doc)/total*100}%`}}
+          aria-label={`Musique ${p.doc.music.name}, à ${editorTime(p.doc.music.startFrame)}, ${Number((editorMusicFrames(p.doc)/30).toFixed(1))} secondes`}
+          onClick={()=>p.doc.music&&p.onSelect({kind:'music',id:p.doc.music.assetId})} onPointerDown={event=>moveMusic(event,'move')}
+          onKeyDown={event=>{if((event.key==='ArrowLeft'||event.key==='ArrowRight')&&p.doc.music){event.preventDefault();p.onChange({...p.doc,music:{...p.doc.music,
+            durationFrames:editorMusicFrames(p.doc),startFrame:Math.max(0,Math.min(total-editorMusicFrames(p.doc),p.doc.music.startFrame+(event.key==='ArrowLeft'?-1:1)*(event.shiftKey?30:3)))}});}}}>
+          {musicPeaks.length>0&&<MusicWaveform peaks={musicPeaks}/>}<span className="editor-clip-grip" data-music-trim="start" onPointerDown={event=>moveMusic(event,'start')} aria-hidden="true"/>
+          <span className="editor-music-clip-label">{p.doc.music.name} · {Math.round(p.doc.music.volume*100)} %</span>
+          <span className="editor-clip-grip" data-music-trim="end" onPointerDown={event=>moveMusic(event,'end')} aria-hidden="true"/>
+        </button>:<span className="editor-track-placeholder">{p.musicBusy?'Ajout de la musique…':musicDrag?'Déposez pour ajouter la musique':'Glissez une musique ici depuis l’onglet Audio'}</span>}
         <i className="editor-playhead" style={{left:`${p.frame/total*100}%`}}/>
       </div>
     </div></div>

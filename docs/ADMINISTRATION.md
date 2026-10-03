@@ -20,6 +20,7 @@ La page vérifie le rôle côté serveur : redirection vers la connexion si aucu
 - **Abonnements** : état, offre, période et résiliation prévue dans le registre Stripe existant. Une table vide correspond à l’absence d’abonnement enregistré ; les paiements en ligne attendent toujours le sprint Stripe. Le panneau ne prétend pas avoir encaissé les tarifs proposés.
 - **Quotas** : toutes les périodes client conservées, type de crédit, quota consommé/réservé/disponible et ajustement de la période active. Un crédit `paid` peut être une allocation de développement historique : il ne prouve pas un paiement.
 - **Imports & brouillons** : annonces encore conservées, URL ou saisie manuelle, photos et erreurs ; dates et filtres. Les données déjà purgées ne sont pas reconstituées. Les compteurs d’usage restent consultables dans le service.
+- **Banque de musiques** : dépôt de morceaux, titre, description et licence ou origine autorisée. Préécoute, recherche, modification et masquage ; les morceaux disponibles apparaissent dans l’onglet Audio de l’Éditeur. La musique est incluse sans crédit supplémentaire.
 - **Signalements** : commentaire, catégorie, vidéo concernée et transition Nouveau / En traitement / Clos.
 - **Service & budget** : configuration utile, autorisation des lancements, limites, usage des imports, erreurs regroupées, appels texte/voix réels ou fixtures, provisions et sous-budget narration. Pause/reprise des **nouveaux** lancements ; les jobs déjà lancés continuent et les autres gardes (budget, flags, quotas, anti-abus) restent nécessaires à la reprise.
 - **Journal** : modifications avec auteur, cible, avant/après, motif et date.
@@ -48,6 +49,16 @@ Le pays vient uniquement de `request.cf.country`, fourni par Cloudflare ; le hea
 L’UPSERT atomique est attaché à `ctx.waitUntil()`. Une erreur de collecte produit seulement le log `traffic_write_failed` et n’interrompt pas la page. Un compteur est borné à un million de chargements par combinaison/jour. Cron web **`23 3 * * *`**, à 03:23 UTC : purge les jours antérieurs à `aujourd’hui - 30 jours`, soit environ 31 jours calendaires conservés. La purge reste active si la collecte est désactivée. Le cron utilise le binding D1 existant.
 
 L’API `GET /api/admin?section=traffic&days=7|30` applique le même contrôle Super admin et le même cache privé que les autres API. Elle ne renvoie que des agrégats. La collecte démarre lors de son activation ; les visites antérieures ne sont pas reconstituées. Le texte de confidentialité de l’accueil indique cette mesure et sa conservation. La configuration du cron est vérifiable au déploiement ; sa première exécution nocturne est distincte de la recette locale du handler.
+
+## Banque de musiques
+
+Le Super admin peut déposer un fichier audio, ou une vidéo contenant une piste audio décodable par le navigateur, de **50 Mo et 5 minutes maximum**. Le navigateur conserve le morceau complet et le convertit en WAV mono à 24 kHz. Le serveur vérifie indépendamment les échantillons, la durée, le poids et l’empreinte ; il calcule la forme d’onde réelle. Un fichier sans piste audio lisible ou entièrement silencieux est refusé avec un message explicite. Un titre et une licence ou origine autorisée sont nécessaires avant publication.
+
+Dans **Éditeur → Médias → Audio**, les utilisateurs connectés peuvent rechercher, écouter et glisser un morceau sur la piste Musique ; le bouton Ajouter propose la même action sur mobile et au clavier. La piste remplit automatiquement la durée restante à partir de son point de dépôt et se répète si le morceau est plus court. Les réglages permettent de choisir un passage dans le morceau complet, de déplacer et redimensionner la piste, de régler son volume ou de l’adapter à toute la vidéo. L’histogramme de la timeline suit les échantillons du passage et ses répétitions. Les réglages existants de fondus, normalisation et baisse du volume pendant la voix restent disponibles sous « Voix, sous-titres et mixage ».
+
+Les sources partagées sont privées dans R2 et accessibles par des routes authentifiées. À l’ajout, une copie identifiée de façon déterministe est isolée dans le projet de l’agence. Masquer une musique empêche de nouveaux ajouts depuis la banque, mais conserve les brouillons, aperçus et exports qui l’utilisent déjà. Les mutations administratives contrôlent la session Super admin vérifiée, l’origine et la révision attendue ; leur journal D1 est atomique et immuable. La migration additive **0041** crée les deux tables et leurs triggers sans modifier les registres existants. La musique ne déclenche aucun appel IA ni débit de crédit supplémentaire.
+
+La recette et ses limites sont décrites dans [la preuve du 03/10](preuves/maintenance/BANQUE-MUSIQUES-03-10.md).
 
 ## Propositions et priorités
 

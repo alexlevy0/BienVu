@@ -415,7 +415,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     ? !manualReady||Boolean(noCredits)||activeOtherJob
     : Boolean(noCredits)||Boolean(importPaused&&ImportUrl.safeParse(url.trim()).success)||activeOtherJob||screen.kind==='job'&&
       (generationActive(selectedJob)||resultReady&&!url.trim()));
-  const contextNote = !me ? 'Essayez gratuitement. Connectez-vous pour télécharger sans filigrane.' : canGenerate
+  const contextNote = !me ? 'Essayez gratuitement.' : canGenerate
     ? (noCredits?'Crédits insuffisants pour ce montage. Réduisez les animations ou consultez vos crédits.':'')
     : 'Accès anticipé · Préparez votre annonce';
   return <div className={`home-create${inConversation ? ' home-create-conversation' : ''}${customizing||screen.kind==='guest-customizing'?' home-create-customizing':''}`}>

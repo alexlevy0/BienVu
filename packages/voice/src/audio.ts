@@ -1,10 +1,10 @@
-import {VoiceFailure,VideoDuration} from '@bienvu/contracts';
+import {VoiceFailure,VideoDuration,MUSIC_LIMITS} from '@bienvu/contracts';
 
 // Chirp LINEAR16 retourne un WAV PCM. Mesure des échantillons, pas une durée
 // déduite du texte ou d'un seul champ d'en-tête. Web APIs uniquement ; appelé par Node et le pipeline Workers.
-export function measureVoiceWav(input: Uint8Array,maximumDurationMs:35000|40000=35000) {
-  if(![35000,40000].includes(maximumDurationMs))throw new VoiceFailure('VOICE_AUDIO_INVALID');
-  if (input.byteLength < 44 || input.byteLength > 7 * 1024 * 1024) throw new VoiceFailure('VOICE_AUDIO_INVALID');
+export function measureVoiceWav(input: Uint8Array,maximumDurationMs:35000|40000|300000=35000) {
+  if(![35000,40000,MUSIC_LIMITS.durationMs].includes(maximumDurationMs))throw new VoiceFailure('VOICE_AUDIO_INVALID');
+  if (input.byteLength < 44 || input.byteLength > (maximumDurationMs===MUSIC_LIMITS.durationMs?MUSIC_LIMITS.bytes:7*1024*1024)) throw new VoiceFailure('VOICE_AUDIO_INVALID');
   const data = new DataView(input.buffer, input.byteOffset, input.byteLength);
   const tag = (offset: number) => String.fromCharCode(...input.subarray(offset, offset + 4));
   if (tag(0) !== 'RIFF' || tag(8) !== 'WAVE' || data.getUint32(4, true) !== input.byteLength - 8)
@@ -42,7 +42,18 @@ export function measureVoiceWav(input: Uint8Array,maximumDurationMs:35000|40000=
   if (!Number.isFinite(rmsDbfs) || rmsDbfs < -55) throw new VoiceFailure('VOICE_AUDIO_SILENT');
   return {durationMs, durationFrames: Math.ceil(durationMs * 30 / 1000), sampleRate: format.sampleRate,
     channels: format.channels, sampleFrames: pcm.bytes / format.blockAlign, rmsDbfs, peak,
-    measurement: 'decoded_pcm16_samples' as const};
+    pcmOffset:pcm.offset,pcmBytes:pcm.bytes,measurement: 'decoded_pcm16_samples' as const};
+}
+
+export function measureMusicWav(bytes:Uint8Array){
+  const metrics=measureVoiceWav(bytes,MUSIC_LIMITS.durationMs);
+  if(metrics.durationMs<500)throw new VoiceFailure('VOICE_AUDIO_INVALID');
+  const data=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength),samples=metrics.pcmBytes/2,
+    peaks=Array.from({length:MUSIC_LIMITS.waveformPeaks},(_,i)=>{let peak=0;
+      for(let s=Math.floor(i*samples/MUSIC_LIMITS.waveformPeaks);s<Math.floor((i+1)*samples/MUSIC_LIMITS.waveformPeaks);s++)
+        peak=Math.max(peak,Math.abs(data.getInt16(metrics.pcmOffset+s*2,true))/32768);
+      return Number(peak.toFixed(3));});
+  return {...metrics,waveform:peaks};
 }
 
 export function voiceSceneTiming(durationsMs: readonly number[],durationSeconds?:VideoDuration) {

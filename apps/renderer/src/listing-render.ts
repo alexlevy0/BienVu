@@ -50,7 +50,7 @@ export async function withVideoAssets<T>(input: unknown, directory: string, use:
     const bytes = await readFile(file);
     if (sha(bytes) !== asset.sha256) throw new Error('VIDEO_ASSET_HASH_MISMATCH');
     if (asset.mime === 'audio/wav') {
-      if (measureVoiceWav(bytes,asset.id===manifest.music?.asset.id?40000:35000).durationMs !== asset.durationMs) throw new Error('VIDEO_AUDIO_DURATION_MISMATCH');
+      if (measureVoiceWav(bytes,asset.id===manifest.music?.asset.id?300000:35000).durationMs !== asset.durationMs) throw new Error('VIDEO_AUDIO_DURATION_MISMATCH');
     } else if(asset.mime==='video/mp4'){
       const {stdout}=await exec(binary('ffprobe'),['-v','error','-show_format','-show_streams','-of','json',file],{cwd:cwd(binary('ffprobe')),timeout:20_000,maxBuffer:128_000});
       const metadata=JSON.parse(stdout) as {format:{duration:string};streams:{codec_type:string;codec_name:string;width:number;height:number}[]};

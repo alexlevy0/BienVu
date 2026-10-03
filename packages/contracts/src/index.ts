@@ -9,6 +9,7 @@ export * from './customization';
 export * from './editor';
 export * from './editor-voice';
 export * from './editor-quality';
+export * from './music-library';
 export * from './credits';
 export * from './import-sources';
 export * from './voice';

@@ -4,14 +4,18 @@ import {ScriptScene} from './narration';
 import {SYNTHETIC_VOICE_DISCLOSURE} from './voice';
 import {VideoStyle} from './customization';
 import {EditorDocument} from './editor';
+import {MUSIC_LIMITS} from './music-library';
 
 export const VideoAsset = z.object({id: EntityId, objectKey: ObjectKey, sha256: Sha256,
-  sizeBytes: z.number().int().positive().max(10 * 1024 * 1024),
+  sizeBytes: z.number().int().positive().max(MUSIC_LIMITS.bytes),
   mime: z.enum(['image/jpeg', 'image/png', 'image/webp', 'audio/wav', 'video/mp4']),
   width: z.number().int().positive().max(12000).optional(), height: z.number().int().positive().max(12000).optional(),
-  durationMs: z.number().int().positive().max(40000).optional(),
+  durationMs: z.number().int().positive().max(MUSIC_LIMITS.durationMs).optional(),
   normalizationGain:z.number().min(.1).max(4).optional(),
-}).strict();
+}).strict().superRefine((asset,ctx)=>{
+  if(asset.mime!=='audio/wav'&&(asset.sizeBytes>10*1024*1024||(asset.durationMs??0)>40000))
+    ctx.addIssue({code:'custom',message:'Média trop volumineux ou trop long.'});
+});
 export type VideoAsset = z.infer<typeof VideoAsset>;
 export const PhotoAnimation=z.object({photoAssetId:EntityId,sourceSha256:Sha256,
   provider:z.literal('runway'),model:z.literal('gen4_turbo'),asset:VideoAsset}).strict();

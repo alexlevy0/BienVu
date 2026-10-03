@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import {MUSIC_LIMITS,MusicWaveform} from './music-library';
 
 // Portable, bounded timeline data. No URLs, object keys, HTML or render code
 // supplied by a client: media references resolve through the owning import.
@@ -24,8 +25,10 @@ export const EditorDocument=z.object({version:z.literal(1),aspectRatio:z.enum(['
   photosVisible:z.boolean(),textsVisible:z.boolean(),voiceEnabled:z.boolean(),subtitlesEnabled:z.boolean(),
   voiceVolume:z.number().min(0.05).max(1),
   audioMix:z.object({ducking:z.boolean(),normalize:z.boolean(),duckLevel:z.number().min(.05).max(.8),fadeInFrames:z.number().int().min(0).max(90),fadeOutFrames:z.number().int().min(0).max(90)}).strict().optional(),
-  music:z.object({assetId:id,name:z.string().min(1).max(100),durationMs:z.number().int().min(500).max(40000),
-    volume:z.number().min(0).max(1),startFrame:frame,trimFromFrame:frame,normalizationGain:z.number().min(.1).max(4).optional()}).strict().nullable(),
+  music:z.object({assetId:id,name:z.string().min(1).max(100),durationMs:z.number().int().min(500).max(MUSIC_LIMITS.durationMs),
+    volume:z.number().min(0).max(1),startFrame:frame,trimFromFrame:z.number().int().min(0).max(MUSIC_LIMITS.durationMs*30/1000-15),
+    durationFrames:duration.optional(),loop:z.boolean().optional(),waveform:MusicWaveform.optional(),
+    normalizationGain:z.number().min(.1).max(4).optional()}).strict().nullable(),
 }).strict().superRefine((doc,ctx)=>{
   const total=doc.durationSeconds*30;
   if(new Set(doc.clips.map(c=>c.id)).size!==doc.clips.length||new Set(doc.layers.map(l=>l.id)).size!==doc.layers.length)
@@ -36,6 +39,9 @@ export const EditorDocument=z.object({version:z.literal(1),aspectRatio:z.enum(['
   if(!doc.voiceEnabled&&doc.subtitlesEnabled)ctx.addIssue({code:'custom',message:'Les sous-titres nécessitent une voix off.'});
   if(doc.music&&(doc.music.startFrame>total-15||doc.music.trimFromFrame>Math.floor(doc.music.durationMs*30/1000)-15))
     ctx.addIssue({code:'custom',message:'Le début de la musique est hors de la piste.'});
+  if(doc.music?.durationFrames&&(doc.music.startFrame+doc.music.durationFrames>total||
+    !doc.music.loop&&doc.music.durationFrames>Math.floor(doc.music.durationMs*30/1000)-doc.music.trimFromFrame))
+    ctx.addIssue({code:'custom',message:'La musique dépasse la vidéo ou le passage disponible.'});
 });
 export type EditorDocument=z.infer<typeof EditorDocument>;
 export const editorFrames=(doc:Pick<EditorDocument,'durationSeconds'>)=>doc.durationSeconds*30;
@@ -94,7 +100,9 @@ export function resizeEditorDocument(doc:EditorDocument,seconds:20|30|40):Editor
   const clips=rebalanceEditorClips(total,doc.clips);
   return EditorDocument.parse({...doc,durationSeconds:seconds,clips,layers:doc.layers.map(l=>{
     const startFrame=Math.min(total-15,Math.round(l.startFrame*ratio));return {...l,startFrame,durationFrames:Math.max(15,Math.min(total-startFrame,Math.round(l.durationFrames*ratio)))};}),
-    music:doc.music?{...doc.music,startFrame:Math.min(total-15,Math.round(doc.music.startFrame*ratio))}:null});
+    music:doc.music?{...doc.music,startFrame:Math.min(total-15,Math.round(doc.music.startFrame*ratio)),
+      ...(doc.music.durationFrames?{durationFrames:Math.max(15,Math.min(total-Math.min(total-15,Math.round(doc.music.startFrame*ratio)),
+        Math.round(doc.music.durationFrames*ratio),doc.music.loop?total:Math.floor(doc.music.durationMs*30/1000)-doc.music.trimFromFrame))}:{})}:null});
 }
 export function splitEditorClip(doc:EditorDocument,id:string,at:number,newId:string):EditorDocument{
   const clip=editorClipStarts(doc).find(c=>c.id===id);if(!clip||doc.clips.length>=24)return doc;
