@@ -1,14 +1,27 @@
-import {CreationDraftData,EditorDocument,GenerationRequest,GeneratableListing,VideoAsset,VideoManifest,defaultVideoCustomization,createEditorDocument,selectedAnimationIndices,audioNormalizationGain,
+import {CreationDraftData,EditorDocument,GenerationRequest,GeneratableListing,VideoAsset,VideoManifest,defaultVideoCustomization,createEditorDocument,selectedAnimationIndices,audioNormalizationGain,generationCreditCost,
   MUSIC_LIMITS,type CreationDraftView,type VideoCustomization} from '@bienvu/contracts';
-import {findCreationDraft,findImport,draftFromListing,updateCreationDraft,beginManualImport,startCreationDraft,blankCreationDraft,ImportStateFailure,type Database} from '@bienvu/db';
+import {findCreationDraft,findImport,draftFromListing,updateCreationDraft,beginManualImport,startCreationDraft,blankCreationDraft,retainedAnimations,ImportStateFailure,type Database} from '@bienvu/db';
 import {measureMusicWav} from '../../../packages/voice/src/audio';
 import {contentHash} from './manual-listings';
 import {startManualCreationDraft,uploadCreationPhoto,finishCreationDraft} from './creation-drafts';
 import {ownGeneration} from './generations';
 import {RequestFailure} from './http';
 import {restoreVideoVoice,copyEditorVoice} from './editor-voice';
+import {editorMediaSourcesKey} from './editor-client';
 
 type Env={DB:Database;MEDIA:Pick<R2Bucket,'put'|'head'|'get'|'delete'>};
+export async function editorResources(db:Database,agencyId:string,id:string){
+  const draft=await findCreationDraft(db,agencyId,id);if(!draft)throw new RequestFailure('NOT_FOUND');
+  const settings=draft.data.videoCustomization,order=settings?.photoOrder??draft.photos.map(p=>p.sourceOrder),
+    selected=new Set(selectedAnimationIndices(order,settings).map(index=>order[index]));
+  // Discover the retained files even if an older editor copy lost its selection.
+  // Only selected animations count towards reuse pricing and the current preview.
+  const available=await retainedAnimations(db,agencyId,{agencyId,photos:draft.photos},
+    {...defaultVideoCustomization(),photoOrder:draft.photos.map(p=>p.sourceOrder),runwayPhotos:draft.photos.map(p=>p.sourceOrder)},settings?.editor?.aspectRatio??'9:16');
+  const availableAnimations=available.map(reuse=>({slot:draft.photos[reuse.index].sourceOrder,url:`/api/animations/${reuse.libraryId}`})),
+    animations=availableAnimations.filter(a=>selected.has(a.slot));
+  return {version:draft.version,sourceKey:editorMediaSourcesKey(settings??defaultVideoCustomization(),draft.photos),cost:generationCreditCost(settings)-animations.length,animations,availableAnimations};
+}
 export async function putEditorMusic(env:Env,agencyId:string,importId:string,id:string,bytes:Uint8Array){
   const draft=await findCreationDraft(env.DB,agencyId,importId);
   if(!draft||draft.expiresAt<=new Date().toISOString())throw new RequestFailure('NOT_FOUND');
@@ -122,7 +135,9 @@ export async function editExistingVideo(env:Env,agencyId:string,jobId:string,key
   const voiceSourceId=await restoreVideoVoice(env,agencyId,draft.id,m,sourceVoice,seconds,signal);
   const settings:VideoCustomization={...defaultVideoCustomization(m.brand),...old,editor,voice:sourceVoice,voiceSourceId,
     ...(voiceSourceId?{narration:m.scenes.map(s=>s.narrationText)}:{}),photoOrder:[...new Set(editor.clips.map(c=>c.photoSlot))],
-    runwayClips:undefined,runwayPhotos:old?.runwayPhotos?.map(remap).filter(slot=>slot>=0)??selectedAnimationIndices(oldOrder,old)};
+    runwayClips:undefined,runwayPhotos:m.photoAnimations?.length?m.photos.flatMap((photo,slot)=>
+      m.photoAnimations!.some(clip=>clip.photoAssetId===photo.id&&clip.sourceSha256===photo.sha256)?[slot]:[]):
+      old?.runwayPhotos?.map(remap).filter(slot=>slot>=0)??selectedAnimationIndices(oldOrder,old)};
   draft=(await findCreationDraft(env.DB,agencyId,draft.id))!;
   if(await updateCreationDraft(env.DB,agencyId,draft.id,draft.version,{...data,videoCustomization:settings})===null)throw new RequestFailure('CONFLICT');
   return (await findCreationDraft(env.DB,agencyId,draft.id))!;

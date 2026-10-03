@@ -54,7 +54,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   const lock = useRef(false), startFresh = useRef(false), interactionVersion=useRef(0),
     scrollRegion = useRef<HTMLDivElement>(null),composerDock=useRef<HTMLDivElement>(null),
     composerAnimation=useRef<Animation|null>(null),previousComposer=useRef<DOMRect|null>(null),previousLayout=useRef(false);
-  const manualForm=useRef<ManualListingFormHandle>(null);
+  const manualForm=useRef<ManualListingFormHandle>(null),composerInput=useRef<HTMLInputElement>(null),autoFocusHandled=useRef(false);
   const pendingImport=useRef<{url:string;key:string}|null>(null);
   const guestPending=useRef<{text:string;key:string}|null>(null);
   const lastOwner=useRef<string|null>(null);
@@ -134,6 +134,15 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     if (draft?.kind === 'url') setUrl(draft.url);
     if (draft?.kind === 'manual') setScreen({kind: 'manual'});
   }, []);
+  useEffect(()=>{
+    if(loading||autoFocusHandled.current)return;
+    autoFocusHandled.current=true;
+    if(screen.kind!=='landing'||window.location.hash||new URLSearchParams(window.location.search).has('draft')||
+      remembered()||readListingDraft()?.kind==='manual')return;
+    const active=document.activeElement;
+    if(active&&active!==document.body&&active!==document.documentElement)return;
+    composerInput.current?.focus({preventScroll:true});
+  },[loading,screen.kind]);
   useEffect(()=>{
     if(!me)return;const id=new URLSearchParams(window.location.search).get('draft');
     if(!id||!/^[a-zA-Z0-9_-]{1,80}$/.test(id))return;
@@ -450,7 +459,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
       onDrop={event=>void dropPhotos(event)}>
       {dropActive&&<div className="home-drop-overlay" aria-hidden="true"><HomeIcon name="upload" size={30}/><strong>Déposez vos photos ici</strong><span>JPEG, PNG ou WebP · Jusqu’à 12 photos</span></div>}
       <div className="home-url-row"><HomeIcon name="link" size={28}/><label htmlFor="home-listing-url" className="sr-only">{manual?'Précisions sur votre bien':'Lien ou description de votre annonce'}</label>
-        <input id="home-listing-url" name="url" type="text" autoComplete="off" spellCheck={false} placeholder={composerPhotos.length?'Décrivez votre bien, ou appuyez sur Entrée…':manual?'Ajoutez des précisions sur votre bien…':resultReady?'Collez le lien d’une autre annonce…':'Collez un lien ou décrivez votre bien…'}
+        <input ref={composerInput} id="home-listing-url" name="url" type="text" autoComplete="off" spellCheck={false} placeholder={composerPhotos.length?'Décrivez votre bien, ou appuyez sur Entrée…':manual?'Ajoutez des précisions sur votre bien…':resultReady?'Collez le lien d’une autre annonce…':'Collez un lien ou décrivez votre bien…'}
           readOnly={customizing} value={manual?customizing?importDraft?.sourceUrl??importDraft?.data.canonicalUrl??importDraft?.data.fields.title??description:description:screen.kind==='sending'?'':url} onChange={event=>{if(manual)setDescription(event.target.value);
             else {if(screen.kind==='extracting'){interactionVersion.current++;lock.current=false;guestPending.current=null;
               trial.setToken('');trial.setChallenge(false);trial.setWidgetVersion(n=>n+1);setScreen({kind:'landing'});}setUrl(event.target.value);}

@@ -1,10 +1,12 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import sharp from 'sharp';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
-import {GenerationRequest,defaultVideoCustomization,VideoManifest,videoAssets,videoPhotoTimeline} from '../packages/contracts/src/index';
-import {findImport,admitGeneration,failGeneration,findGeneration,adminVideoDetail} from '../packages/db/src/index';
+import {GenerationRequest,defaultVideoCustomization,VideoManifest,videoAssets,videoPhotoTimeline,editorCanReuseVoice} from '../packages/contracts/src/index';
+import {findImport,admitGeneration,failGeneration,findGeneration,adminVideoDetail,findEditorVoiceSource} from '../packages/db/src/index';
 import {migrateNarrationProbe,seedNarrationFixture} from '../scripts/narration-fixtures';
-import {videoFixture} from '../fixtures/video';
+import {videoFixture,videoReport} from '../fixtures/video';
 import {toneFixture} from '../fixtures/voice';
 import {googleTts} from '../packages/voice/src/index';
 import {GoogleVoiceConfig} from '../packages/contracts/src/voice';
@@ -14,6 +16,9 @@ import {prepareJobVideo} from '../apps/pipeline/src/video-manifest';
 import {prepareJobAnimations,animationIndices} from '../apps/pipeline/src/photo-animations';
 import {allowedRunwayOutput,downloadRunwayOutput,runwayProvider,RUNWAY_PROMPT,type AnimationProvider} from '../apps/pipeline/src/runway';
 import {cameraMotion} from '../packages/video/src/camera-motion';
+import {editExistingVideo,editorResources,snapshotEditorExport} from '../apps/web/lib/video-editor';
+import {patchCreationDraft} from '../apps/web/lib/creation-drafts';
+import {editorMediaSourcesKey} from '../apps/web/lib/editor-client';
 
 const clip=new Uint8Array(512);clip.set(new TextEncoder().encode('ftyp'),4);
 const taskId='11111111-1111-4111-8111-111111111111';
@@ -35,7 +40,7 @@ test('animation : coûts bornés, URL privées refusées et caméra sans bords v
   assert.deepEqual(cameraMotion(120,300,2,false),{scale:1,x:0,y:0});
 });
 
-async function setup(t:{after(fn:()=>Promise<void>):void},label:string,clips:number|number[]=2){
+async function setup(t:{after(fn:()=>Promise<void>):void},label:string,clips:number|number[]=2,photoOrder?:number[]){
   const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:'export default {fetch(){return new Response("fixture")}}',compatibilityDate:'2026-09-27',d1Databases:['DB'],r2Buckets:['MEDIA']}));
   t.after(()=>mf.dispose());const env=await mf.getBindings<{DB:D1Database;MEDIA:R2Bucket}>();await migrateNarrationProbe(env.DB);
   const seed=await seedNarrationFixture(env.DB,label,true);await env.DB.prepare("UPDATE jobs SET status='failed',error_code='FIXTURE',lease_until=NULL WHERE id=?").bind(seed.jobId).run();
@@ -43,13 +48,14 @@ async function setup(t:{after(fn:()=>Promise<void>):void},label:string,clips:num
   await env.DB.prepare('INSERT INTO hosted_import_budget(month,baseline_cents,ceiling_cents,paused) VALUES(?,0,9000,0)').bind(month).run();
   await env.DB.exec("UPDATE generation_control SET enabled=1; UPDATE allocations SET kind='paid',quota_limit=40");await env.DB.prepare('INSERT INTO generation_access(agency_id,allocation_id,enabled) VALUES(?,?,1)').bind(seed.agencyId,`allocation-${label}`).run();
   const listing=JSON.parse((await findImport(env.DB,seed.agencyId,`listing-${label}`))!.result!),fixture=await videoFixture('paid');
-  for(const [i,p] of listing.photos.entries()){const asset=fixture.manifest.photos[i];Object.assign(p,{contentHash:asset.sha256,sizeBytes:asset.sizeBytes,width:asset.width,height:asset.height});await env.MEDIA.put(p.objectKey,fixture.files.get(asset.id)!);}
+  for(const [i,p] of listing.photos.entries()){const asset=fixture.manifest.photos[i],bytes=photoOrder?new Uint8Array(await sharp(fixture.files.get(asset.id)!).jpeg().toBuffer()):fixture.files.get(asset.id)!;
+    Object.assign(p,{contentHash:createHash('sha256').update(bytes).digest('hex'),sizeBytes:bytes.length,width:asset.width,height:asset.height,...(photoOrder?{mime:'image/jpeg'}:{})});await env.MEDIA.put(p.objectKey,bytes);}
   await env.DB.prepare('UPDATE listing_imports SET result_json=? WHERE id=?').bind(JSON.stringify(listing),listing.id).run();
   const lines=['Découvrez cet appartement à Lyon.','Son prix et sa surface sont présentés dans cette annonce.','La visite se poursuit en images.','Contactez votre agence pour en savoir plus.'];
-  const job=await admitGeneration(env.DB,seed.agencyId,'runway-fixture-key-001',{listingId:listing.id,customization:{...defaultVideoCustomization(),...(Array.isArray(clips)?{runwayPhotos:clips}:{runwayClips:clips}),narration:lines}},'true');
+  const job=await admitGeneration(env.DB,seed.agencyId,'runway-fixture-key-001',{listingId:listing.id,...(photoOrder?{durationSeconds:20}:{}),customization:{...defaultVideoCustomization(),...(Array.isArray(clips)?{runwayPhotos:clips}:{runwayClips:clips}),...(photoOrder?{photoOrder}:{}),narration:lines}},'true');
   await env.DB.prepare("UPDATE jobs SET status='scripting',stage='scripting',listing_id=? WHERE id=?").bind(listing.id,job.jobId).run();
   const config=GoogleVoiceConfig.parse({projectId:'runway-fixture',voice:'fr-FR-Chirp3-HD-Aoede'});
-  const google=googleTts(config,async()=> 'fixture-token-never-networked',{fetch:async()=>Response.json({audioContent:Buffer.from(toneFixture(5000)).toString('base64')})});
+  const google=googleTts(config,async()=> 'fixture-token-never-networked',{fetch:async()=>Response.json({audioContent:Buffer.from(toneFixture(photoOrder?4000:5000)).toString('base64')})});
   await prepareJobNarration(env,seed.agencyId,job.jobId,{mode:'mock',script:{model:DEFAULT_SCRIPT_MODEL,plan:async()=>{throw Error('NO_TEXT_CALL');}},voice:{config,synthesize:google.synthesize}});
   return {env,job: (await findGeneration(env.DB,seed.agencyId,job.jobId))!,month,at,listing};
 }
@@ -63,6 +69,50 @@ test('sélection par photo : trois animations, ordre exact et manifeste sans lim
   const prepared=await prepareJobVideo(env,job.agencyId,job.jobId);
   assert.equal(prepared.manifest.photoAnimations?.length,3);
   assert.equal(prepared.manifest.photoTimeline?.reduce((sum,p)=>sum+p.durationFrames,0),prepared.manifest.scenes.reduce((sum,s)=>sum+s.durationFrames,0));
+});
+
+test('Retouche : retrouve tous les clips, la voix et leurs timings après réordonnancement, sans nouvelle dépense',async t=>{
+  const {env,job,month,at}=await setup(t,'editor-retained-media',[2,0,1],[2,0,1]);
+  await env.DB.prepare('INSERT INTO runway_budget(month,prepaid_cents,api_credits,paused,created_at) VALUES(?,1000,1000,0,?)').bind(month,at).run();
+  let calls=0;const provider:AnimationProvider={mode:'real',generate:async(_bytes,_mime,checkpoint)=>{calls++;await checkpoint(taskId);return clip;},resume:async()=>{throw Error('NO_RESUME');}};
+  await prepareJobAnimations(env,job.agencyId,job.jobId,provider);
+  const original=await prepareJobVideo(env,job.agencyId,job.jobId);
+  await env.DB.batch([env.DB.prepare('INSERT INTO generation_artifacts VALUES(?,?,?,?)').bind(job.jobId,`agencies/${job.agencyId}/jobs/${job.jobId}/video/output.mp4`,JSON.stringify(videoReport(original.hash,original.manifest)),at),
+    env.DB.prepare("UPDATE jobs SET status='ready',lease_until=NULL WHERE id=?").bind(job.jobId)]);
+  // Older jobs must also recover from the retained export when the library journal is absent.
+  await env.DB.exec('DELETE FROM animation_library');
+  let draft=await editExistingVideo(env,job.agencyId,job.jobId,'editor-retained-copy-001',AbortSignal.timeout(20000));
+  const source=await findEditorVoiceSource(env.DB,job.agencyId,draft.id,draft.data.videoCustomization!.voiceSourceId!);assert.ok(source);
+  assert.equal(editorCanReuseVoice(draft.data.videoCustomization!,source.preview),true);
+  let atFrame=0;assert.deepEqual(source.preview.clips.map(c=>c.startFrame),original.manifest.scenes.map(s=>{const start=atFrame;atFrame+=s.durationFrames;return start;}));
+  assert.deepEqual(draft.photos.map(p=>p.contentHash),original.manifest.photos.map(p=>p.sha256));
+  assert.deepEqual(draft.data.videoCustomization!.runwayPhotos,[0,1,2]);
+  const resources=await editorResources(env.DB,job.agencyId,draft.id);assert.equal(resources.animations.length,3);assert.equal(resources.cost,1);
+  assert.equal(resources.sourceKey,editorMediaSourcesKey(draft.data.videoCustomization!,draft.photos));
+  await assert.rejects(editorResources(env.DB,'another-owner',draft.id),/NOT_FOUND/);
+  const changed={...draft.data.videoCustomization!,runwayPhotos:[],narration:['Une visite personnalisée de cet appartement.',...source.preview.clips.slice(1).map(c=>c.text)]};
+  changed.editor={...changed.editor!,clips:[...changed.editor!.clips].reverse(),layers:changed.editor!.layers.map(l=>({...l,x:35}))};
+  changed.photoOrder=[2,1,0];
+  draft=await patchCreationDraft(env.DB,job.agencyId,draft.id,{version:draft.version,changes:{},confirm:[],videoCustomization:changed});
+  const available=await editorResources(env.DB,job.agencyId,draft.id);
+  assert.equal(available.availableAnimations.length,3,'Un ancien brouillon qui a perdu sa sélection retrouve les clips conservés');assert.equal(available.animations.length,0);
+  assert.equal(available.sourceKey,resources.sourceKey,'Les retouches visuelles et audio ne suppriment pas les sources');
+  assert.equal(editorCanReuseVoice(changed,source.preview),false,'La nouvelle narration ne réutilise pas silencieusement l’ancien enregistrement à l’export');
+  assert.deepEqual((await findEditorVoiceSource(env.DB,job.agencyId,draft.id,source.preview.id))!.preview,source.preview,'La piste reste disponible même si son texte a été retouché');
+  draft=await patchCreationDraft(env.DB,job.agencyId,draft.id,{version:draft.version,changes:{},confirm:[],videoCustomization:{...changed,runwayPhotos:[0,1,2],narration:source.preview.clips.map(c=>c.text)}});
+  const retouch=await snapshotEditorExport(env,job.agencyId,draft.id,draft.version,'editor-retained-export-001',AbortSignal.timeout(20000));if(!('listingId' in retouch))throw Error('NO_SNAPSHOT');
+  const next=await admitGeneration(env.DB,job.agencyId,'editor-retained-export-001',retouch,'true');assert.equal(next.creditsReserved,1);
+  await env.DB.prepare("UPDATE jobs SET status='scripting',stage='scripting',listing_id=? WHERE id=?").bind(retouch.listingId,next.jobId).run();
+  const forbidden={mode:'mock' as const,script:{model:DEFAULT_SCRIPT_MODEL,plan:async()=>{throw Error('NO_TEXT_CALL');}},voice:{config:GoogleVoiceConfig.parse({projectId:'runway-fixture',voice:'fr-FR-Chirp3-HD-Aoede'}),synthesize:async()=>{throw Error('NO_NEW_TTS');}}};
+  await prepareJobNarration(env,job.agencyId,next.jobId,forbidden);
+  await prepareJobAnimations(env,job.agencyId,next.jobId,{...provider,generate:async()=>{throw Error('NO_NEW_RUNWAY');}});
+  const rendered=await prepareJobVideo(env,job.agencyId,next.jobId);
+  assert.equal(calls,3);assert.equal(rendered.manifest.photoAnimations!.length,3);assert.deepEqual(rendered.manifest.audio.map(a=>a.sha256),original.manifest.audio.map(a=>a.sha256));
+  assert.deepEqual(rendered.manifest.scenes.map(s=>s.durationFrames),original.manifest.scenes.map(s=>s.durationFrames));
+  assert.equal((await env.DB.prepare('SELECT count(*) n FROM photo_animations WHERE job_id=?').bind(next.jobId).first<{n:number}>())!.n,0);
+  assert.equal((await env.DB.prepare('SELECT count(*) n FROM narration_calls WHERE job_id=?').bind(next.jobId).first<{n:number}>())!.n,0);
+  assert.equal((await env.DB.prepare('SELECT manifest_hash AS hash FROM video_manifests WHERE job_id=?').bind(job.jobId).first<{hash:string}>())!.hash,original.hash,'Le manifeste d’origine reste immuable');
+  assert.notEqual(editorMediaSourcesKey({...changed,editor:{...changed.editor!,aspectRatio:'16:9'}},draft.photos),resources.sourceKey,'Un autre format ne lit pas les clips de l’ancien format');
 });
 test('Runway : images exactes, reprise sans deuxième appel, manifeste privé et coût prépayé unique',async t=>{
   const {env,job,month,at,listing}=await setup(t,'runway-success');

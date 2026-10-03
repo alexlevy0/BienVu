@@ -1,5 +1,8 @@
 import {LandingPage} from '../components/landing-page';
 import './landing.css';
+import './home-showcase.css';
+import './home-sharing.css';
+import './home-editor-showcase.css';
 import './customizer.css';
 
 export const metadata = {

@@ -233,3 +233,25 @@
 .editor-music-controls .editor-music-name{font-weight:600;overflow-wrap:anywhere}.editor-music-name small{display:block;font-size:11px;font-weight:400;color:#7c8674;margin-top:5px}
 .editor-music-controls>label{display:grid;gap:8px;margin:15px 0;font-size:13px}.editor-music-controls>label.editor-check{display:flex}
 .editor-music-controls input[type=range]{width:100%;box-sizing:border-box}
+.editor-guest-content{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.editor-guest-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 16px;background:#eef3e8;border-bottom:1px solid #d3dfc9;font-size:12px;flex:none;line-height:1.5}
+.editor-guest-banner>div{display:flex;align-items:center;gap:18px;flex-shrink:0}
+.editor-guest-banner button{display:inline-flex;align-items:center;gap:6px;border:0;background:none;font:inherit;padding:4px 0;text-decoration:underline;text-underline-offset:3px;color:#405e38}
+.editor-guest-loading{padding:14px 20px;margin:0;font-size:14px;color:#536849;background:#edf3e8}
+.editor-welcome{border:1px solid #d6dece;border-radius:20px;background:#fffefa;box-shadow:0 20px 100px #17231026;padding:34px;width:min(700px,calc(100vw - 32px));max-height:calc(100svh - 40px);overflow:auto;color:#20251f;box-sizing:border-box;font-family:'Inter Tight',Arial,sans-serif}
+.editor-welcome::backdrop{background:#1b231c60;backdrop-filter:blur(4px)}
+.editor-welcome h2{font-family:'Instrument Serif',Georgia,serif;font-size:52px;font-weight:400;letter-spacing:-1.3px;margin:9px 0 10px;line-height:1}
+.editor-welcome>p{color:#71776d;line-height:1.55;font-size:15px;margin:0 0 24px}
+.editor-welcome-options{display:grid;grid-template-columns:1.2fr 1fr;gap:14px}
+.editor-welcome-options>button{border:1px solid #d4deca;border-radius:12px;padding:0;background:#fffefa;color:inherit;text-align:left;overflow:hidden;display:flex;flex-direction:column;transition:border-color .15s,box-shadow .15s;min-width:0;font:inherit;cursor:pointer}
+.editor-welcome-options>button:hover{border-color:#75936a;box-shadow:0 4px 18px #32452c12}
+.editor-welcome-options>button:focus-visible{outline:3px solid #718b62;outline-offset:4px}
+.editor-welcome-demo>img{width:100%;height:150px;object-fit:cover;object-position:center 45%;display:block}
+.editor-welcome-demo>span{padding:19px;display:flex;flex-direction:column;gap:7px;flex:1;background:#edf3e6}
+.editor-welcome-options strong{font-size:19px;font-weight:650}.editor-welcome-options small{font-size:13px;line-height:1.5;color:#70786a}
+.editor-welcome-options b{display:flex;gap:10px;align-items:center;margin-top:auto;padding-top:18px;font-size:13px;font-weight:600}
+.editor-welcome-options .editor-welcome-empty{padding:25px 20px;gap:9px}.editor-welcome-empty>svg{margin:8px 0 auto;color:#647f58;flex:none}
+.editor-welcome .editor-welcome-note{font-size:12px;margin:23px 0 0;border-top:1px solid #e2e6dc;padding-top:16px}
+.editor-welcome-resume{font:inherit;color:#45623b;text-decoration:underline;text-underline-offset:4px;padding:14px 0 0;border:0;background:none;font-size:13px;cursor:pointer}
+@media(max-width:840px){.editor-guest-banner{padding:7px 13px;flex-wrap:wrap;font-size:11px;gap:3px}.editor-guest-banner>div{gap:16px}.editor-guest-content .editor-header-actions{flex-wrap:wrap;justify-content:flex-start}.editor-guest-content .editor-header-actions .editor-primary{margin-left:auto}.editor-welcome{padding:26px}.editor-welcome h2{font-size:46px}}
+@media(max-width:480px){.editor-welcome{padding:23px 20px;border-radius:14px}.editor-welcome-options{grid-template-columns:1fr;gap:12px}.editor-welcome-options .editor-welcome-demo{flex-direction:row}.editor-welcome-demo>img{width:110px;height:auto;min-height:155px}.editor-welcome-demo>span{padding:16px}.editor-welcome-options .editor-welcome-empty{display:grid;grid-template-columns:34px 1fr;gap:6px 14px;padding:17px}.editor-welcome-empty>svg{grid-row:1/4;margin:0;align-self:center;padding:0}.editor-welcome-empty>b{padding-top:7px}.editor-welcome h2{font-size:42px}.editor-welcome>p{font-size:14px;margin-bottom:18px}.editor-welcome .editor-welcome-note{margin-top:18px}}

@@ -3,16 +3,18 @@ import {useEffect,useRef,useState,type CSSProperties,type PointerEvent} from 're
 import {editorActiveClip,editorClipStarts,editorLayerStyle,editorPhotoMotion,editorCaptionStyle,editorVoiceCaption,type EditorVoicePreview,type EditorDocument,type EditorLayer,type PhotoAsset} from '@bienvu/contracts';
 import {HomeIcon} from './home-icons';
 export const editorTime=(frames:number)=>`${Math.floor(frames/30/60).toString().padStart(2,'0')}:${Math.floor(frames/30%60).toString().padStart(2,'0')}`;
-function RetainedClip(p:{url:string;frame:number;playing:boolean;style:CSSProperties}){
+function RetainedClip(p:{url:string;poster?:string;frame:number;playing:boolean;style:CSSProperties}){
  const ref=useRef<HTMLVideoElement>(null),[error,setError]=useState(false);
+ useEffect(()=>setError(false),[p.url]);
  useEffect(()=>{const player=ref.current;if(!player)return;const elapsed=Math.min(4.96,Math.max(0,p.frame/30));
+  let alive=true;
   const sync=()=>{if(player.readyState>0&&Math.abs(player.currentTime-elapsed)>.12)player.currentTime=elapsed;
-   if(p.playing&&p.frame>=0&&p.frame<149)void player.play().catch(()=>setError(true));else player.pause();};
-  sync();player.addEventListener('loadedmetadata',sync);return()=>player.removeEventListener('loadedmetadata',sync);
- },[p.frame,p.playing]);
- return <>{error&&<span className="editor-media-unavailable" role="alert">Ce clip ne peut pas être lu. Rechargez l’aperçu.</span>}<video ref={ref} src={p.url} muted playsInline preload="metadata" style={p.style} onError={()=>setError(true)}/></>;
+   if(p.playing&&p.frame>=0&&p.frame<149)void player.play().catch(cause=>{if(alive&&cause?.name!=='AbortError')setError(true);});else player.pause();};
+  sync();player.addEventListener('loadedmetadata',sync);return()=>{alive=false;player.removeEventListener('loadedmetadata',sync);};
+ },[p.frame,p.playing,p.url]);
+ return <>{error&&<span className="editor-media-unavailable" role="alert">Ce clip ne peut pas être lu. Rechargez l’aperçu.</span>}<video ref={ref} src={p.url} poster={p.poster} muted playsInline preload="metadata" style={p.style} onError={()=>setError(true)}/></>;
 }
-export function EditorPreview(p:{doc:EditorDocument;voice?:EditorVoicePreview|null;photos:PhotoAsset[];draftId:string;logoId?:string|null;frame:number;playing:boolean;zoom:number;
+export function EditorPreview(p:{doc:EditorDocument;voice?:EditorVoicePreview|null;voiceReusable?:boolean;photos:PhotoAsset[];photoUrls?:Record<string,string>;draftId:string;logoId?:string|null;frame:number;playing:boolean;zoom:number;
   photoMotion:boolean;transition:'fade'|'cut';animations?:{slot:number;url:string}[];
   selected:string|null;onSelect(id:string):void;onSeek(frame:number):void;onPlay():void;onMove(layer:EditorLayer):void;onCheckpoint():void}){
   const stage=useRef<HTMLDivElement>(null),canvas=useRef<HTMLDivElement>(null),[scale,setScale]=useState(.25),
@@ -33,8 +35,8 @@ export function EditorPreview(p:{doc:EditorDocument;voice?:EditorVoicePreview|nu
   function photo(clip:typeof active,i:number){if(!clip)return null;const source=p.photos.find(photo=>photo.sourceOrder===clip.photoSlot);
     const animation=p.animations?.find(a=>a.slot===clip.photoSlot);
     const elapsed=p.frame-(('startFrame' in clip?clip.startFrame:0) as number),opacity=p.transition==='fade'&&clip===active&&previous?Math.min(1,elapsed/12):1;
-    if(animation)return <RetainedClip key={clip.id} url={animation.url} frame={elapsed} playing={p.playing} style={{position:'absolute',width:'100%',height:'100%',objectFit:'cover',opacity}}/>;
-    return source?<img src={`/api/imports/${p.draftId}/photos/${source.id}`} alt="" draggable={false} style={{position:'absolute',width:'100%',height:'100%',objectFit:'cover',
+    if(animation)return <RetainedClip key={clip.id} url={animation.url} poster={source?(p.photoUrls?p.photoUrls[source.id]:`/api/imports/${p.draftId}/photos/${source.id}`):undefined} frame={elapsed} playing={p.playing} style={{position:'absolute',width:'100%',height:'100%',objectFit:'cover',opacity}}/>;
+    return source?<img src={p.photoUrls?p.photoUrls[source.id]:`/api/imports/${p.draftId}/photos/${source.id}`} alt="" draggable={false} style={{position:'absolute',width:'100%',height:'100%',objectFit:'cover',
       ...editorPhotoMotion(Math.max(0,p.frame-(('startFrame' in clip?clip.startFrame:0) as number)),clip.durationFrames,i,p.photoMotion,clip.camera),
       opacity:p.transition==='fade'&&clip===active&&previous?Math.min(1,(p.frame-('startFrame' in clip?Number(clip.startFrame):0))/12):1}}/>:null;}
   return <section className="editor-canvas-area" aria-label="Aperçu du montage">
@@ -52,13 +54,13 @@ export function EditorPreview(p:{doc:EditorDocument;voice?:EditorVoicePreview|nu
           {layer.kind==='logo'?p.logoId?<img src={`/api/agency/logo/${p.logoId}`} alt="Logo de l’agence" style={{display:'block',width:'100%',maxHeight:height*.12,objectFit:'contain'}}/>:<span>Votre logo</span>:layer.text}
           {p.selected===layer.id&&!p.playing&&<span className="editor-layer-handles" aria-hidden="true"><i/><i/><i/><i/></span>}
         </button>)}
-        {p.doc.textsVisible&&p.doc.voiceEnabled&&p.doc.subtitlesEnabled&&(p.voice?caption&&<div className="editor-caption-placement" style={editorCaptionStyle(width)} aria-label="Sous-titres de la voix d’origine">{caption}</div>:<div className="editor-caption-placement" style={editorCaptionStyle(width)} aria-label="Emplacement des sous-titres">Sous-titres de votre narration<br/><span>Aperçu de leur emplacement</span></div>)}
+        {p.doc.clips.length>0&&p.doc.textsVisible&&p.doc.voiceEnabled&&p.doc.subtitlesEnabled&&(p.voice?caption&&<div className="editor-caption-placement" style={editorCaptionStyle(width)} aria-label="Sous-titres de la voix d’origine">{caption}</div>:<div className="editor-caption-placement" style={editorCaptionStyle(width)} aria-label="Emplacement des sous-titres">Sous-titres de votre narration<br/><span>Aperçu de leur emplacement</span></div>)}
       </div></div></div>
     <div className="editor-playback"><button type="button" aria-label="Photo précédente" onClick={()=>p.onSeek(Math.max(0,(starts.find(c=>c.id===active?.id)?.startFrame??0)-1))}><HomeIcon name="previous" size={21}/></button>
       <button type="button" className="editor-play" aria-label={p.playing?'Mettre en pause':'Lire l’aperçu'} onClick={p.onPlay}><HomeIcon name={p.playing?'pause':'play'} size={21}/></button>
       <button type="button" aria-label="Photo suivante" onClick={()=>p.onSeek(Math.min(total-1,(starts.find(c=>c.id===active?.id)?.startFrame??0)+(active?.durationFrames??0)))}><HomeIcon name="next" size={21}/></button>
       <span>{editorTime(p.frame)} / {editorTime(total)}</span><button type="button" aria-label="Aperçu en plein écran" onClick={()=>void stage.current?.requestFullscreen?.()}><HomeIcon name="fullscreen" size={20}/></button>
     </div><label className="editor-seek"><span className="sr-only">Position de lecture</span><input type="range" min={0} max={total-1} step={1} value={p.frame} onChange={e=>p.onSeek(Number(e.target.value))}/></label>
-    <p className="editor-preview-note">{!p.doc.voiceEnabled?'Déplacez les textes dans l’aperçu. La voix off est désactivée.':p.voice?'La voix d’origine accompagne l’aperçu. Animations créées à l’export.':'Déplacez les textes dans l’aperçu. Voix et animations créées à l’export.'}</p>
+    <p className="editor-preview-note">{!p.doc.voiceEnabled?'La voix off est désactivée.':p.voice?p.voiceReusable===false?'Vous écoutez la voix d’origine. Vos changements seront appliqués à l’export.':'La voix d’origine accompagne l’aperçu.':'La voix off sera créée à l’export.'} {p.animations?.length?'Les animations conservées sont lues dans l’aperçu.':'Les nouvelles animations seront créées à l’export.'}</p>
   </section>;
 }

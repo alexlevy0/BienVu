@@ -13,7 +13,7 @@ function waveform(bytes:Uint8Array){
     for(let s=Math.floor(i*samples/64);s<Math.floor((i+1)*samples/64);s++)peak=Math.max(peak,Math.abs(view.getInt16(start+s*2,true))/32768);
     return peak;});const maximum=Math.max(...peaks,.0001);return peaks.map(p=>Number((p/maximum).toFixed(3)));
 }
-async function persistVoice(env:Env,agencyId:string,importId:string,source:EditorVoiceSource,buffers:Uint8Array[]){
+export async function persistVoice(env:Env,agencyId:string,importId:string,source:EditorVoiceSource,buffers:Uint8Array[]){
   const json=JSON.stringify(EditorVoiceSource.parse(source));
   const old=await findEditorVoiceSource(env.DB,agencyId,importId,source.preview.id);
   if(old&&JSON.stringify(old)!==json)throw new RequestFailure('CONFLICT');

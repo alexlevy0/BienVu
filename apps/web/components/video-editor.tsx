@@ -21,7 +21,10 @@ import {EditorCameraControls} from './editor-camera-controls';
 import {EditorMusicLibrary} from './editor-music-library';
 import {EditorMusicControls} from './editor-music-controls';
 import {useEditorAudioGain} from './editor-audio-gain';
-import {distributeEditorClips,editorResponse,editorMusicWav} from '../lib/editor-client';
+import {distributeEditorClips,editorResponse,editorMusicWav,editorMediaSourcesKey,type EditorResources} from '../lib/editor-client';
+import {GuestEditor} from './guest-editor';
+import {guestAgency} from '../lib/editor-demo';
+import {type GuestEditorPort} from '../lib/editor-guest';
 
 type Model={fields:Fields;settings:VideoCustomization&{editor:EditorDocument}};
 type Selection={kind:'text'|'photo'|'music';id:string}|null;
@@ -67,7 +70,7 @@ export function VideoEditor(){
     catch(cause){setError(cause instanceof Error?cause.message:'La création du projet a échoué.');setBusy(false);}}
   return <div className="home-studio editor-shell"><a className="home-skip" href="#editor-content">Aller à l’Éditeur</a><StudioSidebar active="editor"/>
     <main className="editor-workspace" id="editor-content" tabIndex={-1}>
-      {draft&&me?<EditorProject key={`${me.agency.id}:${draft.id}`} initial={draft} agency={me.agency}/>:<section className="editor-start">
+      {!loading&&(!me||params.get('guest')==='1')?<GuestEditor render={(initial,guest)=><EditorProject key={initial.id} initial={initial} agency={guestAgency()} guest={guest}/>}/>:draft&&me?<EditorProject key={`${me.agency.id}:${draft.id}`} initial={draft} agency={me.agency}/>:<section className="editor-start">
         <div className="editor-start-top"><Link href="/historique">← Mes vidéos</Link><a href="mailto:contact@bienvu.online">Aide</a></div>
         <span className="editor-eyebrow">VOTRE STUDIO DE MONTAGE</span><h1>Chaque détail<br/><em>fait la différence.</em></h1>
         <p>Vos photos, vos textes, votre rythme. Composez une vidéo qui vous ressemble.</p>
@@ -83,7 +86,7 @@ export function VideoEditor(){
     </main></div>;
 }
 
-function EditorProject({initial,agency}:{initial:CreationDraftView;agency:AgencyProfile}){
+function EditorProject({initial,agency,guest}:{initial:CreationDraftView;agency:AgencyProfile;guest?:GuestEditorPort}){
   const {me,refreshRights}=useAccount(),store=useGenerationStore(),[draft,setDraft]=useState(initial),draftRef=useRef(initial),
     [model,setModel]=useState<Model>(()=>initialModel(initial,agency)),modelRef=useRef(model),
     saved=useRef(JSON.stringify({fields:initial.data.fields,settings:initial.data.videoCustomization})),
@@ -92,13 +95,24 @@ function EditorProject({initial,agency}:{initial:CreationDraftView;agency:Agency
     [tab,setTab]=useState<'photos'|'text'|'audio'>('photos'),[mobilePanel,setMobilePanel]=useState('preview'),[frame,setFrame]=useState(120),[playing,setPlaying]=useState(false),[zoom,setZoom]=useState(50),
     [saveState,setSaveState]=useState<'saved'|'saving'|'unsaved'|'error'>('unsaved'),[error,setError]=useState(''),[conflict,setConflict]=useState(false),conflictRef=useRef(false),
     [pending,setPending]=useState<PendingPhoto[]>([]),pendingRef=useRef<PendingPhoto[]>([]),uploads=useRef(new Map<string,AbortController>()),
-    [musicBusy,setMusicBusy]=useState(false),[exporting,setExporting]=useState(false),[confirm,setConfirm]=useState(false),[rights,setRights]=useState(false),[previewIntent,setPreviewIntent]=useState(false),[fullPreview,setFullPreview]=useState<{version:number;job:GenerationView|null}|null>(null),[resources,setResources]=useState<{version:number;cost:number;animations:{slot:number;url:string}[]}|null>(null),
+    [musicBusy,setMusicBusy]=useState(false),[exporting,setExporting]=useState(false),[confirm,setConfirm]=useState(false),[rights,setRights]=useState(false),[previewIntent,setPreviewIntent]=useState(false),[fullPreview,setFullPreview]=useState<{version:number;job:GenerationView|null}|null>(null),[resources,setResources]=useState<EditorResources|null>(null),[resourcesError,setResourcesError]=useState(''),[resourcesAttempt,setResourcesAttempt]=useState(0),
     write=useRef<Promise<void>|null>(null),alive=useRef(true),photoInput=useRef<HTMLInputElement>(null),musicInput=useRef<HTMLInputElement>(null),audio=useRef<HTMLAudioElement>(null),dialog=useRef<HTMLDialogElement>(null);
-  const doc=model.settings.editor,total=editorFrames(doc),existingExport=fullPreview?.version===draft.version&&saveState==='saved'&&fullPreview.job&&fullPreview.job.status!=='failed'&&fullPreview.job.retention==='available'&&Date.parse(fullPreview.job.expiresAt)>Date.now(),cost=existingExport?0:resources?.version===draft.version&&saveState==='saved'?resources.cost:generationCreditCost(model.settings),selectedLayer=selection?.kind==='text'?doc.layers.find(l=>l.id===selection.id)??null:null,
-    selectedClip=selection?.kind==='photo'?editorClipStarts(doc).find(c=>c.id===selection.id)??null:null;
-  const restoredVoice=useEditorVoice(draft.id,model.settings),voice=restoredVoice.reusable?restoredVoice.voice:null;
-  useEffect(()=>{const controller=new AbortController();void fetch(`/api/imports/${draft.id}/editor-resources`,{signal:controller.signal}).then(r=>editorResponse<NonNullable<typeof resources>>(r)).then(setResources).catch(()=>{});return()=>controller.abort();},[draft.id,draft.version]);
-  useEffect(()=>{if(saveState!=='saved')return;let timer:ReturnType<typeof setTimeout>;const controller=new AbortController();
+  const photoUrl=(id:string)=>guest?guest.photoUrls[id]:`/api/imports/${draft.id}/photos/${id}`;
+  const doc=model.settings.editor,total=editorFrames(doc),currentResources=guest?guest.resources(model.settings,draft.photos):resources?.sourceKey===editorMediaSourcesKey(model.settings,draft.photos)?resources:null,
+    availableAnimations=currentResources?.availableAnimations??[],
+    selectedAnimations=new Set(selectedAnimationIndices(model.settings.photoOrder??[],model.settings).map(index=>model.settings.photoOrder![index])),
+    previewAnimations=availableAnimations.filter(a=>selectedAnimations.has(a.slot)),
+    recoverableAnimations=availableAnimations.filter(a=>model.settings.photoOrder?.includes(a.slot)&&!model.settings.runwayPhotos?.includes(a.slot)),
+    existingExport=fullPreview?.version===draft.version&&saveState==='saved'&&fullPreview.job&&fullPreview.job.status!=='failed'&&fullPreview.job.retention==='available'&&Date.parse(fullPreview.job.expiresAt)>Date.now(),cost=existingExport?0:generationCreditCost(model.settings)-(currentResources?previewAnimations.length:0),selectedLayer=selection?.kind==='text'?doc.layers.find(l=>l.id===selection.id)??null:null,
+    selectedClip=selection?.kind==='photo'?editorClipStarts(doc).find(c=>c.id===selection.id)??null:null,
+    selectedClipLabel=previewAnimations.some(a=>a.slot===selectedClip?.photoSlot)?'Vidéo IA':'Photo';
+  const restoredVoice=useEditorVoice(draft.id,model.settings,guest?.voice),voice=restoredVoice.voice;
+  useEffect(()=>{if(guest)return;const controller=new AbortController();setResourcesError('');
+    void fetch(`/api/imports/${draft.id}/editor-resources`,{signal:controller.signal}).then(r=>editorResponse<EditorResources>(r))
+      .then(value=>{if(!controller.signal.aborted)setResources(value);})
+      .catch(()=>{if(!controller.signal.aborted)setResourcesError('Les animations conservées n’ont pas pu être chargées.');});return()=>controller.abort();
+  },[draft.id,draft.version,resourcesAttempt]);
+  useEffect(()=>{if(guest||saveState!=='saved')return;let timer:ReturnType<typeof setTimeout>;const controller=new AbortController();
     const poll=()=>{void fetch(`/api/imports/${draft.id}/editor-preview`,{signal:controller.signal}).then(r=>editorResponse<{version:number;job:GenerationView|null}>(r)).then((value:{version:number;job:GenerationView|null})=>{
       if(controller.signal.aborted)return;setFullPreview(value);if(value.job&&!['ready','failed'].includes(value.job.status))timer=setTimeout(poll,2500);
     }).catch(()=>{});};poll();return()=>{controller.abort();clearTimeout(timer);};},[draft.id,draft.version,saveState,exporting]);
@@ -108,6 +122,8 @@ function EditorProject({initial,agency}:{initial:CreationDraftView;agency:Agency
     if(remember){setPast(values=>[...values.slice(-49),before]);setFuture([]);}modelRef.current=next;setModel(next);setSaveState('unsaved');},[]);
   const checkpoint=()=>{setPast(values=>[...values.slice(-49),modelRef.current]);setFuture([]);};
   function changeDoc(editor:EditorDocument,remember=true){change(m=>({...m,settings:{...m.settings,editor}}),remember);}
+  function restoreOriginalVoice(){if(!voice)return;setPlaying(false);change(m=>({...m,settings:{...m.settings,
+    voice:voice.voice as VideoCustomization['voice'],narration:voice.clips.map(c=>c.text),editor:resizeEditorDocument(m.settings.editor,voice.durationSeconds)}}));}
   function patchLayer(patch:Partial<EditorLayer>){if(!selectedLayer)return;change(m=>({...m,settings:{...m.settings,editor:{...m.settings.editor,
     layers:m.settings.editor.layers.map(l=>l.id===selectedLayer.id?{...l,...patch}:l)}}}));}
   function undo(){const previous=past.at(-1);if(!previous)return;setPlaying(false);setPast(past.slice(0,-1));setFuture([modelRef.current,...future]);modelRef.current=previous;setModel(previous);setSaveState('unsaved');}
@@ -118,6 +134,8 @@ function EditorProject({initial,agency}:{initial:CreationDraftView;agency:Agency
     const task=(async()=>{setSaveState('saving');
       try{for(let count=0;count<20;count++){
         const wanted=modelRef.current,serialized=JSON.stringify(wanted);if(serialized===saved.current)break;
+        if(guest){const current=draftRef.current,next={...current,data:{...current.data,fields:wanted.fields,videoCustomization:wanted.settings}};
+          await guest.save(next);if(!alive.current)return;const merged={...next,photos:draftRef.current.photos};draftRef.current=merged;setDraft(merged);saved.current=serialized;continue;}
         if(!CreationFields.safeParse(wanted.fields).success)throw new Error('Vérifiez le titre (3 caractères minimum), la ville (2 caractères minimum) et les valeurs numériques.');
         if(!VideoCustomizationSchema.safeParse(wanted.settings).success)throw new Error('Vérifiez les réglages et complétez chaque passage de la narration.');
         const current=draftRef.current,changes=Object.fromEntries(Object.entries(wanted.fields).filter(([key,value])=>current.data.fields[key as keyof Fields]!==value));
@@ -130,7 +148,7 @@ function EditorProject({initial,agency}:{initial:CreationDraftView;agency:Agency
         setError((cause as Error&{code?:string}).code==='CONFLICT'?'Ce projet a changé dans un autre onglet. Vos retouches restent ici ; rechargez le projet pour repartir de sa dernière version.':cause instanceof Error?cause.message:'L’enregistrement a échoué.');}throw cause;}
     })();write.current=task;try{await task;}finally{write.current=null;}
   },[]);
-  useEffect(()=>{if(conflict||!CreationFields.safeParse(model.fields).success||!VideoCustomizationSchema.safeParse(model.settings).success)return;
+  useEffect(()=>{if(conflict||!guest&&!CreationFields.safeParse(model.fields).success||!VideoCustomizationSchema.safeParse(model.settings).success)return;
     const timer=setTimeout(()=>void save().catch(()=>{}),800);return()=>clearTimeout(timer);},[model,conflict,save]);
   useEffect(()=>{alive.current=true;return()=>{alive.current=false;for(const controller of uploads.current.values())controller.abort();
     for(const photo of pendingRef.current)URL.revokeObjectURL(photo.preview);};},[]);
@@ -151,17 +169,18 @@ function EditorProject({initial,agency}:{initial:CreationDraftView;agency:Agency
     const tick=(now:number)=>{const next=from+Math.floor((now-start)*30/1000);if(next>=total){setFrame(total-1);setPlaying(false);return;}setFrame(next);handle=requestAnimationFrame(tick);};
     handle=requestAnimationFrame(tick);return()=>cancelAnimationFrame(handle);},[playing,total]);
   useEffect(()=>{setFrame(current=>Math.min(current,total-1));},[total]);
-  const musicUrl=doc.music?`/api/imports/${draft.id}/music/${doc.music.assetId}`:undefined;
-  useEffect(()=>{if(!musicUrl||doc.music?.waveform)return;const controller=new AbortController();
+  const musicUrl=doc.music?(guest?guest.photoUrls[doc.music.assetId]:`/api/imports/${draft.id}/music/${doc.music.assetId}`):undefined;
+  useEffect(()=>{if(guest||!musicUrl||doc.music?.waveform)return;const controller=new AbortController();
     void fetch(musicUrl+'?metadata=1',{signal:controller.signal,cache:'no-store'}).then(r=>editorResponse<EditorMusicUpload>(r)).then(value=>{
       if(controller.signal.aborted)return;change(m=>{const music=m.settings.editor.music;if(!music||music.assetId!==value.assetId||music.waveform)return m;
         return {...m,settings:{...m.settings,editor:{...m.settings.editor,music:{...music,waveform:value.waveform}}}};},false);
     }).catch(()=>{});return()=>controller.abort();},[musicUrl,Boolean(doc.music?.waveform),change]);
   useEditorAudioGain(audio,editorMusicGain(doc,frame,voice?.clips),playing,musicUrl??'none');
   useEffect(()=>{const player=audio.current,music=doc.music;if(!player||!music)return;
-    const sourceFrame=editorMusicSourceFrame(doc,frame),audible=playing&&sourceFrame!==null&&music.volume>0;
-    if(!audible){player.pause();return;}const elapsed=sourceFrame!/30;if(Math.abs(player.currentTime-elapsed)>.25)player.currentTime=Math.max(0,elapsed);
-    if(player.paused)void player.play().catch(()=>{setError('La musique ne peut pas être lue pour le moment. Relancez l’aperçu.');});
+    let active=true;const sync=()=>{const sourceFrame=editorMusicSourceFrame(doc,frame),audible=playing&&sourceFrame!==null&&music.volume>0;
+      if(!audible){player.pause();return;}const elapsed=sourceFrame!/30;if(player.readyState>0&&Math.abs(player.currentTime-elapsed)>.25)player.currentTime=Math.max(0,elapsed);
+      if(player.paused)void player.play().catch((cause:unknown)=>{if(active&&(cause as {name?:string})?.name!=='AbortError')setError('La musique ne peut pas être lue pour le moment. Relancez l’aperçu.');});
+    };sync();player.addEventListener('loadedmetadata',sync);return()=>{active=false;player.removeEventListener('loadedmetadata',sync);};
   },[frame,playing,doc.music,musicUrl]);
   useEffect(()=>{if(!confirm)return;setPlaying(false);dialog.current?.showModal();return()=>dialog.current?.close();},[confirm]);
   function seek(at:number){setPlaying(false);setFrame(Math.max(0,Math.min(total-1,at)));}
@@ -176,8 +195,8 @@ function EditorProject({initial,agency}:{initial:CreationDraftView;agency:Agency
   }
   async function uploadPhoto(photo:PendingPhoto){if(uploads.current.has(photo.id))return;
     const controller=new AbortController();uploads.current.set(photo.id,controller);setPending(values=>values.map(p=>p.id===photo.id?{...p,state:'uploading',error:''}:p));
-    try{const response=await editorResponse<{photo:unknown}>(await fetch(`/api/imports/${draft.id}/uploads/${photo.slot}`,{method:'PUT',headers:{'Content-Type':photo.file.type,'X-Upload-ID':photo.id},body:photo.file,signal:controller.signal}));
-      const uploaded=PhotoAsset.parse(response.photo);if(controller.signal.aborted||!alive.current)return;
+    try{const uploaded=guest?await guest.upload(photo):PhotoAsset.parse((await editorResponse<{photo:unknown}>(await fetch(`/api/imports/${draft.id}/uploads/${photo.slot}`,{method:'PUT',headers:{'Content-Type':photo.file.type,'X-Upload-ID':photo.id},body:photo.file,signal:controller.signal}))).photo);
+      if(controller.signal.aborted||!alive.current)return;
       // Uploads change the private media journal, not the field version. Merge
       // the acknowledged photo so concurrent saves cannot restore an old row.
       const current=draftRef.current,value={...current,photos:[...current.photos.filter(p=>p.id!==uploaded.id),uploaded].sort((a,b)=>a.sourceOrder-b.sourceOrder)};
@@ -197,7 +216,7 @@ function EditorProject({initial,agency}:{initial:CreationDraftView;agency:Agency
     pendingRef.current=[...pendingRef.current,...added];setPending(values=>[...values,...added]);for(const photo of added)void uploadPhoto(photo);
   }
   async function removePhoto(id:string,slot:number){uploads.current.get(id)?.abort();setError('');
-    try{await editorResponse(await fetch(`/api/imports/${draft.id}/uploads/${slot}`,{method:'DELETE',headers:{'X-Upload-ID':id}}));
+    try{if(guest)await guest.remove(id);else await editorResponse(await fetch(`/api/imports/${draft.id}/uploads/${slot}`,{method:'DELETE',headers:{'X-Upload-ID':id}}));
       const item=pendingRef.current.find(p=>p.id===id);if(item)URL.revokeObjectURL(item.preview);setPending(values=>values.filter(p=>p.id!==id));
       const value={...draftRef.current,photos:draftRef.current.photos.filter(photo=>photo.id!==id)};draftRef.current=value;setDraft(value);
       change(m=>({...m,settings:{...m.settings,editor:distributeEditorClips(m.settings.editor,m.settings.editor.clips.filter(c=>c.photoSlot!==slot))}}));
@@ -205,14 +224,14 @@ function EditorProject({initial,agency}:{initial:CreationDraftView;agency:Agency
     }catch(cause){setError(cause instanceof Error?cause.message:'La photo n’a pas pu être retirée.');}
   }
   async function chooseMusic(event:ChangeEvent<HTMLInputElement>){const file=event.target.files?.[0];event.target.value='';if(!file)return;
-    if(musicBusy)return;setPlaying(false);setMusicBusy(true);setError('');try{const wav=await editorMusicWav(file),id=crypto.randomUUID(),value=await editorResponse<EditorMusicUpload>(await fetch(`/api/imports/${draft.id}/music/${id}`,{
+    if(musicBusy)return;setPlaying(false);setMusicBusy(true);setError('');try{const wav=await editorMusicWav(file),id=crypto.randomUUID(),value=guest?await guest.music(id,wav):await editorResponse<EditorMusicUpload>(await fetch(`/api/imports/${draft.id}/music/${id}`,{
       method:'PUT',headers:{'Content-Type':'audio/wav'},body:wav}));installMusic(value,file.name.slice(0,100),0);
     }catch(cause){setError(cause instanceof Error?cause.message:'La musique n’a pas pu être importée.');}finally{setMusicBusy(false);}
   }
   function installMusic(value:EditorMusicUpload,name:string,startFrame:number){change(m=>{const editor=m.settings.editor,start=Math.max(0,Math.min(editor.durationSeconds*30-15,startFrame)),length=editor.durationSeconds*30-start;
     return {...m,settings:{...m.settings,editor:{...editor,music:{...value,name,volume:.15,startFrame:start,trimFromFrame:0,
       durationFrames:length,loop:Math.floor(value.durationMs*30/1000)<length}}}};});setSelection({kind:'music',id:value.assetId});}
-  async function addLibraryMusic(id:string,startFrame=0){if(musicBusy)return;setPlaying(false);setMusicBusy(true);setError('');try{
+  async function addLibraryMusic(id:string,startFrame=0){if(guest){setError('Connectez-vous pour utiliser la banque de musiques. Vous pouvez déjà importer votre propre piste.');return;}if(musicBusy)return;setPlaying(false);setMusicBusy(true);setError('');try{
     const value=await editorResponse<EditorMusicUpload&{name:string}>(await fetch(`/api/imports/${draft.id}/music/from-library`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({musicId:id})}));
     installMusic(value,value.name,startFrame);
   }catch(cause){setError(cause instanceof Error?cause.message:'La musique n’a pas pu être ajoutée.');}finally{setMusicBusy(false);}}
@@ -228,25 +247,28 @@ function EditorProject({initial,agency}:{initial:CreationDraftView;agency:Agency
     }catch(cause){setError(cause instanceof Error?cause.message:'L’export n’a pas pu démarrer.');setConfirm(false);setExporting(false);}
   }
   async function leave(){setError('');if(uploads.current.size||musicBusy){setError('Attendez la fin de l’import avant de quitter le projet.');return;}
-    try{await save();window.location.assign('/historique');}catch{}}
+    try{await save();window.location.assign(guest?'/':'/historique');}catch{}}
+  async function connect(){if(!guest)return;setPlaying(false);setError('');if(uploads.current.size||musicBusy){setError('Attendez la fin de l’import avant de vous connecter.');return;}
+    try{await save();await guest.connect();}catch(cause){setError(cause instanceof Error?cause.message:'Votre projet n’a pas pu être conservé. Gardez cet onglet ouvert et réessayez.');}}
   const fieldsValid=ManualListingInput.safeParse({...model.fields,description:model.fields.description??'',photos:draft.photos.map(p=>({hash:p.contentHash,size:p.sizeBytes,mime:p.mime}))});
-  const quality=editorQuality(doc,draft.photos,voice,model.settings.narration);
+  const quality=editorQuality(doc,draft.photos,restoredVoice.reusable?voice:null,model.settings.narration);
   function inspectIssue(issue:typeof quality[number]){setConfirm(false);setPlaying(false);setTab(issue.kind==='audio'?'audio':issue.kind==='photo'?'photos':'text');setMobilePanel('media');
     if(issue.targetId){setSelection({kind:issue.kind==='photo'?'photo':'text',id:issue.targetId});const layer=doc.layers.find(l=>l.id===issue.targetId),clip=editorClipStarts(doc).find(c=>c.id===issue.targetId);seek(layer?.startFrame??clip?.startFrame??0);}}
   const canExport=fieldsValid.success&&GenerationCustomization.safeParse(model.settings).success&&Boolean(model.fields.title&&model.fields.locality&&model.fields.propertyType&&model.fields.transaction)&&
     !pending.length&&!musicBusy&&!conflict&&!exporting&&doc.clips.every(c=>draft.photos.some(p=>p.sourceOrder===c.photoSlot));
   const setField=(name:keyof Fields,value:Fields[keyof Fields])=>change(m=>({...m,fields:{...m.fields,[name]:value,...(name==='transaction'?{priceCents:null,charges:null}:{})}}));
   return <div className="editor-project" data-mobile-panel={mobilePanel}>
-    <header className="editor-header"><button type="button" className="editor-back" onClick={()=>void leave()}><HomeIcon name="arrow" size={20}/>Mes vidéos</button>
-      <div className="editor-project-title"><strong>{model.fields.title??'Nouveau projet'}</strong><span role="status" className={`editor-save is-${saveState}`}><i/>{saveState==='saved'?'Enregistré':saveState==='saving'?'Enregistrement…':saveState==='error'?'Non enregistré':'Modifications en cours'}</span></div>
+    <header className="editor-header"><button type="button" className="editor-back" onClick={()=>void leave()}><HomeIcon name="arrow" size={20}/>{guest?'Retour au studio':'Mes vidéos'}</button>
+      <div className="editor-project-title"><strong>{model.fields.title??'Nouveau projet'}</strong><span role="status" className={`editor-save is-${saveState}`}><i/>{saveState==='saved'?(guest?guest.persisted?'Sur cet appareil':'Onglet uniquement':'Enregistré'):saveState==='saving'?'Enregistrement…':saveState==='error'?'Non enregistré':'Modifications en cours'}</span></div>
       <div className="editor-header-actions"><button type="button" aria-label="Annuler la dernière modification" disabled={!past.length||exporting} onClick={undo}><HomeIcon name="undo" size={20}/></button><button type="button" aria-label="Rétablir la modification" disabled={!future.length||exporting} onClick={redo}><HomeIcon name="redo" size={20}/></button>
         <button type="button" className="editor-preview-button" onClick={()=>{if(frame>=total-1)setFrame(0);setPlaying(v=>!v);}}><HomeIcon name="play" size={18}/>Prévisualiser</button>
-        <button type="button" className="editor-preview-button" disabled={!canExport} onClick={()=>{setPreviewIntent(true);setRights(false);setConfirm(true);}}>Aperçu complet</button>
-        <button type="button" className="editor-primary" disabled={!canExport} onClick={()=>{setPreviewIntent(false);setRights(false);setConfirm(true);}}>Exporter la vidéo <HomeIcon name="arrow" size={19}/></button></div>
+        {!guest&&<button type="button" className="editor-preview-button" disabled={!canExport} onClick={()=>{setPreviewIntent(true);setRights(false);setConfirm(true);}}>Aperçu complet</button>}
+        <button type="button" className="editor-primary" disabled={!canExport} onClick={()=>{if(guest){void connect();return;}setPreviewIntent(false);setRights(false);setConfirm(true);}}>{guest?'Enregistrer et exporter':'Exporter la vidéo'} <HomeIcon name="arrow" size={19}/></button></div>
     </header>
+    {guest&&<div className="editor-guest-banner"><span>Essai de l’Éditeur · vos retouches restent {guest.persisted?'sur cet appareil.':'dans cet onglet.'}</span><div><button type="button" disabled={Boolean(pending.length||musicBusy)} onClick={()=>{setPlaying(false);void save().then(()=>guest.choose()).catch(()=>{});}}>Changer de projet</button><button type="button" onClick={()=>void connect()}>{me?'Enregistrer dans mon compte':'Se connecter pour enregistrer'} <HomeIcon name="arrow" size={15}/></button></div></div>}
     <nav className="editor-mobile-panels" aria-label="Panneaux de l’Éditeur">{[['preview','Aperçu'],['media','Médias'],['settings','Réglages'],['timeline','Timeline']].map(([value,label])=><button type="button" key={value} aria-pressed={mobilePanel===value} onClick={()=>setMobilePanel(value)}>{label}</button>)}</nav>
     {error&&<div className="editor-feedback" role="alert"><span>{error}</span>{conflict?<button type="button" onClick={()=>window.location.reload()}>Recharger le projet</button>:saveState==='error'?<button type="button" onClick={()=>{setError('');void save().catch(()=>{});}}>Réessayer l’enregistrement</button>:<button type="button" aria-label="Fermer le message" onClick={()=>setError('')}><HomeIcon name="close" size={17}/></button>}</div>}
-    <EditorLibrary draft={draft} agency={agency} save={async()=>{await save();return draftRef.current;}} onApply={settings=>{if(settings.editor)change(m=>({...m,settings:{...settings,editor:settings.editor!}}));}}/>
+    {!guest&&<EditorLibrary draft={draft} agency={agency} save={async()=>{await save();return draftRef.current;}} onApply={settings=>{if(settings.editor)change(m=>({...m,settings:{...settings,editor:settings.editor!}}));}}/>}
     <details className="editor-quality"><summary>Contrôle avant export · {quality.length?`${quality.length} point(s) à vérifier`:'aucun problème détecté'}</summary><p>Contrôle de cadrage, de résolution et d’équilibre audio. Vérifiez aussi l’aperçu à l’œil et à l’écoute.</p>{quality.map(issue=><button type="button" key={issue.id} onClick={()=>inspectIssue(issue)}>{issue.message} <span>Vérifier →</span></button>)}</details>
     {fullPreview?.job&&fullPreview.version===draft.version&&saveState==='saved'&&<details className="editor-complete-preview" open><summary>Aperçu complet · {fullPreview.job.status==='ready'?'prêt':fullPreview.job.status==='failed'?'interrompu':'préparation en cours'}</summary>{fullPreview.job.videoUrl?<><video src={fullPreview.job.videoUrl} controls playsInline preload="metadata"/><a href={fullPreview.job.downloadUrl??`/historique/${fullPreview.job.id}`}>Télécharger cet export</a><p>Ce fichier est l’export final. Le télécharger à nouveau ne consomme aucun crédit.</p></>:<p role="status">{fullPreview.job.status==='failed'?'La préparation a échoué. Retrouvez le détail dans Mes vidéos.':`Création du montage : ${fullPreview.job.progressPercent} %`}</p>}<a href={`/historique/${fullPreview.job.id}`}>Voir le suivi</a></details>}
     <div className="editor-main">
@@ -258,13 +280,16 @@ function EditorProject({initial,agency}:{initial:CreationDraftView;agency:Agency
             {draft.photos.map(photo=>{const at=doc.clips.findIndex(c=>c.photoSlot===photo.sourceOrder),clip=doc.clips[at];return <div className={`editor-media-photo${clip&&selection?.id===clip.id?' is-selected':''}`} key={photo.id}>
               <button type="button" draggable onDragStart={e=>{e.dataTransfer.setData('application/x-bienvu-photo',String(photo.sourceOrder));e.dataTransfer.effectAllowed='copy';}}
                 aria-label={`Photo ${photo.sourceOrder+1}${at>=0?', présente dans la vidéo':', ajouter à la vidéo'}`} onClick={()=>{if(clip){setSelection({kind:'photo',id:clip.id});seek(editorClipStarts(doc)[at].startFrame);}else addClip(photo.sourceOrder);}}>
-                <img src={`/api/imports/${draft.id}/photos/${photo.id}`} alt={`Photo ${photo.sourceOrder+1} du bien`} draggable={false}/>{at>=0&&<span className="editor-photo-number">{at+1}</span>}</button>
+                <img src={photoUrl(photo.id)} alt={`Photo ${photo.sourceOrder+1} du bien`} draggable={false}/>{at>=0&&<span className="editor-photo-number">{at+1}</span>}</button>
               <button type="button" className="editor-media-remove" aria-label={`Retirer la photo ${photo.sourceOrder+1}`} onClick={()=>void removePhoto(photo.id,photo.sourceOrder)}><HomeIcon name="close" size={13}/></button>
             </div>;})}
             {pending.map(photo=><div className="editor-media-photo editor-photo-pending" key={photo.id}><img src={photo.preview} alt="Photo en cours d’import"/><span role="status">{photo.state==='uploading'?'Envoi…':'Envoi interrompu'}</span>
               <button className="editor-media-remove" type="button" aria-label="Retirer cette photo" onClick={()=>void removePhoto(photo.id,photo.slot)}><HomeIcon name="close" size={13}/></button>
               {photo.error&&<p>{photo.error}<button type="button" onClick={()=>void uploadPhoto(photo)}>Réessayer</button></p>}</div>)}
           </div><p className="editor-media-hint">Glissez vos photos dans la timeline.<br/>{draft.photos.length} / 12 photos importées.</p>
+          {resourcesError&&<p className="editor-error" role="alert">{resourcesError} <button type="button" onClick={()=>setResourcesAttempt(n=>n+1)}>Réessayer</button></p>}
+          {recoverableAnimations.length>0&&<div className="editor-restored-voice"><p>{recoverableAnimations.length} animation{recoverableAnimations.length>1?'s':''} déjà créée{recoverableAnimations.length>1?'s':''} disponible{recoverableAnimations.length>1?'s':''} pour ces photos, sans supplément de crédits.</p>
+            <button type="button" onClick={()=>change(m=>({...m,settings:{...m.settings,runwayPhotos:[...new Set([...(m.settings.runwayPhotos??[]),...recoverableAnimations.map(a=>a.slot)])]}}))}>Réutiliser les animations conservées</button></div>}
           <label className="editor-check"><input type="checkbox" checked={model.settings.photoMotion} onChange={e=>change(m=>({...m,settings:{...m.settings,photoMotion:e.target.checked}}))}/>Mouvements de caméra</label>
           <label>Transition<select value={model.settings.transition} onChange={e=>change(m=>({...m,settings:{...m.settings,transition:e.target.value as 'fade'|'cut'}}))}><option value="fade">Fondu doux</option><option value="cut">Coupe directe</option></select></label>
         </>:tab==='text'?<>
@@ -282,7 +307,7 @@ function EditorProject({initial,agency}:{initial:CreationDraftView;agency:Agency
             {!CreationFields.safeParse(model.fields).success&&<p className="editor-error">Vérifiez le titre (3 caractères), la ville (2 caractères) et les valeurs numériques pour enregistrer.</p>}
           </details>
         </>:<>
-          <EditorMusicLibrary busy={musicBusy} playing={playing} onAdd={addLibraryMusic} onPreview={()=>setPlaying(false)}/>
+          {!guest&&<EditorMusicLibrary busy={musicBusy} playing={playing} onAdd={addLibraryMusic} onPreview={()=>setPlaying(false)}/>}
           <h3>Votre musique</h3><button type="button" className="editor-import" disabled={musicBusy} onClick={()=>musicInput.current?.click()}><HomeIcon name="upload" size={17}/>{musicBusy?'Préparation…':doc.music?'Importer une autre musique':'Importer une musique'}</button>
           <input type="file" ref={musicInput} hidden accept="audio/*,video/mp4,video/webm,video/quicktime" onChange={e=>void chooseMusic(e)}/><p className="editor-media-hint">Audio ou vidéo avec une piste audio · 50 Mo · 5 minutes maximum. Le morceau complet est conservé pour choisir votre passage.</p>
           {doc.music&&<EditorMusicControls doc={doc} onChange={changeDoc}/>}
@@ -292,9 +317,8 @@ function EditorProject({initial,agency}:{initial:CreationDraftView;agency:Agency
           <VoicePreview voice={model.settings.voice} disabled={!doc.voiceEnabled||playing}/>
           {restoredVoice.loading&&<p className="editor-media-hint" role="status">Chargement de la voix d’origine…</p>}
           {restoredVoice.error&&<p className="editor-error" role="alert">{restoredVoice.error} <button type="button" onClick={restoredVoice.retry}>Réessayer</button></p>}
-          {restoredVoice.voice&&<div className="editor-restored-voice"><p>{!doc.voiceEnabled?'La voix off est désactivée. Sa piste d’origine reste disponible dans la timeline.':voice?'La voix d’origine est placée dans la timeline. Elle sera conservée à l’export.':'La voix, la narration ou la durée a changé. Une nouvelle voix sera créée à l’export.'}</p>
-            {!voice&&<button type="button" onClick={()=>{setPlaying(false);const source=restoredVoice.voice!;change(m=>({...m,settings:{...m.settings,
-              voice:source.voice as VideoCustomization['voice'],narration:source.clips.map(c=>c.text),editor:resizeEditorDocument(m.settings.editor,source.durationSeconds)}}));}}>Reprendre la voix d’origine</button>}</div>}
+          {voice&&<div className="editor-restored-voice"><p>{!doc.voiceEnabled?'La voix off est désactivée. Sa piste d’origine reste disponible dans la timeline.':restoredVoice.reusable?'La voix d’origine est placée dans la timeline. Elle sera conservée à l’export.':'La piste d’origine reste visible et écoutable. Vos changements de voix, de narration ou de durée créeront une nouvelle voix à l’export.'}</p>
+            {!restoredVoice.reusable&&<button type="button" onClick={restoreOriginalVoice}>Reprendre la voix d’origine</button>}</div>}
           <label className="editor-check"><input type="checkbox" disabled={!doc.voiceEnabled} checked={doc.subtitlesEnabled} onChange={e=>changeDoc({...doc,subtitlesEnabled:e.target.checked})}/>Afficher les sous-titres</label>
           <label>Volume de la voix ({Math.round(doc.voiceVolume*100)} %)<input type="range" disabled={!doc.voiceEnabled} min={5} max={100} value={doc.voiceVolume*100} onChange={e=>changeDoc({...doc,voiceVolume:Number(e.target.value)/100})}/></label>
           <fieldset className="editor-mix-controls"><legend>Mixage automatique</legend>
@@ -320,18 +344,18 @@ function EditorProject({initial,agency}:{initial:CreationDraftView;agency:Agency
         <label className="editor-duration"><span className="sr-only">Durée de la vidéo</span><select value={doc.durationSeconds} onChange={e=>{setPlaying(false);changeDoc(resizeEditorDocument(doc,Number(e.target.value) as 20|30|40));}}><option value={20}>20 s</option><option value={30}>30 s</option><option value={40}>40 s</option></select></label>
         <div className="editor-canvas-zoom"><button type="button" aria-label="Réduire l’aperçu" onClick={()=>setZoom(z=>Math.max(25,z-10))}>−</button><span>{zoom} %</span><button type="button" aria-label="Agrandir l’aperçu" onClick={()=>setZoom(z=>Math.min(75,z+10))}>+</button></div>
       </div>
-        <EditorPreview doc={doc} voice={voice} draftId={draft.id} photos={draft.photos} logoId={agency.logoAssetId} frame={frame} playing={playing} zoom={zoom}
-          animations={resources?.version===draft.version&&saveState==='saved'?resources.animations:[]} photoMotion={model.settings.photoMotion} transition={model.settings.transition} selected={selection?.kind==='text'?selection.id:null} onSelect={id=>setSelection({kind:'text',id})} onSeek={seek} onPlay={()=>{if(frame>=total-1)setFrame(0);setPlaying(p=>!p);}}
+        <EditorPreview doc={doc} voice={voice} voiceReusable={restoredVoice.reusable} draftId={draft.id} photos={draft.photos} photoUrls={guest?.photoUrls} logoId={agency.logoAssetId} frame={frame} playing={playing} zoom={zoom}
+          animations={previewAnimations} photoMotion={model.settings.photoMotion} transition={model.settings.transition} selected={selection?.kind==='text'?selection.id:null} onSelect={id=>setSelection({kind:'text',id})} onSeek={seek} onPlay={()=>{if(frame>=total-1)setFrame(0);setPlaying(p=>!p);}}
           onCheckpoint={checkpoint} onMove={layer=>change(m=>({...m,settings:{...m.settings,editor:{...m.settings.editor,layers:m.settings.editor.layers.map(l=>l.id===layer.id?layer:l)}}}),false)}/>
       </div>
-      {selection?.kind==='music'&&doc.music?<aside className="editor-inspector"><div className="editor-panel-heading"><h2>Musique sélectionnée</h2><button type="button" aria-label="Fermer les réglages" onClick={()=>setSelection(null)}><HomeIcon name="close" size={18}/></button></div><EditorMusicControls doc={doc} onChange={next=>{changeDoc(next);if(!next.music)setSelection(null);}}/></aside>:selectedClip?<aside className="editor-inspector"><div className="editor-panel-heading"><h2>Photo sélectionnée</h2><button type="button" aria-label="Fermer les réglages" onClick={()=>setSelection(null)}><HomeIcon name="close" size={18}/></button></div>
-        <div className="editor-selected-photo">{draft.photos.find(p=>p.sourceOrder===selectedClip.photoSlot)&&<img src={`/api/imports/${draft.id}/photos/${draft.photos.find(p=>p.sourceOrder===selectedClip.photoSlot)!.id}`} alt="Photo sélectionnée"/>}</div>
+      {selection?.kind==='music'&&doc.music?<aside className="editor-inspector"><div className="editor-panel-heading"><h2>Musique sélectionnée</h2><button type="button" aria-label="Fermer les réglages" onClick={()=>setSelection(null)}><HomeIcon name="close" size={18}/></button></div><EditorMusicControls doc={doc} onChange={next=>{changeDoc(next);if(!next.music)setSelection(null);}}/></aside>:selectedClip?<aside className="editor-inspector"><div className="editor-panel-heading"><h2>{selectedClipLabel} sélectionnée</h2><button type="button" aria-label="Fermer les réglages" onClick={()=>setSelection(null)}><HomeIcon name="close" size={18}/></button></div>
+        <div className="editor-selected-photo">{draft.photos.find(p=>p.sourceOrder===selectedClip.photoSlot)&&<img src={photoUrl(draft.photos.find(p=>p.sourceOrder===selectedClip.photoSlot)!.id)} alt={`${selectedClipLabel} sélectionnée`}/>}</div>
         <label>Durée du plan (s)<EditorNumberInput key={selectedClip.id} min={.5} max={doc.durationSeconds} step={.1} value={Number((selectedClip.durationFrames/30).toFixed(1))} onValue={n=>changeDoc(resizeEditorClip(doc,selectedClip.id,Math.round(n*30)))}/></label>
         <p className="editor-media-hint">La durée totale reste fixe ; le plan voisin s’ajuste.</p>
         <EditorCameraControls camera={selectedClip.camera} onChange={camera=>changeDoc({...doc,clips:doc.clips.map(c=>c.id===selectedClip.id?{...c,camera}:c)})}/>
         <label className="editor-check"><input type="checkbox" checked={model.settings.runwayPhotos?.includes(selectedClip.photoSlot)??false} onChange={e=>change(m=>({...m,settings:{...m.settings,
           runwayPhotos:e.target.checked?[...(m.settings.runwayPhotos??[]),selectedClip.photoSlot]:(m.settings.runwayPhotos??[]).filter(slot=>slot!==selectedClip.photoSlot)}}))}/>Animer avec l’IA</label>
-        <p className="editor-media-hint">1 crédit par nouvelle animation. Une animation conservée est réutilisée sans supplément pour la même photo au même format. Les plans scindés partagent son animation.</p>
+        <p className="editor-media-hint">{availableAnimations.some(a=>a.slot===selectedClip.photoSlot)?'Animation déjà créée disponible pour ce plan. Cochez l’animation IA pour la conserver sans supplément.':'1 crédit par nouvelle animation. Une animation conservée est réutilisée sans supplément pour la même photo au même format.'} Les plans scindés partagent son animation.</p>
         <div className="editor-inspector-actions">{[-1,1].map(direction=><button type="button" key={direction} disabled={direction<0?doc.clips[0].id===selectedClip.id:doc.clips.at(-1)!.id===selectedClip.id} onClick={()=>{
           const clips=[...doc.clips],at=clips.findIndex(c=>c.id===selectedClip.id);[clips[at],clips[at+direction]]=[clips[at+direction],clips[at]];changeDoc({...doc,clips});
         }}>{direction<0?'← Avant':'Après →'}</button>)}</div>
@@ -340,15 +364,17 @@ function EditorProject({initial,agency}:{initial:CreationDraftView;agency:Agency
         const layer={...selectedLayer,id:crypto.randomUUID(),y:Math.min(98,selectedLayer.y+3)};changeDoc({...doc,layers:[...doc.layers,layer]});setSelection({kind:'text',id:layer.id});}}
         onDelete={()=>{if(!selectedLayer)return;changeDoc({...doc,layers:doc.layers.filter(l=>l.id!==selectedLayer.id)});setSelection(null);}}/>}
     </div>
-    <EditorTimeline doc={doc} voice={voice} voiceLoading={restoredVoice.loading} voiceError={Boolean(restoredVoice.error)} photos={draft.photos} draftId={draft.id} frame={frame} selected={selection} onSelect={setSelection} onSeek={seek} onChange={changeDoc} onCheckpoint={checkpoint} onAddPhoto={addClip} musicBusy={musicBusy} onAddMusic={addLibraryMusic}/>
-    <footer className="editor-statusbar"><span>{canExport?'Votre projet est prêt à être exporté.':!model.fields.title||!model.fields.locality||!model.fields.propertyType||!model.fields.transaction?'Complétez les informations du bien dans l’onglet Texte.':'Ajoutez au moins trois photos et vérifiez la narration.'}</span><span>{cost} crédit{cost>1?'s':''} à l’export</span></footer>
+    {voice&&doc.voiceEnabled&&!restoredVoice.reusable&&<div className="editor-feedback" role="status"><span>Voix d’origine conservée dans la timeline. Le texte, la voix ou la durée a changé : l’export utilisera une nouvelle narration.</span><button type="button" onClick={restoreOriginalVoice}>Reprendre la voix d’origine</button></div>}
+    <EditorTimeline doc={doc} voice={voice} voiceLoading={restoredVoice.loading} voiceError={Boolean(restoredVoice.error)} animatedSlots={previewAnimations.map(a=>a.slot)} photos={draft.photos} photoUrls={guest?.photoUrls} draftId={draft.id} frame={frame} selected={selection} onSelect={setSelection} onSeek={seek} onChange={changeDoc} onCheckpoint={checkpoint} onAddPhoto={addClip} musicBusy={musicBusy} onAddMusic={addLibraryMusic}/>
+    <footer className="editor-statusbar"><span>{canExport?'Votre projet est prêt à être exporté.':!model.fields.title||!model.fields.locality||!model.fields.propertyType||!model.fields.transaction?'Complétez les informations du bien dans l’onglet Texte.':'Ajoutez au moins trois photos et vérifiez la narration.'}</span><span>{guest?'Aucun crédit pendant vos essais':`${cost} crédit${cost>1?'s':''} à l’export`}</span></footer>
     {musicUrl&&<audio key={musicUrl} ref={audio} src={musicUrl} preload="metadata" hidden/>}
-    <EditorVoicePlayback draftId={draft.id} voice={doc.voiceEnabled?voice:null} frame={frame} playing={playing} volume={doc.voiceVolume} normalize={doc.audioMix?.normalize}
+    <EditorVoicePlayback draftId={draft.id} voice={doc.voiceEnabled?voice:null} audioUrls={guest?.voiceUrls} frame={frame} playing={playing} volume={doc.voiceVolume} normalize={doc.audioMix?.normalize}
       onError={()=>{setPlaying(false);setError('La voix ne peut pas être lue pour le moment. Relancez l’aperçu.');}}/>
     {confirm&&<dialog ref={dialog} className="editor-export-dialog" onCancel={()=>{if(!exporting)setConfirm(false);}}><h2>{previewIntent?'Préparer l’aperçu complet':'Exporter votre vidéo'}</h2><p>{doc.durationSeconds} secondes · {doc.aspectRatio} · {new Set(doc.clips.map(c=>c.photoSlot)).size} photos</p>
       {quality.length>0&&<div className="editor-quality-dialog"><strong>À vérifier avant export</strong>{quality.map(issue=><button type="button" key={issue.id} onClick={()=>inspectIssue(issue)}>{issue.message} →</button>)}</div>}
       <div className="editor-export-cost"><strong>{cost} crédit{cost>1?'s':''}</strong><span>{existingExport?'Cette version est déjà préparée.':`1 pour la vidéo${cost>1?` + ${cost-1} pour les nouvelles animations`:''}`}</span></div>
       <p>Le MP4 sera enregistré dans Mes vidéos. Une version déjà préparée peut être récupérée sans nouveau débit.</p>
+      {voice&&doc.voiceEnabled&&!restoredVoice.reusable&&<p>Vous écoutez actuellement la voix d’origine. Une nouvelle voix sera générée pour vos réglages modifiés.</p>}
       <label className="editor-check"><input type="checkbox" checked={rights} disabled={exporting} onChange={e=>setRights(e.target.checked)}/>J’ai le droit d’utiliser ces photos et cette musique.</label>
       {me&&me.rights.developmentRemaining<cost&&<p className="editor-error">Vous avez {me.rights.developmentRemaining} crédit(s) disponible(s). Retirez des animations ou découvrez les offres.</p>}
       <div><button type="button" disabled={exporting} onClick={()=>setConfirm(false)}>Annuler</button><button type="button" className="editor-primary" disabled={!rights||exporting||!me||me.rights.developmentRemaining<cost} onClick={()=>void exportVideo()}>{exporting?'Lancement…':`Exporter · ${cost} crédit${cost>1?'s':''}`}</button></div>

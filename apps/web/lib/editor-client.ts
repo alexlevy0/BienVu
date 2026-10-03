@@ -1,4 +1,11 @@
-import {publicErrors,rebalanceEditorClips,MUSIC_LIMITS,type EditorDocument,type PublicErrorCode} from '@bienvu/contracts';
+import {publicErrors,rebalanceEditorClips,MUSIC_LIMITS,type EditorDocument,type PublicErrorCode,type VideoCustomization,type PhotoAsset} from '@bienvu/contracts';
+export type EditorResources={version:number;sourceKey:string;cost:number;animations:{slot:number;url:string}[];availableAnimations:{slot:number;url:string}[]};
+// Visual/text edits must not replace retained videos with stills while saving.
+// A different source photo or format does invalidate the cached files.
+export function editorMediaSourcesKey(settings:VideoCustomization,photos:PhotoAsset[]){
+  return JSON.stringify([settings.editor?.aspectRatio??'9:16',photos.map(photo=>
+    [photo.sourceOrder,photo.id,photo.contentHash]).sort((a,b)=>Number(a[0])-Number(b[0]))]);
+}
 export async function editorResponse<T=unknown>(response:Response):Promise<T>{
   const body=await response.json() as {error?:{code?:PublicErrorCode};fields?:Record<string,string>};
   if(!response.ok){const code=body.error?.code as PublicErrorCode|undefined;

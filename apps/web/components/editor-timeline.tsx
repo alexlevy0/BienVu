@@ -5,7 +5,7 @@ import {HomeIcon} from './home-icons';
 import {editorTime} from './editor-preview';
 import {MusicWaveform} from './music-waveform';
 type Selection={kind:'text'|'photo'|'music';id:string}|null;
-export function EditorTimeline(p:{doc:EditorDocument;voice?:EditorVoicePreview|null;voiceLoading?:boolean;voiceError?:boolean;photos:PhotoAsset[];draftId:string;frame:number;selected:Selection;
+export function EditorTimeline(p:{doc:EditorDocument;voice?:EditorVoicePreview|null;voiceLoading?:boolean;voiceError?:boolean;animatedSlots?:number[];photos:PhotoAsset[];photoUrls?:Record<string,string>;draftId:string;frame:number;selected:Selection;
   musicBusy?:boolean;onAddMusic(id:string,startFrame:number):Promise<void>;onSelect(selection:Selection):void;onSeek(frame:number):void;onChange(doc:EditorDocument,remember?:boolean):void;onCheckpoint():void;onAddPhoto(slot:number,index?:number):void}){
   const [snap,setSnap]=useState(true),[zoom,setZoom]=useState(100),[musicDrag,setMusicDrag]=useState(false),track=useRef<HTMLDivElement>(null),musicTrack=useRef<HTMLDivElement>(null),total=p.doc.durationSeconds*30,starts=editorClipStarts(p.doc),
     musicPeaks=useMemo(()=>editorMusicWaveform(p.doc),[p.doc.music,p.doc.durationSeconds]);
@@ -13,7 +13,7 @@ export function EditorTimeline(p:{doc:EditorDocument;voice?:EditorVoicePreview|n
     const drag=(event:globalThis.DragEvent)=>{if(event.dataTransfer?.types.includes(MUSIC_DRAG_TYPE))reveal();};
     document.addEventListener('dragstart',drag);if(p.doc.music)reveal();return()=>document.removeEventListener('dragstart',drag);
   },[p.doc.music?.assetId]);
-  const markers=Array.from({length:p.doc.durationSeconds/4+1},(_,i)=>i*120),selectedClip=p.selected?.kind==='photo'?starts.find(c=>c.id===p.selected!.id):null;
+  const markers=Array.from({length:p.doc.durationSeconds/4+1},(_,i)=>i*120),selectedClip=p.selected?.kind==='photo'?starts.find(c=>c.id===p.selected!.id):null,animatedSlots=new Set(p.animatedSlots);
   function quantize(value:number){const rounded=Math.round(value);if(!snap)return rounded;
     const stops=[0,total,...starts.map(c=>c.startFrame),...p.doc.layers.flatMap(l=>[l.startFrame,l.startFrame+l.durationFrames])];
     const near=stops.find(stop=>Math.abs(stop-rounded)<9);return near??Math.round(rounded/3)*3;}
@@ -78,23 +78,23 @@ export function EditorTimeline(p:{doc:EditorDocument;voice?:EditorVoicePreview|n
         </button>)}{!p.doc.layers.length&&<span className="editor-track-placeholder">Ajoutez un titre ou les informations du bien</span>}
         <i className="editor-playhead" style={{left:`${p.frame/total*100}%`}}/>
       </div>
-      <div className="editor-track-label"><button type="button" aria-label={p.doc.photosVisible?'Masquer les photos':'Afficher les photos'} aria-pressed={p.doc.photosVisible}
-        onClick={()=>p.onChange({...p.doc,photosVisible:!p.doc.photosVisible})}><HomeIcon name="eye" size={17}/></button><span>Photos</span></div>
+      <div className="editor-track-label"><button type="button" aria-label={p.doc.photosVisible?'Masquer les plans':'Afficher les plans'} aria-pressed={p.doc.photosVisible}
+        onClick={()=>p.onChange({...p.doc,photosVisible:!p.doc.photosVisible})}><HomeIcon name="eye" size={17}/></button><span>Plans</span></div>
       <div className={`editor-track editor-photo-track${p.doc.photosVisible?'':' is-muted'}`} onDragOver={e=>e.preventDefault()} onDrop={e=>drop(e,p.doc.clips.length)}>
-        {starts.map((clip,index)=>{const photo=p.photos.find(photo=>photo.sourceOrder===clip.photoSlot);return <button type="button" draggable key={clip.id}
+        {starts.map((clip,index)=>{const photo=p.photos.find(photo=>photo.sourceOrder===clip.photoSlot),label=animatedSlots.has(clip.photoSlot)?'Vidéo IA':'Photo';return <button type="button" draggable key={clip.id}
           className={`editor-photo-clip${p.selected?.id===clip.id?' is-selected':''}`} style={{left:`${clip.startFrame/total*100}%`,width:`${clip.durationFrames/total*100}%`}}
-          aria-label={`Photo ${index+1}, ${Number((clip.durationFrames/30).toFixed(1))} secondes`} onClick={()=>{p.onSelect({kind:'photo',id:clip.id});p.onSeek(clip.startFrame);}}
+          aria-label={`${label} ${index+1}, ${Number((clip.durationFrames/30).toFixed(1))} secondes`} onClick={()=>{p.onSelect({kind:'photo',id:clip.id});p.onSeek(clip.startFrame);}}
           onDragStart={e=>{e.dataTransfer.setData('application/x-bienvu-clip',clip.id);e.dataTransfer.effectAllowed='move';}}
           onDragOver={e=>{e.preventDefault();e.stopPropagation();}} onDrop={e=>{e.stopPropagation();drop(e,index);}}>
-          {photo&&<img src={`/api/imports/${p.draftId}/photos/${photo.id}`} alt="" draggable={false}/>}<span>{String(index+1).padStart(2,'0')} · Photo</span>
+          {photo&&<img src={p.photoUrls?p.photoUrls[photo.id]:`/api/imports/${p.draftId}/photos/${photo.id}`} alt="" draggable={false}/>}<span>{String(index+1).padStart(2,'0')} · {label}</span>
           <i className="editor-photo-grip" aria-hidden="true" onPointerDown={e=>gesture(e,delta=>p.onChange(resizeEditorClip(p.doc,clip.id,quantize(clip.startFrame+clip.durationFrames+delta)-clip.startFrame),false))}/>
         </button>;})}{!starts.length&&<span className="editor-track-placeholder">Glissez vos photos ici</span>}<i className="editor-playhead" style={{left:`${p.frame/total*100}%`}}/>
       </div>
       <div className="editor-track-label"><button type="button" aria-label={p.doc.voiceEnabled?'Désactiver la voix off':'Activer la voix off'} aria-pressed={p.doc.voiceEnabled}
         onClick={()=>p.onChange({...p.doc,voiceEnabled:!p.doc.voiceEnabled,subtitlesEnabled:p.doc.voiceEnabled?false:p.doc.subtitlesEnabled})}><HomeIcon name="microphone" size={17}/></button><span>Voix off</span></div>
       <div className={`editor-track editor-audio-track${p.doc.voiceEnabled?'':' is-muted'}`}>
-        {p.voice?p.voice.clips.map((clip,i)=><button type="button" key={clip.assetId} className="editor-voice-clip editor-restored-clip" data-editor-voice-clip={clip.assetId}
-          style={{left:`${clip.startFrame/total*100}%`,width:`${Math.ceil(clip.durationMs*30/1000)/total*100}%`}} title={clip.text}
+        {p.voice?p.voice.clips.filter(clip=>clip.startFrame<total).map((clip,i)=><button type="button" key={clip.assetId} className="editor-voice-clip editor-restored-clip" data-editor-voice-clip={clip.assetId}
+          style={{left:`${clip.startFrame/total*100}%`,width:`${Math.min(total-clip.startFrame,Math.ceil(clip.durationMs*30/1000))/total*100}%`}} title={clip.text}
           aria-label={`Voix d’origine, passage ${i+1}, à ${editorTime(clip.startFrame)}`} onClick={()=>p.onSeek(clip.startFrame)}>
           <svg viewBox="0 0 192 26" preserveAspectRatio="none" aria-hidden="true">{clip.waveform.map((peak,j)=><line key={j} x1={j*3+1} x2={j*3+1} y1={13-peak*12} y2={13+peak*12}/>)}</svg>
           <span>{i===0?'Ouverture':i===p.voice!.clips.length-1?'Conclusion':`Passage ${i+1}`}</span></button>):<div className="editor-voice-clip"><HomeIcon name="microphone" size={16}/><span>{!p.doc.voiceEnabled?'Voix off désactivée':p.voiceLoading?'Chargement de la voix d’origine…':p.voiceError?'Voix indisponible · Réessayez dans Audio':'Voix off · créée à l’export'}</span></div>}

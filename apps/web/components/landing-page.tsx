@@ -5,6 +5,9 @@ import {useEffect, useRef, useState} from 'react';
 import {HomeCreate} from './home-create';
 import {AgencySeal, HomeIcon} from './home-icons';
 import {StudioSidebar} from './studio-sidebar';
+import {HomeShowcase} from './home-showcase';
+import {HomeSharing} from './home-sharing';
+import {HomeEditorShowcase} from './home-editor-showcase';
 
 const examples = [
   {id: 'paris', title: 'Lumière sur Paris', agency: 'Maison & Quartier', duration: 28, category: 'Appartements', alt: 'Salon haussmannien ensoleillé, moulures et fenêtres ouvertes sur Paris'},
@@ -36,6 +39,11 @@ export function LandingPage() {
     return () => {element?.close(); document.body.style.overflow = previous; trigger?.focus();};
   }, [modalOpen]);
   const play = (example: Example) => {setSelected(example); setDialog('example');};
+  const focusComposer = () => {
+    const input = document.getElementById('home-listing-url');
+    input?.focus({preventScroll: true});
+    input?.scrollIntoView({block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
+  };
   return <div className="home-studio home-studio-home">
     <a className="home-skip" href="#home-content">Aller au contenu</a>
     <StudioSidebar active="create"/>
@@ -57,6 +65,9 @@ export function LandingPage() {
           </aside>
         </section>
         {!conversationActive && <section id="explorer" className="home-discover" aria-labelledby="home-discover-title"><div className="home-discover-heading"><div><h2 id="home-discover-title">À découvrir sur BienVu</h2><p>Des inspirations pour donner une autre dimension à vos biens.</p></div><button type="button" className="home-explore-link" onClick={() => {setCategory('Tous'); setDialog('explore');}}>Tout explorer <HomeIcon name="external" size={17}/></button></div><div className="home-example-grid">{examples.map(example => <ExampleCard key={example.id} example={example} onPlay={play}/>)}</div><p className="home-demo-note">Démonstrations visuelles sans son · Biens et agences fictifs · Images générées</p></section>}
+        {!conversationActive && <HomeShowcase paused={modalOpen} onCreate={focusComposer}/>}
+        {!conversationActive && <HomeSharing onPlay={() => play(examples[0])} onCreate={focusComposer}/>}
+        {!conversationActive && <HomeEditorShowcase paused={modalOpen} onCreate={focusComposer}/>}
       </main>
       <footer className="home-footer"><span>BienVu · L’immobilier, en mouvement.</span><nav aria-label="Informations"><a href="mailto:contact@bienvu.online">Contact</a><Link href="/confidentialite">Confidentialité</Link><Link href="/conditions">Conditions</Link></nav></footer>
     </div>
