@@ -94,6 +94,11 @@ try{
   await wait("document.querySelector('.manual-step-header').textContent.includes('2 SUR 5')");
   await evaluate("(()=>{for(const [id,value]of [['manual-title','Appartement de recette'],['manual-locality','Lyon']]){const n=document.getElementById(id);Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(n,value);n.dispatchEvent(new Event('input',{bubbles:true}));}})()");
   await evaluate("document.querySelector('.manual-step-actions .home-primary-button').click()");
+  await wait("document.querySelector('.manual-step-header').textContent.includes('3 SUR 5')");
+  assert.ok(await evaluate("document.querySelector('#manual-description').checkVisibility()"));
+  await evaluate("document.querySelector('.manual-step-actions .home-primary-button').click()");
+  await wait("document.querySelector('.manual-step-header').textContent.includes('4 SUR 5')");
+  await evaluate("document.querySelector('.manual-step-actions .home-primary-button').click()");
   await wait("document.querySelector('.manual-step-header').textContent.includes('5 SUR 5')");
   await evaluate("[...document.querySelectorAll('.manual-step-nav button')].find(b=>b.textContent.includes('Photos')).click()");
   await wait("document.querySelector('.manual-step-header').textContent.includes('4 SUR 5')");

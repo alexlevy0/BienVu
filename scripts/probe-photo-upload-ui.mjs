@@ -62,6 +62,9 @@ try{for(const width of [1536,390])for(const scenario of ['quota','manual','custo
       await wait("document.querySelector('.manual-step-header').textContent.includes('2 SUR 5')");
       await evaluate("(()=>{for(const [id,value]of [['manual-title','Appartement de recette'],['manual-locality','Lyon']]){const n=document.getElementById(id);Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(n,value);n.dispatchEvent(new Event('input',{bubbles:true}));}})()");
       await evaluate("document.querySelector('.manual-step-actions .home-primary-button').click()");
+      await wait("document.querySelector('.manual-step-header').textContent.includes('3 SUR 5')");
+      assert.ok(await evaluate("document.querySelector('#manual-description').checkVisibility()"));
+      await evaluate("document.querySelector('.manual-step-actions .home-primary-button').click()");
       await wait("document.querySelector('.manual-step-header').textContent.includes('4 SUR 5')");
     }
     await evaluate(`document.querySelector('${card}').scrollIntoView({block:'center'})`);await shot('error');

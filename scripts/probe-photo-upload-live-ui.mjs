@@ -27,6 +27,7 @@ try{
   await evaluate("document.querySelector('input[name=propertyType][value=apartment]').click();document.querySelector('input[name=transaction][value=sale]').click();document.querySelector('.manual-step-actions .home-primary-button').click()");
   await wait("document.querySelector('.manual-step-header').textContent.includes('2 SUR 5')");
   await evaluate("(()=>{for(const [id,value]of [['manual-title','Appartement de recette'],['manual-locality','Lyon']]){const n=document.getElementById(id);Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(n,value);n.dispatchEvent(new Event('input',{bubbles:true}));}})()");
+  await evaluate("document.querySelector('.manual-step-actions .home-primary-button').click()");await wait("document.querySelector('.manual-step-header').textContent.includes('3 SUR 5')");
   await evaluate("document.querySelector('.manual-step-actions .home-primary-button').click()");await wait("document.querySelector('.manual-step-header').textContent.includes('4 SUR 5')");
   await upload('#manual-photos');await wait("document.querySelector('.manual-photos li')?.textContent.includes('Disponible')");
   await evaluate("document.querySelector('.manual-photos').scrollIntoView({block:'center'})");await shot('manual-uploaded');

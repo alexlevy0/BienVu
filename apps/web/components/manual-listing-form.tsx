@@ -275,8 +275,7 @@ export function ManualListingForm(props: Props) {
       }finally{setPhotoChecking(false);}}
     }
     if(Object.keys(next).length){setErrors(previous=>({...previous,...next}));focusError(Object.keys(next)[0]);return;}
-    const fields=draftFields(),nextStep=step===0&&fields.title&&fields.locality?photos.filter(p=>p.state==='ready').length>=3?4:3
-      :step===1?photos.filter(p=>p.state==='ready').length>=3?4:3:step===2?photos.filter(p=>p.state==='ready').length>=3?4:3:Math.min(4,step+1);
+    const fields=draftFields(),nextStep=Math.min(4,step+1);
     history.current.push(step);setReached(value=>Math.max(value,nextStep));props.guided.setStep(nextStep);
     void saveManualListingDraft(fields,props.guided.agencyId?[]:photos.flatMap(p=>p.file?[p.file]:[]),nextStep,props.guided.agencyId,
       serverRef.current?.id,serverRef.current?.version,customization,photos.map(p=>p.slot));
