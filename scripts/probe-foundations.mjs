@@ -5,14 +5,15 @@ const base = process.env.BIENVU_FOUNDATIONS_URL ?? 'http://localhost:8787';
 const origin = new URL(base);
 if (!['localhost', '127.0.0.1', '[::1]'].includes(origin.hostname)) throw new Error('Sonde sprint 01 limitée au serveur local.');
 const report = {at: new Date().toISOString(), mode: 'local-workerd', externalCalls: 0, checks: []};
+// The studio controls identify these pages without coupling the probe to marketing copy.
 const pages = new Map([
-  ['/', /Une annonce\./],
+  ['/', [/id="home-listing-url"/, /class="home-composer(?:\s[^"]*)?"/]],
   ['/studio', /VOTRE PROCHAINE BELLE HISTOIRE/],
   ['/sources', /IMPORTER VOTRE ANNONCE/],
   ['/generer', /UNE ANNONCE, UNE HISTOIRE/],
   ['/agence', /Votre identité, sur chaque vidéo\./],
   ['/historique', /Toutes vos créations, au même endroit\./],
-  ['/abonnement', /Des vidéos à/],
+  ['/abonnement', [/id="offers-gratuit"/, /id="offers-plus"/, /id="offers-pro"/]],
   ['/connexion', /Votre studio immobilier/],
   ['/laboratoire', /Cette interface est en développement/],
 ]);
@@ -23,7 +24,9 @@ for (const [path, expectedContent] of pages) {
   assert.match(html, /<html lang="fr"/);
   assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
   assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
-  assert.ok(expectedContent.test(html), `Contenu attendu absent sur ${path}: ${expectedContent}`);
+  for (const content of Array.isArray(expectedContent) ? expectedContent : [expectedContent]) {
+    assert.ok(content.test(html), `Contenu attendu absent sur ${path}: ${content}`);
+  }
   report.checks.push({path, status: response.status, french: true, securityHeaders: true});
 }
 const ids = new Set();

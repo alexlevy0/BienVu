@@ -41,10 +41,12 @@ jobs:
           done
           pnpm probe:foundations
           pnpm probe:web
-          pnpm probe:accounts
-          BIENVU_PREVIEW_LOG=/tmp/bienvu-preview.log pnpm probe:auth-email
-          pnpm probe:imports --manual
-          pnpm probe:imports --portals
+          # Owner memberships cannot be deleted. These synthetic accounts live
+          # only in this job's disposable local D1/R2 storage.
+          pnpm probe:accounts --keep-fixtures
+          BIENVU_PREVIEW_LOG=/tmp/bienvu-preview.log pnpm probe:auth-email --keep-fixtures
+          pnpm probe:imports --manual --keep
+          pnpm probe:imports --portals --keep
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -10,6 +10,7 @@ import {promisify} from 'node:util';
 const run = promisify(execFile), base = 'http://localhost:8787', folder = resolve('evidence/local/sprint-02');
 const logPath = process.env.BIENVU_PREVIEW_LOG;
 const bypass = process.argv.includes('--bypass');
+const keepFixtures = process.argv.includes('--keep-fixtures');
 if (!logPath) throw new Error('BIENVU_PREVIEW_LOG doit désigner la sortie du serveur pnpm preview --local.');
 const config = JSON.parse(await readFile('apps/web/wrangler.jsonc', 'utf8'));
 assert.equal(config.vars.AUTH_EMAIL_MODE, 'local');
@@ -111,11 +112,16 @@ try {
   checked('CSRF refusé, déconnexion et essai unique conservés, allocation gratuite inactive');
   }
 } finally {
-  await sql(`DELETE FROM auth_verification WHERE value IN (SELECT id FROM auth_user WHERE email=${quote(email)});
-    DELETE FROM trial_claims WHERE owner_user_id IN (SELECT id FROM auth_user WHERE email=${quote(email)});
-    DELETE FROM allocations WHERE agency_id IN (SELECT id FROM agencies WHERE owner_user_id IN (SELECT id FROM auth_user WHERE email=${quote(email)}));
-    DELETE FROM agencies WHERE owner_user_id IN (SELECT id FROM auth_user WHERE email=${quote(email)});
-    DELETE FROM auth_user WHERE email=${quote(email)};`);
-  console.log('Identité synthétique, sessions et agence supprimées.');
+  if (keepFixtures) {
+    report.fixturesRetained = true;
+    console.log('Identité synthétique conservée dans le stockage local temporaire.');
+  } else {
+    await sql(`DELETE FROM auth_verification WHERE value IN (SELECT id FROM auth_user WHERE email=${quote(email)});
+      DELETE FROM trial_claims WHERE owner_user_id IN (SELECT id FROM auth_user WHERE email=${quote(email)});
+      DELETE FROM allocations WHERE agency_id IN (SELECT id FROM agencies WHERE owner_user_id IN (SELECT id FROM auth_user WHERE email=${quote(email)}));
+      DELETE FROM agencies WHERE owner_user_id IN (SELECT id FROM auth_user WHERE email=${quote(email)});
+      DELETE FROM auth_user WHERE email=${quote(email)};`);
+    console.log('Identité synthétique, sessions et agence supprimées.');
+  }
 }
 await writeFile(resolve(folder, bypass ? 'bypass-workerd.json' : 'email-workerd.json'), JSON.stringify(report, null, 2));
