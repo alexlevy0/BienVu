@@ -9,6 +9,7 @@ import {HomeShowcase} from './home-showcase';
 import {HomeSharing} from './home-sharing';
 import {HomeEditorShowcase} from './home-editor-showcase';
 import {HomeHeroVideo} from './home-hero-video';
+import {HomeFooter} from './home-footer';
 import {HomeVisual, useHomepageMedia, useHomepageConfig, homeClock} from './homepage-media';
 import type {HomepageSlot} from '@bienvu/contracts';
 
@@ -74,7 +75,7 @@ export function LandingPage() {
         {!conversationActive && <HomeSharing onPlay={context => playSlot(`share.${context}.video`)} onCreate={focusComposer}/>}
         {!conversationActive && <HomeEditorShowcase paused={modalOpen || heroPlaying} onCreate={focusComposer}/>}
       </main>
-      <footer className="home-footer"><span>BienVu · L’immobilier, en mouvement.</span><nav aria-label="Informations"><a href="mailto:contact@bienvu.online">Contact</a><Link href="/confidentialite">Confidentialité</Link><Link href="/conditions">Conditions</Link></nav></footer>
+      <HomeFooter onCreate={focusComposer} onHelp={()=>setDialog('help')}/>
     </div>
     {dialog && <dialog ref={modal} className={`home-dialog${dialog === 'example' ? ' home-video-dialog' : dialog === 'explore' ? ' home-explore-dialog' : ''}`} aria-labelledby="home-dialog-title" onCancel={() => setDialog(null)} onClick={event => {if (event.target === event.currentTarget) setDialog(null);}}><button className="home-dialog-close" type="button" aria-label="Fermer" onClick={() => setDialog(null)}><HomeIcon name="close" size={21}/></button>
       {dialog === 'example' ? <><div className="home-video-heading"><p className="home-dialog-kicker">L’IMMOBILIER, EN MOUVEMENT</p><h2 id="home-dialog-title">{movieTitle}</h2><p>{customMovie?(movie.agency??selectedVisual.agency??'BienVu'):`${selected.agency} · Agence fictive`}</p></div><video key={movie.src} src={movie.src} poster={selectedVisual.kind==='image'?selectedVisual.src:movie.poster??undefined} controls autoPlay playsInline preload="metadata" aria-label={`Vidéo : ${movieTitle}`}/>{!customMovie&&<p className="home-dialog-footnote">Animation d’un visuel généré, sans voix off. Vos vidéos utilisent les photos de votre bien et votre identité d’agence.</p>}</>

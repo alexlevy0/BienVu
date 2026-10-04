@@ -9,6 +9,7 @@ import './landing.css';
 import './home-showcase.css';
 import './home-sharing.css';
 import './home-editor-showcase.css';
+import './home-footer.css';
 import './customizer.css';
 
 export const metadata = {
