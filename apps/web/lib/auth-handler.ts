@@ -2,11 +2,13 @@ import {EmailRequest, EmailSignIn, EmailSignUp, PasswordReset} from '@bienvu/con
 import {authOrigin, createAuth, emailVerificationBypassed, googleConfigured, type AuthEnvironment} from './auth';
 import {emailConfigured} from './auth-email';
 import {assertSameOrigin, boundedJson, RequestFailure, respond} from './http';
+import {authLoginPath, authReturnPath} from './auth-navigation';
 
 export function handleAuthRequest(request: Request, env: AuthEnvironment, waitUntil?: (task: Promise<unknown>) => void) {
   return respond(async () => {
     const inputURL = new URL(request.url), path = inputURL.pathname;
     const origin = authOrigin(env);
+    const returnTo = authReturnPath(inputURL.searchParams.get('next'));
     const bypassVerification = emailVerificationBypassed(env);
     if (bypassVerification && inputURL.origin !== origin) throw new RequestFailure('FORBIDDEN');
     if (path === '/api/auth/status' && request.method === 'GET')
@@ -29,7 +31,7 @@ export function handleAuthRequest(request: Request, env: AuthEnvironment, waitUn
           !('provider' in input) || input.provider !== 'google')
           throw new RequestFailure('VALIDATION_ERROR');
         if (!googleConfigured(env)) throw new RequestFailure('AUTH_UNAVAILABLE');
-        body = {provider: 'google', callbackURL: continueTrial ? '/essai/recuperer' : continueListing ? '/' : '/agence', errorCallbackURL: continueTrial ? '/connexion?error=oauth&trial=1' : '/connexion?error=oauth', disableRedirect: true};
+        body = {provider: 'google', callbackURL: returnTo ?? (continueTrial ? '/essai/recuperer' : continueListing ? '/' : '/agence'), errorCallbackURL: authLoginPath(returnTo, {error:'oauth', ...(!returnTo && continueTrial ? {trial:'1'} : {})}), disableRedirect: true};
       } else {
         const schema = ({'/api/auth/sign-up/email': EmailSignUp, '/api/auth/sign-in/email': EmailSignIn,
           '/api/auth/request-password-reset': EmailRequest, '/api/auth/send-verification-email': EmailRequest,
@@ -43,8 +45,8 @@ export function handleAuthRequest(request: Request, env: AuthEnvironment, waitUn
         if (needsEmail && !emailConfigured(env))
           throw new RequestFailure('EMAIL_UNAVAILABLE');
         if (path === '/api/auth/sign-up/email') body.name = String(body.email).split('@')[0];
-        if (path === '/api/auth/sign-up/email' || path === '/api/auth/send-verification-email') body.callbackURL = '/connexion?verified=1';
-        if (path === '/api/auth/sign-in/email') body.callbackURL = '/agence';
+        if (path === '/api/auth/sign-up/email' || path === '/api/auth/send-verification-email') body.callbackURL = authLoginPath(returnTo, {verified:'1'});
+        if (path === '/api/auth/sign-in/email') body.callbackURL = returnTo ?? '/agence';
       }
       const headers = new Headers(request.headers);
       headers.set('content-type', 'application/json'); headers.delete('content-length');
@@ -53,7 +55,12 @@ export function handleAuthRequest(request: Request, env: AuthEnvironment, waitUn
       const token = inputURL.searchParams.get('token');
       if (!token || token.length > 4096) throw new RequestFailure('AUTH_LINK_INVALID');
       const url = new URL(`${origin}${path}`);
-      url.searchParams.set('token', token); url.searchParams.set('callbackURL', '/connexion?verified=1');
+      let verifiedReturn: string | null = null;
+      try {
+        const callback = new URL(inputURL.searchParams.get('callbackURL') ?? '', origin);
+        if (callback.origin === origin && callback.pathname === '/connexion') verifiedReturn = authReturnPath(callback.searchParams.get('next'));
+      } catch {/* Discard untrusted callback URLs. */}
+      url.searchParams.set('token', token); url.searchParams.set('callbackURL', authLoginPath(verifiedReturn, {verified:'1'}));
       request = new Request(url, {headers: request.headers});
     } else if (!(path === '/api/auth/callback/google' && request.method === 'GET')) throw new RequestFailure('NOT_FOUND');
 
@@ -71,7 +78,7 @@ export function handleAuthRequest(request: Request, env: AuthEnvironment, waitUn
       const redirect = new URL(location, origin);
       if (redirect.origin !== origin) throw new RequestFailure('AUTH_FAILED');
       const headers = new Headers(response.headers);
-      if (redirect.searchParams.has('error')) headers.set('location', `${origin}/connexion?error=${path === '/api/auth/verify-email' ? 'verification' : 'oauth'}${redirect.searchParams.get('trial')==='1'?'&trial=1':''}`);
+      if (redirect.searchParams.has('error')) headers.set('location', origin + authLoginPath(authReturnPath(redirect.searchParams.get('next')), {error:path === '/api/auth/verify-email' ? 'verification' : 'oauth', ...(redirect.searchParams.get('trial') === '1' ? {trial:'1'} : {})}));
       return new Response(null, {status: response.status, headers});
     }
     // Les cookies passent ; ni jeton de session, ni profil synthétique ne sortent dans le JSON.

@@ -2,6 +2,7 @@
 import {createContext, useCallback, useContext, useEffect, useState} from 'react';
 import {Me, type AgencyProfile} from '@bienvu/contracts';
 import {clearListingDraft} from '../lib/listing-draft';
+import {clearAgencyDraft} from '../lib/agency-draft';
 
 type AccountState = {me: Me | null; loading: boolean; error: string; refresh: () => Promise<void>; refreshRights: () => Promise<void>; setAgency: (agency: AgencyProfile) => void};
 const AccountContext = createContext<AccountState | null>(null);
@@ -42,7 +43,7 @@ export function SignOut() {
     try {
       const response = await fetch('/api/auth/sign-out', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'});
       if (!response.ok) throw new Error();
-      clearListingDraft();await refresh(); window.location.assign('/connexion');
+      clearListingDraft();await clearAgencyDraft();await refresh(); window.location.assign('/connexion');
     } catch {setError('La déconnexion a échoué. Réessayez.'); setBusy(false);}
   }
   return <div><button className="button secondary" type="button" disabled={busy} onClick={signOut}>{busy ? 'Déconnexion…' : 'Se déconnecter'}</button><p className="form-feedback error" role="alert">{error}</p></div>;

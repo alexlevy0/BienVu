@@ -482,9 +482,10 @@
 .home-studio-home .home-content:not(.home-content-conversation) {padding:3px 20px 0}
 .home-hero-dashboard {max-width:none;display:grid;grid-template-columns:minmax(0,1fr) minmax(250px,29%);column-gap:28px;row-gap:14px;padding:28px 26px 16px;border-radius:19px;background:linear-gradient(120deg,#e6ecdf,#e1e9da 67%,#e4ecde);text-align:left;align-items:start}
 .home-hero-dashboard .home-hero-intro {grid-column:1;grid-row:1;min-width:0;padding:16px 12px 0}
-.home-hero-dashboard h1 {font-size:clamp(54px,5.2vw,82px);line-height:.88;letter-spacing:-3.3px;margin:0 0 25px;font-weight:600}
-.home-hero-dashboard h1 em {display:block;width:max-content;max-width:100%;letter-spacing:-3.4px}
-.home-hero-dashboard h1 em::after {height:7px;bottom:-11px;left:28%;right:-3%;background:#bfceaf;transform:rotate(-1deg)}
+.home-hero-dashboard h1 {font-size:clamp(54px,5.2vw,82px);line-height:.88;letter-spacing:-3.3px;margin:0 0 25px;font-weight:400}
+.home-hero-dashboard h1>span {display:block}
+.home-hero-dashboard h1 em {display:inline-block;max-width:100%;letter-spacing:-3.4px}
+.home-hero-dashboard h1 em::after {height:7px;bottom:-11px;left:0;right:0;background:#bfceaf;transform:rotate(-1deg)}
 .home-studio .home-hero-dashboard .home-intro {margin:0;font-size:22px;line-height:1.45;max-width:none}
 .home-hero-dashboard>.home-create {grid-column:1;grid-row:2;min-width:0;align-self:end}
 .home-hero-dashboard .home-composer {background:#fffefa;border:1px solid #ffffffb3;border-radius:17px;padding:22px 23px 20px;gap:18px;box-shadow:0 6px 22px #29362012,0 1px 5px #29362008}

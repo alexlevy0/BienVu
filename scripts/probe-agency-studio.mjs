@@ -22,6 +22,7 @@ const fixtureScript = `(()=>{const native=window.fetch.bind(window);window.__age
     const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json'}});
     if(path==='/api/me')return json(profile);
     if(path==='/api/generations')return json({jobs:[],nextCursor:null});
+    if(path==='/api/social/connections')return json({connections:[],configured:true});
     if(path==='/api/agency'&&options.method==='PUT'){const body=JSON.parse(options.body);window.__agencySaves.push(body);
       profile={...profile,agency:{...profile.agency,...body,brandVersion:profile.agency.brandVersion+1}};return json({agency:profile.agency});}
     if(path.startsWith('/api/'))throw Error('UNEXPECTED_AGENCY_FIXTURE_API:'+path);

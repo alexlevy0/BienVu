@@ -14,6 +14,7 @@
 .login-studio-left {min-width:0;min-height:100svh;padding:35px clamp(30px,5.4vw,88px) 28px;display:flex;flex-direction:column}
 .login-studio-header,.login-studio-footer {display:flex;align-items:center;justify-content:space-between;gap:22px}
 .login-studio-header {color:#60645e;font-size:14px;white-space:nowrap}
+.login-studio-header>span {min-width:0;white-space:normal;text-align:right;line-height:1.4}
 .login-studio-header>a {display:inline-flex}
 .login-studio-header .home-wordmark {font-size:38px;gap:12px;letter-spacing:-2.5px}
 .login-studio-header .home-wordmark>svg {width:34px;height:34px}

@@ -3,6 +3,11 @@
 .agency-studio-heading h1 {font-family:'Times New Roman',Times,serif;font-size:80px;font-weight:500;line-height:.98;letter-spacing:-3.6px;margin:0;color:#070806}
 .home-studio .agency-studio-heading p {font-size:29px;line-height:1.25;color:#575d6b;margin:6px 0 0}
 .agency-studio-grid {display:grid;grid-template-columns:minmax(0,1.6fr) minmax(330px,1fr);gap:32px}
+.agency-studio-guest-note {display:flex;align-items:center;gap:12px;padding:15px 18px;margin:0 0 26px;border:1px solid #d2dec8;border-radius:10px;background:#edf2e7;color:#3d5335;font-size:14px;line-height:1.5}
+.agency-studio-guest-note>svg {flex:none}
+.agency-studio-guest-note>p {margin:0}
+.agency-studio-storage-actions {display:flex;flex-wrap:wrap;gap:12px;margin-top:12px;font-size:13px}
+.agency-studio-storage-actions :is(a,button) {padding:8px 10px;border:1px solid #bccdb1;border-radius:7px;background:#f7faf3;color:#36552c;font:inherit;cursor:pointer}
 .agency-studio-form {min-width:0}
 .agency-studio-form fieldset {min-width:0;border:0;margin:0;padding:0}
 .agency-studio-section + .agency-studio-section {margin-top:34px}

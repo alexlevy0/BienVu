@@ -12,7 +12,7 @@ export default function Page() {
     <section className="login-studio-left" aria-labelledby="login-studio-title">
       <header className="login-studio-header">
         <Link href="/" aria-label="BienVu, retour à l’accueil"><HomeWordmark/></Link>
-        <span>Votre studio immobilier</span>
+        <span>Le studio marketing IA de votre agence immobilière.</span>
       </header>
       <div className="login-studio-content">
         <p className="login-studio-kicker">L’IMMOBILIER, EN MOUVEMENT</p>

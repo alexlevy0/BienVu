@@ -117,6 +117,16 @@ test('e-mail/mot de passe : routes réelles et D1, envoi capturé en mémoire', 
     assert.equal((await db.prepare('SELECT count(*) n FROM auth_account WHERE userId=?').bind(id).first<{n: number}>())?.n, 2);
     assert.deepEqual(createAuth(env).options.account.accountLinking, {enabled: true, requireLocalEmailVerified: true, trustedProviders: [], allowDifferentEmails: false});
   });
+  await t.test('la confirmation e-mail conserve le retour au calendrier, sans ouvrir de session', async () => {
+    const response = await post('sign-up/email?next=%2Fpublications', {email:'calendar-guest@example.com', password});
+    assert.equal(response.status, 200);
+    const confirmation = await get(mailURL().href);
+    assert.equal(confirmation.status, 302); assert.equal(confirmation.headers.get('set-cookie'), null);
+    const destination = new URL(confirmation.headers.get('location')!, env.BETTER_AUTH_URL);
+    assert.equal(destination.pathname, '/connexion');
+    assert.equal(destination.searchParams.get('verified'), '1');
+    assert.equal(destination.searchParams.get('next'), '/publications');
+  });
   await t.test('bypass local : inscription vérifiée, cookie signé et agence sans fournisseur e-mail', async () => {
     const local = {...env, AUTH_EMAIL_VERIFICATION_BYPASS: 'true', AUTH_EMAIL: undefined, AUTH_EMAIL_MODE: 'disabled'};
     const address = 'local-bypass@example.com', count = messages.length;

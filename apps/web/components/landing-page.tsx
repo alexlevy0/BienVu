@@ -60,10 +60,10 @@ export function LandingPage() {
   return <div className="home-studio home-studio-home">
     <a className="home-skip" href="#home-content">Aller au contenu</a>
     <StudioSidebar active="create"/>
-    <div className="home-workspace"><header className="home-topbar"><span>Votre studio immobilier</span><button type="button" onClick={() => setDialog('help')}>Aide</button></header>
+    <div className="home-workspace"><header className="home-topbar"><span>Le studio marketing IA de votre agence immobilière.</span><button type="button" onClick={() => setDialog('help')}>Aide</button></header>
       <main className={`home-content${conversationActive ? ' home-content-conversation' : ''}`} id="home-content" tabIndex={-1}>
         <section className={`home-hero${conversationActive?'':' home-hero-dashboard'}`} aria-label={conversationActive?'Créer votre vidéo':undefined} aria-labelledby={conversationActive?undefined:'home-title'}>
-          <div className={`home-hero-intro${conversationActive?' home-hero-intro-leaving':''}`} inert={conversationActive}><h1 id="home-title">Vos annonces, <em>en version vidéo.</em></h1><p className="home-intro">Collez votre annonce. L’IA crée votre vidéo, prête à partager.</p></div>
+          <div className={`home-hero-intro${conversationActive?' home-hero-intro-leaving':''}`} inert={conversationActive}><h1 id="home-title"><span>Vous rentrez le mandat.</span> BienVu s'occupe du <em><strong>marketing</strong>.</em></h1><p className="home-intro"><strong>Création, personnalisation et publication. Tout est automatisé.</strong></p></div>
           <HomeCreate onLayoutChange={setConversationActive}/>
           <aside className="home-hero-showcase" hidden={conversationActive} aria-label="Un aperçu de votre prochaine vidéo">
             <p>Votre prochain coup de cœur, en vidéo.</p>

@@ -10,11 +10,12 @@ import './home-showcase.css';
 import './home-sharing.css';
 import './home-editor-showcase.css';
 import './home-footer.css';
+import './home-composer.css';
 import './customizer.css';
 
 export const metadata = {
-  title: 'BienVu — Vos annonces, en version vidéo.',
-  description: 'Collez votre annonce. L’IA crée votre vidéo, prête à partager.',
+  title: "BienVu — Vous rentrez le mandat. BienVu s'occupe du marketing.",
+  description: 'Création, personnalisation et publication. Tout est automatisé.',
   alternates:{canonical:'/'},
 };
 export const dynamic='force-dynamic';
