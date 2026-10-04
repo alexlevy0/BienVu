@@ -4,6 +4,7 @@ import {httpsRedirect} from './lib/https-redirect';
 import {collectTraffic,purgeTraffic} from './lib/traffic';
 import {runSocialBatch} from './lib/social-publisher';
 import {cleanupSocial} from './lib/social';
+import {cleanupHomepageAssets} from './lib/homepage-media';
 
 export default {
   async fetch(request, env, ctx) {
@@ -12,7 +13,7 @@ export default {
     return response;
   },
   async scheduled(controller,env){
-    if(controller.cron==='23 3 * * *'){await purgeTraffic(env.DB);await cleanupSocial(env);}
+    if(controller.cron==='23 3 * * *'){await purgeTraffic(env.DB);await cleanupSocial(env);await cleanupHomepageAssets(env);}
     else await runSocialBatch(env);
   },
 } satisfies ExportedHandler<CloudflareEnv>;

@@ -5,6 +5,7 @@ import {useEffect, useRef, useState} from 'react';
 import type {VideoCustomization} from '@bienvu/contracts';
 import {voicePreviews} from '../lib/voice-previews';
 import {HomeIcon} from './home-icons';
+import {HomeVisual,useHomepageMedia} from './homepage-media';
 
 const voices = ['fish-manon', 'fish-lucas', 'fish-camille'] as const;
 const peaks = [4, 5, 8, 12, 19, 26, 35, 23, 15, 12, 18, 26, 20, 15, 26, 33, 21, 13, 6, 9, 21, 34, 43, 30, 20, 15, 24, 28, 22, 13, 9, 14, 22, 32, 38, 29, 21, 15, 21, 30, 25, 18, 13, 17, 24, 20, 11, 7, 11, 20, 30, 23, 17, 9, 14, 18, 12, 9, 6, 5];
@@ -25,11 +26,12 @@ const questions = [
 ] as const;
 
 export function HomeShowcase({paused, onCreate}: {paused: boolean; onCreate(): void}) {
+  const photo=useHomepageMedia('life.photo'),visual=useHomepageMedia('life.visual'),movie=useHomepageMedia('life.video'),editor=useHomepageMedia('life.editor');
   const video = useRef<HTMLVideoElement>(null), audio = useRef<HTMLAudioElement>(null), attempt = useRef(0);
   const [videoPlaying, setVideoPlaying] = useState(false), [videoStarted, setVideoStarted] = useState(false), [videoError, setVideoError] = useState(false);
   const [voice, setVoice] = useState<VideoCustomization['voice']>('fish-manon');
   const [audioState, setAudioState] = useState<'idle' | 'loading' | 'playing'>('idle'), [audioError, setAudioError] = useState(false);
-  const [text, setText] = useState('65 m² · 3 pièces'), [font, setFont] = useState('Instrument Serif'), [largeText, setLargeText] = useState(false);
+  const [text, setText] = useState(editor.custom?'Votre texte':'65 m² · 3 pièces'), [font, setFont] = useState('Instrument Serif'), [largeText, setLargeText] = useState(false);
   const [color, setColor] = useState('#ffffff'), [align, setAlign] = useState<'left' | 'center' | 'right'>('center');
   const sample = voicePreviews[voice], audioActive = audioState !== 'idle';
   useEffect(() => {
@@ -66,16 +68,16 @@ export function HomeShowcase({paused, onCreate}: {paused: boolean; onCreate(): v
     </header>
     <div className="home-life-stage">
       <figure className="home-life-photo">
-        <img src="/images/studio-home/paris.webp" width="768" height="1024" loading="lazy" decoding="async" alt="Exemple de photo d’un salon lumineux avec grandes fenêtres et cheminée"/>
+        <HomeVisual media={photo} alt={photo.title??'Photo du bien'}/>
         <figcaption className="home-life-badge"><HomeIcon name="image" size={18}/>Votre photo</figcaption>
       </figure>
       <svg className="home-life-arrow" viewBox="0 0 64 50" fill="none" aria-hidden="true"><path d="M4 31C19 10 38 12 56 31m-1-12 1 12-12-2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
       <figure className="home-life-video">
         <figcaption className="home-life-badge home-life-video-badge"><HomeIcon name="play" size={17}/>Votre vidéo BienVu</figcaption>
-        <video ref={video} src="/videos/studio-home/paris.mp4" poster="/images/studio-home/paris.webp" controls={videoStarted} playsInline preload="none" aria-label="Exemple de vidéo BienVu : un appartement à Paris"
+        <video ref={video} src={movie.src} poster={visual.kind==='image'?visual.src:movie.poster??undefined} controls={videoStarted} playsInline preload={visual.kind==='image'||movie.poster?'none':'metadata'} aria-label={movie.custom?movie.title??'Vidéo BienVu':'Exemple de vidéo BienVu : un appartement à Paris'}
           onPlay={() => {attempt.current++; audio.current?.pause(); setAudioState('idle'); setVideoError(false); setVideoStarted(true); setVideoPlaying(true);}}
           onPause={() => setVideoPlaying(false)} onEnded={() => setVideoPlaying(false)} onError={() => {setVideoPlaying(false); setVideoError(true);}}/>
-        <div className="home-life-video-facts" aria-hidden="true"><strong>Paris</strong><span>65 m² · 3 pièces</span><b>385 000 €</b></div>
+        {!movie.custom&&!visual.custom&&<div className="home-life-video-facts" aria-hidden="true"><strong>Paris</strong><span>65 m² · 3 pièces</span><b>385 000 €</b></div>}
         {!videoPlaying && <button type="button" className="home-life-video-play" aria-label="Lire la vidéo de démonstration" onClick={() => void playVideo()}><HomeIcon name="play" size={28}/></button>}
       </figure>
       <div className="home-life-extras">
@@ -105,7 +107,7 @@ export function HomeShowcase({paused, onCreate}: {paused: boolean; onCreate(): v
         <h3>Chaque détail vous appartient.</h3>
         <p>Modifiez simplement les textes, les couleurs et votre logo.</p>
         <div className="home-life-editor-demo">
-          <img src="/images/studio-home/paris.webp" width="768" height="1024" loading="lazy" decoding="async" alt="Exemple de personnalisation du texte sur une photo du bien"/>
+          <HomeVisual media={editor} alt="Personnalisation du texte sur un visuel du bien"/>
           <div className={`home-life-editable${color === '#ffffff' ? '' : ' has-light-background'}`}>
             <label className="sr-only" htmlFor="home-demo-text">Texte de démonstration</label>
             <input id="home-demo-text" value={text} maxLength={60} placeholder="Votre texte" onChange={event => setText(event.target.value)} style={{color, fontFamily: font, fontSize: largeText ? '36px' : '29px', textAlign: align}}/>

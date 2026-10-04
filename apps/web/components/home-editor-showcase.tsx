@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import {useEffect, useRef, useState, type CSSProperties, type PointerEvent} from 'react';
 import {HomeIcon} from './home-icons';
+import {HomeVisual,useHomepageMedia} from './homepage-media';
 
 const photos = [
   {id: 'salon', src: '/images/studio-home/paris.webp', name: 'Séjour', duration: 7},
@@ -19,7 +20,8 @@ const dragType = 'application/x-bienvu-demo-photo';
 function clock(seconds: number) {return `0:${String(Math.floor(seconds)).padStart(2, '0')}`;}
 
 export function HomeEditorShowcase({paused, onCreate}: {paused: boolean; onCreate(): void}) {
-  const [history, setHistory] = useState<{past: Demo[]; current: Demo; future: Demo[]}>({past: [], current: initial, future: []});
+  const media={salon:useHomepageMedia('editor.salon'),interieur:useHomepageMedia('editor.interieur'),loft:useHomepageMedia('editor.loft'),terrasse:useHomepageMedia('editor.terrasse')};
+  const [history, setHistory] = useState<{past: Demo[]; current: Demo; future: Demo[]}>({past: [], current: Object.values(media).some(m=>m.custom)?{...initial,text:'Votre texte'}:initial, future: []});
   const [time, setTime] = useState(0), [playing, setPlaying] = useState(false);
   const [dragged, setDragged] = useState<PhotoId | null>(null), [movingText, setMovingText] = useState(false);
   const preview = useRef<HTMLDivElement>(null), playhead = useRef(0), gesture = useRef<{id: number; dx: number; dy: number; moved: boolean} | null>(null);
@@ -96,11 +98,11 @@ export function HomeEditorShowcase({paused, onCreate}: {paused: boolean; onCreat
             onDragStart={event => {event.dataTransfer.setData(dragType, photo.id); event.dataTransfer.effectAllowed = 'move'; setDragged(photo.id);}}
             onDragEnd={() => setDragged(null)} onDragOver={event => {if (event.dataTransfer.types.includes(dragType)) {event.preventDefault(); event.dataTransfer.dropEffect = 'move';}}}
             onDrop={event => {if (!event.dataTransfer.types.includes(dragType)) return; event.preventDefault(); const id = event.dataTransfer.getData(dragType) as PhotoId; if (doc.order.includes(id)) reorder(id, photo.id); setDragged(null);}}>
-            <img src={photo.src} alt={photo.name} width="768" height="1024" loading="lazy" decoding="async"/></button>)}</div>
+            <HomeVisual media={media[photo.id]} alt={photo.name}/></button>)}</div>
           <div className="home-editor-demo-reorder"><span>Changez l’ordre des photos.</span><div><button type="button" onClick={() => move(-1)} disabled={doc.order[0] === selected.id} aria-label="Déplacer le plan sélectionné avant le précédent"><HomeIcon name="arrow" size={16}/></button><button type="button" onClick={() => move(1)} disabled={doc.order.at(-1) === selected.id} aria-label="Déplacer le plan sélectionné après le suivant"><HomeIcon name="arrow" size={16}/></button></div></div>
         </div>
         <div className="home-editor-demo-canvas"><div ref={preview} className="home-editor-demo-portrait" role="group" aria-label={`Aperçu du plan ${selected.name}`}>
-          <img key={selected.id} src={selected.src} width="768" height="1024" alt="" loading="lazy" decoding="async" style={{transform: `scale(${1 + (time - selected.start) / selected.duration * .055})`}}/>
+          <HomeVisual key={selected.id} media={media[selected.id]} time={time-selected.start} playing={playing} style={{transform:media[selected.id].kind==='image'?`scale(${1 + (time - selected.start) / selected.duration * .055})`:undefined}}/>
           <div className={`home-editor-demo-text${movingText ? ' is-moving' : ''}${doc.color === '#191c18' || doc.color === '#8d8e86' ? ' has-light-background' : ''}`} style={textStyle} tabIndex={0} role="button" aria-label="Déplacer le texte de démonstration avec les flèches du clavier"
             onKeyDown={event => {const keys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']; if (!keys.includes(event.key)) return; event.preventDefault(); change(textPosition(event.currentTarget, doc.x + (event.key === 'ArrowLeft' ? -2 : event.key === 'ArrowRight' ? 2 : 0), doc.y + (event.key === 'ArrowUp' ? -2 : event.key === 'ArrowDown' ? 2 : 0)));}}
             onPointerDown={startTextMove} onPointerMove={moveText} onPointerUp={() => {gesture.current = null; setMovingText(false);}} onPointerCancel={() => {gesture.current = null; setMovingText(false);}}>
@@ -117,7 +119,7 @@ export function HomeEditorShowcase({paused, onCreate}: {paused: boolean; onCreat
       </div>
       <div className="home-editor-demo-timeline">
         <div className="home-editor-demo-transport"><button type="button" onClick={togglePlayback} aria-label={playbackLabel} aria-pressed={playing}><HomeIcon name={playing ? 'pause' : 'play'} size={25}/></button><span>{clock(time)} / {clock(total)}</span></div>
-        <div className="home-editor-demo-clips" role="group" aria-label="Plans de la démonstration">{clips.map(photo => <button key={photo.id} type="button" aria-pressed={selected.id === photo.id} aria-label={`Aller au plan ${photo.name}, ${photo.duration} secondes`} onClick={() => select(photo.id)} style={{flex: photo.duration}}><img src={photo.src} alt="" width="768" height="1024" loading="lazy" decoding="async"/><span>{photo.name}</span><small>{photo.duration} s</small></button>)}</div>
+        <div className="home-editor-demo-clips" role="group" aria-label="Plans de la démonstration">{clips.map(photo => <button key={photo.id} type="button" aria-pressed={selected.id === photo.id} aria-label={`Aller au plan ${photo.name}, ${photo.duration} secondes`} onClick={() => select(photo.id)} style={{flex: photo.duration}}><HomeVisual media={media[photo.id]}/><span>{photo.name}</span><small>{photo.duration} s</small></button>)}</div>
         <div className="home-editor-demo-voice"><HomeIcon name="microphone" size={20}/><span>Voix off</span></div>
         <div className="home-editor-demo-wave" aria-hidden="true"><svg viewBox="0 0 800 42" preserveAspectRatio="none">{peaks.map((peak, i) => <line key={i} x1={i * 5 + 2} x2={i * 5 + 2} y1={21 - peak / 2} y2={21 + peak / 2}/>)}</svg><span style={{left: `${time / total * 100}%`}}/></div>
         <label className="home-editor-demo-seek"><span className="sr-only">Position de lecture de la démonstration</span><input type="range" min={0} max={total} step={.1} value={time} onChange={event => {setPlaying(false); setTime(Number(event.target.value));}}/></label>

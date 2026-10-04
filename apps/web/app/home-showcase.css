@@ -10,7 +10,7 @@
 .home-life-stage {position:relative;display:grid;grid-template-columns:minmax(0,1.4fr) 42px minmax(0,.95fr) minmax(130px,.5fr);align-items:center;gap:14px;padding:42px 20px 27px;margin-top:35px;background:linear-gradient(120deg,#e8eee2,#e4ecdd);border-radius:13px}
 .home-life-photo,.home-life-video {position:relative;margin:0;min-width:0;border-radius:10px}
 .home-life-photo {aspect-ratio:1.19;overflow:hidden}
-.home-life-photo>img {display:block;width:100%;height:100%;object-fit:cover;object-position:50% 61%}
+.home-life-photo>:is(img,video) {display:block;width:100%;height:100%;object-fit:cover;object-position:50% 61%}
 .home-life-badge {position:absolute;top:10px;left:10px;display:flex;align-items:center;gap:8px;padding:9px 11px;border-radius:7px;background:#fffffff0;box-shadow:0 2px 8px #21331710;font-size:12px;line-height:1.15}
 .home-life-arrow {width:100%;height:auto;transform:translateY(-25px)}
 .home-life-video {aspect-ratio:9/14;margin:-57px 0 -37px;background:#282c24;box-shadow:0 7px 18px #23301b20;isolation:isolate;overflow:hidden}
@@ -56,7 +56,7 @@
 .home-life-audio-caption select {appearance:none;max-width:145px;min-height:36px;border:0;background:transparent;color:inherit;font-size:12px!important;padding:6px 22px 6px 5px;cursor:pointer}
 .home-life-audio-caption label>svg {position:absolute;right:3px;pointer-events:none}
 .home-life-editor-demo {position:relative;display:grid;grid-template-rows:minmax(45px,1fr) auto;gap:14px;padding:24px 10px 10px;min-height:151px;margin-top:10px;border-radius:8px;overflow:hidden;background:#c7b498}
-.home-life-editor-demo>img {display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 64%}
+.home-life-editor-demo>:is(img,video) {display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 64%}
 .home-life-editor-demo::after {content:'';position:absolute;inset:0;background:linear-gradient(#16160c05,#16160c40);pointer-events:none}
 .home-life-editable {position:relative;justify-self:center;align-self:center;width:70%;border:1px solid #6ca3cb;z-index:1;min-height:45px}
 .home-life-editable.has-light-background {background:#ffffffe6}

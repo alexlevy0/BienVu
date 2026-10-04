@@ -155,7 +155,7 @@
 .home-example-grid {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px}
 .home-example {min-width:0}
 .home-example-cover {display:block;position:relative;aspect-ratio:3/4;width:100%;overflow:hidden;border:0;padding:0;background:#dadbd0;border-radius:9px;isolation:isolate;text-align:left}
-.home-example-cover>img {width:100%;height:100%;object-fit:cover;display:block;transition:transform .6s cubic-bezier(.2,.7,.3,1)}
+.home-example-cover>:is(img,video) {width:100%;height:100%;object-fit:cover;display:block;transition:transform .6s cubic-bezier(.2,.7,.3,1)}
 .home-example-cover:hover>img {transform:scale(1.035)}
 .home-example-shade {position:absolute;inset:0;background:linear-gradient(transparent 58%,#080c064f 84%,#080c0699)}
 .home-duration {position:absolute;right:12px;top:12px;min-width:47px;padding:5px 10px;border-radius:22px;background:#1c201abe;color:#fffef9;font-size:13px;font-weight:550;line-height:1.35;text-align:center;font-variant-numeric:tabular-nums}
@@ -505,9 +505,14 @@
 .home-hero-showcase {grid-column:2;grid-row:1/span 2;min-width:0;display:flex;flex-direction:column;gap:8px}
 .home-hero-showcase[hidden] {display:none}
 .home-studio .home-hero-showcase>p {font-size:16px;color:#34383d;text-align:center;line-height:1.4;margin:0}
-.home-hero-demo {display:block;position:relative;width:100%;aspect-ratio:2/3;overflow:hidden;border:2px solid #fffefa;border-radius:14px;padding:0;background:#30352c;isolation:isolate;text-align:left;box-shadow:0 5px 20px #5863490c;cursor:pointer}
-.home-hero-demo>img {width:100%;height:100%;display:block;object-fit:cover;transition:transform .6s cubic-bezier(.2,.7,.3,1)}
-.home-hero-demo:hover>img {transform:scale(1.03)}
+.home-hero-demo {display:block;position:relative;width:100%;aspect-ratio:9/16;overflow:hidden;border:2px solid #fffefa;border-radius:14px;padding:0;background:#30352c;isolation:isolate;text-align:left;box-shadow:0 5px 20px #5863490c}
+.home-hero-demo>video {position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:cover}
+.home-hero-demo.is-started {background:#11120f}
+.home-hero-demo-cover {position:absolute;inset:0;display:block;width:100%;height:100%;padding:0;border:0;background:transparent;text-align:left;cursor:pointer}
+.home-hero-demo-cover>img {width:100%;height:100%;display:block;object-fit:cover;transition:transform .6s cubic-bezier(.2,.7,.3,1)}
+.home-hero-demo-cover:hover>img {transform:scale(1.03)}
+.home-studio .home-hero-demo-cover:focus-visible {outline-offset:-5px}
+.home-studio .home-hero-showcase>.home-hero-video-error {font-size:13px;color:#a1432b;text-align:left}
 .home-hero-demo-shade {position:absolute;inset:0;background:linear-gradient(180deg,#17190f25,transparent 35%,transparent 60%,#14180faa)}
 .home-hero-demo-heading {position:absolute;top:32px;left:23px;right:15px;color:#fffefa;font-family:'Times New Roman',Times,serif;line-height:1.02;text-shadow:0 1px 12px #15191045}
 .home-hero-demo-heading>strong {display:block;font-size:35px;font-weight:600;letter-spacing:-.7px;margin-bottom:4px}
@@ -541,6 +546,10 @@
  .home-hero-demo-heading>strong {font-size:29px}
  .home-hero-demo-heading>span {font-size:22px}
  .home-studio .home-hero-showcase>p {font-size:13px}
+}
+@media(min-width:761px) {
+ .home-hero-dashboard {grid-template-rows:minmax(min-content,1fr) auto}
+ .home-hero-dashboard .home-hero-intro {align-self:stretch;display:flex;flex-direction:column;justify-content:center;padding-block:0}
 }
 @media(max-width:760px) {
  .home-studio-home .home-content:not(.home-content-conversation) {padding:4px 16px 0}
@@ -581,3 +590,6 @@
 .customizer-editor-entry button:disabled {opacity:.5;cursor:default;}
 .customizer-editor-entry p {margin:0;color:#777b83;font-size:14px;}
 @media (max-width:700px) {.customizer-editor-entry {align-items:flex-start;flex-direction:column;gap:10px;}.customizer-editor-entry button {width:100%;justify-content:center;}}
+
+.homepage-preview-banner {position:sticky;top:0;z-index:1000;padding:12px 24px;background:#dce8d0;border-bottom:1px solid #9eb28d;color:#304325;display:flex;justify-content:center;flex-wrap:wrap;gap:16px;font-size:14px}
+.homepage-preview-banner a {text-decoration:underline;text-underline-offset:3px}

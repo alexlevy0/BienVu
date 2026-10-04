@@ -16,6 +16,7 @@ export * from './voice';
 export * from './narration';
 export * from './video';
 export * from './generation';
+export * from './homepage';
 
 export const ProbeRender = z.object({
   id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
