@@ -1,0 +1,21 @@
+{
+  "name": "@bienvu/mail",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typegen": "wrangler types --strict-vars false --env-interface MailEnv mail-env.d.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "dry-run": "wrangler deploy --dry-run"
+  },
+  "dependencies": {
+    "@bienvu/contracts": "workspace:*",
+    "@bienvu/db": "workspace:*",
+    "html-to-text": "10.0.1",
+    "postal-mime": "4.0.4",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/html-to-text": "9.0.4"
+  }
+}

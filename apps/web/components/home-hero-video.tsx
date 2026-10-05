@@ -88,7 +88,7 @@ function HeroPlayer({visual, movie, paused, onPlayingChange}: PlaybackProps & {v
 
   return <>
     <div className={`home-hero-demo${started ? ' is-started' : ''}`} style={{aspectRatio}}>
-      <video ref={video} src={movie.src} poster={poster ?? undefined} controls={started} muted={muted} playsInline
+      <video ref={video} src={movie.src} poster={poster ?? undefined} controls={started} muted={muted} playsInline loop
         preload={poster ? 'none' : 'metadata'} tabIndex={started ? 0 : -1} aria-hidden={!started}
         aria-label={movie.title ? `Vidéo de présentation : ${movie.title}` : 'Vidéo de présentation BienVu'}
         onLoadedMetadata={event => {const player = event.currentTarget; if (player.videoWidth && player.videoHeight) setAspectRatio(`${player.videoWidth} / ${player.videoHeight}`);}}

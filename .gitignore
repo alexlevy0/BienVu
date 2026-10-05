@@ -38,3 +38,4 @@ playwright-report/
 fixtures/generated/
 apps/pipeline/wrangler.staging*.jsonc
 apps/web/wrangler.staging*.jsonc
+apps/mail/wrangler.staging*.jsonc

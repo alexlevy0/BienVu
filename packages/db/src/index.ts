@@ -9,6 +9,7 @@ export * from './editor-voice';
 export * from './animation-library';
 export * from './retention';
 export * from './homepage';
+export * from './mailbox';
 
 // Port structurel minimal compatible D1 ; pas de transaction interactive.
 export interface SqlStatement {

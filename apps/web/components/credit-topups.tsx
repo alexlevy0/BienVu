@@ -50,8 +50,8 @@ export function CreditTopups({enabled,mode,validDays=0}:{enabled:boolean;mode:'t
     <label className="offers-topup-consent"><input type="checkbox" checked={accepted} disabled={busy} onChange={e=>setAccepted(e.target.checked)}/><span>J’accepte les <Link href="/conditions">conditions d’utilisation</Link> et j’ai lu la <Link href="/confidentialite">politique de confidentialité</Link>.</span></label>
     {me&&!manages&&<p className="offers-topup-access">Seuls le propriétaire et les administrateurs de l’agence peuvent acheter des crédits.</p>}
     {error&&<p className="offers-topup-error" role="alert">{error}</p>}
-    <button type="submit" className="offers-action offers-action-primary offers-topup-pay" disabled={!accepted||busy||loading||Boolean(me)&&(!enabled||!manages)}>{busy?'Ouverture…':me?'Continuer vers le paiement':'Se connecter pour acheter'}<HomeIcon name="arrow" size={20}/></button>
-    <p className="offers-topup-secure"><HomeIcon name="lock" size={15}/>{mode==='test'?'Paiement de test via Stripe':'Paiement sécurisé via Stripe'}</p>
+    <button type="submit" className="offers-action offers-action-primary offers-topup-pay" disabled={!accepted||busy||loading||!enabled||Boolean(me)&&!manages}>{busy?'Ouverture…':me?'Continuer vers le paiement':'Se connecter pour acheter'}<HomeIcon name="arrow" size={20}/></button>
+    <p className="offers-topup-secure"><HomeIcon name="lock" size={15}/>{!enabled?'Paiements momentanément indisponibles':mode==='test'?'Paiement en mode test · Aucun débit réel':'Paiement sécurisé via Stripe'}</p>
    </aside>
   </form>
   {confirmation&&<p className="offers-billing-notice" role="status">Votre recharge apparaîtra dès que Stripe aura confirmé le paiement. <button type="button" onClick={()=>{void refreshRights();setRevision(n=>n+1);}}>Actualiser mon solde</button></p>}

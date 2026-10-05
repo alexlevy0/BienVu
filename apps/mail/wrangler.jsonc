@@ -1,0 +1,13 @@
+{
+  "$schema":"../../node_modules/wrangler/config-schema.json",
+  "name":"bienvu-mail-local",
+  "main":"src/index.ts",
+  "compatibility_date":"2026-10-05",
+  "compatibility_flags":["nodejs_compat"],
+  "workers_dev":false,
+  "preview_urls":false,
+  "vars":{"MAILBOX_ADDRESS":"contact@bienvu.online","MAILBOX_ENABLED":"true"},
+  "d1_databases":[{"binding":"DB","database_name":"bienvu-mail-local","database_id":"00000000-0000-0000-0000-000000000000","migrations_dir":"../../packages/db/migrations"}],
+  "r2_buckets":[{"binding":"MEDIA","bucket_name":"bienvu-mail-local"}],
+  "observability":{"enabled":true,"logs":{"enabled":true,"invocation_logs":false},"traces":{"enabled":true,"head_sampling_rate":0.01}}
+}

@@ -24,6 +24,7 @@ jobs:
       - run: pnpm fixtures
       - run: pnpm --filter @bienvu/web typegen
       - run: pnpm --filter @bienvu/pipeline typegen
+      - run: pnpm --filter @bienvu/mail typegen
       - run: pnpm check
       - run: pnpm probe:voice:worker
       - run: pnpm probe:narration:worker

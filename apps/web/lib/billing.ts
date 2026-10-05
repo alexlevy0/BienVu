@@ -7,12 +7,14 @@ import {contentHash} from './manual-listings';
 import {topupMutations} from './credit-purchases';
 import {financialEventMutations,invoiceAccountingMutations} from './stripe-accounting';
 export type BillingEnv=Pick<CloudflareEnv,'DB'>&{BILLING_MODE?:string;STRIPE_SECRET_KEY?:string;STRIPE_WEBHOOK_SECRET?:string;STRIPE_PRICE_PLUS?:string;STRIPE_PRICE_PRO?:string;STRIPE_PORTAL_CONFIGURATION?:string;STRIPE_TOPUP_PRICE_10?:string;STRIPE_TOPUP_PRICE_30?:string;STRIPE_TOPUP_PRICE_100?:string};
-export function billingMode(env:BillingEnv){return env.BILLING_MODE==='test'&&env.STRIPE_SECRET_KEY?.startsWith('sk_test_')?'test':env.BILLING_MODE==='live'&&env.STRIPE_SECRET_KEY?.startsWith('sk_live_')?'live':null;}
+export function billingMode(env:BillingEnv):'test'|'live'|null{return env.BILLING_MODE==='test'&&env.STRIPE_SECRET_KEY?.startsWith('sk_test_')?'test':env.BILLING_MODE==='live'&&env.STRIPE_SECRET_KEY?.startsWith('sk_live_')?'live':null;}
+export function billingAvailability(env:BillingEnv){const mode=billingMode(env);return {enabled:Boolean(mode&&env.STRIPE_WEBHOOK_SECRET),mode};}
+export type BillingAvailability=ReturnType<typeof billingAvailability>;
 export function stripeClient(env:BillingEnv){if(!billingMode(env))throw new RequestFailure('BILLING_UNAVAILABLE');return new Stripe(env.STRIPE_SECRET_KEY!,{httpClient:Stripe.createFetchHttpClient(),maxNetworkRetries:1,timeout:15000});}
 export async function billingStatus(env:BillingEnv,agencyId:string){
  const subscription=await env.DB.prepare('SELECT plan_code AS plan,status,period_end AS periodEnd,cancel_at_period_end AS cancelAtPeriodEnd,stripe_mode AS mode FROM subscriptions WHERE agency_id=?').bind(agencyId).first();
  const policy=await env.DB.prepare('SELECT topup_valid_days AS validDays FROM credit_payment_policy WHERE id=1').first<{validDays:number}>();
- return {enabled:Boolean(billingMode(env)&&env.STRIPE_WEBHOOK_SECRET),mode:billingMode(env),subscription,topupValidDays:policy?.validDays??0};
+ return {...billingAvailability(env),subscription,topupValidDays:policy?.validDays??0};
 }
 export async function createCheckout(env:BillingEnv,agencyId:string,email:string,origin:string,input:unknown,key:string,client=stripeClient(env)){
  const parsed=z.object({plan:z.enum(['plus','pro']),accepted:z.literal(true)}).strict().safeParse(input);if(!parsed.success||!EntityId.safeParse(agencyId).success||!/^[-a-zA-Z0-9_]{16,128}$/.test(key))throw new RequestFailure('VALIDATION_ERROR');

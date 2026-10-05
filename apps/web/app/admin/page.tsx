@@ -8,6 +8,7 @@ import {AdminPanel} from '../../components/admin-panel';
 import '../landing.css';
 import './admin.css';
 import './homepage.css';
+import './mailbox.css';
 export const dynamic='force-dynamic';
 export const metadata={title:'Super admin — BienVu',robots:{index:false,follow:false}};
 export default async function Page(){

@@ -7,7 +7,7 @@ const root = process.cwd();
 const failures = [];
 const modules = new Set(builtinModules.flatMap(name => [name, `node:${name}`]));
 const forbidden = /^(?:@remotion\/(?:renderer|bundler|compositor[^/]*)|remotion|sharp|fluent-ffmpeg|ffmpeg[^/]*|puppeteer[^/]*|playwright(?:-core)?|@bienvu\/(?:renderer|video))(?:\/|$)/;
-const roots = ['apps/web', 'apps/pipeline', 'packages/contracts', 'packages/db', 'packages/importers', 'packages/observability', 'packages/voice', 'packages/narration'];
+const roots = ['apps/web', 'apps/mail', 'apps/pipeline', 'packages/contracts', 'packages/db', 'packages/importers', 'packages/observability', 'packages/voice', 'packages/narration'];
 const portable = ['packages/contracts', 'packages/db', 'packages/importers', 'packages/observability', 'packages/voice', 'packages/narration'];
 const skip = new Set(['node_modules', '.next', '.open-next', '.wrangler', 'dist', 'out', 'evidence']);
 const options = {moduleResolution: ts.ModuleResolutionKind.Bundler, target: ts.ScriptTarget.ES2022, allowJs: true};

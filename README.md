@@ -34,6 +34,8 @@ Pour travailler seulement sur l'interface : `pnpm dev` (`http://localhost:3000`)
 
 ## Vidéo locale et parcours Cloudflare
 
+**Messagerie du superadmin :** réception à `contact@bienvu.online`, conversations, pièces jointes, recherche et réponses via Cloudflare Email Service. [Configuration et vérifications](docs/MESSAGERIE.md).
+
 **Animation Runway — 01/10 : publiée sur bienvu.online.** `Personnaliser → Style` permet de demander une ou deux photos animées ; zooms et translations locaux restent disponibles sans Runway. Une vraie tâche de cinq secondes a consommé **25 crédits** et son clip est intégré dans un MP4 Cloudflare de **20,05 s**. Le téléchargement Workers a été corrigé après le premier essai ; la recette de reprise réutilise la même tâche sans seconde création payante. API serveur, R2 privé, prépaiement de 10 € compté une fois, 226 tests. [Configuration, budget et distinction des recettes](docs/RUNWAY.md).
 
 **Sprint 05 terminé : texte et voix validés sur Cloudflare.** Le Worker a produit cinq scènes avec les vrais fournisseurs OpenAI et Chirp 3 HD, puis relu le script D1 et les pistes R2 privées. Reprise après redéploiement sans nouvel appel ; assemblage naturel de 20 s approuvé par Alex. Recette sur annonce synthétique, Worker ensuite remis en pause. Le sprint 06 assemble cette narration en vidéo ; le parcours durable est validé au sprint 07, sous accès de développement. [Guide narration et commandes](docs/NARRATION.md) · [Configuration Google](docs/VOIX-GOOGLE.md) · [Preuves Cloudflare](docs/preuves/sprint-05/CLOUDFLARE.md).

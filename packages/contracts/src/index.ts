@@ -1,6 +1,7 @@
 import {z} from 'zod';
 
 export * from './product';
+export * from './mailbox';
 export * from './errors';
 export * from './agency';
 export * from './manual-listing';

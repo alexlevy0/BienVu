@@ -1,6 +1,10 @@
 import type {ReactNode} from 'react';
 
 const shapes = {
+  mail: <><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 5 10 8L22 5"/></>,
+  archive: <><rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v13h16V8M9 12h6"/></>,
+  paperclip: <path d="m8 14 7-7a3 3 0 0 1 4 4l-9 9a5 5 0 0 1-7-7L13 3a2 2 0 0 1 3 3L6 16"/>,
+  send: <><path d="m22 2-7 20-4-9L2 9l20-7ZM11 13 22 2"/></>,
   calendar: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 2v6M17 2v6M3 11h18M7 15h2m6 0h2m-10 3h2m6 0h2"/></>,
   clapper: <><path d="M3 8h18v13H3V8Zm0-5 17-2 1 5-18 2-1-5Zm4-1 3 5m3-6 3 5"/></>,
   pause: <><path d="M8 5v14M16 5v14" strokeWidth="4"/></>,

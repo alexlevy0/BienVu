@@ -1,6 +1,8 @@
 import {z} from 'zod';
 
 export const publicErrors = {
+  MAILBOX_UNAVAILABLE: [503, 'La messagerie est momentanément indisponible. Aucun message n’a été envoyé.'],
+  MAIL_ATTACHMENTS_TOO_LARGE: [413, 'Les pièces jointes ne doivent pas dépasser 3 Mo au total.'],
   ANONYMOUS_UNAVAILABLE: [503, 'L’essai sans compte est momentanément indisponible. Vous pouvez vous connecter.'],
   TRIAL_USED: [429, 'L’essai de ce navigateur a déjà été utilisé. Connectez-vous pour retrouver vos vidéos.'],
   TRIAL_LIMIT: [429, 'La limite des essais est atteinte. Réessayez plus tard ou connectez-vous.'],

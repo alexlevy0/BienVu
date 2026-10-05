@@ -8,12 +8,13 @@ import {AdminFinance,AdminVideoProfit} from './admin-finance';
 import {AdminBudgetSettings} from './admin-budget-settings';
 import {AdminMusicLibrary} from './admin-music-library';
 import {AdminHomepage} from './admin-homepage';
+import {AdminMailbox} from './admin-mailbox';
 import {AdminAttention,AdminPerformance,AdminMonthlyCosts,AdminTrafficView,type AdminTarget} from './admin-insights';
 
-type View=AdminSection|'overview'|'system'|'traffic'|'performance'|'costs'|'commercial'|'finance'|'music'|'homepage';
+type View=AdminSection|'overview'|'system'|'traffic'|'performance'|'costs'|'commercial'|'finance'|'music'|'homepage'|'mailbox';
 const tabs:{id:View;label:string}[]=[{id:'overview',label:'Vue d’ensemble'},{id:'videos',label:'Vidéos'},{id:'agencies',label:'Agences'},{id:'users',label:'Comptes'},
   {id:'subscriptions',label:'Abonnements'},{id:'quotas',label:'Crédits'},{id:'imports',label:'Imports & brouillons'},
-  {id:'reports',label:'Signalements'},{id:'music',label:'Banque de musiques'},{id:'homepage',label:'Page d’accueil'},{id:'traffic',label:'Fréquentation'},{id:'performance',label:'Performance'},{id:'costs',label:'Coûts mensuels'},{id:'commercial',label:'Conversion & recettes'},{id:'finance',label:'Rentabilité'},{id:'system',label:'Service & budget'},{id:'audit',label:'Journal'}];
+  {id:'reports',label:'Signalements'},{id:'mailbox',label:'Messagerie'},{id:'music',label:'Banque de musiques'},{id:'homepage',label:'Page d’accueil'},{id:'traffic',label:'Fréquentation'},{id:'performance',label:'Performance'},{id:'costs',label:'Coûts mensuels'},{id:'commercial',label:'Conversion & recettes'},{id:'finance',label:'Rentabilité'},{id:'system',label:'Service & budget'},{id:'audit',label:'Journal'}];
 const labels:Record<string,string>={ready:'Prête',failed:'Échec',active:'Actif',queued:'En attente',importing:'Import',scripting:'Rédaction',voicing:'Voix',rendering:'Assemblage',retry_wait:'Nouvel essai',
   account:'Compte',anonymous:'Anonyme',internal:'Test interne',available:'Disponible',unavailable:'Indisponible',expired:'Expiré',expiring:'Purge en cours',consumed:'Consommé',reserved:'Réservé',released:'Libéré',unfunded:'Non débité',
   new:'Nouveau',reviewing:'En traitement',closed:'Clos',free:'Gratuit',paid:'Payant',trial:'Essai',current:'Période en cours',none:'Sans abonnement',verified:'Vérifié',unverified:'Non vérifié',
@@ -61,13 +62,13 @@ export function AdminPanel(){
   const [pending,setPending]=useState<AdminAction|null>(null),[reason,setReason]=useState(''),[saving,setSaving]=useState(false),[actionError,setActionError]=useState('');
   const loadVersion=useRef(0),morePending=useRef(false),dialog=useRef<HTMLDialogElement>(null),actionDialog=useRef<HTMLDialogElement>(null);
   const accountId=me?.isSuperAdmin?me.user.id:null;
-  useEffect(()=>{const tab=new URLSearchParams(location.search).get('view');if(tabs.some(t=>t.id===tab))setView(tab as View);},[]);
+  useEffect(()=>{const params=new URLSearchParams(location.search),tab=params.get('view');if(tabs.some(t=>t.id===tab))setView(tab as View);const target=params.get('agency');if(target&&/^[a-zA-Z0-9_-]{1,64}$/.test(target))setAgency(target);},[]);
   useEffect(()=>{const timer=setTimeout(()=>setSearch(query.trim()),300);return()=>clearTimeout(timer);},[query]);
   const endpoint=()=>{const p=new URLSearchParams({section:view,q:search,status});if(from)p.set('from',from);if(to)p.set('to',to);if(agency)p.set('agency',agency);return '/api/admin?'+p;};
   useEffect(()=>{
     const controller=new AbortController(),version=++loadVersion.current;setPage(null);setFailure('');setBusy(true);setSelected(null);setDetail(null);setPending(null);setOverview(null);setTraffic(null);
     if(!accountId){setBusy(false);return()=>controller.abort();}
-    if(view==='commercial'||view==='finance'||view==='music'||view==='homepage'){setBusy(false);return()=>controller.abort();}
+    if(view==='commercial'||view==='finance'||view==='music'||view==='homepage'||view==='mailbox'){setBusy(false);return()=>controller.abort();}
     if(from&&to&&from>to){setFailure('La date de fin doit suivre la date de début.');setBusy(false);return()=>controller.abort();}
     const aggregate=['overview','system','performance','costs'].includes(view);
     const url=view==='traffic'?'/api/admin?section=traffic&days='+trafficDays:aggregate?'/api/admin?section=overview':endpoint();
@@ -103,7 +104,7 @@ export function AdminPanel(){
     }catch(error){setActionError(error instanceof Error?error.message:'Modification interrompue.');}finally{setSaving(false);}
   }
   if(!loading&&!accountId)return <div className="admin-shell"><h1>Accès réservé</h1><p>Connectez-vous avec votre compte administrateur.</p></div>;
-  const recordView=!['overview','system','traffic','performance','costs','commercial','finance','music','homepage'].includes(view)?view as AdminSection:null;
+  const recordView=!['overview','system','traffic','performance','costs','commercial','finance','music','homepage','mailbox'].includes(view)?view as AdminSection:null;
   const selectedColumns=recordView?columns[recordView]:[];
   return <div className="admin-shell">
     <header className="admin-heading"><div><span className="admin-eyebrow">PILOTAGE DE BIENVU</span><h1>Super admin<span>.</span></h1><p>Votre activité, vos agences et votre service, au même endroit.</p></div><span className="admin-access"><span/>Accès privé</span></header>
@@ -120,6 +121,7 @@ export function AdminPanel(){
     {view==='finance'&&accountId&&<AdminFinance key={revision}/>}
     {view==='music'&&accountId&&<AdminMusicLibrary key={revision}/>}
     {view==='homepage'&&accountId&&<AdminHomepage key={revision}/>}
+    {view==='mailbox'&&accountId&&<AdminMailbox revision={revision}/>}
     {failure&&<p role="alert" className="admin-error">{failure}</p>}
     {busy||loading?<div className="admin-loading" role="status"><span className="admin-spinner"/>Lecture des données…</div>:<>
       {overview&&view==='overview'&&<><AdminAttention data={overview} onFocus={focus}/><Overview data={overview} choose={choose}/></>}
