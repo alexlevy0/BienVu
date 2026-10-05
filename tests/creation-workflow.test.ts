@@ -78,6 +78,44 @@ test('extraction structurée : faits sourcés, absent et contradiction sans inve
     (async()=>Response.json({status:'completed',output:[{type:'message',role:'assistant',status:'completed',content:[{type:'output_text',text:'{}'}]}]})) as typeof fetch));
 });
 
+test('description de maison : pièces avec ou sans accent et vente au présent remplissent les champs',async()=>{
+  const supplied=(evidence:string,transaction='vend')=>({
+    fields:{propertyType:'house',transaction:'sale',locality:'Lyon',priceCents:20_000_000,charges:null,area:null,rooms:3},
+    evidence:{propertyType:'maison',transaction,locality:'Lyon',priceCents:'200000€',charges:null,area:null,rooms:evidence},ambiguous:[]});
+  const text='Je vend une maison à Lyon a 200000€ pour un 3 pieces';
+  for(const spelling of ['3 pieces','3 pièces','3 PIECES','3 pièce','3 piece','3 pie\u0300ces']){
+    const value=validateExtraction(text.replace('3 pieces',spelling),supplied(spelling));
+    assert.equal(value.fields.rooms,3,spelling);assert.equal(value.provenance.rooms?.evidence,spelling);
+    assert.equal(value.fields.transaction,'sale');assert.equal(value.fields.propertyType,'house');
+    assert.equal(value.fields.locality,'Lyon');assert.equal(value.fields.priceCents,20_000_000);
+    assert.equal(value.fields.area,null);assert.equal(value.fields.title,'Maison 3 pièces à Lyon');
+  }
+  for(const verb of ['vend','vends','vendre','vendue']){
+    assert.equal(validateExtraction(text.replace('vend',verb),supplied('3 pieces',verb)).fields.transaction,'sale',verb);
+  }
+  let calls=0;
+  const fetcher=(async()=>{calls++;return Response.json({status:'completed',output:[{type:'message',role:'assistant',status:'completed',
+    content:[{type:'output_text',text:JSON.stringify(supplied('3 pieces'))}]}]});}) as typeof fetch;
+  const result=await extractDescription(text,'sk-test_key_abcdefghijklmnop','gpt-5.4-mini',fetcher);
+  assert.equal(result.data.fields.rooms,3);assert.equal(result.data.originalText,text);assert.equal(calls,1);
+});
+
+test('nombre de pièces : les chambres et les preuves absentes ne remplissent pas le champ',()=>{
+  const supplied=(rooms:number,evidence:string,ambiguous:string[]=[])=>({
+    fields:{...extracted.fields,rooms},evidence:{...extracted.evidence,rooms:evidence},ambiguous});
+  for(const spelling of ['3 chambres','3 chambres et un séjour']){
+    const value=validateExtraction(sample.replace('3 pièces',spelling),supplied(3,spelling));
+    assert.equal(value.fields.rooms,null,spelling);
+  }
+  assert.equal(validateExtraction(sample,supplied(4,'4 pieces')).fields.rooms,null);
+  assert.equal(validateExtraction(sample,supplied(4,'3 pièces')).fields.rooms,null);
+  const ambiguous=validateExtraction(sample,supplied(3,'3 pièces',['rooms']));
+  assert.equal(ambiguous.fields.rooms,3);assert.equal(ambiguous.provenance.rooms?.confirm,true);
+  const noSale=validateExtraction('Vendredi, maison à Lyon avec 3 pieces à 200000€.',{
+    ...supplied(3,'3 pieces'),fields:{...extracted.fields,transaction:'sale'},evidence:{...extracted.evidence,transaction:'Vendredi',rooms:'3 pieces'}});
+  assert.equal(noSale.fields.transaction,null);
+});
+
 test('prix abrégés : conversion exacte, omission récupérée et demande reformulée sans perdre les détails',()=>{
   const supplied=(evidence:string,priceCents:number|null=20_000_000)=>({
     fields:{...extracted.fields,locality:'Lyon',priceCents,area:null,rooms:null},

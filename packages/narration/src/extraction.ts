@@ -59,14 +59,14 @@ function supported(name:string,value:unknown,evidence:string){
   const normalized=evidence.toLocaleLowerCase('fr-FR');
   if(name==='propertyType')return value==='apartment'?/appartement/.test(normalized):
     value==='house'?/maison/.test(normalized):value==='other';
-  if(name==='transaction')return value==='sale'?/vente|vend(?:re|u)|achat/.test(normalized):
+  if(name==='transaction')return value==='sale'?/\b(?:vente|vendre|vends?|vendu(?:e)?s?|achat)\b/.test(normalized):
     /lou(?:er|é|er|age)|location|loyer/.test(normalized);
   if(name==='priceCents'){
     return typeof value==='number'&&euroAmounts(evidence).some(amount=>amount.cents===value);
   }
   if(name==='area')return typeof value==='number'&&[...evidence.matchAll(/(\d+(?:[,.]\d+)?)\s*m\s*(?:²|2|ètres? carrés?)/gi)]
     .some(match=>Number(match[1].replace(',','.'))===value);
-  if(name==='rooms')return typeof value==='number'&&[...evidence.matchAll(/\b(\d+)\s*pièces?\b/gi)]
+  if(name==='rooms')return typeof value==='number'&&[...evidence.matchAll(/\b(\d+)\s*pi(?:[eè]|e\u0300)ces?\b/gi)]
     .some(match=>Number(match[1])===value);
   if(name==='charges')return value==='included'?/charges? (?:comprises?|incluses?)/.test(normalized):
     /charges? (?:non comprises?|exclues?)/.test(normalized);
