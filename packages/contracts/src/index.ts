@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import type {ImportResourceDiagnostic} from './import-diagnostics';
 
 export * from './product';
 export * from './mailbox';
@@ -13,6 +14,8 @@ export * from './editor-quality';
 export * from './music-library';
 export * from './credits';
 export * from './import-sources';
+export * from './import-diagnostics';
+export * from './source-coverage';
 export * from './voice';
 export * from './narration';
 export * from './video';
@@ -35,7 +38,8 @@ export function importFailureReason(value: unknown): ImportFailureReason | undef
   return importFailureReasons.find(reason => reason === value);
 }
 export class ImportFailure extends Error {
-  constructor(public code: ImportErrorCode, message: string, public reason?: ImportFailureReason) {super(message);}
+  constructor(public code: ImportErrorCode, message: string, public reason?: ImportFailureReason,
+    public resource?: ImportResourceDiagnostic) {super(message);}
 }
 
 const fact = <T extends z.ZodType>(value: T) => z.object({

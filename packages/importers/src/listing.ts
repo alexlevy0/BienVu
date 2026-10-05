@@ -6,6 +6,7 @@ import {selectAdapter} from './registry';
 import {clean, missing, numeric, unique, verified} from './facts';
 import {extractBienici} from './portals/bienici';
 import {extractFigaro} from './portals/figaro';
+import {extractLadresse} from './agencies/ladresse';
 export {verified, missing} from './facts';
 
 type Obj = Record<string, unknown>;
@@ -223,14 +224,15 @@ export function extractListingHtml(html: string, url: string, options: {allowPar
   if (scripts.length > 20) throw new ImportFailure('NOT_A_LISTING', 'Trop de blocs JSON-LD.');
   const documents = scripts.flatMap(n => {const content = rawText(n); if (content.length > 128_000) throw new ImportFailure('NOT_A_LISTING', 'JSON-LD trop volumineux.'); try {return [JSON.parse(content) as unknown];} catch {return [];}});
   const figaro = adapter.id === 'figaro' ? extractFigaro(nodes, documents, url, canonicalUrl, adapter.listingId!) : undefined;
+  const ladresse = adapter.id === 'ladresse' ? extractLadresse(nodes, url, canonicalUrl, adapter.listingId!) : undefined;
   let output: ExtractedListing | undefined;
-  try {if (documents.length) output = structured(documents, url, canonicalUrl, figaro?.transaction);} catch (error) {
+  try {if (documents.length) output = structured(documents, url, canonicalUrl, (figaro ?? ladresse)?.transaction);} catch (error) {
     if (!(error instanceof ImportFailure) || error.code !== 'NOT_A_LISTING' || error.reason === 'not_listing') throw error;
   }
   const microHomes = nodes.filter(n => /\/(House|Apartment|SingleFamilyResidence|Residence)$/.test(attr(n, 'itemtype')));
   if (microHomes.length > 1) throw new ImportFailure('CONFLICTING_FACTS', 'Plusieurs biens dans le DOM.');
   if (microHomes.length === 1) {
-    const home = microHomes[0], micro = structured([microdata(home)], url, canonicalUrl, figaro?.transaction);
+    const home = microHomes[0], micro = structured([microdata(home)], url, canonicalUrl, (figaro ?? ladresse)?.transaction);
     micro.adapterVersion = 'microdata/3.2';
     // Le texte riche est lu dans le DOM pour conserver ses paragraphes.
     const descriptionNodes = descendants(home).filter(n => attr(n, 'itemprop').split(/\s+/).includes('description') && attr(n, 'content') === '')
@@ -266,7 +268,7 @@ export function extractListingHtml(html: string, url: string, options: {allowPar
     agency.description ??= output?.description ?? null;
     output = agency;
   }
-  const dom = figaro ?? (adapter.id === 'bienici' ? extractBienici(nodes, documents, url, canonicalUrl, adapter.listingId!)
+  const dom = figaro ?? ladresse ?? (adapter.id === 'bienici' ? extractBienici(nodes, documents, url, canonicalUrl, adapter.listingId!)
     : domAgency(nodes, url, canonicalUrl, options.allowPartial));
   if (dom) {
     if (output) for (const field of ['price', 'propertyType', 'locality', 'area', 'rooms'] as const) {
@@ -290,7 +292,7 @@ export function extractListingHtml(html: string, url: string, options: {allowPar
   }
   if (!output) throw new ImportFailure('NOT_A_LISTING', 'Aucune annonce structurée exploitable.', 'structure_changed');
   // Les URLs douteuses de la galerie sont refusées avant tout téléchargement.
-  output.photoUrls = output.photoUrls.filter(v => !/(?:logo|avatar|floor.?plan|plan[-_]|dpe|ges)(?:[-_.\/]|$)/i.test(new URL(v).pathname));
+  output.photoUrls = output.photoUrls.filter(v => !/(?:^|[-_.\/])(?:logo|avatar|floor.?plan|plan|dpe|ges)(?:[-_.\/]|$)/i.test(new URL(v).pathname));
   if (output.photoUrls.length < 3 && !options.allowPartial)
     throw new ImportFailure('INSUFFICIENT_PHOTOS', 'La galerie liée au bien est insuffisante.');
   return output;

@@ -37,10 +37,10 @@ try{for(const width of [1536,390]){
   await wait("document.querySelector('.home-account')&&document.querySelector('.home-composer button[type=submit]')&&!document.querySelector('.home-composer button[type=submit]').disabled");
   await evaluate(`(()=>{const input=document.querySelector('#home-listing-url');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,${JSON.stringify(source)});input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
   await evaluate("document.querySelector('.home-composer').requestSubmit()");
-  await wait("document.querySelector('.manual-step-header')?.textContent.includes('4 SUR 5')");
-  assert.equal(await evaluate("document.body.innerText.includes('Les informations du bien ont été récupérées')"),true);
-  await evaluate("[...document.querySelectorAll('.manual-step-nav button')].find(b=>b.textContent.startsWith('Détails')).click()");
-  await wait("document.querySelector('.manual-step-header')?.textContent.includes('3 SUR 5')");
+  await wait("document.querySelector('.manual-sheet-card')&&!document.querySelector('.manual-sheet-card').disabled");
+  assert.equal(await evaluate("document.querySelector('#manual-locality').checkVisibility()&&document.querySelector('#manual-priceCents').checkVisibility()"),true);
+  assert.equal(await evaluate("document.querySelector('.manual-step-nav')"),null);
+  await wait("document.querySelector('#manual-description').checkVisibility()");
   const values=await evaluate("Object.fromEntries(['priceCents','area','rooms','description','locality'].map(key=>[key,document.querySelector('#manual-'+key).value]))");
   assert.equal(Number(values.priceCents.replace(/\s/g,'')),280000);assert.equal(values.area,'268');assert.equal(values.rooms,'12');
   assert.equal(values.locality,'Ville de recette');assert.equal(values.description,data.fields.description);
@@ -52,6 +52,7 @@ try{for(const width of [1536,390]){
   await evaluate("document.querySelector('#manual-description').scrollIntoView({block:'center'})");
   shot=await cdp.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
   await writeFile(`${directory}/description-${width}.png`,Buffer.from(shot.value.data,'base64'));
-  report.push({width,fixture:'reconstructed-figaro',priceEuros:280000,descriptionRetained:true,photosStepAutomatic:true,paidCalls:0});await page.close();
+  report.push({width,fixture:'reconstructed-figaro',priceEuros:280000,descriptionRetained:true,singleSheet:true,paidCalls:0});
+  await evaluate("localStorage.clear();sessionStorage.clear();new Promise((resolve,reject)=>{const r=indexedDB.deleteDatabase('bienvu-local-drafts');r.onsuccess=resolve;r.onerror=reject;})");await page.close();
 }}finally{await browser.close({silent:true});}
 await writeFile(`${directory}/report.json`,JSON.stringify(report,null,2));console.log(JSON.stringify(report));

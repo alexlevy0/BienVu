@@ -1,6 +1,6 @@
 // Hôtes et routes explicites, partagés par le contrat, le registre et l'interface.
 // La présence dans ce catalogue n'est pas une promesse de compatibilité.
-export type SourceId = 'espaces-atypiques' | 'orpi' | 'century21' | 'figaro' | 'seloger' | 'leboncoin' | 'bienici';
+export type SourceId = 'espaces-atypiques' | 'orpi' | 'century21' | 'figaro' | 'seloger' | 'leboncoin' | 'bienici' | 'ladresse';
 export type ImportSource = {id: SourceId; name: string; hosts: readonly string[]; paths: readonly RegExp[];
   mediaHosts: readonly string[]};
 export const importSources: readonly ImportSource[] = [
@@ -20,6 +20,8 @@ export const importSources: readonly ImportSource[] = [
       /^\/(?:ventes_immobilieres|locations)\/(\d+)\.htm$/], mediaHosts: ['www.leboncoin.fr']},
   {id: 'bienici', name: 'Bien’ici', hosts: ['www.bienici.com', 'bienici.com'],
     paths: [/^\/annonce\/(?:vente|location)\/(?:[^/]+\/){2,3}([a-zA-Z0-9_-]+)\/?$/], mediaHosts: ['www.bienici.com', 'file.bienici.com']},
+  {id: 'ladresse', name: 'l’Adresse', hosts: ['www.ladresse.com', 'ladresse.com'],
+    paths: [/^\/annonce\/achat\/(?:maison|appartement)\/[^/]+\/(\d+)\/?$/], mediaHosts: ['admin.exceladresse.com']},
 ];
 export const sourceForHost = (host: string) => importSources.find(source => source.hosts.includes(host));
 export function sourceListingId(source: ImportSource, path: string): string | null {
@@ -29,18 +31,3 @@ export function sourceListingId(source: ImportSource, path: string): string | nu
 export function sameSourceHost(first: string, second: string) {
   return first === second || Boolean(sourceForHost(first)?.hosts.includes(second));
 }
-
-export type SourceCoverage = {status: 'sample_tested' | 'generic_to_try' | 'temporarily_unavailable';
-  checkedAt: string; listingAttempts: number; successfulImports: number;
-  environment: 'cloudflare' | 'local_https'; summary: string};
-export const sourceCoverage: Readonly<Record<SourceId, SourceCoverage>> = {
-  'espaces-atypiques': {status: 'sample_tested', checkedAt: '2026-09-28', listingAttempts: 1, successfulImports: 1, environment: 'cloudflare', summary: 'Une annonce de vente importée. Les surfaces ambiguës sont omises.'},
-  orpi: {status: 'sample_tested', checkedAt: '2026-09-28', listingAttempts: 1, successfulImports: 1, environment: 'cloudflare', summary: 'Une annonce de vente importée avec sa galerie.'},
-  century21: {status: 'sample_tested', checkedAt: '2026-09-28', listingAttempts: 1, successfulImports: 1, environment: 'cloudflare', summary: 'Une annonce de vente importée avec sa galerie.'},
-  figaro: {status: 'temporarily_unavailable', checkedAt: '2026-09-28', listingAttempts: 1, successfulImports: 0, environment: 'cloudflare', summary: 'Accès refusé à l’importeur sur le lien essayé.'},
-  seloger: {status: 'temporarily_unavailable', checkedAt: '2026-09-28', listingAttempts: 1, successfulImports: 0, environment: 'cloudflare', summary: 'Accès refusé à l’importeur sur le lien essayé.'},
-  leboncoin: {status: 'temporarily_unavailable', checkedAt: '2026-09-28', listingAttempts: 1, successfulImports: 0, environment: 'cloudflare', summary: 'Accès refusé à l’importeur sur le lien essayé.'},
-  bienici: {status: 'temporarily_unavailable', checkedAt: '2026-09-28', listingAttempts: 1, successfulImports: 0, environment: 'cloudflare', summary: 'BienVu ne parvient pas encore à récupérer automatiquement les informations et les photos de l’annonce testée.'},
-};
-export const coverageLabels = {sample_tested: 'Testé sur un échantillon', generic_to_try: 'Import générique à essayer',
-  temporarily_unavailable: 'Import momentanément indisponible'} as const;

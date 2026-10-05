@@ -1,6 +1,6 @@
 # Créer une annonce manuellement
 
-Décision d’Alex du **28 septembre 2026** : permettre la saisie d’un bien et l’ajout de ses photos, notamment lorsqu’un site ne peut pas être importé. Elle remplace l’exclusion initiale de ce parcours. L’import URL reste disponible ; aucun éditeur vidéo n’est ajouté.
+La saisie manuelle permet de préparer un bien et ses photos, notamment lorsqu’un site ne peut pas être importé. Depuis le **5 octobre 2026**, l’accueil présente une fiche unique avec aperçu, à la place des cinq étapes. L’import par lien et le mode Éditeur restent disponibles.
 
 ## Utilisation
 
@@ -8,11 +8,13 @@ Sur Cloudflare : ouvrir [bienvu.online](https://bienvu.online/) ; aucun serveur 
 
 En local : Après `pnpm db:migrate` et `pnpm build:web`, lancer `pnpm preview` et `pnpm dev:imports` dans deux terminaux. Se connecter sur `http://localhost:8787/generer`, puis cliquer sur **Saisir mon annonce manuellement** sous l’import URL.
 
-Renseigner le titre, le type de bien et la localisation, choisir vente ou location, puis ajouter si disponibles prix, surface, pièces et description. Un loyer renseigné exige de préciser si les charges sont comprises. Ajouter 3 à 12 photos du bien ; les aperçus permettent de retirer un fichier avant envoi. Le formulaire conserve les champs lorsqu’il est replié ou qu’un envoi échoue.
+Sur l’accueil, cliquer sur **Saisie manuelle**, choisir le type de bien et vente ou location, renseigner la ville, puis ajouter si disponibles prix, surface et pièces. Un loyer renseigné exige de préciser si les charges sont comprises. Le volet **Ajouter des précisions** contient le titre et la description ; le titre est proposé à partir du type, de la transaction et de la ville, et reste modifiable.
 
-La coche de l'onglet **Détails** indique qu'au moins une information de cette section est renseignée et que ses valeurs respectent les règles du formulaire. Une section vide, passée, ou contenant une valeur invalide reste sans coche. Les détails restent facultatifs : prix, surface et pièces ne deviennent pas obligatoires.
+Ajouter 3 à 12 photos différentes du bien. Déplacer les miniatures, ou utiliser leurs flèches, pour changer l’ordre et la couverture ; les boutons permettent aussi de retirer ou réessayer un fichier. L’aperçu suit la couverture, les informations et le format choisis. Prix, surface, pièces et description restent facultatifs ; une valeur renseignée doit être valide.
 
-**Enregistrer mon annonce** envoie les fichiers, vérifie les images et sauvegarde l’annonce. Le résultat porte la mention « Informations et photos fournies par votre agence » et peut être retrouvé dans **Vos dernières annonces** après rechargement. L’enregistrement ne crée aucune vidéo et ne consomme aucun crédit ou essai.
+**Réglages**, dans la barre du bas, permet de choisir format vertical ou horizontal, durée, voix et sous-titres, et d’ouvrir la personnalisation existante. Le coût affiché suit les animations sélectionnées. **Créer ma vidéo** reste désactivé tant que les informations ou les uploads sont incomplets. Sans compte, cette action conserve la fiche et les fichiers dans le navigateur puis ouvre l’inscription ; après connexion, la saisie reprend sans devoir resélectionner les photos. **Importer un lien** revient à l’accueil en conservant la fiche.
+
+L’enregistrement du brouillon et les uploads ne consomment aucun crédit vidéo. La génération conserve le barème de 1 crédit pour la vidéo, plus 1 par photo animée. L’ancien écran `/generer` utilise toujours son enregistrement manuel, avec la même nouvelle fiche adaptée à sa colonne.
 
 ## Limites et provenance
 
@@ -32,7 +34,7 @@ Toutes les mutations contrôlent session, origine et rattachement à l’agence.
 
 La migration `0008` ajoute `source_kind`, `input_json` et `input_hash`, une unicité par slot photo et des contrôles de publication. Pour conserver sans reconstruction destructive les colonnes SQL historiques `NOT NULL`, une absence de source est stockée comme chaîne vide dans ces seules colonnes ; le contrat/API expose `null`, jamais une URL inventée. Les anciennes lignes restent de type `url`.
 
-Un dossier partiel n’est pas une annonce publiée. Un échec réseau garde la clé d’idempotence tant que le formulaire est ouvert et inchangé : réessayer reprend les fichiers déjà reçus. Après rechargement de page, les fichiers locaux doivent être sélectionnés à nouveau et une nouvelle saisie est créée. Les dossiers abandonnés sont purgés par le cron Cloudflare, ou `pnpm imports:cleanup` en local, après leur bail et cinq minutes de grâce. Tout job référençant une annonce en empêche la purge. Les compteurs de tentative persistent après purge produit.
+Un dossier partiel n’est pas une annonce publiée. Le parcours de l’accueil utilise le brouillon partagé versionné (`POST /api/imports/draft`, `PATCH /api/imports/:id/draft`) et envoie les photos au fur et à mesure. La reprise conserve ses références privées, l’ordre des photos et la personnalisation. Le brouillon local invité reste disponible une heure. L’ancien parcours `/generer` conserve les routes décrites ci-dessus et sa clé d’idempotence pendant les réessais. Les dossiers abandonnés sont purgés selon les règles produit ; tout job référençant une annonce en empêche la purge. Les compteurs persistent après purge.
 
 ## Validation et limites d’hébergement
 

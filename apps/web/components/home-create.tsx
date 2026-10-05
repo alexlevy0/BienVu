@@ -43,13 +43,13 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   const [manualCredits,setManualCredits]=useState(1);
   const [customizing,setCustomizing]=useState(false),[guestSettings,setGuestSettings]=useState<VideoCustomization|undefined>();
   const pendingCustomization=useRef<{id:string;key:string}|null>(null);
-  const [url, setUrl] = useState(''), [description, setDescription] = useState(''), [step, setStep] = useState(0);
+  const [url, setUrl] = useState(''), [description, setDescription] = useState('');
   const [feedback, setFeedback] = useState(''), [manualBusy, setManualBusy] = useState(false);
   const [composerPhotos,setComposerPhotos]=useState<ComposerPhoto[]>([]),[photoChecking,setPhotoChecking]=useState(false),
     [dropActive,setDropActive]=useState(false),[incomingPhotos,setIncomingPhotos]=useState<{id:string;files:File[]}|null>(null);
   const stagedPhotos=useRef<ComposerPhoto[]>([]),dropDepth=useRef(0),photoLock=useRef(false),photoVersion=useRef(0);
   const [importDraft,setImportDraft]=useState<CreationDraftView|null>(null),[manualReady,setManualReady]=useState(false),
-    [manualReason,setManualReason]=useState('Terminez les sections puis vérifiez votre annonce.'),
+    [manualReason,setManualReason]=useState('Ajoutez les informations du bien et au moins trois photos.'),
     [guestExtraction,setGuestExtraction]=useState<CreationDraftData|null>(null);
   const lock = useRef(false), startFresh = useRef(false), interactionVersion=useRef(0),
     scrollRegion = useRef<HTMLDivElement>(null),composerDock=useRef<HTMLDivElement>(null),
@@ -123,7 +123,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     if(lastOwner.current&&lastOwner.current!=='guest'&&lastOwner.current!==owner){
       clearComposerPhotos();setCustomizing(false);setGuestSettings(undefined);
       interactionVersion.current++;
-      forget();guestPending.current=null;setScreen({kind:'landing'});setUrl('');setDescription('');setStep(0);
+      forget();guestPending.current=null;setScreen({kind:'landing'});setUrl('');setDescription('');
       setImportDraft(null);setGuestExtraction(null);setFeedback('');
     }
     lastOwner.current=owner;
@@ -153,7 +153,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
       if(value.draft.data.videoCustomization?.editor){window.location.replace(`/editeur?draft=${encodeURIComponent(value.draft.id)}`);return;}
       interactionVersion.current++;
       startFresh.current=true;setImportDraft(value.draft);setGuestExtraction(null);
-      setDescription(value.draft.data.fields.description??value.draft.data.originalText??'');setStep(0);setScreen({kind:'manual'});
+      setDescription(value.draft.data.fields.description??value.draft.data.originalText??'');setScreen({kind:'manual'});
     }).catch(()=>{});
     return()=>controller.abort();
   },[me?.agency.id]);
@@ -188,17 +188,17 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
       if(importDraft?.id!==id&&!manualForm.current?.isDraft(id)&&location.searchParams.get('draft')!==id)return;
       previousComposer.current=composerDock.current?.getBoundingClientRect()??null;
       interactionVersion.current++;lock.current=false;startFresh.current=true;forget();
-      setCustomizing(false);setScreen({kind:'landing'});setImportDraft(null);setGuestExtraction(null);setUrl('');setDescription('');setStep(0);setFeedback('');setManualBusy(false);
+      setCustomizing(false);setScreen({kind:'landing'});setImportDraft(null);setGuestExtraction(null);setUrl('');setDescription('');setFeedback('');setManualBusy(false);
       try{sessionStorage.removeItem(`bienvu:manual-start:${agencyId}`);}catch{/* Optional storage. */}
       if(location.searchParams.get('draft')===id){location.searchParams.delete('draft');
         window.history.replaceState(window.history.state,'',location.pathname+location.search+location.hash);}
     };
     window.addEventListener('bienvu:draft-deleted',deleted);return()=>window.removeEventListener('bienvu:draft-deleted',deleted);
   },[importDraft?.id]);
-  useEffect(() => {if(manual)scrollRegion.current?.scrollTo({top:0,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});}, [manual,step]);
-  useEffect(()=>{if(manual&&step===4)setFeedback(current=>
+  useEffect(() => {if(manual)scrollRegion.current?.scrollTo({top:0,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});}, [manual]);
+  useEffect(()=>{if(manual)setFeedback(current=>
     current.startsWith('Les informations du bien ont été récupérées.')||
-    current.startsWith('Certaines informations du bien sont à compléter')?'':current);},[manual,step]);
+    current.startsWith('Certaines informations du bien sont à compléter')?'':current);},[manual]);
   useEffect(() => {
     if (!me || startFresh.current || readListingDraft()?.kind==='manual') return;
     const saved=remembered();if(!saved)return;
@@ -235,7 +235,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     const fresh = () => {
       interactionVersion.current++;lock.current=false;startFresh.current = true; forget(); setFeedback('');guestPending.current=null;
       trial.setToken('');trial.setChallenge(false);
-      if (screen.kind !== 'manual') {setScreen({kind: 'landing'});setUrl('');setDescription('');setStep(0);}
+      if (screen.kind !== 'manual') {setScreen({kind: 'landing'});setUrl('');setDescription('');}
     };
     window.addEventListener('bienvu:new-video', fresh);
     return () => window.removeEventListener('bienvu:new-video', fresh);
@@ -255,7 +255,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     interactionVersion.current++;lock.current=false;startFresh.current = true;forget();
     if (fromText) setDescription(fromText);
     setImportDraft(null);setGuestExtraction(initialData);guestPending.current=null;trial.setToken('');trial.setChallenge(false);
-    setCustomizing(false);setFeedback('');setStep(0);setScreen({kind: 'manual'});
+    setCustomizing(false);setFeedback('');setScreen({kind: 'manual'});
   }
   async function analyzeGuest(text:string,key:string,token:string){
     if(lock.current||guestPending.current?.key!==key)return;
@@ -265,9 +265,9 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
       if(!response.ok)throw new Error('Analyse indisponible.');
       const value=await response.json() as {extraction:string;data:CreationDraftData|null};
       if(interactionVersion.current!==version)return;
-      setGuestExtraction(value.data);setDescription(text);setStep(0);startFresh.current=true;forget();setScreen({kind:'manual'});
+      setGuestExtraction(value.data);setDescription(text);startFresh.current=true;forget();setScreen({kind:'manual'});
       if(value.extraction!=='ready')setFeedback('Vous pouvez compléter les informations manuellement. Votre texte est conservé.');
-    }catch{if(interactionVersion.current!==version)return;setGuestExtraction(null);setDescription(text);setStep(0);startFresh.current=true;forget();
+    }catch{if(interactionVersion.current!==version)return;setGuestExtraction(null);setDescription(text);startFresh.current=true;forget();
       setScreen({kind:'manual'});setFeedback('Vous pouvez compléter les informations manuellement. Votre texte est conservé.');}
     finally{if(interactionVersion.current===version){lock.current=false;guestPending.current=null;
       trial.setToken('');trial.setChallenge(false);trial.setWidgetVersion(n=>n+1);}}
@@ -293,7 +293,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
         const response=await fetch('/api/imports/describe',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key},body:JSON.stringify({text})});
         if(!response.ok)throw new Error();const result=await response.json() as {draft:CreationDraftView|null};
         if(interactionVersion.current!==version||currentOwner.current!==owner)return;
-        setImportDraft(result.draft);setGuestExtraction(null);setDescription(text);setStep(0);setScreen({kind:'manual'});setCustomizing(true);
+        setImportDraft(result.draft);setGuestExtraction(null);setDescription(text);setScreen({kind:'manual'});setCustomizing(true);
         startFresh.current=true;forget();void refreshDrafts();
       }catch{if(interactionVersion.current===version&&currentOwner.current===owner){openManual(text);setCustomizing(true);}}
       finally{if(interactionVersion.current===version)lock.current=false;}
@@ -326,7 +326,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
       }
       if(!draft)throw new Error('Ce site ne permet pas de préparer cette annonce. Vous pouvez saisir ses informations et ajouter vos photos manuellement.');
       if(interactionVersion.current!==version||currentOwner.current!==owner)return;
-      setImportDraft(draft);setGuestExtraction(null);setDescription(draft.data.fields.description??'');setStep(4);setScreen({kind:'manual'});setCustomizing(true);
+      setImportDraft(draft);setGuestExtraction(null);setDescription(draft.data.fields.description??'');setScreen({kind:'manual'});setCustomizing(true);
       void refreshDrafts();
     }catch(error){if(interactionVersion.current===version&&currentOwner.current===owner)
       setScreen({kind:'error',request:{kind:'url',text:parsed.data},message:error instanceof Error?error.message:'Préparation interrompue.'});}
@@ -337,7 +337,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     if(loading||photoChecking||incomingPhotos)return;
     if(composerPhotos.length){openWithPhotos();return;}
     if (manual) {
-      if ((step === 4||customizing) && !manualBusy && !noCredits && !activeOtherJob)
+      if (manualReady && !manualBusy && !noCredits && !activeOtherJob)
         (document.getElementById('manual-guided-form') as HTMLFormElement | null)?.requestSubmit();
       return;
     }
@@ -363,7 +363,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
           if(!response.ok)throw new Error('L’analyse est indisponible.');
           const result=await response.json() as {draft:CreationDraftView|null;extraction:string};
           if(interactionVersion.current!==version||currentOwner.current!==owner)return;
-          setImportDraft(result.draft);setGuestExtraction(null);setDescription(value);setStep(0);startFresh.current=true;forget();setScreen({kind:'manual'});
+          setImportDraft(result.draft);setGuestExtraction(null);setDescription(value);startFresh.current=true;forget();setScreen({kind:'manual'});
           if(result.extraction!=='ready')setFeedback('Vous pouvez compléter les informations manuellement. Votre texte est conservé.');
           else sessionStorage.removeItem('bienvu:description-request');
         }catch{if(interactionVersion.current===version&&currentOwner.current===owner){
@@ -399,7 +399,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
       if(imported.status==='failed'){pendingImport.current=null;sessionStorage.removeItem('bienvu:url-import-request');}
       if(imported.status==='needs_input'&&imported.draft){
         startFresh.current=true;forget();setImportDraft(imported.draft);setDescription(imported.draft.data.fields.description??'');
-        setStep(0);setScreen({kind:'manual'});
+        setScreen({kind:'manual'});
         void refreshDrafts();
         setFeedback(imported.draft.photos.length<3?'Les informations du bien ont été récupérées. Ajoutez vos photos pour continuer.':
           'Certaines informations du bien sont à compléter avant de créer la vidéo.');
@@ -430,13 +430,11 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   return <div className={`home-create${inConversation ? ' home-create-conversation' : ''}${customizing||screen.kind==='guest-customizing'?' home-create-customizing':''}`}>
     <div ref={scrollRegion} className="home-conversation-scroll">
     {screen.kind==='guest-customizing'&&<VideoCustomizer sourceUrl={screen.url} settings={guestSettings??defaultVideoCustomization()} onChange={value=>{const {photoOrder,runwayPhotos,...settings}=value;setGuestSettings(settings);}} photos={[]} fields={{title:'Votre annonce',propertyType:'',transaction:'',locality:'',description:'',priceCents:'',charges:'',area:'',rooms:''}} agencyName="" subtitlesEnabled={subtitlesEnabled} onSubtitles={setSubtitlesEnabled} voiceEnabled={voiceEnabled} onVoice={setVoiceEnabled} durationSeconds={durationSeconds} aspectRatio={aspectRatio} onBack={closeCustomization} onAdd={files=>{if(files){setIncomingPhotos({id:crypto.randomUUID(),files:Array.from(files)});openManual();setCustomizing(true);}}} busy={busy} ready onEdit={()=>{openManual();}} saved={false}/> }
-    {manual && <div className="home-conversation-manual"><div className="home-request-bubble" style={customizing?{display:'none'}:undefined}><HomeIcon name={importDraft?.sourceUrl?'link':'pencil'} size={21}/>
-      <strong>{importDraft?.sourceUrl??importDraft?.data.originalText??guestExtraction?.originalText??(description.trim()||'Je souhaite ajouter mon annonce manuellement.')}</strong></div>
-      <p className="home-conversation-lead" style={customizing?{display:'none'}:undefined}>Décrivons votre bien, étape par étape.</p>
+    {manual && <div className="home-conversation-manual home-manual-sheet-view">
       <div className="home-manual-panel">
-        {!me ? <ManualListingForm onCreditCost={setManualCredits} ref={manualForm} key="guest" initialCustomization={guestSettings} customizing={customizing} onCloseCustomizer={closeCustomization} subtitlesEnabled={subtitlesEnabled} onSubtitles={setSubtitlesEnabled} voiceEnabled={voiceEnabled} onVoice={setVoiceEnabled} durationSeconds={durationSeconds} aspectRatio={aspectRatio} prepareGuest incomingPhotos={incomingPhotos} onPhotosReceived={receivePhotos} guided={{step,setStep,description,setDescription,initialData:guestExtraction,onCancel:()=>{previousComposer.current=composerDock.current?.getBoundingClientRect()??null;setCustomizing(false);setScreen({kind:'landing'});},
+        {!me ? <ManualListingForm onCreditCost={setManualCredits} ref={manualForm} key="guest" initialCustomization={guestSettings} customizing={customizing} onCloseCustomizer={closeCustomization} subtitlesEnabled={subtitlesEnabled} onSubtitles={setSubtitlesEnabled} voiceEnabled={voiceEnabled} onVoice={setVoiceEnabled} durationSeconds={durationSeconds} aspectRatio={aspectRatio} prepareGuest incomingPhotos={incomingPhotos} onPhotosReceived={receivePhotos} guided={{description,setDescription,initialData:guestExtraction,onCancel:()=>{previousComposer.current=composerDock.current?.getBoundingClientRect()??null;setCustomizing(false);setScreen({kind:'landing'});},
           onReadyChange:(ready,reason)=>{setManualReady(ready);setManualReason(reason);}}} busy={manualBusy} setBusy={setManualBusy} onPrepared={() => window.location.assign('/connexion?mode=signup')}/>
-          : <ManualListingForm onCreditCost={setManualCredits} ref={manualForm} customizing={customizing} onCloseCustomizer={closeCustomization} brand={me.agency} subtitlesEnabled={subtitlesEnabled} onSubtitles={setSubtitlesEnabled} voiceEnabled={voiceEnabled} onVoice={setVoiceEnabled} durationSeconds={durationSeconds} aspectRatio={aspectRatio} key={`agency:${me.agency.id}:${importDraft?.id??'manual'}`} incomingPhotos={incomingPhotos} onPhotosReceived={receivePhotos} generate={canGenerate} guided={{step,setStep,description,setDescription,agencyId:me.agency.id,initialDraft:importDraft,
+          : <ManualListingForm onCreditCost={setManualCredits} ref={manualForm} customizing={customizing} onCloseCustomizer={closeCustomization} brand={me.agency} subtitlesEnabled={subtitlesEnabled} onSubtitles={setSubtitlesEnabled} voiceEnabled={voiceEnabled} onVoice={setVoiceEnabled} durationSeconds={durationSeconds} aspectRatio={aspectRatio} key={`agency:${me.agency.id}:${importDraft?.id??'manual'}`} incomingPhotos={incomingPhotos} onPhotosReceived={receivePhotos} generate={canGenerate} guided={{description,setDescription,agencyId:me.agency.id,initialDraft:importDraft,
             onReadyChange:(ready,reason)=>{setManualReady(ready);setManualReason(reason);},onDraftChange:()=>void refreshDrafts(),
             onCancel:()=>{previousComposer.current=composerDock.current?.getBoundingClientRect()??null;setCustomizing(false);setScreen({kind:'landing'});}}} busy={manualBusy} setBusy={setManualBusy} onCreated={async value => {
             void refreshDrafts();
@@ -452,7 +450,19 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     {screen.kind==='extracting'&&<div className="home-conversation-manual"><div className="home-request-bubble"><HomeIcon name="pencil" size={21}/><strong>{screen.text}</strong></div>
       <p className="home-conversation-lead" role="status">Nous préparons les informations de votre bien…</p></div>}
     </div>
-    <div ref={composerDock} className="home-composer-dock"><form className={`home-composer home-composer-modern${feedback || screen.kind === 'error' ? ' home-composer-invalid' : ''}${dropActive?' home-composer-dropping':''}`} onSubmit={submit} noValidate aria-label="Créer une vidéo depuis une annonce"
+    <div ref={composerDock} className="home-composer-dock">{manual?<form className="home-manual-toolbar" onSubmit={submit} aria-label="Créer la vidéo de votre bien">
+      <div className="home-manual-settings"><details><summary aria-disabled={busy||loading} onClick={event=>{if(busy||loading)event.preventDefault();}}><HomeIcon name="settings" size={22}/>Réglages</summary>
+        <fieldset className="home-manual-settings-panel" disabled={busy||loading}><legend>Réglages de la vidéo</legend>
+          <label>Format<select aria-label="Format de la vidéo" value={aspectRatio} onChange={event=>setAspectRatio(event.target.value==='16:9'?'16:9':'9:16')}><option value="9:16">Vertical 9:16</option><option value="16:9">Horizontal 16:9</option></select></label>
+          <label>Durée<select aria-label="Durée de la vidéo" value={durationSeconds} onChange={event=>setDurationSeconds(VideoDuration.parse(Number(event.target.value)))}><option value={20}>20 secondes</option><option value={30}>30 secondes</option><option value={40}>40 secondes</option></select></label>
+          <label className="home-manual-setting-check"><input type="checkbox" aria-label="Voix off" checked={voiceEnabled} onChange={event=>setVoiceEnabled(event.target.checked)}/>Voix off</label>
+          <label className="home-manual-setting-check"><input type="checkbox" aria-label="Sous-titres de la voix off" checked={subtitlesEnabled} disabled={!voiceEnabled} onChange={event=>setSubtitlesEnabled(event.target.checked)}/>Sous-titres</label>
+          <button type="button" className="home-manual-personalize" disabled={photoChecking||activeOtherJob} onClick={event=>{event.currentTarget.closest('details')!.open=false;void personalize();}}>{customizing?'Revenir à la fiche du bien':'Personnaliser la vidéo'}<HomeIcon name="arrow" size={17}/></button>
+        </fieldset></details></div>
+      <p className="home-manual-settings-summary">{aspectRatio==='16:9'?'Horizontal':'Vertical'} · {durationSeconds} s{voiceEnabled?' · Voix off':''}{subtitlesEnabled?' · Sous-titres':''}</p>
+      <span className="home-credit-cost" aria-live="polite">{creditCost} crédit{creditCost>1?'s':''}</span>
+      <button type="submit" className="home-primary-button" disabled={composerDisabled} aria-describedby={!manualReady?'home-manual-action-note':undefined}>{manualBusy?'Préparation…':me&&!canGenerate?'Enregistrer mon annonce':'Créer ma vidéo'}<HomeIcon name="arrow" size={19}/></button>
+    </form>:<><form className={`home-composer home-composer-modern${feedback || screen.kind === 'error' ? ' home-composer-invalid' : ''}${dropActive?' home-composer-dropping':''}`} onSubmit={submit} noValidate aria-label="Créer une vidéo depuis une annonce"
       onDragEnter={event=>{if(draggingFiles(event)&&canDropPhotos){event.preventDefault();dropDepth.current++;setDropActive(true);}}}
       onDragOver={event=>{if(draggingFiles(event)){event.preventDefault();event.dataTransfer.dropEffect=canDropPhotos?'copy':'none';}}}
       onDragLeave={event=>{if(draggingFiles(event)){dropDepth.current=Math.max(0,dropDepth.current-1);if(!dropDepth.current)setDropActive(false);}}}
@@ -487,6 +497,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
       </div>
     </form>
     <button type="button" className={manual?'home-mode-pill is-active':'home-mode-pill'} aria-pressed={manual} disabled={busy || photoChecking || Boolean(incomingPhotos) || screen.kind==='job' && generationActive(selectedJob)} onClick={()=>{if(manual)void manualForm.current?.cancel();else if(composerPhotos.length)openWithPhotos();else openManual();}}><HomeIcon name="pencil" size={20}/>Saisie manuelle</button>
+    </>}
     {manual&&!manualReady&&<p id="home-manual-action-note" className="home-form-note" role="status">{manualReason}</p>}
     {screen.kind==='error'&&<p className="home-form-feedback" role="alert">{screen.message} Votre saisie est conservée pour réessayer.</p>}
     {feedback && <p className="home-form-feedback" id="home-url-error" role="alert">{feedback}</p>}
@@ -500,7 +511,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     {!me && trial.failure && screen.kind !== 'error' && <p className="home-form-feedback" role="alert">{trial.failure} <Link href="/connexion">Se connecter</Link></p>}
     {importPaused&&!manual && <p className="home-form-note" role="status">La limite des imports par lien est atteinte jusqu’au {new Date(me!.rights.importRetryAt!).toLocaleString('fr-FR')}. Vous pouvez ajouter vos informations et photos en saisie manuelle.</p>}
     {activeOtherJob && <p className="home-form-note">Une vidéo est déjà en cours de création. <Link href="/historique">Suivez-la dans Mes vidéos</Link>.</p>}
-    <p className="home-create-note" id="home-create-note" hidden={!manual&&!(screen.kind==='job'&&generationActive(selectedJob))&&!contextNote}>{manual ? 'Votre brouillon reste sur cet appareil pendant une heure.' : screen.kind === 'job' && generationActive(selectedJob) ? 'Votre création sera enregistrée dans Mes vidéos.' : contextNote}</p>
+    <p className="home-create-note" id="home-create-note" hidden={manual?Boolean(me):!(screen.kind==='job'&&generationActive(selectedJob))&&!contextNote}>{manual ? 'Votre saisie est conservée ici. La connexion sera demandée pour créer la vidéo.' : screen.kind === 'job' && generationActive(selectedJob) ? 'Votre création sera enregistrée dans Mes vidéos.' : contextNote}</p>
     </div>
   </div>;
 }

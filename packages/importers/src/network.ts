@@ -1,16 +1,19 @@
-import {ImportFailure, ListingUrl, sourceForHost} from '@bienvu/contracts';
+import {ImportFailure, ListingUrl, importResourceDiagnostic, sourceForHost, type ImportResourceDiagnostic} from '@bienvu/contracts';
 import {isPublicIp} from './safety';
 
 export const IMPORT_LIMITS = {htmlBytes: 2 * 1024 * 1024, imageBytes: 10 * 1024 * 1024,
   totalBytes: 50 * 1024 * 1024, photos: 12, candidates: 24, redirects: 3, requests: 20, durationMs: 60_000,
   photoDurationMs: 50_000,imageDurationMs:8_000} as const;
 
-export function publicUrl(value: string): URL {
+type ResourceContext = Pick<ImportResourceDiagnostic, 'stage' | 'resourceType'>;
+export function publicUrl(value: string, context: ResourceContext = {stage: 'page'}): URL {
   const parsed = ListingUrl.safeParse(value);
-  if (!parsed.success) throw new ImportFailure('UNSAFE_URL', 'URL non publique ou invalide.');
+  if (!parsed.success) throw new ImportFailure('UNSAFE_URL', 'URL non publique ou invalide.', undefined,
+    importResourceDiagnostic(value, context.stage, 'invalid_url', context.resourceType));
   const url = new URL(parsed.data);
   if (!/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(url.hostname))
-    throw new ImportFailure('UNSAFE_URL', 'Nom de domaine non pris en charge.');
+    throw new ImportFailure('UNSAFE_URL', 'Nom de domaine non pris en charge.', undefined,
+      importResourceDiagnostic(value, context.stage, 'invalid_url', context.resourceType));
   return url;
 }
 
@@ -19,9 +22,10 @@ export function sourcePolicy(source: string) {
   const host = publicUrl(source).hostname, registered = sourceForHost(host);
   return {pageHosts: registered?.hosts ?? [host], imageHosts: registered ? [...new Set([...registered.hosts, ...registered.mediaHosts])] : [host]};
 }
-export function scopedUrl(value: string, hosts: readonly string[]) {
-  const url = publicUrl(value);
-  if (!hosts.includes(url.hostname)) throw new ImportFailure('UNSAFE_URL', 'Hôte extérieur à la source autorisée.');
+export function scopedUrl(value: string, hosts: readonly string[], context: ResourceContext = {stage: 'page'}) {
+  const url = publicUrl(value, context);
+  if (!hosts.includes(url.hostname)) throw new ImportFailure('UNSAFE_URL', 'Hôte extérieur à la source autorisée.', undefined,
+    importResourceDiagnostic(value, context.stage, 'host_not_allowed', context.resourceType));
   return url;
 }
 export function publicAddresses(addresses: readonly {address: string; family: number}[]) {

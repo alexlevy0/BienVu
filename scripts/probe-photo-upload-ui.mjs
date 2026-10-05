@@ -50,7 +50,7 @@ try{for(const width of [1536,390])for(const scenario of ['quota','manual','custo
   await evaluate(`document.querySelector('${custom?'.home-customize-button':'.home-mode-pill'}').click()`);
   await wait(custom?"document.querySelector('.customizer-add')&&!document.querySelector('.customizer-add').disabled":"document.querySelector('#manual-photos')&&!document.querySelector('#manual-photos').disabled");
   await evaluate(`window.__upload('${custom?'.video-customizer input[type=file]':'#manual-photos'}')`);
-  const card=custom?'.customizer-photo':'.manual-photos li';
+  const card=custom?'.customizer-photo':'.manual-sheet-photo';
   await wait(`document.querySelector('${card}')`);
   if(scenario==='guest'){
     assert.equal(await evaluate('window.__photos.puts'),0);
@@ -58,14 +58,9 @@ try{for(const width of [1536,390])for(const scenario of ['quota','manual','custo
   }else{
     await wait(`document.querySelector('${card} [role=alert]')`);
     if(!custom&&scenario==='manual'){
-      await evaluate("document.querySelector('input[name=propertyType][value=apartment]').click();document.querySelector('input[name=transaction][value=sale]').click();document.querySelector('.manual-step-actions .home-primary-button').click()");
-      await wait("document.querySelector('.manual-step-header').textContent.includes('2 SUR 5')");
+      await evaluate("document.querySelector('.manual-sheet-details summary').click()");
       await evaluate("(()=>{for(const [id,value]of [['manual-title','Appartement de recette'],['manual-locality','Lyon']]){const n=document.getElementById(id);Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(n,value);n.dispatchEvent(new Event('input',{bubbles:true}));}})()");
-      await evaluate("document.querySelector('.manual-step-actions .home-primary-button').click()");
-      await wait("document.querySelector('.manual-step-header').textContent.includes('3 SUR 5')");
       assert.ok(await evaluate("document.querySelector('#manual-description').checkVisibility()"));
-      await evaluate("document.querySelector('.manual-step-actions .home-primary-button').click()");
-      await wait("document.querySelector('.manual-step-header').textContent.includes('4 SUR 5')");
     }
     await evaluate(`document.querySelector('${card}').scrollIntoView({block:'center'})`);await shot('error');
     if(scenario==='quota'){
@@ -75,7 +70,7 @@ try{for(const width of [1536,390])for(const scenario of ['quota','manual','custo
       assert.equal(await evaluate('window.__photos.starts'),before,'Retirer ne crée pas de nouveau brouillon');
     }else{
       await evaluate(`(()=>{const b=[...document.querySelectorAll('${card} button')].find(b=>b.textContent==='Réessayer');b.click();b.click();})()`);
-      await wait(custom?"!document.querySelector('.customizer-photo-state')":"document.querySelector('.manual-photos li').textContent.includes('Disponible')");
+      await wait(custom?"!document.querySelector('.customizer-photo-state')":"document.querySelector('.manual-sheet-photo')&&!document.querySelector('.manual-sheet-photo-status')&&!document.querySelector('.manual-sheet-photo.has-error')");
       assert.equal(await evaluate('window.__photos.puts'),2,'Double clic : un seul réessai');await shot('ready');
       await evaluate(`document.querySelector('${card} button[aria-label^="Retirer"]').click()`);await wait(`!document.querySelector('${card}')`);
       // Remove during an upload: the late completion must not restore the card.

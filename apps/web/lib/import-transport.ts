@@ -1,4 +1,4 @@
-import {ImportFailure, importFailureReason} from '@bienvu/contracts';
+import {ImportFailure, importFailureReason, parseImportResourceHeader} from '@bienvu/contracts';
 import {IMPORT_LIMITS, readLimited, type ImportTransport} from '@bienvu/importers';
 import {RequestFailure} from './http';
 import type {PhotoNormalizer} from './manual-listings';
@@ -25,7 +25,8 @@ async function hostedCall(env: HostedEnv, agencyId: string, id: string, path: st
     const code = response.headers.get('X-Import-Error'); await response.body?.cancel();
     if (response.status === 429) throw new RequestFailure('IMPORT_LIMIT');
     throw new ImportFailure(code === 'UNSAFE_URL' || code === 'SOURCE_BLOCKED' || code === 'IMPORT_TIMEOUT'
-      || code === 'INSUFFICIENT_PHOTOS' || code === 'NOT_A_LISTING' ? code : 'SOURCE_UNAVAILABLE', 'Import hébergé indisponible.', importFailureReason(response.headers.get('X-Import-Reason')));
+      || code === 'INSUFFICIENT_PHOTOS' || code === 'NOT_A_LISTING' ? code : 'SOURCE_UNAVAILABLE', 'Import hébergé indisponible.', importFailureReason(response.headers.get('X-Import-Reason')),
+      parseImportResourceHeader(response.headers.get('X-Import-Resource')));
   }
   return response;
 }
@@ -72,7 +73,8 @@ export function localImportTransport(request: Request, env: ImportEnv): ImportTr
     if (!response.ok) {
       const code = response.headers.get('X-Import-Error'); await response.body?.cancel();
       throw new ImportFailure(code === 'UNSAFE_URL' || code === 'SOURCE_BLOCKED' || code === 'IMPORT_TIMEOUT'
-        || code === 'INSUFFICIENT_PHOTOS' || code === 'NOT_A_LISTING' ? code : 'SOURCE_UNAVAILABLE', 'Ressource non importable.', importFailureReason(response.headers.get('X-Import-Reason')));
+        || code === 'INSUFFICIENT_PHOTOS' || code === 'NOT_A_LISTING' ? code : 'SOURCE_UNAVAILABLE', 'Ressource non importable.', importFailureReason(response.headers.get('X-Import-Reason')),
+        parseImportResourceHeader(response.headers.get('X-Import-Resource')));
     }
     return {url: response.headers.get('X-Source-Url') ?? url, mime: response.headers.get('Content-Type') ?? '',
       sourceBytes: Number(response.headers.get('X-Source-Bytes')), width: Number(response.headers.get('X-Image-Width')) || undefined,

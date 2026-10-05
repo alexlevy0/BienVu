@@ -1,23 +1,35 @@
 import Link from 'next/link';
-import {coverageLabels, importSources, sourceCoverage} from '@bienvu/contracts';
+import {coverageSources, sourceCoverage} from '@bienvu/contracts';
 import {Shell} from '../../components/shell';
+import {SourceDirectory} from '../../components/source-directory';
+import {HomeIcon} from '../../components/home-icons';
 import './sources.css';
 
-export const metadata = {title: 'Sources testées', description: 'Les sites testés par BienVu, les limites constatées et les alternatives pour préparer votre annonce.',alternates:{canonical:'/sources'}};
+export const metadata = {title: 'Sources testées', description: 'Les sites testés par BienVu, les limites constatées et les alternatives pour préparer votre annonce.', alternates: {canonical: '/sources'}};
 export default function SourcesPage() {
-  return <Shell><div className="page-heading"><div><p className="eyebrow">IMPORTER VOTRE ANNONCE</p><h1>Les sources,<br/><em>en toute clarté.</em></h1>
-    <p className="page-intro">Un site testé n’est pas une garantie pour toutes ses annonces.<br/>Voici ce que nos essais ont réellement permis.</p></div></div>
-    <section aria-label="Couverture des sources" className="source-coverage-grid">{importSources.map(source => {
-      const result = sourceCoverage[source.id];
-      const date = new Intl.DateTimeFormat('fr-FR', {day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC'}).format(new Date(result.checkedAt));
-      return <article className="step-card" key={source.id}><span className="mini-label">{coverageLabels[result.status]}</span><h2>{source.name}</h2><p>{result.summary}</p>
-        <p className="field-help">{result.successfulImports} import{result.successfulImports > 1 ? 's' : ''} abouti{result.successfulImports > 1 ? 's' : ''} sur {result.listingAttempts} lien{result.listingAttempts > 1 ? 's' : ''} essayé{result.listingAttempts > 1 ? 's' : ''} · <time dateTime={result.checkedAt}>{date}</time></p>
-        <p className="field-help">{result.environment === 'cloudflare'
-          ? result.successfulImports > 0 ? 'Import confirmé dans BienVu.' : 'Import essayé dans BienVu, sans résultat exploitable.'
-          : 'Essai exploratoire. L’import n’est pas encore confirmé dans BienVu.'}</p></article>;
-    })}</section>
-    <section className="information-note"><h2>Un autre site d’agence ?</h2><p>L’import générique peut être essayé sur une annonce publique. Les informations et la galerie sont vérifiées avant l’enregistrement ; seules les photos du bien doivent être conservées.</p>
-      <p>Un accès refusé ou une annonce retirée ne déclenche pas de nouvelle tentative automatique. Vous pouvez utiliser le lien de l’agence ou renseigner le bien et ses photos vous-même.</p><Link className="button primary" href="/generer">Préparer mon annonce →</Link></section>
-    <p className="field-help">Ces résultats sont datés et portent sur un petit échantillon. Les simulations ne comptent pas comme des imports réussis. Utilisez uniquement des textes et des photos que vous êtes autorisé à exploiter.</p>
-  </Shell>;
+  const latest = Object.values(sourceCoverage).map(result => result.checkedAt).sort().at(-1)!;
+  const checkedDate = new Intl.DateTimeFormat('fr-FR', {day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC'}).format(new Date(latest));
+  return <Shell><div className="sources-page">
+    <Link className="source-back" href="/">← Retour au studio</Link>
+    <header className="source-page-heading"><p className="eyebrow">IMPORTER VOTRE ANNONCE</p><h1>Les sources,<br/><em>en toute clarté.</em></h1>
+      <p className="page-intro">De votre annonce à votre vidéo, tout commence par un lien.<br/>Découvrez les résultats de nos essais sur les principaux réseaux immobiliers.</p>
+      <span className="source-updated"><HomeIcon name="check" size={16}/> Dernière campagne : <time dateTime={latest}>{checkedDate}</time></span>
+    </header>
+    <section className="source-overview" aria-label="Notre couverture">
+      <div><strong>{coverageSources.filter(s => s.kind === 'agency').length}</strong><span>agences et réseaux testés</span></div>
+      <div><strong>{coverageSources.filter(s => s.kind === 'portal').length}</strong><span>portails d’annonces testés</span></div>
+      <p><HomeIcon name="link" size={23}/><span>Collez le <strong>lien direct d’un bien</strong>.<br/>Les pages de recherche ne sont pas des annonces.</span></p>
+    </section>
+    <SourceDirectory/>
+    <section className="source-alternatives" aria-labelledby="other-source-title"><div><span className="source-note-icon"><HomeIcon name="building" size={26}/></span>
+      <h2 id="other-source-title">Votre agence n’est pas dans la liste ?</h2><p>Essayez son lien public dans BienVu. Si l’import ne suffit pas, renseignez les informations du bien et ajoutez vos photos grâce à la saisie manuelle.</p></div>
+      <Link className="button secondary" href="/generer">Préparer mon annonce <HomeIcon name="arrow" size={20}/></Link></section>
+    <details className="source-methodology"><summary>Comment testons-nous les sources ?</summary>
+      <p>Nous sélectionnons des annonces publiques de réseaux d’agences et de mandataires présents en France, puis utilisons le même import que dans BienVu.</p>
+      <p>Un import complet signifie que les informations nécessaires et au moins trois photos distinctes ont été récupérées, vérifiées et enregistrées. Un brouillon à compléter n’est pas compté comme un import complet.</p>
+      <p>Chaque résultat précise son lien et sa date. Les essais portent sur un petit échantillon : ils ne garantissent pas l’ensemble des annonces d’un réseau. Une annonce peut aussi être retirée entre deux essais. Les précédents tests restent datés, y compris ceux des portails.</p>
+      <p>Un accès refusé ou une annonce retirée ne déclenche pas de nouvelle tentative automatique. Nous ne contournons pas les restrictions d’accès des sites.</p>
+    </details>
+    <p className="source-rights-note">Utilisez uniquement des textes et des photos que vous êtes autorisé à exploiter.</p>
+  </div></Shell>;
 }

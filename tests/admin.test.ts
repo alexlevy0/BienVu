@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {randomBytes,createHmac} from 'node:crypto';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import {migrateNarrationProbe,seedNarrationFixture} from '../scripts/narration-fixtures';
-import {adminPage,adminOverview,adminAction,adminVideoDetail,ensureAgency,admitGeneration,findGeneration} from '../packages/db/src/index';
+import {adminPage,adminOverview,adminAction,adminVideoDetail,ensureAgency,admitGeneration,findGeneration,beginImport,failImport,findImport} from '../packages/db/src/index';
 import {AdminQuery,Me,VideoReport} from '../packages/contracts/src/index';
 import {isSuperAdmin,requireAdmin} from '../apps/web/lib/admin-access';
 import {financeRequest} from '../apps/web/lib/profitability';
@@ -11,6 +11,7 @@ import {adminRequest,adminJobRequest} from '../apps/web/lib/admin';
 import {createAuth} from '../apps/web/lib/auth';
 import {videoFixture,videoReport} from '../fixtures/video';
 import {RequestFailure} from '../apps/web/lib/http';
+import {importResult} from '../apps/web/lib/imports';
 
 test('Super admin : accès fermé par défaut, adresse exacte et vérification obligatoires',()=>{
   const user={id:'admin',email:'Owner@Example.com',emailVerified:true};
@@ -57,6 +58,17 @@ test('Admin avec Better Auth/D1/R2 locaux : isolation, pagination globale, actio
     for(const query of ['section=traffic&days=365','section=traffic&country=FR','section=users&status=ready','section=videos&cursor=evil','section=users&secret=x','section=videos&q='+encodeURIComponent('x'.repeat(101))])assert.equal((await adminRequest(req('/api/admin?'+query),env)).status,422);
     const overview=await adminOverview(db,{generations:true,anonymousTrials:true,imports:'disabled',email:'local',google:false,origin:env.BETTER_AUTH_URL});
     assert.equal(overview.counts.agencies,2);assert.equal(overview.counts.users,3);assert.equal(overview.counts.activeSubscriptions,0);
+  });
+  await t.test('imports : diagnostic privé ciblé, sans payload brut ni exposition à l’import public',async()=>{
+    const {row}=await beginImport(db,agency.id,'https://fixtures.bienvu.example/vente','diagnostic-fixture-key');
+    await failImport(db,agency.id,row.id,'UNSAFE_URL',{stage:'browser',failureResource:{stage:'browser',host:'outside.example',path:'/photo.jpg',resourceType:'image',reason:'host_not_allowed'},authorization:'PRIVATE_SECRET'});
+    const response=await adminRequest(req('/api/admin?section=imports'),env);assert.equal(response.status,200);
+    const page=await response.json() as {rows:Record<string,unknown>[]};const item=page.rows.find(i=>i.id===row.id)!;
+    assert.equal(item.errorStage,'browser');assert.equal(item.blockedHost,'outside.example');assert.equal(item.blockedPath,'/photo.jpg');
+    assert.equal(item.blockReason,'host_not_allowed');assert.equal(item.resourceType,'image');
+    assert.doesNotMatch(JSON.stringify(page),/PRIVATE_SECRET|authorization|diagnostics_json/);
+    const publicResult=importResult(await findImport(db,agency.id,row.id));
+    assert.equal(publicResult.errorCode,'UNSAFE_URL');assert.doesNotMatch(JSON.stringify(publicResult),/outside\.example|photo\.jpg|PRIVATE_SECRET|failureResource|diagnostics/);
   });
   const fixture=await seedNarrationFixture(db,'admin-test');
   // One real retained ledger entry (fixture media, no paid provider/render).

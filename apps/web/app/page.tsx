@@ -12,6 +12,7 @@ import './home-sharing.css';
 import './home-editor-showcase.css';
 import './home-footer.css';
 import './home-composer.css';
+import './manual-listing.css';
 import './customizer.css';
 
 export const metadata = {

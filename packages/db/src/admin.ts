@@ -58,10 +58,15 @@ const sections:Record<AdminSection,{sql:string;fields:string[];search:string[];s
     fields:['id','sortKey','agencyId','agency','email','plan','status','start','end','cancelAtEnd','syncVersion'],search:['agency','email','plan','id'],statuses:['active','trialing','past_due','unpaid','canceled','paused','incomplete','incomplete_expired']},
   imports:{sql:`SELECT i.id,i.created_at AS sortKey,i.agency_id AS agencyId,a.name AS agency,u.email,i.source_kind AS sourceKind,i.source_url AS sourceUrl,
     IIF(i.draft_pending=1 AND i.status='importing','draft',i.status) AS status,i.error_code AS error,i.expires_at AS expiresAt,
+    json_extract(i.diagnostics_json,'$.stage') AS errorStage,
+    json_extract(i.diagnostics_json,'$.failureResource.host') AS blockedHost,
+    json_extract(i.diagnostics_json,'$.failureResource.path') AS blockedPath,
+    json_extract(i.diagnostics_json,'$.failureResource.reason') AS blockReason,
+    json_extract(i.diagnostics_json,'$.failureResource.resourceType') AS resourceType,
     coalesce(json_extract(i.result_json,'$.facts.title.value'),json_extract(d.data_json,'$.fields.title'),'Votre annonce') AS title,
     (SELECT count(*) FROM import_objects WHERE import_id=i.id) AS photos
     FROM listing_imports i JOIN agencies a ON a.id=i.agency_id LEFT JOIN auth_user u ON u.id=a.owner_user_id LEFT JOIN creation_drafts d ON d.id=i.id`,
-    fields:['id','sortKey','agencyId','agency','email','sourceKind','sourceUrl','status','error','expiresAt','title','photos'],search:['agency','email','title','sourceUrl','id'],statuses:['draft','ready','failed','importing','deleting']},
+    fields:['id','sortKey','agencyId','agency','email','sourceKind','sourceUrl','status','error','expiresAt','title','photos','errorStage','blockedHost','blockedPath','blockReason','resourceType'],search:['agency','email','title','sourceUrl','id'],statuses:['draft','ready','failed','importing','deleting']},
   reports:{sql:`SELECT r.id,r.created_at AS sortKey,r.job_id AS jobId,coalesce(g.owner_agency_id,j.agency_id) AS agencyId,a.name AS agency,r.category,r.comment,r.status,j.status AS videoStatus
     FROM generation_reports r JOIN jobs j ON j.id=r.job_id LEFT JOIN generation_runs g ON g.job_id=j.id LEFT JOIN agencies a ON a.id=coalesce(g.owner_agency_id,j.agency_id)`,
     fields:['id','sortKey','jobId','agencyId','agency','category','comment','status','videoStatus'],search:['agency','comment','jobId','id'],statuses:['new','reviewing','closed']},

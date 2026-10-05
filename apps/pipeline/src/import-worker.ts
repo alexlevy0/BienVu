@@ -1,5 +1,5 @@
 import {Container} from '@cloudflare/containers';
-import {EntityId, ImportFailure, importFailureReason} from '@bienvu/contracts';
+import {EntityId, ImportFailure, importFailureReason, importResourceDiagnostic, importResourceHeader, parseImportResourceHeader} from '@bienvu/contracts';
 import {findImport, claimHostedResource, settleHostedResource, claimHostedBrowser, releaseHostedBrowser, ImportStateFailure} from '@bienvu/db';
 import {IMPORT_LIMITS, readLimited, scopedUrl, sourcePolicy, type ImportTransport} from '@bienvu/importers';
 import {authorized, json, smallJson} from './auth';
@@ -35,7 +35,8 @@ function cloudTransport(env: Env, row: {id: string; agencyId: string; sourceUrl:
   return {async load(value, kind, _hosts, signal, maxBytes) {
     if (!row.sourceUrl) throw new ImportFailure('UNSAFE_URL', 'SOURCE_REQUIRED');
     const policy = sourcePolicy(row.sourceUrl), hosts = kind === 'image' ? policy.imageHosts : policy.pageHosts;
-    scopedUrl(value, hosts);
+    const resourceContext = {stage: kind === 'image' ? 'photo' as const : kind === 'asset' ? 'browser' as const : 'page' as const, resourceType: kind};
+    scopedUrl(value, hosts, resourceContext);
     const limit = Math.min(kind === 'image' ? IMPORT_LIMITS.imageBytes : IMPORT_LIMITS.htmlBytes, maxBytes ?? IMPORT_LIMITS.htmlBytes);
     await claimHostedResource(env.DB, row.agencyId, row.id, limit);
     const response = await env.IMPORT_CONTAINER.getByName('imports-single-slot').fetch(new Request('http://container/resource', {
@@ -44,12 +45,14 @@ function cloudTransport(env: Env, row: {id: string; agencyId: string; sourceUrl:
     if (!response.ok) {
       const code = response.headers.get('X-Import-Error'); await response.body?.cancel();
       throw new ImportFailure(code === 'UNSAFE_URL' || code === 'SOURCE_BLOCKED' || code === 'IMPORT_TIMEOUT'
-        || code === 'INSUFFICIENT_PHOTOS' || code === 'NOT_A_LISTING' ? code : 'SOURCE_UNAVAILABLE', 'RESOURCE_REFUSED', importFailureReason(response.headers.get('X-Import-Reason')));
+        || code === 'INSUFFICIENT_PHOTOS' || code === 'NOT_A_LISTING' ? code : 'SOURCE_UNAVAILABLE', 'RESOURCE_REFUSED', importFailureReason(response.headers.get('X-Import-Reason')),
+        code === 'UNSAFE_URL' ? parseImportResourceHeader(response.headers.get('X-Import-Resource'))
+          ?? importResourceDiagnostic(value, resourceContext.stage, 'transport_refused', kind) : undefined);
     }
     const sourceBytes = Number(response.headers.get('X-Source-Bytes'));
     const bytes = await readLimited(response, kind === 'image' ? IMPORT_LIMITS.imageBytes : IMPORT_LIMITS.htmlBytes);
     await settleHostedResource(env.DB, row.id, limit, sourceBytes);
-    const url = response.headers.get('X-Source-Url') ?? value; scopedUrl(url, hosts);
+    const url = response.headers.get('X-Source-Url') ?? value; scopedUrl(url, hosts, resourceContext);
     return {url, bytes, sourceBytes, mime: response.headers.get('Content-Type') ?? '',
       width: Number(response.headers.get('X-Image-Width')) || undefined, height: Number(response.headers.get('X-Image-Height')) || undefined};
   }};
@@ -100,7 +103,8 @@ export default {
     } catch (error) {
       const code = error instanceof ImportFailure ? error.code : error instanceof ImportStateFailure ? 'IMPORT_LIMIT' : 'SOURCE_UNAVAILABLE';
       return new Response(null, {status: code === 'IMPORT_LIMIT' ? 429 : 422, headers: {'X-Import-Error': code,
-        ...(error instanceof ImportFailure && error.reason ? {'X-Import-Reason': error.reason} : {})}});
+        ...(error instanceof ImportFailure && error.reason ? {'X-Import-Reason': error.reason} : {}),
+        ...(error instanceof ImportFailure && error.resource ? {'X-Import-Resource': importResourceHeader(error.resource)} : {})}});
     }
   },
   async scheduled(_event, env) {console.log(JSON.stringify({event: 'import_cleanup', ...await purgeHostedImports(env)}));},

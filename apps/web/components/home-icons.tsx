@@ -54,6 +54,7 @@ const shapes = {
   eye: <><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></>,
   lock: <><rect x="5" y="10" width="14" height="12" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></>,
   globe: <><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2c-3 3-4 6-4 10s1 7 4 10m0-20c3 3 4 6 4 10s-1 7-4 10"/></>,
+  location: <><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></>,
 } satisfies Record<string, ReactNode>;
 
 export function HomeIcon({name, size = 24}: {name: keyof typeof shapes; size?: number}) {

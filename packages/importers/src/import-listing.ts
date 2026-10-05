@@ -1,11 +1,13 @@
-import {EntityId, GeneratableListing, NormalizedListing, ImportFailure, type ImportFailureReason} from '@bienvu/contracts';
+import {EntityId, GeneratableListing, NormalizedListing, ImportFailure, importResourceDiagnostic,
+  type ImportFailureReason, type ImportResourceDiagnostic} from '@bienvu/contracts';
 import {extractListingHtml} from './listing';
 import {IMPORT_LIMITS, publicUrl, scopedUrl, sourcePolicy, type ImportTransport} from './network';
 import {assertListingDestination, selectAdapter} from './registry';
 
 export type ImportDiagnostics = {durationMs: number; resources: number; sourceBytes: number; storedBytes: number;
   rejected: Array<{order: number; reason: string}>; duplicatePhotos: number; mode: 'local' | 'cloudflare'; browserUsed: boolean;
-  failureReason?: ImportFailureReason};
+  failureReason?: ImportFailureReason; stage?: 'page' | 'extraction' | 'browser' | 'photo' | 'storage';
+  failureResource?: ImportResourceDiagnostic};
 export async function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
   signal.throwIfAborted();
   let onAbort: () => void = () => {};
@@ -23,20 +25,28 @@ export async function importListing(url: string, context: {agencyId: string; imp
   const agencyId = EntityId.parse(context.agencyId), id = EntityId.parse(context.importId), source = publicUrl(url).href;
   const policy = sourcePolicy(source);
   const diagnostics: ImportDiagnostics = {durationMs: 0, resources: 0, sourceBytes: 0, storedBytes: 0, rejected: [], duplicatePhotos: 0, mode: options.mode ?? 'local', browserUsed: false};
+  let stage: NonNullable<ImportDiagnostics['stage']> = 'page';
   // Une récupération échouée garde sa réservation : ses octets ne sont pas
   // toujours mesurables (flux interrompu ou image indécodable).
   let byteBudgetUsed = 0;
   const maxPhotos = Math.min(IMPORT_LIMITS.photos, Math.max(3, options.maxPhotos ?? IMPORT_LIMITS.photos));
   const load = async (value: string, kind: 'page' | 'image', resourceSignal = signal) => {
+    stage = kind === 'image' ? 'photo' : 'page';
+    const resourceContext = {stage, resourceType: kind} as const;
     resourceSignal.throwIfAborted();
     if (++diagnostics.resources > IMPORT_LIMITS.requests) throw new ImportFailure('IMPORT_TIMEOUT', 'Plafond de requêtes atteint.');
     const hosts = kind === 'page' ? policy.pageHosts : policy.imageHosts;
-    scopedUrl(value, hosts);
+    scopedUrl(value, hosts, resourceContext);
     const limit = Math.min(kind === 'page' ? IMPORT_LIMITS.htmlBytes : IMPORT_LIMITS.imageBytes, IMPORT_LIMITS.totalBytes - byteBudgetUsed);
     if (limit <= 0) throw new ImportFailure('SOURCE_UNAVAILABLE', 'Plafond total de médias atteint.');
     byteBudgetUsed += limit;
-    const resource = await abortable(ports.transport.load(value, kind, hosts, resourceSignal, limit), resourceSignal);
-    scopedUrl(resource.url, hosts); resourceSignal.throwIfAborted();
+    let resource;
+    try {resource = await abortable(ports.transport.load(value, kind, hosts, resourceSignal, limit), resourceSignal);} catch (error) {
+      if (error instanceof ImportFailure && error.code === 'UNSAFE_URL' && !error.resource)
+        error.resource = importResourceDiagnostic(value, resourceContext.stage, 'transport_refused', kind);
+      throw error;
+    }
+    scopedUrl(resource.url, hosts, resourceContext); resourceSignal.throwIfAborted();
     if (!Number.isInteger(resource.sourceBytes) || resource.sourceBytes < 0 || resource.sourceBytes > limit)
       throw new ImportFailure('SOURCE_UNAVAILABLE', 'Réponse hors limites.');
     byteBudgetUsed -= limit - resource.sourceBytes;
@@ -48,23 +58,27 @@ export async function importListing(url: string, context: {agencyId: string; imp
     selectAdapter(source);
     const page = await load(source, 'page');
     assertListingDestination(source, page.url);
+    stage = 'extraction';
     let extracted;
     try {extracted = extractListingHtml(new TextDecoder('utf-8', {fatal: true}).decode(page.bytes), page.url,
       {allowPartial: options.allowPartial});} catch (error) {
       if (!(error instanceof ImportFailure) || error.code !== 'NOT_A_LISTING' || error.reason === 'not_listing' || !ports.browserHtml) throw error;
       diagnostics.browserUsed = true;
-      extracted = extractListingHtml(await abortable(ports.browserHtml(page.url, signal), signal), page.url,
-        {allowPartial: options.allowPartial});
+      stage = 'browser';
+      const browserHtml = await abortable(ports.browserHtml(page.url, signal), signal);
+      stage = 'extraction';
+      extracted = extractListingHtml(browserHtml, page.url, {allowPartial: options.allowPartial});
     }
     // Validation de TOUTE la galerie avant récupération. Une URL privée ou
     // malformée reste fatale. Un CDN public non autorisé n'est jamais contacté,
     // mais ne doit pas effacer les faits d'un brouillon partiel.
+    stage = 'photo';
     const candidates = extracted.photoUrls.flatMap((value, order) => {
-      const photoUrl = publicUrl(value);
+      const photoUrl = publicUrl(value, {stage: 'photo', resourceType: 'image'});
       if (!policy.imageHosts.includes(photoUrl.hostname) && options.allowPartial) {
         diagnostics.rejected.push({order, reason: 'MEDIA_HOST_UNSUPPORTED'}); return [];
       }
-      scopedUrl(value, policy.imageHosts); return [{value, order}];
+      scopedUrl(value, policy.imageHosts, {stage: 'photo', resourceType: 'image'}); return [{value, order}];
     });
     if (diagnostics.rejected.length) extracted.warnings.push('Certaines photos ne sont pas disponibles à l’import. Vous pouvez les ajouter manuellement.');
     const photos: NormalizedListing['photos'] = [], hashes = new Set<string>();
@@ -103,8 +117,10 @@ export async function importListing(url: string, context: {agencyId: string; imp
       const photo = {id: crypto.randomUUID(), agencyId, listingId: id, sourceUrl: candidate,
         objectKey: `agencies/${agencyId}/imports/${id}/${hash}.jpg`, contentHash: hash,
         width: resource.width, height: resource.height, mime: 'image/jpeg' as const, sizeBytes: resource.bytes.length, sourceOrder: photos.length};
+      stage = 'storage';
       await abortable(ports.store(photo, resource.bytes, signal), signal);
       signal.throwIfAborted(); photos.push(photo); diagnostics.storedBytes += resource.bytes.length;
+      stage = 'photo';
     }
     signal.throwIfAborted();
     const unavailable=diagnostics.rejected.filter(p=>p.reason!=='MEDIA_HOST_UNSUPPORTED').length;
@@ -118,9 +134,11 @@ export async function importListing(url: string, context: {agencyId: string; imp
     return {listing, diagnostics};
   } catch (error) {
     diagnostics.durationMs = Date.now() - start;
+    diagnostics.stage = stage;
     const failure = signal.aborted ? new ImportFailure('IMPORT_TIMEOUT', 'Temps maximal d’import dépassé.')
       : error instanceof ImportFailure ? error : new ImportFailure('INCOMPLETE_LISTING', 'Les données ne respectent pas le contrat d’import.');
     if (failure.reason) diagnostics.failureReason = failure.reason;
+    if (failure.resource) diagnostics.failureResource = failure.resource;
     throw Object.assign(failure, {diagnostics});
   }
 }

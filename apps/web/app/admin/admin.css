@@ -31,3 +31,5 @@
 .admin-music-card-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}.admin-music-card-actions .admin-button{font-size:12px;padding:9px 11px}
 .admin-music-player{width:100%;max-width:560px;margin:12px 0}.admin-music-edit{border:1px solid #adbfa0;border-radius:12px;padding:24px;background:#eef3e8;margin-top:24px}
 @media(max-width:800px){.admin-music-upload,.admin-music-grid{grid-template-columns:minmax(0,1fr)}.admin-music-upload{padding:16px}.admin-music-drop{padding:24px 14px}}
+
+.admin-import-error{display:block;max-width:260px;overflow-wrap:anywhere}.admin-import-error small{display:block;white-space:normal}
