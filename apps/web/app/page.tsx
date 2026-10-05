@@ -7,6 +7,7 @@ import {requireAdmin} from '../lib/admin-access';
 import {readHomepageConfig} from '../lib/homepage-media';
 import './landing.css';
 import './home-showcase.css';
+import './home-mandate-kit.css';
 import './home-sharing.css';
 import './home-editor-showcase.css';
 import './home-footer.css';

@@ -1,27 +1,92 @@
 # BienVu
 
-> BienVu est un studio de vidéos immobilières en français, destiné aux agences et aux professionnels de l'immobilier. Il transforme les informations et les photos d'un bien en une vidéo verticale avec voix off et identité d'agence.
+> BienVu est le studio marketing IA de votre agence immobilière. Il transforme les annonces et les photos d'un bien en vidéos personnalisables, avec voix off française, animations IA en option et publication immédiate ou programmée sur Instagram et Facebook.
 
 Site officiel : https://bienvu.online/
 Contact public : contact@bienvu.online
+Dernière mise à jour : 5 octobre 2026.
 
-La création commence par un lien d'annonce, une description du bien ou une saisie manuelle avec photos. L'import dépend de la compatibilité du site source ; la saisie manuelle permet de présenter un bien lorsque son lien ne peut pas être importé. Les informations du brouillon peuvent être vérifiées avant la génération.
+La page d'accueil présente BienVu avec « Vous rentrez le mandat. BienVu s'occupe du marketing. » et « Création, personnalisation et publication. Tout est automatisé. ». Le service s'adresse aux agences et aux professionnels de l'immobilier qui souhaitent présenter leurs biens en vidéo et organiser leur diffusion. L'interface est en français ; les autres langues annoncées ne sont pas encore disponibles.
 
-Les vidéos utilisent un format vertical 9:16, une voix off française et les photos du bien. Le logo, les couleurs et les coordonnées de l'agence sont enregistrés pour ses prochaines créations. Le parcours comprend génération, aperçu et téléchargement, sans éditeur vidéo.
+## Création de vidéos immobilières
 
-Un essai anonyme permet de regarder un aperçu avec filigrane. Un nouvel essai dispose d’un crédit offert ; sa récupération après connexion ne décompte pas les crédits mensuels. Un compte confirmé dispose de 3 crédits par mois. Chaque vidéo utilise 1 crédit, plus 1 crédit par photo animée par IA (après connexion). Les offres Plus et Pro annoncent respectivement 40 et 120 crédits par mois à 19 € HT et 49 € HT. La connexion est proposée avec Google ou avec une adresse e-mail et un mot de passe. Les créations sont soumises à des quotas ; les abonnements payants affichés ne sont pas encore ouverts à la souscription.
+- Démarrage depuis un lien d'annonce, une description du bien ou une saisie manuelle avec ses propres photos. Les photos peuvent être déposées dans le champ principal ou ajoutées au formulaire et à l'éditeur.
+- Import des informations et des images depuis les sites compatibles. La compatibilité dépend du site source ; la saisie manuelle reste disponible lorsqu'un lien ne peut pas être importé. Un brouillon permet de vérifier et de compléter les informations avant génération.
+- Vidéos verticales 9:16 ou horizontales 16:9, de 20, 30 ou 40 secondes.
+- Génération du texte de présentation et d'une voix off française à partir des informations de l'annonce. Choix de la voix ; Manon est la voix par défaut. Voix off et sous-titres peuvent être activés ou désactivés.
+- Zooms et mouvements de caméra classiques inclus. Animation IA des photos choisies en option, après connexion. Les animations conservées peuvent être réutilisées pour la même photo au même format.
+- Logo, couleurs et coordonnées de l'agence intégrés à la vidéo. Aperçu puis téléchargement d'un fichier MP4 pour les réseaux sociaux, les échanges avec les clients ou le site de l'agence.
 
-Explorer présente des vidéos partagées volontairement et des démonstrations identifiées comme telles. Les démonstrations ne sont pas des annonces réelles importées. Les vidéos non publiées et les brouillons appartiennent à l'espace privé de leur utilisateur.
+## Éditeur vidéo et audio
+
+L'éditeur permet de préparer un brouillon et de retoucher une vidéo déjà générée. Les plans animés et les pistes de voix off déjà disponibles sont récupérés dans le projet.
+
+- Timeline avec réorganisation, ajout, retrait et découpe des plans ; réglage de leur durée, du cadrage et des mouvements par photo.
+- Ajout et modification des textes, des informations du bien et du logo : typographie, taille, couleur, position, alignement, ombre, arrière-plan et animation. Annulation et rétablissement des retouches.
+- Lecture de l'aperçu, contrôle avant export et préparation d'un aperçu complet avec le même rendu que le fichier exporté.
+- Import d'une piste musicale personnelle ou choix dans la banque de musiques publiée par BienVu. Glisser-déposer vers la timeline, adaptation à la durée de la vidéo, choix du passage, déplacement, découpe et répétition du morceau, avec sa forme d'onde affichée.
+- Mixage de la voix et de la musique : volumes, normalisation, fondus et baisse de la musique pendant la parole.
+
+Sans compte, l'éditeur propose « Utiliser la démo » ou « Nouveau projet ». Les retouches sont conservées localement lorsque le navigateur le permet ; la connexion est requise pour enregistrer le projet dans son agence et exporter depuis l'éditeur.
+
+## Espace et travail d'agence
+
+- Mon agence conserve le nom, le logo, les couleurs et les coordonnées utilisés dans les créations. Le formulaire et son aperçu sont accessibles sans connexion ; l'enregistrement demande un compte.
+- Mes vidéos regroupe les créations et leurs états, avec lecture, téléchargement, ouverture dans l'éditeur et accès à la publication sur les réseaux.
+- Dossiers et modèles organise les brouillons et les exports par bien. Les modèles d'agence mémorisent une mise en page, des cadrages et un mixage ; un modèle peut être défini par défaut.
+- Validation client par lien privé révocable : lecture de la version partagée, commentaires horodatés et validation. L'utilisateur transmet lui-même le lien au destinataire.
+- Équipes avec invitations, rôles Propriétaire, Administrateur, Éditeur et Lecteur, et choix de l'agence active. Les crédits sont partagés au niveau de l'agence ; les actions disponibles dépendent du rôle.
+
+## Publication et programmation
+
+Les comptes sociaux se connectent depuis Mon agence. La publication directe concerne Instagram Reels et Facebook Reels, pour les comptes et Pages autorisés par Meta. Dans le parcours actuel, Instagram doit être professionnel et associé à une Page Facebook gérée par l'utilisateur. Facebook Reels nécessite un export vertical.
+
+Depuis Mes vidéos, l'utilisateur choisit les destinations, relit ou modifie la légende proposée à partir de l'annonce, puis publie immédiatement ou programme une date jusqu'à 30 jours à l'avance. Le calendrier Publications affiche les résultats par réseau et permet de modifier ou d'annuler une programmation avant son démarrage, ainsi que de reprendre une destination en échec. La diffusion se poursuit sans garder le navigateur ouvert et ne consomme aucun crédit supplémentaire. Sans connexion, un aperçu du calendrier est accessible.
+
+La home illustre le kit « 1 mandat → 7 contenus » : Reel Instagram, Story Instagram, TikTok, vidéo horizontale, post Facebook, visuel prix / surface et texte de publication. Ce bloc présente des exemples de supports de communication ; il ne constitue pas un export automatique de sept fichiers. La publication directe disponible concerne les Reels Instagram et Facebook ; les autres usages passent par le téléchargement et le partage du fichier vidéo.
+
+## Essai gratuit et connexion
+
+Un visiteur sans compte dispose de 1 crédit d'essai offert pour une vidéo avec les mouvements classiques et un aperçu filigrané. Après connexion, la récupération de cet essai donne accès au téléchargement sans filigrane et ne décompte pas les crédits mensuels. Un compte confirmé reçoit 3 crédits gratuits par mois, utilisables aussi pour les animations IA. La connexion est proposée avec Google ou avec une adresse e-mail et un mot de passe. Les crédits, les vérifications et les limites du service restent applicables.
+
+## Crédits, abonnements et recharges
+
+Une nouvelle vidéo ou un nouvel export utilise 1 crédit, plus 1 crédit par nouvelle photo animée par IA. Une vidéo avec quatre nouvelles photos animées coûte donc 5 crédits. Le coût maximum est affiché avant le lancement. Revoir, télécharger ou publier une vidéo déjà produite ne coûte pas de crédit supplémentaire ; un aperçu complet et l'export de la même version sauvegardée réutilisent le même rendu.
+
+Si l'export échoue, le crédit vidéo est restitué. Les suppléments d'animations échouées sont restitués ; les animations réussies restent débitées, conservées et réutilisables sans nouveau supplément tant qu'elles sont disponibles pour la même photo au même format.
+
+| Offre | Prix mensuel | Crédits mensuels |
+| --- | --- | --- |
+| Gratuit | 0 € | 3 |
+| Plus | 19 € HT | 40 |
+| Pro | 49 € HT | 120 |
+
+Les crédits mensuels se renouvellent sans report. Les recharges ponctuelles complètent le solde sans changer l'abonnement : 10 crédits à 7 € HT, 30 crédits à 19 € HT ou 100 crédits à 59 € HT. Les recharges sont sans expiration et les crédits mensuels sont consommés en premier. La page des offres propose un estimateur selon le nombre de photos animées, le solde et l'historique des crédits après connexion.
+
+La page des offres indique la disponibilité des abonnements et des recharges, ainsi que les modalités de souscription et de paiement. Les factures, le moyen de paiement et la résiliation se gèrent depuis l'abonnement. Pour changer d'offre, contacter le support.
+
+## Explorer et confidentialité des créations
+
+Explorer permet de découvrir les vidéos partagées volontairement et les exemples de rendu. Une vidéo n'y apparaît qu'après un partage public explicite. Les brouillons, les créations non partagées, les ressources d'agence et les liens de validation client restent privés. Les visuels de démonstration de la home illustrent le produit et ne prouvent pas l'existence d'une annonce ou d'une transaction immobilière.
 
 ## Pages publiques
 
-- [Studio BienVu](https://bienvu.online/): Présentation du produit et démarrage de la création d'une vidéo.
+- [Studio BienVu](https://bienvu.online/): Création, démonstrations, kit du mandat, partage et présentation de l'éditeur.
 - [Explorer](https://bienvu.online/explorer): Vidéos partagées et exemples de rendu.
-- [Offres et quotas](https://bienvu.online/abonnement): Tarifs affichés, nombre de vidéos par offre et disponibilité des abonnements.
+- [Offres et crédits](https://bienvu.online/abonnement): Offres Gratuit, Plus et Pro, estimateur, recharges et disponibilité des paiements.
 - [Sources testées](https://bienvu.online/sources): Compatibilité des sites d'annonces, limites connues et alternatives à l'import par lien.
+- [Éditeur](https://bienvu.online/editeur): Démonstration ou projet local sans compte ; projets d'agence après connexion.
+- [Mon agence](https://bienvu.online/agence): Formulaire d'identité et aperçu ; enregistrement et connexion des réseaux après connexion.
+- [Publications](https://bienvu.online/publications): Aperçu du calendrier sans compte ; diffusion et programmation des vidéos après connexion.
 - [Connexion](https://bienvu.online/connexion): Accès au compte par Google ou par e-mail et mot de passe.
 - [Conditions d’utilisation](https://bienvu.online/conditions): Règles du service, essai, crédits, contenus autorisés et partage public.
 - [Politique de confidentialité](https://bienvu.online/confidentialite): Données utilisées, connexion Google, prestataires, conservation et droits des personnes.
+
+## Parcours après connexion
+
+- [Mes vidéos](https://bienvu.online/historique): Historique privé, aperçu, téléchargement, retouche et publication.
+- [Dossiers et modèles](https://bienvu.online/projets): Classement par bien, modèles d'agence et validations client.
+- [Équipe](https://bienvu.online/equipe): Membres, invitations, rôles et agences accessibles.
 
 ## Optional
 

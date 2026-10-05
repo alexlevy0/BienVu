@@ -1,6 +1,8 @@
 # Visuels de la page d’accueil
 
-Le super admin dispose de l’onglet **Page d’accueil** (`/admin?view=homepage`). Il contrôle 24 emplacements : le visuel principal et sa vidéo, les quatre inspirations, les démonstrations photo/vidéo/texte, les trois exemples de partage et les quatre plans de la démonstration de l’Éditeur.
+Le super admin dispose de l’onglet **Page d’accueil** (`/admin?view=homepage`). Il contrôle 34 emplacements : le visuel principal et sa vidéo, les quatre inspirations, les démonstrations photo/vidéo/texte, le kit du mandat, les trois exemples de partage et les quatre plans de la démonstration de l’Éditeur.
+
+Le groupe **Un mandat, sept contenus** contrôle le bloc situé après « Vos photos prennent vie » : visuel et vidéo du Reel Instagram, de la Story Instagram, de TikTok et de la vidéo horizontale, ainsi que le média du post Facebook et du visuel prix/surface. Les quatre aperçus vidéo ouvrent le lecteur existant. Les exemples chiffrés sont retirés lorsqu’un média personnalisé est choisi ; son titre, sa ville et son agence sont alors utilisés. Le texte de publication reprend le média choisi pour le post Facebook. « Créer mes contenus » ramène au compositeur principal.
 
 ## Utilisation
 

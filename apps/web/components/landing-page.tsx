@@ -6,6 +6,7 @@ import {HomeCreate} from './home-create';
 import {AgencySeal, HomeIcon} from './home-icons';
 import {StudioSidebar} from './studio-sidebar';
 import {HomeShowcase} from './home-showcase';
+import {HomeMandateKit} from './home-mandate-kit';
 import {HomeSharing} from './home-sharing';
 import {HomeEditorShowcase} from './home-editor-showcase';
 import {HomeHeroVideo} from './home-hero-video';
@@ -21,6 +22,12 @@ const examples = [
 ] as const;
 type Example = typeof examples[number];
 type Dialog = 'help' | 'explore' | 'example' | null;
+const kitTitles: Partial<Record<HomepageSlot, string>> = {
+  'kit.reel.video': 'Votre futur chez-vous',
+  'kit.story.video': 'Découvrez ce bien en story',
+  'kit.tiktok.video': 'On visite ?',
+  'kit.landscape.video': 'Votre bien en vidéo',
+};
 
 function ExampleCard({example, onPlay}: {example: Example; onPlay(example: Example): void}) {
   const visual=useHomepageMedia(`discover.${example.id}.visual`), movie=useHomepageMedia(`discover.${example.id}.video`);
@@ -38,7 +45,7 @@ export function LandingPage() {
   const [selectedSlot,setSelectedSlot]=useState<HomepageSlot>('hero.video');
   const movie=useHomepageMedia(selectedSlot);
   const selectedVisual=useHomepageMedia(selectedSlot.replace(/\.video$/,'.visual') as HomepageSlot);
-  const customMovie=movie.custom||selectedVisual.custom, movieTitle=movie.custom?movie.title:selectedVisual.custom?selectedVisual.title:selected.title;
+  const customMovie=movie.custom||selectedVisual.custom, movieTitle=movie.custom?movie.title:selectedVisual.custom?selectedVisual.title:kitTitles[selectedSlot]??selected.title;
   const [conversationActive, setConversationActive] = useState(false);
   const [heroPlaying, setHeroPlaying] = useState(false);
   const modal = useRef<HTMLDialogElement>(null);
@@ -72,6 +79,7 @@ export function LandingPage() {
         </section>
         {!conversationActive && <section id="explorer" className="home-discover" aria-labelledby="home-discover-title"><div className="home-discover-heading"><div><h2 id="home-discover-title">À découvrir sur BienVu</h2><p>Des inspirations pour donner une autre dimension à vos biens.</p></div><button type="button" className="home-explore-link" onClick={() => {setCategory('Tous'); setDialog('explore');}}>Tout explorer <HomeIcon name="external" size={17}/></button></div><div className="home-example-grid">{examples.map(example => <ExampleCard key={example.id} example={example} onPlay={play}/>)}</div></section>}
         {!conversationActive && <HomeShowcase paused={modalOpen || heroPlaying} onCreate={focusComposer}/>}
+        {!conversationActive && <HomeMandateKit onPlay={playSlot} onCreate={focusComposer}/>}
         {!conversationActive && <HomeSharing onPlay={context => playSlot(`share.${context}.video`)} onCreate={focusComposer}/>}
         {!conversationActive && <HomeEditorShowcase paused={modalOpen || heroPlaying} onCreate={focusComposer}/>}
       </main>
