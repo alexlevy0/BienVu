@@ -1,15 +1,17 @@
 import Link from 'next/link';
 import {coverageSources, sourceCoverage} from '@bienvu/contracts';
-import {Shell} from '../../components/shell';
+import {StudioFrame} from '../../components/studio-frame';
 import {SourceDirectory} from '../../components/source-directory';
 import {HomeIcon} from '../../components/home-icons';
+import {seoMetadata} from '../../lib/seo';
+import '../landing.css';
 import './sources.css';
 
-export const metadata = {title: 'Sources testées', description: 'Les sites testés par BienVu, les limites constatées et les alternatives pour préparer votre annonce.', alternates: {canonical: '/sources'}};
+export const metadata = seoMetadata({title:'Importer une annonce immobilière — Sources testées par BienVu',description:'Consultez les tests datés d’import d’annonces immobilières par réseau : informations, photos, limites constatées et saisie manuelle avec BienVu.',path:'/sources'});
 export default function SourcesPage() {
   const latest = Object.values(sourceCoverage).map(result => result.checkedAt).sort().at(-1)!;
   const checkedDate = new Intl.DateTimeFormat('fr-FR', {day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC'}).format(new Date(latest));
-  return <Shell><div className="sources-page">
+  return <StudioFrame active="create"><div className="sources-page">
     <Link className="source-back" href="/">← Retour au studio</Link>
     <header className="source-page-heading"><p className="eyebrow">IMPORTER VOTRE ANNONCE</p><h1>Les sources,<br/><em>en toute clarté.</em></h1>
       <p className="page-intro">De votre annonce à votre vidéo, tout commence par un lien.<br/>Découvrez les résultats de nos essais sur les principaux réseaux immobiliers.</p>
@@ -31,5 +33,6 @@ export default function SourcesPage() {
       <p>Un accès refusé ou une annonce retirée ne déclenche pas de nouvelle tentative automatique. Nous ne contournons pas les restrictions d’accès des sites.</p>
     </details>
     <p className="source-rights-note">Utilisez uniquement des textes et des photos que vous êtes autorisé à exploiter.</p>
-  </div></Shell>;
+    <p><Link href="/comment-ca-marche">Comment créer une vidéo à partir de votre annonce →</Link></p>
+  </div></StudioFrame>;
 }

@@ -126,4 +126,18 @@ test('Home : banque globale privée, copie indépendante, publication atomique e
   selected=await publish();const config=await readHomepageConfig(db);assert.equal(config.version,previous.version+1);
   for(const slot of slots){const asset=config.slots[slot.id]!;assert.ok(asset);assert.equal(asset.kind,slot.kind==='video'||slot.id==='kit.tiktok.visual'?'video':'image');assert.equal((await homepageMediaRequest(req(asset.url,''),env,asset.id)).status,200);}
  });
+ await t.test('SEO : déduplication publique, aperçu allégé, repli et révocation des variantes',async()=>{
+  const config=await readHomepageConfig(db),groups=new Map<string,Set<string>>();for(const asset of Object.values(config.slots)){const group=groups.get(asset.sha256)??new Set<string>();group.add(asset.url);groups.set(asset.sha256,group);}for(const group of groups.values())assert.equal(group.size,1);
+  const asset=config.slots['kit.reel.video']!,row=(await homepageAsset(db,asset.id))!,original=await bucket.get(row.object_key);assert.ok(original);
+  const key=`homepage/${asset.id}/seo/${asset.sha256}-720.mp4`,url='/api/homepage/media/'+asset.id+'?preview=1';
+  const fallback=await homepageMediaRequest(req(url,''),env,asset.id);assert.equal(fallback.headers.get('content-length'),String(original.size));
+  const optimized=new Uint8Array([1,2,3]);await bucket.put(key,optimized,{httpMetadata:{contentType:'video/mp4'}});
+  const response=await homepageMediaRequest(req(url,''),env,asset.id);assert.equal(response.status,200);assert.deepEqual(new Uint8Array(await response.arrayBuffer()),optimized);
+  const range=await homepageMediaRequest(req(url,'',{headers:{range:'bytes=1-2'}}),env,asset.id);assert.equal(range.status,206);assert.equal(range.headers.get('content-range'),'bytes 1-2/3');
+  assert.equal((await homepageMediaRequest(req('/api/homepage/media/'+asset.id+'?w=1',''),env,asset.id)).status,422);
+  assert.equal((await homepageMediaRequest(req('/api/homepage/media/'+asset.id,''),env,asset.id)).headers.get('content-length'),String(original.size));
+  for(const slot of homepageSlots)if(selected.draft[slot.id]===asset.id)await assign(slot.id,null);await publish();
+  assert.equal((await homepageMediaRequest(req(url,''),env,asset.id)).status,404);assert.ok(await bucket.head(key),'La présence d’une variante ne contourne pas le retrait public');
+  await cleanupHomepageAssets(env,Date.now()+2*86400_000);assert.equal(await bucket.head(key),null);
+ });
 });

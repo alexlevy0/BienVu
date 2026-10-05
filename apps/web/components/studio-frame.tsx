@@ -3,7 +3,7 @@ import Link from 'next/link';
 import type {ReactNode} from 'react';
 import {StudioSidebar} from './studio-sidebar';
 
-export function StudioFrame({active, children, showFooter=true}: {active: 'videos' | 'explore' | 'agency' | 'offers' | 'projects' | 'admin' | 'social'; children: ReactNode; showFooter?: boolean}) {
+export function StudioFrame({active, children, showFooter=true}: {active: 'create' | 'videos' | 'explore' | 'agency' | 'offers' | 'projects' | 'admin' | 'social'; children: ReactNode; showFooter?: boolean}) {
   return <div className="home-studio">
     <a className="home-skip" href="#home-content">Aller au contenu</a>
     <StudioSidebar active={active}/>

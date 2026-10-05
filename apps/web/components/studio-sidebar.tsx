@@ -42,7 +42,7 @@ export function StudioSidebar({active}: {active: 'create' | 'videos' | 'explore'
   const initials = me?.user.name.trim().split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase() || 'BV';
   const accountName = me?.user.name.trim().split(/\s+/)[0] || 'Mon compte';
   const item = (href: string, name: string, icon: 'plus' | 'video' | 'compass' | 'house' | 'clapper' | 'calendar', section: typeof active) =>
-    <Link className={`home-nav-item${active === section ? ' home-nav-active' : ''}`} href={href}
+    <Link className={`home-nav-item${active === section ? ' home-nav-active' : ''}`} href={href} prefetch={false}
       aria-current={active === section ? 'page' : undefined} onClick={() => {closeMenu();if(active==='create'&&section==='create')window.dispatchEvent(new Event('bienvu:new-video'));}}>
       <HomeIcon name={icon} size={section === 'create' ? 28 : 26}/>{name}
       {section === 'editor' && <span className="home-nav-badge"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 1.5c1.5 6 4.5 9 10.5 10.5-6 1.5-9 4.5-10.5 10.5C10.5 16.5 7.5 13.5 1.5 12 7.5 10.5 10.5 7.5 12 1.5Z"/></svg>Nouveau</span>}

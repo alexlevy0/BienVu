@@ -2,6 +2,7 @@ import {AdminQuery,AdminTrafficQuery,AdminAction,EntityId} from '@bienvu/contrac
 import {adminPage,adminOverview,adminTraffic,adminAction,adminVideoDetail,findGeneration} from '@bienvu/db';
 import type {AuthEnvironment} from './auth';
 import {commercialSummary} from './commercial';
+import {seoSummary} from './seo-analytics';
 import {requireAdmin} from './admin-access';
 import {assertSameOrigin,boundedJson,RequestFailure,respond} from './http';
 import {streamGenerationMedia} from './generations';
@@ -19,6 +20,7 @@ export async function adminRequest(request:Request,env:AdminEnvironment){
     }
     if(request.method!=='GET')throw new RequestFailure('FORBIDDEN');
     const params=new URL(request.url).searchParams;
+    if(params.get('section')==='seo'){if([...params.keys()].some(k=>k!=='section'))throw new RequestFailure('VALIDATION_ERROR');return Response.json(await seoSummary(env.DB,env.TRAFFIC_ENABLED==='true'));}
     if(params.get('section')==='commercial'){if([...params.keys()].some(k=>k!=='section'))throw new RequestFailure('VALIDATION_ERROR');return Response.json(await commercialSummary(env.DB));}
     if(params.get('section')==='traffic'){
       const query=AdminTrafficQuery.safeParse(Object.fromEntries(params));if(!query.success)throw new RequestFailure('VALIDATION_ERROR');

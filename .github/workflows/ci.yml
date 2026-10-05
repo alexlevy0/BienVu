@@ -41,6 +41,7 @@ jobs:
             sleep 1
           done
           pnpm probe:foundations
+          pnpm probe:seo
           pnpm probe:web
           # Owner memberships cannot be deleted. These synthetic accounts live
           # only in this job's disposable local D1/R2 storage.
@@ -59,3 +60,4 @@ jobs:
             evidence/local/sprint-03/http-report.json
             evidence/local/sprint-05/worker-build/report.json
             evidence/local/sprint-05/narration-worker/report.json
+            evidence/local/seo/http.json

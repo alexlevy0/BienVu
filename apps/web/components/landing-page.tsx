@@ -13,6 +13,7 @@ import {HomeHeroVideo} from './home-hero-video';
 import {HomeFooter} from './home-footer';
 import {HomeVisual, useHomepageMedia, useHomepageConfig, homeClock} from './homepage-media';
 import type {HomepageSlot} from '@bienvu/contracts';
+import {publicFeatureLinks as featurePages} from '../lib/marketing-navigation';
 
 const examples = [
   {id: 'paris', title: 'Lumière sur Paris', agency: 'Maison & Quartier', duration: 28, category: 'Appartements', alt: 'Salon haussmannien ensoleillé, moulures et fenêtres ouvertes sur Paris'},
@@ -35,7 +36,7 @@ function ExampleCard({example, onPlay}: {example: Example; onPlay(example: Examp
   return <article className="home-example"><button type="button" className="home-example-cover" onClick={() => onPlay(example)} aria-label={`Lire l’aperçu : ${title}`} aria-haspopup="dialog">
     <HomeVisual media={visual} alt={custom?title??'Vidéo immobilière':example.alt}/>
     <span className="home-example-shade"/><span className="home-duration">{homeClock(movie.duration??example.duration)}</span><span className="home-play"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 11 7-11 7V5Z"/></svg></span><h3>{title}</h3>
-  </button><div className="home-example-agency">{custom?<HomeIcon name="house" size={24}/>:<AgencySeal kind={example.id}/>}<span>{custom?(movie.agency??visual.agency??'BienVu'):example.agency}</span></div></article>;
+  </button><div className="home-example-agency">{custom?<HomeIcon name="house" size={24}/>:<AgencySeal kind={example.id}/>}<span>{custom?(movie.agency??visual.agency??'BienVu'):example.agency}</span></div><Link className="home-example-detail-link" href={`/exemples/${example.id}`}>Voir la présentation →</Link></article>;
 }
 
 export function LandingPage() {
@@ -82,8 +83,9 @@ export function LandingPage() {
         {!conversationActive && <HomeMandateKit onPlay={playSlot} onCreate={focusComposer}/>}
         {!conversationActive && <HomeSharing onPlay={context => playSlot(`share.${context}.video`)} onCreate={focusComposer}/>}
         {!conversationActive && <HomeEditorShowcase paused={modalOpen || heroPlaying} onCreate={focusComposer}/>}
+        {!conversationActive && <section className="home-resource-links" aria-labelledby="home-resources-title"><h2 id="home-resources-title">Le marketing immobilier IA, de l’annonce à la publication.</h2><p>Créez une vidéo à partir de vos annonces et photos, personnalisez-la avec l’identité de votre agence et programmez sa publication sur Instagram et Facebook.</p><nav aria-label="Découvrir les fonctionnalités">{featurePages.map(page=><Link key={page.slug} href={`/${page.slug}`}>{page.heading}</Link>)}<Link href="/guides">Conseils et guides</Link><Link href="/sources">Sources d’import testées</Link></nav></section>}
       </main>
-      <HomeFooter onCreate={focusComposer} onHelp={()=>setDialog('help')}/>
+      <HomeFooter onCreate={focusComposer}/>
     </div>
     {dialog && <dialog ref={modal} className={`home-dialog${dialog === 'example' ? ' home-video-dialog' : dialog === 'explore' ? ' home-explore-dialog' : ''}`} aria-labelledby="home-dialog-title" onCancel={() => setDialog(null)} onClick={event => {if (event.target === event.currentTarget) setDialog(null);}}><button className="home-dialog-close" type="button" aria-label="Fermer" onClick={() => setDialog(null)}><HomeIcon name="close" size={21}/></button>
       {dialog === 'example' ? <><div className="home-video-heading"><p className="home-dialog-kicker">L’IMMOBILIER, EN MOUVEMENT</p><h2 id="home-dialog-title">{movieTitle}</h2><p>{customMovie?(movie.agency??selectedVisual.agency??'BienVu'):`${selected.agency} · Agence fictive`}</p></div><video key={movie.src} src={movie.src} poster={selectedVisual.kind==='image'?selectedVisual.src:movie.poster??undefined} controls autoPlay playsInline preload="metadata" aria-label={`Vidéo : ${movieTitle}`}/>{!customMovie&&<p className="home-dialog-footnote">Animation d’un visuel généré, sans voix off. Vos vidéos utilisent les photos de votre bien et votre identité d’agence.</p>}</>

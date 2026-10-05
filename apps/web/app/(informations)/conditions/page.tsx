@@ -1,12 +1,9 @@
 import type {Metadata} from 'next';
 import Link from 'next/link';
 import {LegalDocument, LegalSection} from '../../../components/legal-document';
+import {seoMetadata} from '../../../lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Conditions d’utilisation',
-  description: 'Les conditions d’utilisation de BienVu : création de vidéos immobilières, compte, essai, quotas et partage public.',
-  alternates: {canonical: '/conditions'},
-};
+export const metadata: Metadata = seoMetadata({title:'Conditions d’utilisation et crédits — BienVu',description:'Les conditions d’utilisation de BienVu : création de vidéos immobilières, compte, essai, crédits et partage public.',path:'/conditions'});
 
 const contents = [
   {id: 'service', title: 'Le service BienVu'},

@@ -117,6 +117,14 @@ export async function listPublic(db: D1Database, cursor?: string, filters: Publi
     ? btoa(JSON.stringify([last.publishedAt, last.id])) : null};
 }
 
+export async function publicSitemapVideos(db: D1Database) {
+  // The very same visibility rules as the public watch page. Never enumerate
+  // private exports, revoked shares or client-validation links in a sitemap.
+  const rows=await db.prepare(`SELECT ${publicColumns} ${publicJoins} WHERE ${visible} ORDER BY s.published_at DESC,s.id DESC LIMIT 5000`)
+    .bind(new Date().toISOString()).all<SharedRow>();
+  return rows.results.map(publicView);
+}
+
 // Les vignettes sont des photos du manifeste figé, jamais une URL fournie par le navigateur.
 export async function generationPoster(env: Env, agencyId: string, jobId: string) {
   const job = await ownGeneration(env, agencyId, jobId);

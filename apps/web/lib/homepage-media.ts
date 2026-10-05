@@ -34,7 +34,16 @@ function assetView(row:HomepageAssetRow,admin=false):HomepageAsset {
 }
 export async function readHomepageConfig(db:Database,preview=false):Promise<HomepageConfig>{
  const state=await homepageSettings(db),selections=HomepageSelections.parse(JSON.parse(preview?state.draft_json:state.published_json)),rows=await homepageSelectedAssets(db,selections);
- const assets=new Map(rows.map(row=>[row.id,assetView(row,preview)]));
+ rows.sort((a,b)=>a.id.localeCompare(b.id));
+ const views=rows.map(row=>assetView(row,preview));
+ // Reuse one public URL for identical bytes, including posters also used as photos.
+ // Only currently published assets participate; private or withdrawn copies never do.
+ if(!preview){const urls=new Map<string,string>();
+  for(const asset of views)if(!urls.has(asset.sha256))urls.set(asset.sha256,asset.url);
+  for(const row of rows){if(row.poster_json){const poster=JSON.parse(row.poster_json) as Media;if(!urls.has(poster.sha256))urls.set(poster.sha256,assetView(row).posterUrl!);}}
+  for(const asset of views){asset.url=urls.get(asset.sha256)!;const row=rows.find(row=>row.id===asset.id)!;if(row.poster_json)asset.posterUrl=urls.get((JSON.parse(row.poster_json) as Media).sha256)!;}
+ }
+ const assets=new Map(views.map(asset=>[asset.id,asset]));
  const slots:HomepageConfig['slots']={};for(const slot of homepageSlots){const id=selections[slot.id],asset=id?assets.get(id):null;if(asset)slots[slot.id]=asset;}
  return {version:preview?state.revision:state.published_version,slots};
 }
@@ -145,6 +154,15 @@ export async function homepageMediaRequest(request:Request,env:Env,id:string,adm
   if(poster&&!row.poster_json)throw new RequestFailure('NOT_FOUND');
   const media:Media=poster?JSON.parse(row.poster_json!):{...homepageStoredMetadata(row),key:row.object_key};
   if(!media.key.startsWith(`homepage/${row.id}/`))throw new RequestFailure('NOT_FOUND');
+  const params=new URL(request.url).searchParams,width=params.get('w'),preview=params.get('preview');
+  if(!admin&&(width||preview)){
+   if(!await mediaPresent(env,media))throw new RequestFailure('NOT_FOUND');
+   if(width&&(!['320','640','960'].includes(width)||media.mime==='video/mp4')||preview&&(preview!=='1'||media.mime!=='video/mp4'))throw new RequestFailure('VALIDATION_ERROR');
+   const key=`homepage/${row.id}/seo/${media.sha256}-${width??'720'}.${width?'webp':'mp4'}`,head=await env.MEDIA.head(key);
+   if(head&&head.size>0&&head.size<=media.sizeBytes&&head.httpMetadata?.contentType===(width?'image/webp':'video/mp4')){
+    return serveMedia(request,env,{...media,key,sizeBytes:head.size,mime:width?'image/webp':'video/mp4'},true);
+   }
+  }
   return serveMedia(request,env,media,!admin);
  });
  if(!admin&&[200,206,304].includes(response.status))response.headers.set('Cache-Control','public, max-age=60, must-revalidate');return response;
@@ -161,8 +179,16 @@ export async function cleanupHomepageAssets(env:Env,now=Date.now()){
  const candidates=(await env.DB.prepare(`SELECT a.* FROM homepage_assets a WHERE created_at<? AND ${refs} ORDER BY created_at LIMIT 12`).bind(cutoff).all<HomepageAssetRow>()).results;
  let removed=0;for(const row of candidates){
   const claim=await env.DB.prepare(`UPDATE homepage_assets AS a SET state='deleting' WHERE id=? AND ${refs} RETURNING id`).bind(row.id).first();if(!claim)continue;
-  const keys=[row.object_key,...(row.poster_json?[(JSON.parse(row.poster_json) as Media).key]:[])];
+  const media:Media={...homepageStoredMetadata(row),key:row.object_key},poster=row.poster_json?JSON.parse(row.poster_json) as Media:null;
+  const variants=(item:Media)=>item.mime==='video/mp4'?[`homepage/${row.id}/seo/${item.sha256}-720.mp4`]:[320,640,960].map(width=>`homepage/${row.id}/seo/${item.sha256}-${width}.webp`);
+  const keys=[row.object_key,...variants(media),...(poster?[poster.key,...variants(poster)]:[])];
   if(keys.some(key=>!key.startsWith(`homepage/${row.id}/`)))throw Error('HOMEPAGE_SCOPE_INVALID');
   await env.MEDIA.delete(keys);await env.DB.prepare("DELETE FROM homepage_assets WHERE id=? AND state='deleting'").bind(row.id).run();removed++;
  }return {removed};
+}
+export async function publicHomepageManifest(db:Database){
+ const state=await homepageSettings(db),config=await readHomepageConfig(db),rows=await homepageSelectedAssets(db,HomepageSelections.parse(JSON.parse(state.published_json)));
+ return {version:config.version,publishedAt:state.published_at,assets:rows.map(row=>{const asset=assetView(row),poster=row.poster_json?JSON.parse(row.poster_json) as Media:null;
+  return {id:asset.id,url:asset.url,mime:asset.mime,sha256:asset.sha256,sizeBytes:asset.sizeBytes,width:asset.width,height:asset.height,
+   poster:poster?{url:asset.posterUrl!,mime:poster.mime,sha256:poster.sha256,sizeBytes:poster.sizeBytes,width:poster.width,height:poster.height}:null};})};
 }

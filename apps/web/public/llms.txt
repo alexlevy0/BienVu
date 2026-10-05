@@ -75,6 +75,14 @@ Explorer permet de découvrir les vidéos partagées volontairement et les exemp
 - [Explorer](https://bienvu.online/explorer): Vidéos partagées et exemples de rendu.
 - [Offres et crédits](https://bienvu.online/abonnement): Offres Gratuit, Plus et Pro, estimateur, recharges et disponibilité des paiements.
 - [Sources testées](https://bienvu.online/sources): Compatibilité des sites d'annonces, limites connues et alternatives à l'import par lien.
+- [Vidéo immobilière IA](https://bienvu.online/video-immobiliere-ia): Création à partir d’une annonce et de ses photos, formats et crédits.
+- [Animation des photos immobilières](https://bienvu.online/animation-photo-immobiliere): Sélection des nouvelles animations IA, coût et contrôle du résultat.
+- [Éditeur vidéo immobilier](https://bienvu.online/editeur-video-immobilier): Présentation des retouches, de la timeline, des cadrages et du mixage audio.
+- [Publication sur les réseaux sociaux](https://bienvu.online/publication-reseaux-sociaux-immobilier): Connexion des comptes professionnels et programmation sur Instagram et Facebook.
+- [Modèles de vidéos immobilières](https://bienvu.online/modeles-video-immobilier): Identité d’agence et présentations réutilisables.
+- [Comment ça marche](https://bienvu.online/comment-ca-marche): Parcours complet, de l’import à la publication.
+- [Guides](https://bienvu.online/guides): Créer un Reel immobilier, choisir ses photos, organiser ses publications et essayer gratuitement.
+- [Exemple de présentation](https://bienvu.online/exemples/paris): Page de lecture d’une vidéo de démonstration ou d’une sélection publique de BienVu.
 - [Éditeur](https://bienvu.online/editeur): Démonstration ou projet local sans compte ; projets d'agence après connexion.
 - [Mon agence](https://bienvu.online/agence): Formulaire d'identité et aperçu ; enregistrement et connexion des réseaux après connexion.
 - [Publications](https://bienvu.online/publications): Aperçu du calendrier sans compte ; diffusion et programmation des vidéos après connexion.

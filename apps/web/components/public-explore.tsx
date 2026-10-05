@@ -3,21 +3,14 @@
 import Link from 'next/link';
 import {useEffect, useRef, useState} from 'react';
 import {AgencySeal, HomeIcon} from './home-icons';
+import type {listPublic} from '../lib/sharing';
 
 type Category = 'all' | 'apartments' | 'houses' | 'exceptional';
 type Sort = 'newest' | 'oldest';
 type PublicVideo = {id: string; title: string; locality: string; propertyType: 'apartment' | 'house' | 'other' | null;
   agency: string; publishedAt: string; expiresAt: string|null; durationSeconds: number; posterUrl: string; pageUrl: string};
-type Demo = {id: 'paris' | 'sud' | 'lyon' | 'bordeaux'; title: string; agency: string; locality: string;
-  category: 'apartments' | 'houses'; exceptional: boolean; durationSeconds: number};
-
-// Les quatre animations de l’accueil restent des démonstrations, jamais des publications d’agences.
-const demos: Demo[] = [
-  {id: 'paris', title: 'Lumière sur Paris', agency: 'Maison & Quartier', locality: 'Paris', category: 'apartments', exceptional: false, durationSeconds: 28},
-  {id: 'sud', title: 'L’air du Sud', agency: 'Agence Horizon', locality: 'Aix-en-Provence', category: 'houses', exceptional: true, durationSeconds: 32},
-  {id: 'lyon', title: 'Un loft à Lyon', agency: 'Atelier Immobilier', locality: 'Lyon', category: 'apartments', exceptional: true, durationSeconds: 27},
-  {id: 'bordeaux', title: 'Une maison à Bordeaux', agency: 'Les Belles Adresses', locality: 'Bordeaux', category: 'houses', exceptional: false, durationSeconds: 30},
-];
+export type PublicExample={id:'paris'|'sud'|'lyon'|'bordeaux';title:string;agency:string;locality:string;category:'apartments'|'houses'|null;exceptional:boolean;durationSeconds:number;poster:string;src:string;custom:boolean};
+type Demo = PublicExample;
 const categories: {value: Category; label: string}[] = [
   {value: 'all', label: 'Tout'}, {value: 'apartments', label: 'Appartements'},
   {value: 'houses', label: 'Maisons'}, {value: 'exceptional', label: 'Biens d’exception'},
@@ -27,7 +20,7 @@ const plain = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]
 
 function Cover({src, title, seconds, demo}: {src: string; title: string; seconds: number; demo?: boolean}) {
   return <>
-    <img src={src} alt={`Photo du bien : ${title}`} loading="lazy" onError={event => {event.currentTarget.style.display = 'none';}}/>
+    <img src={src} width="768" height="1024" alt={`Photo du bien : ${title}`} loading="lazy" onError={event => {event.currentTarget.style.display = 'none';}}/>
     <span className="public-explore-shade"/>
     {demo && <span className="public-explore-demo-badge">Démo</span>}
     <span className="public-explore-duration">{duration(seconds)}</span>
@@ -49,24 +42,30 @@ function PublicCard({video}: {video: PublicVideo}) {
 function DemoCard({demo, onPlay}: {demo: Demo; onPlay(demo: Demo): void}) {
   return <article className="public-explore-card">
     <button className="public-explore-cover" type="button" onClick={() => onPlay(demo)} aria-label={`Lire la démonstration ${demo.title}`} aria-haspopup="dialog">
-      <Cover src={`/images/studio-home/${demo.id}.webp`} title={demo.title} seconds={demo.durationSeconds} demo/>
+      <Cover src={demo.poster} title={demo.title} seconds={demo.durationSeconds} demo={!demo.custom}/>
     </button>
-    <div className="public-explore-byline"><AgencySeal kind={demo.id}/><span className="public-explore-agency-copy"><strong>{demo.agency}</strong><small>{demo.locality}</small></span><HomeIcon name="arrow" size={19}/></div>
+    <div className="public-explore-byline">{demo.custom?<span className="public-explore-agency-mark" aria-hidden="true">{demo.agency.slice(0,1).toUpperCase()}</span>:<AgencySeal kind={demo.id}/>}<span className="public-explore-agency-copy"><strong>{demo.agency}</strong><small>{demo.locality}</small></span><HomeIcon name="arrow" size={19}/></div>
+    <Link href={`/exemples/${demo.id}`} className="public-explore-example-link">Voir la présentation →</Link>
   </article>;
 }
 
-export function PublicExplore() {
-  const [query, setQuery] = useState(''), [search, setSearch] = useState('');
-  const [category, setCategory] = useState<Category>('all'), [sort, setSort] = useState<Sort>('newest');
-  const [videos, setVideos] = useState<PublicVideo[]>([]), [cursor, setCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true), [moreBusy, setMoreBusy] = useState(false);
+export function PublicExplore({initialPage,initialFilters,demos}:{initialPage:Awaited<ReturnType<typeof listPublic>>;initialFilters:{query:string;category:Category;sort:Sort};demos:PublicExample[]}) {
+  const [query, setQuery] = useState(initialFilters.query), [search, setSearch] = useState(initialFilters.query);
+  const [category, setCategory] = useState<Category>(initialFilters.category), [sort, setSort] = useState<Sort>(initialFilters.sort);
+  const [videos, setVideos] = useState<PublicVideo[]>(initialPage.videos), [cursor, setCursor] = useState<string | null>(initialPage.nextCursor);
+  const [loading, setLoading] = useState(false), [moreBusy, setMoreBusy] = useState(false);
   const [error, setError] = useState(''), [moreError, setMoreError] = useState(''), [revision, setRevision] = useState(0);
   const [selected, setSelected] = useState<Demo | null>(null);
   const requestVersion = useRef(0), dialog = useRef<HTMLDialogElement>(null);
+  const firstFilter=JSON.stringify([initialFilters.query,initialFilters.category,initialFilters.sort]);
+  const initialActive=useRef(true);
   useEffect(() => {const timer = setTimeout(() => setSearch(query.trim()), 250); return () => clearTimeout(timer);}, [query]);
   const parameters = () => new URLSearchParams({q: search, category, sort});
 
   useEffect(() => {
+    const key=JSON.stringify([search,category,sort]);
+    if(initialActive.current&&key===firstFilter&&revision===0)return;
+    initialActive.current=false;
     const version = ++requestVersion.current, controller = new AbortController();
     setVideos([]); setCursor(null); setLoading(true); setError(''); setMoreError('');
     void (async () => {
@@ -80,7 +79,7 @@ export function PublicExplore() {
       finally {if (!controller.signal.aborted && version === requestVersion.current) setLoading(false);}
     })();
     return () => controller.abort();
-  }, [search, category, sort, revision]);
+  }, [search, category, sort, revision, firstFilter]);
 
   useEffect(() => {
     if (!selected) return;
@@ -124,17 +123,17 @@ export function PublicExplore() {
     {loading && <p className="public-explore-state" role="status">Chargement des vidéos…</p>}
     {error && <p className="public-explore-state" role="alert">{error} <button type="button" onClick={() => setRevision(value => value + 1)}>Réessayer</button></p>}
     {!loading && !error && videos.length > 0 && <div className="public-explore-grid">{videos.map(video => <PublicCard key={video.id} video={video}/>)}</div>}
-    {cursor && <button className="public-explore-more" type="button" disabled={moreBusy} onClick={() => void loadMore()}>{moreBusy ? 'Chargement…' : 'Voir plus de vidéos'}</button>}
+    {cursor && <Link className="public-explore-more" href={`/explorer?${new URLSearchParams({...Object.fromEntries(parameters()),cursor})}`} aria-disabled={moreBusy} onClick={event=>{event.preventDefault();if(!moreBusy)void loadMore();}}>{moreBusy ? 'Chargement…' : 'Voir plus de vidéos'}</Link>}
     {moreError && <p className="public-explore-state" role="alert">{moreError} <button type="button" onClick={() => void loadMore()}>Réessayer</button></p>}
     {showDemos && <div className={videos.length ? 'public-explore-demos public-explore-demos-after' : 'public-explore-demos'}>
-      <p className="public-explore-demo-note">{videos.length ? 'Inspirations de démonstration' : 'En attendant les premiers partages : des démonstrations'} · Images et agences fictives, animations sans voix.</p>
+      <p className="public-explore-demo-note">{demos.some(demo=>demo.custom)?'Présentations sélectionnées par BienVu.':'Démonstrations · Images et agences fictives, animations sans voix.'}</p>
       <div className="public-explore-grid">{matchingDemos.map(demo => <DemoCard key={demo.id} demo={demo} onPlay={setSelected}/>)}</div>
     </div>}
     {!loading && !error && videos.length === 0 && matchingDemos.length === 0 && <div className="public-explore-empty"><h2>Aucun résultat pour cette recherche.</h2><p>Essayez une autre ville ou un autre type de bien.</p><button type="button" onClick={() => {setQuery(''); setCategory('all');}}>Effacer les filtres</button></div>}
     {selected && <dialog ref={dialog} className="public-explore-dialog" onCancel={() => setSelected(null)} onClick={event => {if (event.target === event.currentTarget) setSelected(null);}} aria-label={`Démonstration : ${selected.title}`}>
       <button type="button" className="public-explore-dialog-close" onClick={() => setSelected(null)} aria-label="Fermer">×</button><h2>{selected.title}</h2>
-      <video src={`/videos/studio-home/${selected.id}.mp4`} poster={`/images/studio-home/${selected.id}.webp`} controls autoPlay playsInline preload="metadata" aria-label={`Démonstration : ${selected.title}`}/>
-      <p>Animation sans voix · Images et agence fictives. Les vidéos publiées par les agences utilisent leurs propres photos.</p>
+      <video src={selected.src} poster={selected.poster} controls autoPlay playsInline preload="metadata" aria-label={`Présentation : ${selected.title}`}/>
+      <p>{selected.custom?'Une sélection publique de BienVu.':'Animation sans voix · Images et agence fictives. Les vidéos publiées par les agences utilisent leurs propres photos.'}</p><Link href={`/exemples/${selected.id}`}>Ouvrir la page de cette présentation →</Link>
     </dialog>}
   </section>;
 }

@@ -2,6 +2,7 @@ import type {NextConfig} from 'next';
 const config: NextConfig = {
   poweredByHeader: false,
   transpilePackages: ['@bienvu/contracts', '@bienvu/db', '@bienvu/observability', '@bienvu/importers'],
+  async redirects() {return [{source:'/studio',destination:'/',permanent:true},{source:'/generer',destination:'/',permanent:true}];},
   async headers() {
     return [{source: '/:path*', headers: [
       {key: 'X-Content-Type-Options', value: 'nosniff'},

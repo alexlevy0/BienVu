@@ -33,3 +33,4 @@
 @media(max-width:800px){.admin-music-upload,.admin-music-grid{grid-template-columns:minmax(0,1fr)}.admin-music-upload{padding:16px}.admin-music-drop{padding:24px 14px}}
 
 .admin-import-error{display:block;max-width:260px;overflow-wrap:anywhere}.admin-import-error small{display:block;white-space:normal}
+.admin-seo .admin-insight-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.admin-seo .admin-insight{border:1px solid #d9dfd2;border-radius:12px;background:#fffefb;padding:24px;min-width:0;margin-bottom:20px}.admin-seo .admin-insight h3{font-size:17px;margin:0 0 18px}.admin-seo .admin-insight p{line-height:1.7;font-size:14px}.admin-seo .admin-insight a{color:#48653b;text-underline-offset:4px}.admin-seo .admin-insight details{margin-top:20px}.admin-seo .admin-insight summary{cursor:pointer;font-size:14px}@media(max-width:900px){.admin-seo .admin-insight-grid{grid-template-columns:1fr}.admin-seo .admin-insight{padding:18px}}

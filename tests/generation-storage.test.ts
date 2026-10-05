@@ -4,7 +4,7 @@ import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import {migrateNarrationProbe,seedNarrationFixture} from '../scripts/narration-fixtures';
 import {admitGeneration,findGeneration,failGeneration,generationView,listGenerations,generationRights} from '../packages/db/src/index';
 import {generationVideo} from '../apps/web/lib/generations';
-import {generationPoster,findPublic,listPublic,ownerShares,publishGeneration,revokeGeneration} from '../apps/web/lib/sharing';
+import {generationPoster,findPublic,listPublic,ownerShares,publishGeneration,revokeGeneration,publicSitemapVideos} from '../apps/web/lib/sharing';
 import {generationSourcePhoto} from '../apps/web/lib/generation-source-photo';
 import {findImport} from '../packages/db/src/index';
 import {GeneratableListing} from '../packages/contracts/src/index';
@@ -97,6 +97,7 @@ test('admission D1 atomique : idempotence, budget, isolation, quota et résultat
   const oldest=(await listGenerations(env.DB,agencyId,undefined,{sort:'oldest'})).jobs;
   assert.equal(oldest.length,2);assert.ok(oldest[0]!.createdAt<=oldest[1]!.createdAt);
   assert.deepEqual((await listPublic(env.DB)).videos,[]);
+  assert.deepEqual(await publicSitemapVideos(env.DB),[]);
   await assert.rejects(publishGeneration(env,'another-agency',ready.jobId),/NOT_FOUND/);
   await assert.rejects(publishGeneration(env,agencyId,a.jobId),/NOT_FOUND/);
   const shared=await publishGeneration(env,agencyId,ready.jobId);
@@ -105,6 +106,7 @@ test('admission D1 atomique : idempotence, budget, isolation, quota et résultat
   assert.deepEqual(await ownerShares(env.DB,'another-agency'),[]);
   const listed=(await listPublic(env.DB)).videos;
   assert.equal(listed.length,1);assert.equal(listed[0]?.id,shared.id);
+  assert.deepEqual((await publicSitemapVideos(env.DB)).map(video=>video.id),[shared.id]);
   assert.equal(listed[0]?.title,readyRow.title);
   assert.equal(listed[0]?.locality,'Lyon');
   assert.equal(listed[0]?.propertyType,'apartment');
@@ -121,6 +123,7 @@ test('admission D1 atomique : idempotence, budget, isolation, quota et résultat
   assert.equal(publicFile.status,206);assert.deepEqual([...new Uint8Array(await publicFile.arrayBuffer())],[2,3,4]);
   await assert.rejects(revokeGeneration(env.DB,'another-agency',ready.jobId),/NOT_FOUND/);
   await revokeGeneration(env.DB,agencyId,ready.jobId);
+  assert.deepEqual(await publicSitemapVideos(env.DB),[]);
   assert.deepEqual((await listPublic(env.DB)).videos,[]);
   await assert.rejects(findPublic(env.DB,shared.id),/NOT_FOUND/);
   assert.deepEqual(await ownerShares(env.DB,agencyId),[]);

@@ -8,15 +8,14 @@ const report = {at: new Date().toISOString(), mode: 'local-workerd', externalCal
 // The studio controls identify these pages without coupling the probe to marketing copy.
 const pages = new Map([
   ['/', [/id="home-listing-url"/, /class="home-composer(?:\s[^"]*)?"/]],
-  ['/studio', /VOTRE PROCHAINE BELLE HISTOIRE/],
+  ['/studio', /id="home-listing-url"/],
   ['/sources', /IMPORTER VOTRE ANNONCE/],
-  ['/generer', /UNE ANNONCE, UNE HISTOIRE/],
+  ['/generer', /id="home-listing-url"/],
   ['/agence', /Votre identité, sur chaque vidéo\./],
   ['/historique', /id="property-library-title"/],
   ['/biens', /id="property-library-title"/],
   ['/abonnement', [/id="offers-gratuit"/, /id="offers-plus"/, /id="offers-pro"/]],
   ['/connexion', [/id="login-studio-title"/, /class="login-box(?:\s[^"]*)?"/]],
-  ['/laboratoire', /Cette interface est en développement/],
 ]);
 for (const [path, expectedContent] of pages) {
   const response = await fetch(new URL(path, base));
@@ -30,6 +29,8 @@ for (const [path, expectedContent] of pages) {
   }
   report.checks.push({path, status: response.status, french: true, securityHeaders: true});
 }
+for(const path of ['/studio','/generer']){const redirect=await fetch(new URL(path,base),{redirect:'manual'});assert.equal(redirect.status,308);assert.equal(new URL(redirect.headers.get('location'),base).pathname,'/');}
+assert.equal((await fetch(new URL('/laboratoire',base))).status,404);
 const ids = new Set();
 for (const body of [{url: 'https://example.com/listing'}, {url: 'https://127.0.0.1', agencyId: 'forged', watermarked: false}]) {
   const response = await fetch(new URL('/api/generations', base), {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Request-ID': 'forged'}, body: JSON.stringify(body)});

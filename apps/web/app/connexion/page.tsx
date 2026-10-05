@@ -5,7 +5,7 @@ import {LoginDemo} from '../../components/login-demo';
 import '../landing.css';
 import './login.css';
 
-export const metadata = {title: 'Connexion'};
+export const metadata = {title: 'Connexion', robots:{index:false,follow:true},alternates:{canonical:'/connexion'}};
 
 export default function Page() {
   return <main className="login-studio">

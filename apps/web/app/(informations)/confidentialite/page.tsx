@@ -1,12 +1,9 @@
 import type {Metadata} from 'next';
 import Link from 'next/link';
 import {LegalDocument, LegalSection} from '../../../components/legal-document';
+import {seoMetadata} from '../../../lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Politique de confidentialité',
-  description: 'Comment BienVu utilise les données du compte, la connexion Google, les annonces, les photos et les vidéos, et comment exercer vos droits.',
-  alternates: {canonical: '/confidentialite'},
-};
+export const metadata: Metadata = seoMetadata({title:'Politique de confidentialité — BienVu',description:'Comment BienVu utilise les données du compte, la connexion Google, les annonces, les photos et les vidéos, et comment exercer vos droits.',path:'/confidentialite'});
 
 const contents = [
   {id: 'responsable', title: 'BienVu et vos données'},
@@ -89,7 +86,7 @@ export default function Page() {
     <LegalSection {...contents[6]}>
       <p>Des cookies nécessaires permettent de maintenir la connexion, sécuriser l’authentification et retrouver un essai anonyme dans le même navigateur. Les contrôles Turnstile de Cloudflare traitent des signaux techniques de sécurité. BienVu n’installe pas de cookie publicitaire ni d’identifiant analytique de visiteur.</p>
       <p>Le lien d’une annonce peut être gardé dans l’onglet pendant une heure. Pour reprendre une annonce manuelle, les champs et photos peuvent être conservés localement dans ce navigateur pendant une heure, lorsque son stockage est autorisé. Ils sont effacés après enregistrement ou lors d’une visite suivant leur expiration. Les photos simplement déposées dans l’input restent en mémoire avant leur ajout au brouillon.</p>
-      <p>Les statistiques du site comptent les pages vues par jour, page publique et pays d’origine réseau communiqué par Cloudflare. Ces agrégats n’enregistrent ni adresse IP, ni identifiant de visiteur, ni référent. Ils n’indiquent pas votre position précise et ne comptent pas des visiteurs uniques. Les données techniques utilisées pour la sécurité des connexions restent un traitement distinct.</p>
+      <p>Les statistiques du site comptent les chargements de pages publiques par jour et pays d’origine réseau communiqué par Cloudflare. Une catégorie de source (moteur de recherche, réseau social, accès direct ou autre site) peut être calculée à partir du référent transmis par le navigateur, sans conserver son URL. Les performances de chargement et d’interaction sont regroupées par page et classe de qualité. Ces agrégats n’enregistrent ni adresse IP, ni identifiant de visiteur, ni adresse de bien, ni paramètres d’URL. Ils sont conservés environ trente et un jours, ne comptent pas des visiteurs uniques et ne permettent pas d’attribuer une inscription ou un paiement à une personne ayant visité une page. Les données techniques utilisées pour la sécurité des connexions restent un traitement distinct.</p>
       <p>Vous pouvez effacer les cookies et le stockage du site depuis votre navigateur. Cela peut fermer votre session, supprimer un brouillon local ou empêcher de retrouver un essai anonyme.</p>
     </LegalSection>
     <LegalSection {...contents[7]}>

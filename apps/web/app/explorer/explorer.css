@@ -66,3 +66,4 @@
 
 .public-video-layout.is-horizontal {grid-template-columns:minmax(0,1.6fr) minmax(260px,1fr)}.public-video-layout.is-horizontal .public-video-player {max-width:none;aspect-ratio:16/9}
 @media(max-width:850px){.public-video-layout.is-horizontal {grid-template-columns:1fr}}
+.public-explore-example-link{display:inline-block;font-size:13px;margin:8px 0;color:#526747;text-underline-offset:4px}

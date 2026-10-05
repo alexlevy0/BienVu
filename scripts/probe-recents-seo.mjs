@@ -10,7 +10,7 @@ for(const path of ['/','/explorer','/abonnement','/sources','/connexion']){
   const response=await fetch(base+path),html=await response.text();assert.equal(response.status,200);
   assert.ok(!/noindex|nofollow/i.test(response.headers.get('x-robots-tag')??''));
   const robots=html.match(/<meta name="robots" content="([^"]*)"/i)?.[1];assert.ok(robots,`Robots missing: ${path}`);
-  assert.ok(!/noindex|nofollow/i.test(robots),path+': '+robots);
+  if(path==='/connexion')assert.match(robots,/noindex/);else assert.ok(!/noindex|nofollow/i.test(robots),path+': '+robots);
   assert.match(html,/<link rel="icon" href="\/favicon\.ico/);assert.match(html,/<link rel="icon" href="\/icon\.svg/);
   if(path!=='/connexion')assert.match(html,new RegExp('rel="canonical" href="https://bienvu.online'+(path==='/'?'/?':path)+'"'));
   report.push({path,status:response.status,robots});
@@ -19,7 +19,7 @@ const robotsResponse=await fetch(base+'/robots.txt'),robots=await robotsResponse
 assert.match(robots,/User-Agent: \*/);assert.match(robots,/Allow: \/\n/);assert.match(robots,/Sitemap: https:\/\/bienvu.online\/sitemap.xml/);
 assert.doesNotMatch(robots,/Disallow: \/\s*$/m);
 const sitemapResponse=await fetch(base+'/sitemap.xml'),sitemap=await sitemapResponse.text();assert.equal(sitemapResponse.status,200);
-assert.equal((sitemap.match(/<loc>/g)??[]).length,4);assert.doesNotMatch(sitemap,/historique|agence|essai|draft|token/);
+assert.ok((sitemap.match(/<loc>/g)??[]).length>=21);assert.doesNotMatch(sitemap,/<loc>[^<]*(?:historique|\/agence|\/essai|draft|token)/);
 const iconResponse=await fetch(base+'/icon.svg');assert.equal(iconResponse.status,200);assert.match(await iconResponse.text(),/M14 3H3v11M26 3h11v11M3 26v11h11m12 0h11V26/);
 const icoResponse=await fetch(base+'/favicon.ico'),ico=Buffer.from(await icoResponse.arrayBuffer());assert.equal(icoResponse.status,200);assert.equal(ico.readUInt16LE(2),1);assert.equal(ico.readUInt16LE(4),4);
 report.push({robots:true,sitemap:true,favicon:true});

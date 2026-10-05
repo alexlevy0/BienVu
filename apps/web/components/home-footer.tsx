@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import {HomeIcon, HomeWordmark} from './home-icons';
 
-export function HomeFooter({onCreate,onHelp}:{onCreate:()=>void;onHelp:()=>void}) {
+export function HomeFooter({onCreate}:{onCreate:()=>void}) {
   const backToTop=()=>{
     window.scrollTo({top:0,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
     document.getElementById('home-listing-url')?.focus({preventScroll:true});
@@ -35,8 +35,10 @@ export function HomeFooter({onCreate,onHelp}:{onCreate:()=>void;onHelp:()=>void}
       </nav>
       <nav className="home-premium-footer-column" aria-labelledby="home-footer-resources-title">
         <h3 id="home-footer-resources-title">Ressources</h3>
-        <button type="button" onClick={onHelp}>Comment ça marche</button>
-        <Link href="/projets">Modèles de vidéos</Link>
+        <Link href="/comment-ca-marche">Comment ça marche</Link>
+        <Link href="/modeles-video-immobilier">Modèles de vidéos</Link>
+        <Link href="/guides">Guides immobiliers</Link>
+        <Link href="/sources">Sources d’import</Link>
         <a href="#home-life-faq-title">Questions fréquentes</a>
       </nav>
       <div className="home-premium-footer-column home-premium-footer-contact">
