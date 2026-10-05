@@ -18,6 +18,7 @@ function fixture(auth){return `(()=>{
  const job=()=>({id:'manual-sheet-video',status:'queued',stage:'importing',attempt:1,errorCode:null,createdAt:at,updatedAt:at,expiresAt:null,
    title:state.draft.data.fields.title,locality:state.draft.data.fields.locality,sourceKind:'manual',videoUrl:null,downloadUrl:null,syntheticVoice:true,retryAllowed:false,ownership:'owned',masterAccess:'unlocked',retention:'available'});
  window.fetch=async(input,options={})=>{const p=new URL(typeof input==='string'?input:input.url,location.href).pathname,method=options.method??'GET';
+   if(p==='/api/properties')return json({properties:[],total:0,nextCursor:null});
   if(p==='/api/me'){window.__sheetMeCalls=(window.__sheetMeCalls??0)+1;return signed?json({user:{id:'sheet-user',name:'Recette',email:'fixture@example.invalid'},agency:{id:'sheet-agency',ownerUserId:'sheet-user',name:'Agence de recette',logoAssetId:null,primaryColor:'#E1E8D9',secondaryColor:'#171714',phone:null,email:'fixture@example.invalid',website:null,city:null,brandVersion:0,createdAt:at,updatedAt:at},rights:{generationEnabled:true,developmentRemaining:20,importRetryAt:null,trial:'eligible',watermarked:false}}):json({},401);}
   if(p==='/api/trial')return json({enabled:false,siteKey:'',used:false,job:null});
   if(p==='/api/trial/history')return json({jobs:[],nextCursor:null});

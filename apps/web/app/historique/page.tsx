@@ -1,8 +1,8 @@
-import {GenerationHistory} from '../../components/generation-history';
+import {PropertyLibrary} from '../../components/property-library';
 import {StudioFrame} from '../../components/studio-frame';
 import '../landing.css';
-import './history.css';
-export const metadata = {title: 'Mes vidéos',robots:{index:false,follow:true}};
+import '../biens/properties.css';
+export const metadata = {title: 'Mes biens',robots:{index:false,follow:true}};
 export default function Page() {
-  return <StudioFrame active="videos"><GenerationHistory/></StudioFrame>;
+  return <StudioFrame active="videos"><PropertyLibrary/></StudioFrame>;
 }

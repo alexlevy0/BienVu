@@ -14,6 +14,7 @@ import {editExistingVideo,snapshotEditorExport,recoverDraftVoice} from '../apps/
 import {editorVoicePreview,privateEditorVoice} from '../apps/web/lib/editor-voice';
 import {prepareJobNarration} from '../apps/pipeline/src/narration';
 import {prepareJobVideo} from '../apps/pipeline/src/video-manifest';
+import {propertyDetail,propertyPhoto,readPropertyGroups} from '../apps/web/lib/properties';
 
 const speech=['Découvrez ce bien à travers une visite en images.','Prenons le temps de parcourir les lieux.',
   'Retrouvez les informations de cette annonce dans votre vidéo.','Pour en savoir plus, contactez votre agence.'];
@@ -57,6 +58,11 @@ test('Voix d’éditeur D1/R2 : WAV privés retrouvés, timings identiques à l�
     env.DB.prepare('UPDATE narration_runs SET expires_at=? WHERE job_id=?').bind(past,original.jobId),
   ]);
   let cloned=await editExistingVideo(env,agencyId,original.jobId,'voice-editor-copy-001',AbortSignal.timeout(20000));
+  const groups=await readPropertyGroups(env,agencyId);assert.equal(groups.length,1);
+  const property=await propertyDetail(env,agencyId,groups[0].summary.id,null,'Notre agence');
+  assert.equal(property.jobs[0].id,original.jobId);assert.ok(property.drafts.some(d=>d.id===cloned.id));assert.equal(property.photos.length,3);
+  const cover=await propertyPhoto(env,agencyId,property.property.id,property.photos[0].id,new Request('https://test/photo'));
+  assert.equal(cover.status,200);assert.ok((await cover.arrayBuffer()).byteLength>0);
   const sourceId=cloned.data.videoCustomization!.voiceSourceId!;assert.ok(sourceId);assert.equal((await generationRights(env.DB,agencyId,'true')).developmentRemaining,before);
   const preview=await editorVoicePreview(env,agencyId,cloned.id,sourceId);assert.equal(editorCanReuseVoice(cloned.data.videoCustomization!,preview),true);
   let frame=0;assert.deepEqual(preview.clips.map(c=>c.startFrame),narration.durationFrames.map(duration=>{const from=frame;frame+=duration;return from;}));

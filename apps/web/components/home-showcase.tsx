@@ -21,7 +21,7 @@ const features = [
 ] as const;
 const questions = [
   {title: 'Puis-je utiliser mes propres photos ?', answer: 'Oui. Glissez vos photos dans le champ principal, puis complétez les informations du bien. Vous pouvez aussi ajouter vos images dans la saisie manuelle ou dans l’éditeur.'},
-  {title: 'Puis-je modifier ma vidéo ?', answer: 'Oui. Depuis « Mes vidéos », ouvrez votre création dans l’éditeur pour ajuster les plans, les textes, le cadrage ou le son. Le coût d’un nouvel export est indiqué avant sa création.'},
+  {title: 'Puis-je modifier ma vidéo ?', answer: 'Oui. Depuis « Mes biens », ouvrez votre création dans l’éditeur pour ajuster les plans, les textes, le cadrage ou le son. Le coût d’un nouvel export est indiqué avant sa création.'},
   {title: 'Comment fonctionnent les crédits ?', answer: 'Créer une vidéo coûte 1 crédit. Chaque nouvelle photo animée avec l’IA ajoute 1 crédit. Les zooms et les mouvements de caméra classiques sont inclus.'},
 ] as const;
 

@@ -44,7 +44,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   const [customizing,setCustomizing]=useState(false),[guestSettings,setGuestSettings]=useState<VideoCustomization|undefined>();
   const pendingCustomization=useRef<{id:string;key:string}|null>(null);
   const [url, setUrl] = useState(''), [description, setDescription] = useState('');
-  const [feedback, setFeedback] = useState(''), [manualBusy, setManualBusy] = useState(false);
+  const [feedback, setFeedback] = useState(''), [manualBusy, setManualBusy] = useState(false),[editingProperty,setEditingProperty]=useState(false);
   const [composerPhotos,setComposerPhotos]=useState<ComposerPhoto[]>([]),[photoChecking,setPhotoChecking]=useState(false),
     [dropActive,setDropActive]=useState(false),[incomingPhotos,setIncomingPhotos]=useState<{id:string;files:File[]}|null>(null);
   const stagedPhotos=useRef<ComposerPhoto[]>([]),dropDepth=useRef(0),photoLock=useRef(false),photoVersion=useRef(0);
@@ -68,7 +68,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   const busy = screen.kind === 'sending' || screen.kind==='extracting' || manualBusy;
   const canGenerate = Boolean(me?.rights.generationEnabled);
   const creditCost=screen.kind==='manual'?manualCredits:generationCreditCost(guestSettings);
-  const noCredits = canGenerate && (me?.rights.developmentRemaining??0)<creditCost;
+  const noCredits = !editingProperty && canGenerate && (me?.rights.developmentRemaining??0)<creditCost;
   const importPaused = Boolean(me?.rights.importRetryAt);
   const manual = screen.kind === 'manual';
   const inConversation = screen.kind !== 'landing' && screen.kind !== 'error';
@@ -124,7 +124,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
       clearComposerPhotos();setCustomizing(false);setGuestSettings(undefined);
       interactionVersion.current++;
       forget();guestPending.current=null;setScreen({kind:'landing'});setUrl('');setDescription('');
-      setImportDraft(null);setGuestExtraction(null);setFeedback('');
+      setEditingProperty(false);setImportDraft(null);setGuestExtraction(null);setFeedback('');
     }
     lastOwner.current=owner;
   },[loading,me?.agency.id]);
@@ -150,9 +150,9 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     void fetch(`/api/imports/${encodeURIComponent(id)}`,{cache:'no-store',signal:controller.signal}).then(async response=>{
       if(!response.ok)return;const value=await response.json() as {status:string;draft?:CreationDraftView|null};
       if(controller.signal.aborted||interactionVersion.current!==version||value.status!=='needs_input'||!value.draft)return;
-      if(value.draft.data.videoCustomization?.editor){window.location.replace(`/editeur?draft=${encodeURIComponent(value.draft.id)}`);return;}
+      if(value.draft.data.videoCustomization?.editor&&new URLSearchParams(window.location.search).get('fiche')!=='1'){window.location.replace(`/editeur?draft=${encodeURIComponent(value.draft.id)}`);return;}
       interactionVersion.current++;
-      startFresh.current=true;setImportDraft(value.draft);setGuestExtraction(null);
+      startFresh.current=true;setEditingProperty(new URLSearchParams(window.location.search).get('fiche')==='1');setImportDraft(value.draft);setGuestExtraction(null);
       setDescription(value.draft.data.fields.description??value.draft.data.originalText??'');setScreen({kind:'manual'});
     }).catch(()=>{});
     return()=>controller.abort();
@@ -254,9 +254,13 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     previousComposer.current=composerDock.current?.getBoundingClientRect()??null;
     interactionVersion.current++;lock.current=false;startFresh.current = true;forget();
     if (fromText) setDescription(fromText);
-    setImportDraft(null);setGuestExtraction(initialData);guestPending.current=null;trial.setToken('');trial.setChallenge(false);
+    setEditingProperty(false);setImportDraft(null);setGuestExtraction(initialData);guestPending.current=null;trial.setToken('');trial.setChallenge(false);
     setCustomizing(false);setFeedback('');setScreen({kind: 'manual'});
   }
+  const manualNavigation=useRef(false);
+  useEffect(()=>{if(loading||manualNavigation.current||new URLSearchParams(window.location.search).get('manuel')!=='1')return;
+    manualNavigation.current=true;openManual();const url=new URL(window.location.href);url.searchParams.delete('manuel');window.history.replaceState(window.history.state,'',url.pathname+url.search+url.hash);
+  },[loading]);
   async function analyzeGuest(text:string,key:string,token:string){
     if(lock.current||guestPending.current?.key!==key)return;
     const version=++interactionVersion.current;lock.current=true;setScreen({kind:'extracting',text});setFeedback('');
@@ -337,7 +341,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     if(loading||photoChecking||incomingPhotos)return;
     if(composerPhotos.length){openWithPhotos();return;}
     if (manual) {
-      if (manualReady && !manualBusy && !noCredits && !activeOtherJob)
+      if (manualReady && !manualBusy && !noCredits && (editingProperty||!activeOtherJob))
         (document.getElementById('manual-guided-form') as HTMLFormElement | null)?.requestSubmit();
       return;
     }
@@ -421,7 +425,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   const resultReady = screen.kind === 'job' && selectedJob?.status === 'ready';
   const composerDisabled = screen.kind==='guest-customizing'&&guestSettings&&!GenerationCustomization.safeParse(guestSettings).success || loading || busy || photoChecking || Boolean(incomingPhotos) || (composerPhotos.length
     ? screen.kind==='job'&&generationActive(selectedJob) : manual
-    ? !manualReady||Boolean(noCredits)||activeOtherJob
+    ? !manualReady||Boolean(noCredits)||!editingProperty&&activeOtherJob
     : Boolean(noCredits)||Boolean(importPaused&&ImportUrl.safeParse(url.trim()).success)||activeOtherJob||screen.kind==='job'&&
       (generationActive(selectedJob)||resultReady&&!url.trim()));
   const contextNote = !me ? 'Essayez gratuitement.' : canGenerate
@@ -434,7 +438,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
       <div className="home-manual-panel">
         {!me ? <ManualListingForm onCreditCost={setManualCredits} ref={manualForm} key="guest" initialCustomization={guestSettings} customizing={customizing} onCloseCustomizer={closeCustomization} subtitlesEnabled={subtitlesEnabled} onSubtitles={setSubtitlesEnabled} voiceEnabled={voiceEnabled} onVoice={setVoiceEnabled} durationSeconds={durationSeconds} aspectRatio={aspectRatio} prepareGuest incomingPhotos={incomingPhotos} onPhotosReceived={receivePhotos} guided={{description,setDescription,initialData:guestExtraction,onCancel:()=>{previousComposer.current=composerDock.current?.getBoundingClientRect()??null;setCustomizing(false);setScreen({kind:'landing'});},
           onReadyChange:(ready,reason)=>{setManualReady(ready);setManualReason(reason);}}} busy={manualBusy} setBusy={setManualBusy} onPrepared={() => window.location.assign('/connexion?mode=signup')}/>
-          : <ManualListingForm onCreditCost={setManualCredits} ref={manualForm} customizing={customizing} onCloseCustomizer={closeCustomization} brand={me.agency} subtitlesEnabled={subtitlesEnabled} onSubtitles={setSubtitlesEnabled} voiceEnabled={voiceEnabled} onVoice={setVoiceEnabled} durationSeconds={durationSeconds} aspectRatio={aspectRatio} key={`agency:${me.agency.id}:${importDraft?.id??'manual'}`} incomingPhotos={incomingPhotos} onPhotosReceived={receivePhotos} generate={canGenerate} guided={{description,setDescription,agencyId:me.agency.id,initialDraft:importDraft,
+          : <ManualListingForm saveOnly={editingProperty} onSaved={draft=>{clearListingDraft();void refreshDrafts();window.location.assign(`/biens/${encodeURIComponent(`listing:${draft.id}`)}`);}} onCreditCost={setManualCredits} ref={manualForm} customizing={customizing} onCloseCustomizer={closeCustomization} brand={me.agency} subtitlesEnabled={subtitlesEnabled} onSubtitles={setSubtitlesEnabled} voiceEnabled={voiceEnabled} onVoice={setVoiceEnabled} durationSeconds={durationSeconds} aspectRatio={aspectRatio} key={`agency:${me.agency.id}:${importDraft?.id??'manual'}`} incomingPhotos={incomingPhotos} onPhotosReceived={receivePhotos} generate={canGenerate} guided={{description,setDescription,agencyId:me.agency.id,initialDraft:importDraft,
             onReadyChange:(ready,reason)=>{setManualReady(ready);setManualReason(reason);},onDraftChange:()=>void refreshDrafts(),
             onCancel:()=>{previousComposer.current=composerDock.current?.getBoundingClientRect()??null;setCustomizing(false);setScreen({kind:'landing'});}}} busy={manualBusy} setBusy={setManualBusy} onCreated={async value => {
             void refreshDrafts();
@@ -450,7 +454,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     {screen.kind==='extracting'&&<div className="home-conversation-manual"><div className="home-request-bubble"><HomeIcon name="pencil" size={21}/><strong>{screen.text}</strong></div>
       <p className="home-conversation-lead" role="status">Nous préparons les informations de votre bien…</p></div>}
     </div>
-    <div ref={composerDock} className="home-composer-dock">{manual?<form className="home-manual-toolbar" onSubmit={submit} aria-label="Créer la vidéo de votre bien">
+    <div ref={composerDock} className="home-composer-dock">{manual?<form className="home-manual-toolbar" onSubmit={submit} aria-label={editingProperty?"Enregistrer les informations du bien":"Créer la vidéo de votre bien"}>
       <div className="home-manual-settings"><details><summary aria-disabled={busy||loading} onClick={event=>{if(busy||loading)event.preventDefault();}}><HomeIcon name="settings" size={22}/>Réglages</summary>
         <fieldset className="home-manual-settings-panel" disabled={busy||loading}><legend>Réglages de la vidéo</legend>
           <label>Format<select aria-label="Format de la vidéo" value={aspectRatio} onChange={event=>setAspectRatio(event.target.value==='16:9'?'16:9':'9:16')}><option value="9:16">Vertical 9:16</option><option value="16:9">Horizontal 16:9</option></select></label>
@@ -460,8 +464,8 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
           <button type="button" className="home-manual-personalize" disabled={photoChecking||activeOtherJob} onClick={event=>{event.currentTarget.closest('details')!.open=false;void personalize();}}>{customizing?'Revenir à la fiche du bien':'Personnaliser la vidéo'}<HomeIcon name="arrow" size={17}/></button>
         </fieldset></details></div>
       <p className="home-manual-settings-summary">{aspectRatio==='16:9'?'Horizontal':'Vertical'} · {durationSeconds} s{voiceEnabled?' · Voix off':''}{subtitlesEnabled?' · Sous-titres':''}</p>
-      <span className="home-credit-cost" aria-live="polite">{creditCost} crédit{creditCost>1?'s':''}</span>
-      <button type="submit" className="home-primary-button" disabled={composerDisabled} aria-describedby={!manualReady?'home-manual-action-note':undefined}>{manualBusy?'Préparation…':me&&!canGenerate?'Enregistrer mon annonce':'Créer ma vidéo'}<HomeIcon name="arrow" size={19}/></button>
+      <span className="home-credit-cost" aria-live="polite">{editingProperty?'Sans crédit':`${creditCost} crédit${creditCost>1?'s':''}`}</span>
+      <button type="submit" className="home-primary-button" disabled={composerDisabled} aria-describedby={!manualReady?'home-manual-action-note':undefined}>{manualBusy?'Enregistrement…':editingProperty?'Enregistrer le bien':me&&!canGenerate?'Enregistrer mon annonce':'Créer ma vidéo'}<HomeIcon name="arrow" size={19}/></button>
     </form>:<><form className={`home-composer home-composer-modern${feedback || screen.kind === 'error' ? ' home-composer-invalid' : ''}${dropActive?' home-composer-dropping':''}`} onSubmit={submit} noValidate aria-label="Créer une vidéo depuis une annonce"
       onDragEnter={event=>{if(draggingFiles(event)&&canDropPhotos){event.preventDefault();dropDepth.current++;setDropActive(true);}}}
       onDragOver={event=>{if(draggingFiles(event)){event.preventDefault();event.dataTransfer.dropEffect=canDropPhotos?'copy':'none';}}}
@@ -510,8 +514,8 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
       }} onError={trial.setFailure}/>}
     {!me && trial.failure && screen.kind !== 'error' && <p className="home-form-feedback" role="alert">{trial.failure} <Link href="/connexion">Se connecter</Link></p>}
     {importPaused&&!manual && <p className="home-form-note" role="status">La limite des imports par lien est atteinte jusqu’au {new Date(me!.rights.importRetryAt!).toLocaleString('fr-FR')}. Vous pouvez ajouter vos informations et photos en saisie manuelle.</p>}
-    {activeOtherJob && <p className="home-form-note">Une vidéo est déjà en cours de création. <Link href="/historique">Suivez-la dans Mes vidéos</Link>.</p>}
-    <p className="home-create-note" id="home-create-note" hidden={manual?Boolean(me):!(screen.kind==='job'&&generationActive(selectedJob))&&!contextNote}>{manual ? 'Votre saisie est conservée ici. La connexion sera demandée pour créer la vidéo.' : screen.kind === 'job' && generationActive(selectedJob) ? 'Votre création sera enregistrée dans Mes vidéos.' : contextNote}</p>
+    {activeOtherJob && <p className="home-form-note">Une vidéo est déjà en cours de création. <Link href="/biens">Suivez-la dans Mes biens</Link>.</p>}
+    <p className="home-create-note" id="home-create-note" hidden={manual?Boolean(me):!(screen.kind==='job'&&generationActive(selectedJob))&&!contextNote}>{manual ? 'Votre saisie est conservée ici. La connexion sera demandée pour créer la vidéo.' : screen.kind === 'job' && generationActive(selectedJob) ? 'Votre création sera enregistrée dans Mes biens.' : contextNote}</p>
     </div>
   </div>;
 }

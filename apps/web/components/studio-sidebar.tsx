@@ -54,25 +54,27 @@ export function StudioSidebar({active}: {active: 'create' | 'videos' | 'explore'
       <Link className="home-brand-link" href="/" aria-label="BienVu, accueil" onClick={closeMenu}><HomeWordmark/></Link>
       <nav className="home-navigation" aria-label="Navigation principale">
         {item('/', 'Créer une vidéo', 'plus', 'create')}
-        {item('/historique', 'Mes vidéos', 'video', 'videos')}
+        {item('/biens', 'Mes biens', 'house', 'videos')}
         {item('/explorer', 'Explorer', 'compass', 'explore')}
         {item('/agence', 'Mon agence', 'house', 'agency')}
         {item('/editeur', 'Éditeur', 'clapper', 'editor')}
         {item('/projets', 'Dossiers & modèles', 'house', 'projects')}
         {item('/publications', 'Publications', 'calendar', 'social')}
       </nav>
-      <section className="home-recents" aria-labelledby="home-recents-title"><h2 id="home-recents-title">RÉCENTES</h2>
-        {recent.map(item => item.kind==='job'?<Link className="home-recent-link" key={`job:${item.job.id}`}
-          href={`/historique/${encodeURIComponent(item.job.id)}`} onClick={closeMenu}>
+      <section className="home-recents" aria-labelledby="home-recents-title"><h2 id="home-recents-title">RÉCENTS</h2>
+        {me&&store.properties.length?store.properties.slice(0,12).map(property=><Link className="home-recent-link" key={property.id} href={`/biens/${encodeURIComponent(property.id)}`} onClick={closeMenu}>
+          {property.coverUrl?<img src={property.coverUrl} alt="" loading="lazy" decoding="async" onError={event=>{event.currentTarget.style.visibility='hidden';}}/>:<span className="home-recent-placeholder"><HomeIcon name="house" size={20}/></span>}
+          <span>{property.title}<small>{property.fields.locality||'Informations à compléter'}</small></span></Link>):recent.map(item => item.kind==='job'?<Link className="home-recent-link" key={`job:${item.job.id}`}
+          href={me?`/biens/${encodeURIComponent(`job:${item.job.id}`)}`:`/historique/${encodeURIComponent(item.job.id)}`} onClick={closeMenu}>
           <img src={`/api/${item.job.ownership==='anonymous'?'trial':'generations'}/${item.job.id}/source-photo`} alt="" loading="lazy" decoding="async" onError={event=>{event.currentTarget.style.display='none';}}/>
           <span>{item.job.title||'Votre annonce'}<small>{item.job.status==='ready'?'Prête':item.job.status==='failed'?'Échec':'En cours'}
             {item.job.locality?` · ${item.job.locality}`:''}</small></span></Link>
-          :<div className="home-recent-row" key={`draft:${item.draft.id}`}><Link className="home-recent-link" href={`/?draft=${encodeURIComponent(item.draft.id)}`} onClick={closeMenu}>
+          :<div className="home-recent-row" key={`draft:${item.draft.id}`}><Link className="home-recent-link" href={`/biens/${encodeURIComponent(`listing:${item.draft.id}`)}`} onClick={closeMenu}>
             {item.draft.previewPhotoId?<img src={`/api/imports/${item.draft.id}/photos/${item.draft.previewPhotoId}`} alt="" loading="lazy" decoding="async"
               onError={event=>{event.currentTarget.style.display='none';}}/>:<span className="home-recent-placeholder"><HomeIcon name="pencil" size={20}/></span>}
             <span>{item.draft.title||'Votre annonce'}<small>À compléter{item.draft.locality?` · ${item.draft.locality}`:''}</small></span>
           </Link>{me&&<DraftActions draft={item.draft} agencyId={me.agency.id}/>}</div>)}
-        {!recent.length && <p className="home-recents-empty">{loading||store.loading ? 'Chargement de votre espace…' : store.unavailable ? 'Vos créations sont disponibles dans Mes vidéos.' : me ? 'Vos prochaines créations apparaîtront ici.' : 'Vos essais apparaîtront ici.'}</p>}
+        {!recent.length&&!store.properties.length && <p className="home-recents-empty">{loading||store.loading ? 'Chargement de votre espace…' : store.unavailable ? 'Vos créations sont disponibles dans Mes biens.' : me ? 'Vos prochains biens apparaîtront ici.' : 'Vos essais apparaîtront ici.'}</p>}
       </section>
       <div className="home-sidebar-bottom"><div className="home-plan"><span aria-live="polite">{loading?'Chargement de vos crédits…':me?`${me.rights.developmentRemaining} crédit${me.rights.developmentRemaining>1?'s':''} disponible${me.rights.developmentRemaining>1?'s':''}`:`${guestCredits} crédit d’essai disponible`}</span>{Boolean(me?.rights.creditReserved)&&<small>{me!.rights.creditReserved} crédit(s) réservé(s)</small>}<Link href="/abonnement" className={active === 'offers' ? 'home-plan-link-active' : undefined} aria-current={active === 'offers' ? 'page' : undefined}>Découvrir les offres <HomeIcon name="arrow" size={17}/></Link></div>
         {me ? <details className="home-account"><summary><span className="home-avatar">{initials}</span><span>{accountName}</span><HomeIcon name="chevron" size={17}/></summary><div className="home-account-menu"><span>{me.agency.name}</span><Link href="/agence">Mon agence</Link><Link href="/abonnement">Mon abonnement</Link><Link href="/equipe">Mon équipe</Link>{me.isSuperAdmin&&<Link href="/admin" aria-current={active==='admin'?'page':undefined}>Super admin</Link>}<SignOut/></div></details> : <Link className="home-guest-account" href="/connexion"><span className="home-avatar"><HomeIcon name="user" size={20}/></span><span>Se connecter</span><HomeIcon name="arrow" size={17}/></Link>}

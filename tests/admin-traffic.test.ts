@@ -11,7 +11,7 @@ test('Trafic : minimisation, métadonnées Cloudflare uniquement et exclusions',
   assert.deepEqual(pageHit(req('/?email=private@example.com',{cookie:'secret','cf-ipcountry':'US','cf-connecting-ip':'1.2.3.4',referer:'https://secret.example/'}),html,origin,'FR',now),{day:'2026-09-30',page:'home',country:'FR'});
   assert.equal(pageHit(req('/',{'cf-ipcountry':'FR'}),html,origin,undefined,now)?.country,'XX');
   for(const country of ['T1','USA','fr','<script>',''])assert.equal(pageHit(req(),html,origin,country,now)?.country,'XX');
-  for(const path of ['/admin','/api/admin','/historique','/agence','/explorer/private-id','/reset-password'])assert.equal(pageHit(req(path),html,origin,'FR',now),null);
+  for(const path of ['/admin','/api/admin','/historique','/biens','/biens/listing%3Aprivate-id','/agence','/explorer/private-id','/reset-password'])assert.equal(pageHit(req(path),html,origin,'FR',now),null);
   const skipped:Record<string,string>[]=[{rsc:'1'},{'next-router-prefetch':'1'},{purpose:'prefetch'},{'sec-purpose':'prefetch;prerender'},{'user-agent':'Googlebot'},{'user-agent':'curl/8'}];for(const headers of skipped)assert.equal(pageHit(req('/',headers),html,origin,'FR',now),null);
   assert.equal(pageHit(req('/'),html,'https://other.example','FR',now),null);
   assert.equal(pageHit(req('/',{},'POST'),html,origin,'FR',now),null);

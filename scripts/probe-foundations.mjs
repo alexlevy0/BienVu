@@ -12,7 +12,8 @@ const pages = new Map([
   ['/sources', /IMPORTER VOTRE ANNONCE/],
   ['/generer', /UNE ANNONCE, UNE HISTOIRE/],
   ['/agence', /Votre identité, sur chaque vidéo\./],
-  ['/historique', /Toutes vos créations, au même endroit\./],
+  ['/historique', /id="property-library-title"/],
+  ['/biens', /id="property-library-title"/],
   ['/abonnement', [/id="offers-gratuit"/, /id="offers-plus"/, /id="offers-pro"/]],
   ['/connexion', [/id="login-studio-title"/, /class="login-box(?:\s[^"]*)?"/]],
   ['/laboratoire', /Cette interface est en développement/],
@@ -40,6 +41,11 @@ for (const body of [{url: 'https://example.com/listing'}, {url: 'https://127.0.0
 assert.equal(ids.size, 2);
 report.checks.push({path: '/api/generations', status: 401, requestIdsGenerated: true, paidWorkRefused: true});
 const history = await fetch(new URL('/api/generations', base)); assert.equal(history.status, 401);
+for(const path of ['/api/properties','/api/properties/listing%3Amissing']){
+  const response=await fetch(new URL(path,base));assert.equal(response.status,401);
+  assert.equal(response.headers.get('cache-control'),'private, no-store');
+  report.checks.push({path,status:401,private:true});
+}
 const probe = await fetch(new URL('/api/probe', base)); assert.equal(probe.status, 401);
 report.checks.push({unauthenticatedHistory: 401, unauthenticatedProbe: 401});
 await mkdir('evidence/local/sprint-01', {recursive: true});

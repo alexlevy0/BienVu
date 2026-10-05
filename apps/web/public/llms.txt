@@ -32,7 +32,7 @@ Sans compte, l'éditeur propose « Utiliser la démo » ou « Nouveau projet ».
 ## Espace et travail d'agence
 
 - Mon agence conserve le nom, le logo, les couleurs et les coordonnées utilisés dans les créations. Le formulaire et son aperçu sont accessibles sans connexion ; l'enregistrement demande un compte.
-- Mes vidéos regroupe les créations et leurs états, avec lecture, téléchargement, ouverture dans l'éditeur et accès à la publication sur les réseaux.
+- Mes biens regroupe les annonces et leurs contenus dans un espace privé : recherche, filtres vente/location, archivage réversible et vues grille ou liste. Chaque fiche rassemble les vidéos et brouillons associés, les photos, les informations du bien et ses publications. Elle donne accès à la lecture, aux téléchargements individuels ou groupés, à la retouche dans l'éditeur et à la publication sur les réseaux. Un visuel prix/surface et un texte de publication sont disponibles à partir des informations et photos du bien.
 - Dossiers et modèles organise les brouillons et les exports par bien. Les modèles d'agence mémorisent une mise en page, des cadrages et un mixage ; un modèle peut être défini par défaut.
 - Validation client par lien privé révocable : lecture de la version partagée, commentaires horodatés et validation. L'utilisateur transmet lui-même le lien au destinataire.
 - Équipes avec invitations, rôles Propriétaire, Administrateur, Éditeur et Lecteur, et choix de l'agence active. Les crédits sont partagés au niveau de l'agence ; les actions disponibles dépendent du rôle.
@@ -41,7 +41,7 @@ Sans compte, l'éditeur propose « Utiliser la démo » ou « Nouveau projet ».
 
 Les comptes sociaux se connectent depuis Mon agence. La publication directe concerne Instagram Reels et Facebook Reels, pour les comptes et Pages autorisés par Meta. Dans le parcours actuel, Instagram doit être professionnel et associé à une Page Facebook gérée par l'utilisateur. Facebook Reels nécessite un export vertical.
 
-Depuis Mes vidéos, l'utilisateur choisit les destinations, relit ou modifie la légende proposée à partir de l'annonce, puis publie immédiatement ou programme une date jusqu'à 30 jours à l'avance. Le calendrier Publications affiche les résultats par réseau et permet de modifier ou d'annuler une programmation avant son démarrage, ainsi que de reprendre une destination en échec. La diffusion se poursuit sans garder le navigateur ouvert et ne consomme aucun crédit supplémentaire. Sans connexion, un aperçu du calendrier est accessible.
+Depuis Mes biens, l'utilisateur choisit les destinations, relit ou modifie la légende proposée à partir de l'annonce, puis publie immédiatement ou programme une date jusqu'à 30 jours à l'avance. Le calendrier Publications affiche les résultats par réseau et permet de modifier ou d'annuler une programmation avant son démarrage, ainsi que de reprendre une destination en échec. La diffusion se poursuit sans garder le navigateur ouvert et ne consomme aucun crédit supplémentaire. Sans connexion, un aperçu du calendrier est accessible.
 
 La home illustre le kit « 1 mandat → 7 contenus » : Reel Instagram, Story Instagram, TikTok, vidéo horizontale, post Facebook, visuel prix / surface et texte de publication. Ce bloc présente des exemples de supports de communication ; il ne constitue pas un export automatique de sept fichiers. La publication directe disponible concerne les Reels Instagram et Facebook ; les autres usages passent par le téléchargement et le partage du fichier vidéo.
 
@@ -84,7 +84,7 @@ Explorer permet de découvrir les vidéos partagées volontairement et les exemp
 
 ## Parcours après connexion
 
-- [Mes vidéos](https://bienvu.online/historique): Historique privé, aperçu, téléchargement, retouche et publication.
+- [Mes biens](https://bienvu.online/biens): Biens et contenus privés, photos, informations, téléchargements, retouche et publications.
 - [Dossiers et modèles](https://bienvu.online/projets): Classement par bien, modèles d'agence et validations client.
 - [Équipe](https://bienvu.online/equipe): Membres, invitations, rôles et agences accessibles.
 

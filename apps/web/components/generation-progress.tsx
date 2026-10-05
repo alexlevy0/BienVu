@@ -18,7 +18,7 @@ export function GenerationProgress({job,unavailable=false}:{job:GenerationView;u
     if(!r.ok)throw 0;setFeedback('Démarrage demandé. Le même traitement sera repris.');}catch{setFeedback('La reprise reste en attente. Vous pouvez revenir plus tard.');}finally{setRetrying(false);}}
   return <section id={`video-${job.id}`} className="generation-progress panel" aria-label="Votre génération">
     <span className="section-kicker">{job.title}</span><h3 aria-live="polite">{states[job.status]}</h3>
-    {generationActive(job)&&<><ol className="generation-steps" aria-label="Étapes de création">{(['importing','scripting','voicing','rendering'] as const).map((s,i)=><li key={s} aria-current={job.stage===s?'step':undefined}>{i+1}. {['Annonce','Texte','Voix','Vidéo'][i]}</li>)}</ol><p>Vous pouvez fermer cette page. Retrouvez la vidéo dans <Link href="/historique">votre historique</Link>.</p></>}
+    {generationActive(job)&&<><ol className="generation-steps" aria-label="Étapes de création">{(['importing','scripting','voicing','rendering'] as const).map((s,i)=><li key={s} aria-current={job.stage===s?'step':undefined}>{i+1}. {['Annonce','Texte','Voix','Vidéo'][i]}</li>)}</ol><p>Vous pouvez fermer cette page. Retrouvez la vidéo dans <Link href="/biens">Mes biens</Link>.</p></>}
     {unavailable&&<p role="status">La connexion est interrompue. Le traitement continue ; son état sera actualisé à votre retour.</p>}
     {job.status==='failed'&&<p className="form-feedback error" role="alert">{publicErrors[job.errorCode as PublicErrorCode]?.[1]??publicErrors.GENERATION_FAILED[1]}</p>}
     {job.retryAllowed&&<button className="text-button" disabled={retrying} onClick={()=>void retry()}>Relancer le démarrage</button>}

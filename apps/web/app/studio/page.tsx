@@ -9,6 +9,6 @@ export default function Page() {
     <section className="getting-started" aria-labelledby="steps-title"><div className="section-header"><h2 id="steps-title">Votre studio, en trois temps.</h2><span>Un parcours pensé pour aller à l’essentiel</span></div><div className="step-grid">
       <article className="step-card"><span className="step-number">01</span><Icon name="building" size={23}/><h3>Votre signature</h3><p>Un logo, vos couleurs, vos coordonnées. Une identité enregistrée pour vos futures vidéos.</p><Link href="/agence">Découvrir mon agence<Icon name="arrow" size={16}/></Link></article>
       <article className="step-card"><span className="step-number">02</span><Icon name="link" size={23}/><h3>Votre annonce</h3><p>Un lien suffit. BienVu vérifie les informations et les photos, puis prépare votre vidéo.</p><Link href="/generer">Préparer une vidéo<Icon name="arrow" size={16}/></Link></article>
-      <article className="step-card"><span className="step-number">03</span><Icon name="film" size={23}/><h3>Votre vidéo</h3><p>Prévisualisez, téléchargez, partagez. Vos créations seront réunies dans votre espace.</p><Link href="/historique">Voir mes vidéos<Icon name="arrow" size={16}/></Link></article>
+      <article className="step-card"><span className="step-number">03</span><Icon name="film" size={23}/><h3>Votre vidéo</h3><p>Prévisualisez, téléchargez, partagez. Vos créations seront réunies dans votre espace.</p><Link href="/biens">Voir mes biens<Icon name="arrow" size={16}/></Link></article>
     </div></section></Shell>;
 }

@@ -8,7 +8,7 @@ import {readListingDraft} from '../lib/listing-draft';
 const navigation: {href: string; name: string; icon: IconName}[] = [
   {href: '/studio', name: 'Vue d’ensemble', icon: 'grid'},
   {href: '/generer', name: 'Créer une vidéo', icon: 'spark'},
-  {href: '/historique', name: 'Mes vidéos', icon: 'history'},
+  {href: '/biens', name: 'Mes biens', icon: 'history'},
   {href: '/agence', name: 'Mon agence', icon: 'building'},
   {href: '/abonnement', name: 'Mon abonnement', icon: 'card'},
 ];

@@ -1,6 +1,6 @@
 'use client';
 import {useEffect, useImperativeHandle, useRef, useState, type ChangeEvent, type FormEvent, type Ref} from 'react';
-import {generationCreditCost,defaultVideoCustomization,createEditorDocument,CreationFields,VideoCustomization,GenerationCustomization,DESCRIPTION_MAX_CHARACTERS, ManualListingInput, MANUAL_PHOTO_LIMITS, publicErrors, type PublicErrorCode,
+import {generationCreditCost,defaultVideoCustomization,createEditorDocument,CreationFields,VideoCustomization,GenerationCustomization,DESCRIPTION_MAX_CHARACTERS, ManualListingInput, PropertyListingInput,MANUAL_PHOTO_LIMITS, publicErrors, type PublicErrorCode,
   type CreationDraftData, type CreationDraftView, type NormalizedListing,type VideoDuration,type VideoAspectRatio} from '@bienvu/contracts';
 import {HomeIcon} from './home-icons';
 import type {ImportView} from './generation-form';
@@ -33,6 +33,7 @@ async function photoHash(file:File){
 const labels: Record<string, string> = {title: 'titre', locality: 'localisation', propertyType: 'type de bien', description: 'description',
   priceCents: 'prix', charges: 'charges', area: 'surface', rooms: 'nombre de pièces', photos: 'photos'};
 type Props = {busy: boolean; generate?: boolean; setBusy(value: boolean): void;guided?:Guided;ref?:Ref<ManualListingFormHandle>;
+  saveOnly?:boolean;onSaved?(draft:CreationDraftView):void;
   onCreditCost?(value:number):void;
   customizing?:boolean;onCloseCustomizer?():void;brand?:{name:string;primaryColor:string;secondaryColor:string};
   initialCustomization?:VideoCustomization;
@@ -69,7 +70,7 @@ export function ManualListingForm(props: Props) {
     const data=new FormData(formRef.current),value=(name:string)=>String(data.get(name)??'').trim();
     const number=(name:string)=>{const raw=value(name).replace(/\s/g,'');return !raw?null:/^\d+(?:[.,]\d{1,2})?$/.test(raw)?Number(raw.replace(',','.')):NaN;};
     const price=number('priceCents');
-    return ManualListingInput.safeParse({title:listingTitle(value('title'),value('locality'),propertyType,transaction),propertyType,transaction,
+    return (props.saveOnly?PropertyListingInput:ManualListingInput).safeParse({title:listingTitle(value('title'),value('locality'),propertyType,transaction),propertyType,transaction,
       locality:value('locality'),description:props.guided?props.guided.description:value('description'),
       priceCents:price===null?null:Math.round(price*100),charges:transaction==='rent'?value('charges')||null:null,
       area:number('area'),rooms:number('rooms'),photos:photos.map((photo,index)=>({hash:photo.remote?.contentHash??photo.sourceHash??index.toString(16).padStart(64,'0'),
@@ -86,17 +87,17 @@ export function ManualListingForm(props: Props) {
   useEffect(()=>{if(!props.guided)return;
     const validated=finalInput(),fieldsValid=validated?.success===true;
     const issue=validated&&!validated.success?validated.error.issues.find(i=>i.path[0]!=='photos'):null;
-    const selectionValid=!customization||GenerationCustomization.safeParse(customization).success&&
+    const selectionValid=props.saveOnly||!customization||GenerationCustomization.safeParse(customization).success&&
       (!customization.photoOrder||customization.photoOrder.every(slot=>photos.some(photo=>photo.slot===slot&&photo.state==='ready')));
-    const ready=(completed||hydrated&&fieldsValid&&unresolved().length===0&&photos.filter(photo=>photo.state==='ready').length>=3&&
+    const ready=(completed||hydrated&&fieldsValid&&unresolved().length===0&&(props.saveOnly||photos.filter(photo=>photo.state==='ready').length>=3)&&
       !photos.some(photo=>photo.state!=='ready'||photo.removing)&&(!props.guided.agencyId||Boolean(serverDraft)));
     const reason=!selectionValid?'Vérifiez la narration et sélectionnez au moins trois photos.':completed?'':!hydrated?'Chargement du brouillon en cours.':
       unresolved().length?'Confirmez les informations signalées avant la création.':
       photos.some(photo=>photo.removing)?'Retrait des photos en cours.':photos.some(photo=>photo.state==='sending')?'Envoi des photos en cours.':photos.some(photo=>photo.state==='error')?
-      'Réessayez ou retirez les photos en erreur.':issue?fieldMessage(String(issue.path[0]),issue.code,issue.message):photos.length<3?'Ajoutez au moins trois photos.':!serverDraft&&props.guided.agencyId?
+      'Réessayez ou retirez les photos en erreur.':issue?fieldMessage(String(issue.path[0]),issue.code,issue.message):!props.saveOnly&&photos.length<3?'Ajoutez au moins trois photos.':!serverDraft&&props.guided.agencyId?
       'Préparation du brouillon privé en cours.':!fieldsValid?'Vérifiez les informations du bien.':'';
     props.guided.onReadyChange?.(Boolean(ready&&selectionValid),reason);
-  },[props.guided?.agencyId,props.guided?.description,hydrated,photos,serverDraft,revision,propertyType,transaction,completed,guestConfirmed,customization,props.customizing]);
+  },[props.guided?.agencyId,props.guided?.description,hydrated,photos,serverDraft,revision,propertyType,transaction,completed,guestConfirmed,customization,props.customizing,props.saveOnly]);
   async function confirmField(name:string){
     await settingsWrite.current;const draft=serverRef.current;if(!draft){setGuestConfirmed(current=>new Set([...current,name]));return;}
     try{const response=await fetch(`/api/imports/${draft.id}/draft`,{method:'PATCH',headers:{'Content-Type':'application/json'},
@@ -302,7 +303,7 @@ export function ManualListingForm(props: Props) {
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();if(busy||photoChecking||submitLock.current||!hydrated)return;
-    if(customization&&!GenerationCustomization.safeParse(customization).success){setFeedback('Vérifiez la narration et choisissez au moins trois photos.');return;}
+    if(!props.saveOnly&&customization&&!GenerationCustomization.safeParse(customization).success){setFeedback('Vérifiez la narration et choisissez au moins trois photos.');return;}
     const form = event.currentTarget, data = new FormData(form), validatedBefore=finalInput();
     const text = (name: string) => String(data.get(name) ?? '').trim();
     const number = (name: string) => {
@@ -324,7 +325,7 @@ export function ManualListingForm(props: Props) {
             fields[name]=fieldMessage(name,issue.code,issue.message);}setErrors(fields);
             if(fields.title||fields.description)setDetailsOpen(true);focusError(Object.keys(fields)[0]);}
           throw new FormFailure('Vérifiez les champs indiqués avant de créer la vidéo.');}
-        if(photos.some(photo=>photo.state!=='ready'||photo.removing)||photos.filter(photo=>photo.remote).length<3)
+        if(photos.some(photo=>photo.state!=='ready'||photo.removing)||!props.saveOnly&&photos.filter(photo=>photo.remote).length<3)
           throw new FormFailure('Complétez l’envoi de trois photos valides avant de créer la vidéo.');
         const changes={title:validated.data.title,propertyType:propertyType||null,transaction:transaction||null,
           locality:text('locality')||null,description:props.guided.description||null,
@@ -335,6 +336,7 @@ export function ManualListingForm(props: Props) {
         const updated=await response.json() as CreationDraftView&{error?:{message?:string};fields?:Record<string,string>};
         if(!response.ok){if(updated.fields)setErrors(updated.fields);throw new FormFailure(updated.error?.message??'Le brouillon a changé. Rechargez ses données et réessayez.');}
         serverRef.current=updated;setServerDraft(updated);
+        if(props.saveOnly){props.onSaved?.(updated);return;}
         setProgress('Validation de votre annonce…');
         const result=await send(`/api/imports/${draft.id}/complete`,{method:'POST',headers:{'Content-Type':'application/json'},
           body:JSON.stringify({version:updated.version})});

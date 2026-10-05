@@ -2,6 +2,7 @@ import {z} from 'zod';
 import type {ImportResourceDiagnostic} from './import-diagnostics';
 
 export * from './product';
+export * from './properties';
 export * from './mailbox';
 export * from './errors';
 export * from './agency';

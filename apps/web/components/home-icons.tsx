@@ -1,6 +1,8 @@
 import type {ReactNode} from 'react';
 
 const shapes = {
+  grid: <>{[3,14].flatMap(x=>[3,14].map(y=><rect key={`${x}-${y}`} x={x} y={y} width="7" height="7" rx="1"/>))}</>,
+  list: <><path d="M8 5h13M8 12h13M8 19h13M3 5h1M3 12h1M3 19h1"/></>,
   mail: <><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 5 10 8L22 5"/></>,
   archive: <><rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v13h16V8M9 12h6"/></>,
   paperclip: <path d="m8 14 7-7a3 3 0 0 1 4 4l-9 9a5 5 0 0 1-7-7L13 3a2 2 0 0 1 3 3L6 16"/>,
