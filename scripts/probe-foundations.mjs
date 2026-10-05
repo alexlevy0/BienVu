@@ -14,7 +14,7 @@ const pages = new Map([
   ['/agence', /Votre identité, sur chaque vidéo\./],
   ['/historique', /Toutes vos créations, au même endroit\./],
   ['/abonnement', [/id="offers-gratuit"/, /id="offers-plus"/, /id="offers-pro"/]],
-  ['/connexion', /Votre studio immobilier/],
+  ['/connexion', [/id="login-studio-title"/, /class="login-box(?:\s[^"]*)?"/]],
   ['/laboratoire', /Cette interface est en développement/],
 ]);
 for (const [path, expectedContent] of pages) {
