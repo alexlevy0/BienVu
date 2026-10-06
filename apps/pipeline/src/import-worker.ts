@@ -1,5 +1,5 @@
 import {Container} from '@cloudflare/containers';
-import {EntityId, ImportFailure, importFailureReason, importResourceDiagnostic, importResourceHeader, parseImportResourceHeader} from '@bienvu/contracts';
+import {EntityId, ImportFailure, importFailureReason, importResourceDiagnostic, importResourceHeader, parseImportResourceHeader, publicErrors} from '@bienvu/contracts';
 import {findImport, claimHostedResource, settleHostedResource, claimHostedBrowser, releaseHostedBrowser, ImportStateFailure} from '@bienvu/db';
 import {IMPORT_LIMITS, readLimited, scopedUrl, sourcePolicy, type ImportTransport} from '@bienvu/importers';
 import {authorized, json, smallJson} from './auth';
@@ -101,8 +101,8 @@ export default {
       }
       return json({error: 'NOT_FOUND'}, 404);
     } catch (error) {
-      const code = error instanceof ImportFailure ? error.code : error instanceof ImportStateFailure ? 'IMPORT_LIMIT' : 'SOURCE_UNAVAILABLE';
-      return new Response(null, {status: code === 'IMPORT_LIMIT' ? 429 : 422, headers: {'X-Import-Error': code,
+      const code = error instanceof ImportFailure || error instanceof ImportStateFailure ? error.code : 'SOURCE_UNAVAILABLE';
+      return new Response(null, {status: publicErrors[code][0], headers: {'X-Import-Error': code,
         ...(error instanceof ImportFailure && error.reason ? {'X-Import-Reason': error.reason} : {}),
         ...(error instanceof ImportFailure && error.resource ? {'X-Import-Resource': importResourceHeader(error.resource)} : {})}});
     }

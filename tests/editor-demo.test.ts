@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import {createEditorDocument,defaultVideoCustomization,emptyCreationFields,EditorVoicePreview,editorCanReuseVoice,type PhotoAsset} from '../packages/contracts/src/index';
-import {generationRights,admitGeneration,findCreationDraft,retainedAnimations} from '../packages/db/src/index';
+import {generationRights,admitGeneration,findCreationDraft,retainedAnimations,beginManualImport} from '../packages/db/src/index';
 import {migrateNarrationProbe} from '../scripts/narration-fixtures';
 import {fixtureImportTransport} from '../scripts/import-fixtures';
 import {toneFixture} from '../fixtures/voice';
@@ -63,6 +63,10 @@ test('Connexion après essai : copies privées idempotentes avec voix, musique e
     await env.DB.prepare('INSERT INTO hosted_import_budget VALUES(?,0,9500,0)').bind(at.slice(0,7)).run();await env.DB.exec('UPDATE generation_control SET enabled=1; UPDATE trial_policy SET free_enabled=1');
     const listing=await createPrivateImport(env,'demo-owner-a','https://fixtures.bienvu.example/vente','demo-origin-fixture-001',fixtureImportTransport());
     const origin=await admitGeneration(env.DB,'demo-owner-a','demo-origin-job-001',{listingId:listing.id},'true');
+    for(let i=0;i<30;i++)await beginManualImport(env.DB,'demo-owner-b',`existing-demo-project-${i}`,'{}','a'.repeat(64));
+    await env.DB.prepare('UPDATE hosted_import_budget SET paused=1').run();
+    await env.DB.prepare('UPDATE import_usage SET attempts=60 WHERE day=?').bind(at.slice(0,10)).run();
+    const usageBefore=(await env.DB.prepare('SELECT * FROM import_usage ORDER BY day').all()).results;
     const target=await startManualCreationDraft(env.DB,'demo-owner-b','demo-target-fixture-001'),foreign=await startManualCreationDraft(env.DB,'demo-owner-a','demo-foreign-fixture-001');
     const wav=new Uint8Array(toneFixture(1000)),audioHash=await contentHash(wav),photos:PhotoAsset[]=[],assets:ReturnType<typeof editorDemo>['media']=[];
     for(let slot=0;slot<4;slot++){const image=new Uint8Array([255,216,slot,7,255,217]),sha256=await contentHash(image),id=`demo-photo-${slot}`;
@@ -94,6 +98,9 @@ test('Connexion après essai : copies privées idempotentes avec voix, musique e
     assert.equal((await env.DB.prepare('SELECT count(*) n FROM animation_library').first<{n:number}>())!.n,4);
     assert.equal((await env.DB.prepare('SELECT count(*) n FROM editor_voice_sources').first<{n:number}>())!.n,1);
     assert.equal((await env.DB.prepare('SELECT count(*) n FROM editor_music_assets').first<{n:number}>())!.n,1);
+    assert.equal((await env.DB.prepare("SELECT count(*) n FROM listing_imports WHERE agency_id='demo-owner-b'").first<{n:number}>())!.n,31);
+    assert.equal((await env.DB.prepare('SELECT count(*) n FROM hosted_import_costs').first<{n:number}>())!.n,0);
+    assert.deepEqual((await env.DB.prepare('SELECT * FROM import_usage ORDER BY day').all()).results,usageBefore);
     assert.equal((await env.DB.prepare('PRAGMA foreign_key_check').all()).results.length,0);
   }finally{await mf.dispose();}
 });

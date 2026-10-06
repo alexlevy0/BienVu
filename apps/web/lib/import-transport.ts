@@ -23,6 +23,7 @@ async function hostedCall(env: HostedEnv, agencyId: string, id: string, path: st
       Authorization: `Bearer ${env.IMPORT_TOKEN}`, 'X-Agency-ID': agencyId, 'X-Import-ID': id}}));
   if (!response.ok) {
     const code = response.headers.get('X-Import-Error'); await response.body?.cancel();
+    if(code==='IMPORT_BUDGET_LIMIT'||code==='IMPORT_RESOURCE_LIMIT'||code==='PROJECT_RATE_LIMIT')throw new RequestFailure(code);
     if (response.status === 429) throw new RequestFailure('IMPORT_LIMIT');
     throw new ImportFailure(code === 'UNSAFE_URL' || code === 'SOURCE_BLOCKED' || code === 'IMPORT_TIMEOUT'
       || code === 'INSUFFICIENT_PHOTOS' || code === 'NOT_A_LISTING' ? code : 'SOURCE_UNAVAILABLE', 'Import hébergé indisponible.', importFailureReason(response.headers.get('X-Import-Reason')),

@@ -70,7 +70,7 @@ export function GenerationForm() {
   return <>
     <p className="field-help">{me.rights.generationEnabled?`${me.rights.creditKind==='free'?'Compte gratuit':'Votre quota'} · ${me.rights.developmentRemaining} vidéo(s) disponible(s).`:'La génération est momentanément fermée. Vous pouvez préparer vos annonces.'}</p>
     {me.rights.renewalAt&&<p className="field-help">Renouvellement le {new Date(me.rights.renewalAt).toLocaleDateString('fr-FR')}.</p>}
-    {me.rights.importRetryAt&&<p className="information-note" role="status">La limite des imports de test est atteinte. Les nouvelles annonces seront disponibles à partir du {new Date(me.rights.importRetryAt).toLocaleString('fr-FR')}. Vos annonces déjà enregistrées restent utilisables.</p>}
+    {me.rights.importRetryAt&&<p className="information-note" role="status">La limite des imports par lien est atteinte jusqu’au {new Date(me.rights.importRetryAt).toLocaleString('fr-FR')}. Vous pouvez utiliser la saisie manuelle et vos annonces déjà enregistrées.</p>}
     {job&&<GenerationProgress job={job} unavailable={unavailable}/>}
     <form className="generation-form" onSubmit={submit} noValidate>
       <label htmlFor="listing-url">Le lien de votre annonce</label>

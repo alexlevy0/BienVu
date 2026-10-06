@@ -47,7 +47,7 @@ test('budget imports hébergés : réservation atomique, rejouable, bornes rése
   assert.equal((await purgeHostedImports({DB, MEDIA}, now + 700_000)).removed, 0);
 });
 
-test('photos personnelles après quota de scraping : brouillon permis, budget financier et stockage toujours bornés',async t=>{
+test('photos personnelles après quota de scraping : plus de 30 brouillons permis et budget des transferts toujours borné',async t=>{
   const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:'export default {fetch(){return new Response("fixture")}}',
     compatibilityDate:'2026-09-28',d1Databases:['DB']}));t.after(()=>mf.dispose());
   const {DB}=await mf.getBindings<Pick<CloudflareEnv,'DB'>>();
@@ -61,8 +61,10 @@ test('photos personnelles après quota de scraping : brouillon permis, budget fi
   const first=(await beginManualImport(DB,'photos','manual-allowed-quota-01','{}','a'.repeat(64))).row;
   await reserveHostedImport(DB,'photos',first.id);
   const second=(await beginManualImport(DB,'photos','manual-allowed-quota-02','{}','a'.repeat(64))).row;
-  await assert.rejects(reserveHostedImport(DB,'photos',second.id),/IMPORT_LIMIT/);
+  await assert.rejects(reserveHostedImport(DB,'photos',second.id),/IMPORT_BUDGET_LIMIT/);
   assert.equal((await DB.prepare('SELECT attempts FROM import_usage WHERE day=?').bind(day).first<{attempts:number}>())?.attempts,20);
   for(let i=2;i<30;i++)await beginManualImport(DB,'photos',`manual-storage-limit-${i}`,'{}','a'.repeat(64));
-  await assert.rejects(beginManualImport(DB,'photos','manual-storage-limit-30','{}','a'.repeat(64)),/IMPORT_LIMIT/);
+  const extra=(await beginManualImport(DB,'photos','manual-storage-limit-30','{}','a'.repeat(64))).row;
+  assert.equal(extra.sourceKind,'manual');
+  assert.equal((await DB.prepare("SELECT count(*) n FROM listing_imports WHERE agency_id='photos'").first<{n:number}>())?.n,31);
 });

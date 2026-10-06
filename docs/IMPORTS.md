@@ -193,3 +193,15 @@ Le registre accepte désormais les fiches `/annonce-location-…-UUID/` en plus 
 L'essai anonyme autorise ces locations Orpi. Une page de recherche d'une source autorisée donne `NOT_A_LISTING` ; un portail extérieur au pilote donne `TRIAL_SOURCE_UNSUPPORTED`. Aucun contrôle HTTPS, hôte, UUID, redirection, photo ou budget n'est supprimé.
 
 Les deux pages fournies par Alex le 30/09 ont été téléchargées par le transport HTTPS natif borné et extraites localement : Chevilly-Larue (833 €/mois charges comprises, 22,41 m², une pièce, cinq candidats photo) et Issy-les-Moulineaux (1 178 €/mois charges comprises, 37,23 m², deux pièces, sept candidats). Cela valide leurs HTML réels, pas à lui seul les photos décodées, la persistance Cloudflare ou une nouvelle vidéo. La fixture `orpi-rent.html` contient des données de recette synthétiques et ne constitue pas une troisième annonce réelle.
+
+## Projets de l’Éditeur — correction du 6 octobre 2026
+
+Le nombre total de lignes `listing_imports` n’est plus un quota : l’ancien plafond de 30 lignes par agence bloquait aussi « Nouveau projet » et « Utiliser la démo ». Les projets et imports existants restent conservés. La création `/api/imports/draft` ne sollicite plus le transport d’import et ne réserve plus 0,50 € simplement pour ouvrir un éditeur vide ou copier les médias déjà publiés de la démo. L’envoi de photos personnelles conserve sa réservation avant normalisation dans la route d’upload.
+
+Les imports par lien gardent leur compteur partagé de 20 par jour UTC et 60 par mois, leur réservation financière, les bornes réseau et la purge existantes. Les photos restent limitées à 12 et 50 Mio par brouillon. Aucun compteur, crédit consommé ou coût déjà provisionné n’est remboursé par ce changement.
+
+La migration `0047_project_creation_rate.sql` ajoute une protection indépendante : 60 nouvelles créations manuelles par agence et par heure UTC. Elle reprend l’historique des projets existants. Un rejeu idempotent ne compte pas deux fois, la suppression d’un projet ne réinitialise pas le registre et une autre agence dispose de son propre compteur.
+
+Les erreurs publiques distinguent désormais `IMPORT_LIMIT` (quota de liens), `IMPORT_BUDGET_LIMIT` (budget de traitement), `IMPORT_RESOURCE_LIMIT` (bornes du transfert) et `PROJECT_RATE_LIMIT` (créations trop rapprochées). Les messages de l’Éditeur et des uploads utilisent ce contrat au lieu d’annoncer une limite générique « d’imports de test ».
+
+Régression : `tests/editor-projects.test.ts` vérifie la migration, l’ouverture après 30 projets, l’indépendance des quotas/budgets, la concurrence, le rejeu, la suppression et le renouvellement horaire. `tests/editor-demo.test.ts` vérifie en plus la copie complète avec voix, musique et animations après 30 projets et avec les imports par lien et leur budget indisponibles.

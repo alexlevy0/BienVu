@@ -11,7 +11,7 @@ const columns = `id,agency_id AS agencyId,source_kind AS sourceKind,nullif(sourc
   (SELECT version FROM creation_drafts WHERE id=listing_imports.id) AS draftVersion,
   (SELECT json_group_array(json(photo_json)) FROM import_objects WHERE import_id=listing_imports.id AND agency_id=listing_imports.agency_id) AS draftPhotos,
   created_at AS createdAt,expires_at AS expiresAt,lease_until AS leaseUntil`;
-export class ImportStateFailure extends Error {constructor(readonly code: 'CONFLICT' | 'IMPORT_LIMIT' | 'NOT_FOUND' | 'VALIDATION_ERROR') {super(code);}}
+export class ImportStateFailure extends Error {constructor(readonly code: 'CONFLICT' | 'IMPORT_LIMIT' | 'IMPORT_BUDGET_LIMIT' | 'IMPORT_RESOURCE_LIMIT' | 'PROJECT_RATE_LIMIT' | 'NOT_FOUND' | 'VALIDATION_ERROR') {super(code);}}
 export async function findImport(db: Database, agencyId: string, id: string) {
   if (!EntityId.safeParse(id).success) return null;
   return db.prepare(`SELECT ${columns} FROM listing_imports WHERE agency_id=? AND id=?`).bind(agencyId, id).first<ImportRow>();
@@ -31,17 +31,17 @@ async function startImport(db: Database, agencyId: string, url: string | null, k
   if (existing) {if (!matches(existing)) throw new ImportStateFailure('CONFLICT'); return {row: existing, fresh: false};}
   const id = crypto.randomUUID(), created = new Date(now).toISOString();
   try {
-    // INSERT SELECT = un seul contrôle atomique sous concurrence, limites hors crédits vidéo.
+    // Les triggers limitent les imports par lien et les créations rapprochées.
+    // Le nombre total de projets conservés ne bloque plus un nouveau brouillon.
     await db.prepare(`INSERT INTO listing_imports(id,agency_id,idempotency_key,source_url,source_kind,input_json,input_hash,status,created_at,lease_until,expires_at)
-      SELECT ?,?,?,?,?,?,?,'importing',?,?,? WHERE
-      (SELECT count(*) FROM listing_imports WHERE agency_id=?) < 30
+      VALUES(?,?,?,?,?,?,?,'importing',?,?,?)
       ON CONFLICT(agency_id,idempotency_key) DO NOTHING`)
       .bind(id, agencyId, key, url ?? '', url === null ? 'manual' : 'url', input, inputHash, created,
-        new Date(now + (url === null ? 900_000 : 90_000)).toISOString(), new Date(now + 30 * 86400_000).toISOString(),
-        agencyId).run();
-  } catch (error) {throw new ImportStateFailure(String(error).includes('IMPORT_LIMIT') ? 'IMPORT_LIMIT' : 'CONFLICT');}
+        new Date(now + (url === null ? 900_000 : 90_000)).toISOString(), new Date(now + 30 * 86400_000).toISOString()).run();
+  } catch (error) {const message=String(error);throw new ImportStateFailure(message.includes('PROJECT_RATE_LIMIT') ? 'PROJECT_RATE_LIMIT'
+    : message.includes('IMPORT_LIMIT') ? 'IMPORT_LIMIT' : 'CONFLICT');}
   const row = await previous();
-  if (!row) throw new ImportStateFailure('IMPORT_LIMIT');
+  if (!row) throw new ImportStateFailure('CONFLICT');
   if (!matches(row)) throw new ImportStateFailure('CONFLICT');
   return {row, fresh: row.id === id};
 }
