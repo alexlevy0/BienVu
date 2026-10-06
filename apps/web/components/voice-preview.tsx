@@ -1,11 +1,11 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
-import type {VideoCustomization} from '@bienvu/contracts';
+import {frenchVoices,type VideoCustomization} from '@bienvu/contracts';
 import {voicePreviews} from '../lib/voice-previews';
 import {HomeIcon} from './home-icons';
 
 export function VoicePreview({voice,disabled}: {voice:VideoCustomization['voice'];disabled:boolean}) {
-  const sample=voicePreviews[voice],audio=useRef<HTMLAudioElement>(null),attempt=useRef(0);
+  const sample=voicePreviews[voice]??{name:frenchVoices.find(v=>v.id===voice)?.name??'Voix française',src:`/audio/voice-previews/cartesia-v1/${voice.slice(9)}.mp3`},audio=useRef<HTMLAudioElement>(null),attempt=useRef(0);
   const [state,setState]=useState<'idle'|'loading'|'playing'>('idle'),[error,setError]=useState(false);
   useEffect(()=>{const player=audio.current;player?.setAttribute('src',sample.src);return()=>{attempt.current++;player?.pause();player?.removeAttribute('src');player?.load();};},[sample.src]);
   useEffect(()=>{if(disabled){attempt.current++;audio.current?.pause();setState('idle');}},[disabled]);

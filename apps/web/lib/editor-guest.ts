@@ -16,8 +16,8 @@ export type GuestEditorPort={persisted:boolean;photoUrls:Record<string,string>;v
   save(draft:CreationDraftView):Promise<void>;upload(photo:{id:string;slot:number;file:File}):Promise<PhotoAsset>;
   remove(id:string):Promise<void>;music(id:string,wav:Blob):Promise<EditorMusicUpload>;connect():Promise<void>;choose():void};
 
-export function newGuestRecord(kind:'demo'|'empty',id:string=crypto.randomUUID()):GuestEditorRecord{
-  return {version:1,demoVersion:EDITOR_DEMO_VERSION,kind,draft:newGuestDraft(id,kind),savedAt:Date.now(),files:[],handoff:false,connectionKey:null,transfer:null};
+export function newGuestRecord(kind:'demo'|'empty',id:string=crypto.randomUUID(),voice?:Settings['voice']):GuestEditorRecord{
+  return {version:1,demoVersion:EDITOR_DEMO_VERSION,kind,draft:newGuestDraft(id,kind,voice),savedAt:Date.now(),files:[],handoff:false,connectionKey:null,transfer:null};
 }
 export function parseGuestRecord(value:unknown):GuestEditorRecord|null{
   const parsed=recordSchema.safeParse(value);if(!parsed.success||!value||typeof value!=='object')return null;

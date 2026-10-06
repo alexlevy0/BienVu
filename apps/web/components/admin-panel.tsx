@@ -7,16 +7,17 @@ import {AdminCommercial} from './admin-commercial';
 import {AdminSeo} from './admin-seo';
 import {AdminFinance,AdminVideoProfit} from './admin-finance';
 import {AdminBudgetSettings} from './admin-budget-settings';
+import {AdminVoiceLibrary} from './admin-voices';
 import {AdminMusicLibrary} from './admin-music-library';
 import {AdminHomepage} from './admin-homepage';
 import {AdminMailbox} from './admin-mailbox';
 import {AdminImportDiagnostic,AdminImportError,importDiagnosticKeys} from './admin-import-diagnostic';
 import {AdminAttention,AdminPerformance,AdminMonthlyCosts,AdminTrafficView,type AdminTarget} from './admin-insights';
 
-type View=AdminSection|'overview'|'system'|'traffic'|'performance'|'costs'|'commercial'|'finance'|'music'|'homepage'|'mailbox'|'seo';
+type View=AdminSection|'overview'|'system'|'traffic'|'performance'|'costs'|'commercial'|'finance'|'voices'|'music'|'homepage'|'mailbox'|'seo';
 const tabs:{id:View;label:string}[]=[{id:'overview',label:'Vue d’ensemble'},{id:'videos',label:'Vidéos'},{id:'agencies',label:'Agences'},{id:'users',label:'Comptes'},
   {id:'subscriptions',label:'Abonnements'},{id:'quotas',label:'Crédits'},{id:'imports',label:'Imports & brouillons'},
-  {id:'reports',label:'Signalements'},{id:'mailbox',label:'Messagerie'},{id:'music',label:'Banque de musiques'},{id:'homepage',label:'Page d’accueil'},{id:'traffic',label:'Fréquentation'},{id:'seo',label:'SEO & acquisition'},{id:'performance',label:'Performance'},{id:'costs',label:'Coûts mensuels'},{id:'commercial',label:'Conversion & recettes'},{id:'finance',label:'Rentabilité'},{id:'system',label:'Service & budget'},{id:'audit',label:'Journal'}];
+  {id:'reports',label:'Signalements'},{id:'mailbox',label:'Messagerie'},{id:'voices',label:'Voix off'},{id:'music',label:'Banque de musiques'},{id:'homepage',label:'Page d’accueil'},{id:'traffic',label:'Fréquentation'},{id:'seo',label:'SEO & acquisition'},{id:'performance',label:'Performance'},{id:'costs',label:'Coûts mensuels'},{id:'commercial',label:'Conversion & recettes'},{id:'finance',label:'Rentabilité'},{id:'system',label:'Service & budget'},{id:'audit',label:'Journal'}];
 const labels:Record<string,string>={ready:'Prête',failed:'Échec',active:'Actif',queued:'En attente',importing:'Import',scripting:'Rédaction',voicing:'Voix',rendering:'Assemblage',retry_wait:'Nouvel essai',
   account:'Compte',anonymous:'Anonyme',internal:'Test interne',available:'Disponible',unavailable:'Indisponible',expired:'Expiré',expiring:'Purge en cours',consumed:'Consommé',reserved:'Réservé',released:'Libéré',unfunded:'Non débité',
   new:'Nouveau',reviewing:'En traitement',closed:'Clos',free:'Gratuit',paid:'Payant',trial:'Essai',current:'Période en cours',none:'Sans abonnement',verified:'Vérifié',unverified:'Non vérifié',
@@ -70,7 +71,7 @@ export function AdminPanel(){
   useEffect(()=>{
     const controller=new AbortController(),version=++loadVersion.current;setPage(null);setFailure('');setBusy(true);setSelected(null);setDetail(null);setPending(null);setOverview(null);setTraffic(null);
     if(!accountId){setBusy(false);return()=>controller.abort();}
-    if(view==='commercial'||view==='finance'||view==='music'||view==='homepage'||view==='mailbox'||view==='seo'){setBusy(false);return()=>controller.abort();}
+    if(view==='commercial'||view==='finance'||view==='voices'||view==='music'||view==='homepage'||view==='mailbox'||view==='seo'){setBusy(false);return()=>controller.abort();}
     if(from&&to&&from>to){setFailure('La date de fin doit suivre la date de début.');setBusy(false);return()=>controller.abort();}
     const aggregate=['overview','system','performance','costs'].includes(view);
     const url=view==='traffic'?'/api/admin?section=traffic&days='+trafficDays:aggregate?'/api/admin?section=overview':endpoint();
@@ -106,7 +107,7 @@ export function AdminPanel(){
     }catch(error){setActionError(error instanceof Error?error.message:'Modification interrompue.');}finally{setSaving(false);}
   }
   if(!loading&&!accountId)return <div className="admin-shell"><h1>Accès réservé</h1><p>Connectez-vous avec votre compte administrateur.</p></div>;
-  const recordView=!['overview','system','traffic','performance','costs','commercial','finance','music','homepage','mailbox','seo'].includes(view)?view as AdminSection:null;
+  const recordView=!['overview','system','traffic','performance','costs','commercial','finance','voices','music','homepage','mailbox','seo'].includes(view)?view as AdminSection:null;
   const selectedColumns=recordView?columns[recordView]:[];
   return <div className="admin-shell">
     <header className="admin-heading"><div><span className="admin-eyebrow">PILOTAGE DE BIENVU</span><h1>Super admin<span>.</span></h1><p>Votre activité, vos agences et votre service, au même endroit.</p></div><span className="admin-access"><span/>Accès privé</span></header>
@@ -122,6 +123,7 @@ export function AdminPanel(){
     {view==='commercial'&&accountId&&<AdminCommercial key={revision}/>}
     {view==='seo'&&accountId&&<AdminSeo key={revision}/>}
     {view==='finance'&&accountId&&<AdminFinance key={revision}/>}
+    {view==='voices'&&accountId&&<AdminVoiceLibrary key={revision}/>}
     {view==='music'&&accountId&&<AdminMusicLibrary key={revision}/>}
     {view==='homepage'&&accountId&&<AdminHomepage key={revision}/>}
     {view==='mailbox'&&accountId&&<AdminMailbox revision={revision}/>}
@@ -170,13 +172,13 @@ function NarrationCosts({calls}:{calls:AdminNarrationCall[]}){
     const real=calls.filter(c=>c.provider===provider&&c.mode==='real'),known=real.filter(c=>c.currency==='USD'&&c.estimatedMicros!==null);
     return {real:real.length,known:known.length,micros:known.reduce((sum,c)=>sum+c.estimatedMicros!,0)};
   };
-  const openai=totals('openai'),google=totals('google'),fish=totals('fish');
+  const openai=totals('openai'),google=totals('google'),fish=totals('fish'),cartesia=totals('cartesia');
   return <section className="admin-narration-costs" aria-label="Coût de la narration"><h3>Coût de la narration</h3>
-    <div className="admin-cost-grid">{([{name:'OpenAI · rédaction',total:openai,note:'Avant remise sur les tokens en cache.'},{name:'Google · voix',total:google,note:'Avant gratuité mensuelle Google.'},{name:'Fish Audio · voix',total:fish,note:'Modèle gratuit S2.1 Pro ; usage mesuré en octets UTF-8.'}]).map(({name,total,note})=><div className="admin-cost-card" key={name}><span>{name}</span><strong>{!total.real?'Aucun appel réel':!total.known?'Non mesuré':usd(total.micros)}</strong><small>{total.real?`${total.known} / ${total.real} appel${total.real>1?'s':''} mesuré${total.known>1?'s':''}. `:''}{note}{total.known<total.real?' Total partiel.':''}</small></div>)}
+    <div className="admin-cost-grid">{([{name:'OpenAI · rédaction',total:openai,note:'Avant remise sur les tokens en cache.'},{name:'Google · voix',total:google,note:'Avant gratuité mensuelle Google.'},{name:'Cartesia · voix',total:cartesia,note:'Sonic 3.6 · quota Free, facture à rapprocher.'},{name:'Fish Audio · voix',total:fish,note:'Modèle gratuit S2.1 Pro ; usage mesuré en octets UTF-8.'}]).map(({name,total,note})=><div className="admin-cost-card" key={name}><span>{name}</span><strong>{!total.real?'Aucun appel réel':!total.known?'Non mesuré':usd(total.micros)}</strong><small>{total.real?`${total.known} / ${total.real} appel${total.real>1?'s':''} mesuré${total.known>1?'s':''}. `:''}{note}{total.known<total.real?' Total partiel.':''}</small></div>)}
       <div className="admin-cost-card"><span>Provision des appels</span><strong>{euro(calls.reduce((sum,c)=>sum+c.reservedCents,0))}</strong><small>Réserve préventive en euros, déjà incluse dans le budget vidéo.</small></div>
     </div>
     <p className="admin-muted">Estimations enregistrées au moment des appels, en dollars US, hors taxes et conversion. La facture effective et le coût Cloudflare de cette vidéo ne sont pas connus. Une mesure absente ne vaut pas zéro.</p>
-    {calls.length?<div className="admin-table-scroll"><table className="admin-table"><thead><tr><th>Fournisseur</th><th>Mode</th><th>État</th><th>Coût estimé (USD)</th><th>Provision (EUR)</th><th>Erreur</th></tr></thead><tbody>{calls.map(c=><tr key={c.id}><td>{c.provider==='openai'?'OpenAI':c.provider==='fish'?'Fish Audio':'Google TTS'}</td><td>{c.mode==='real'?'Réel':'Fixture'}</td><td>{c.state==='done'?'Terminé':c.state==='failed'?'Échec':'En cours'}</td><td>{c.mode==='mock'?'Simulé · non facturé':c.estimatedMicros===null?'Non mesuré':usd(c.estimatedMicros)}</td><td>{euro(c.reservedCents)}</td><td>{text(c.error)}</td></tr>)}</tbody></table></div>:<p className="admin-muted">Aucun appel enregistré pour cette génération.</p>}
+    {calls.length?<div className="admin-table-scroll"><table className="admin-table"><thead><tr><th>Fournisseur</th><th>Mode</th><th>État</th><th>Coût estimé (USD)</th><th>Provision (EUR)</th><th>Erreur</th></tr></thead><tbody>{calls.map(c=><tr key={c.id}><td>{c.provider==='openai'?'OpenAI':c.provider==='fish'?'Fish Audio':c.provider==='cartesia'?'Cartesia':'Google TTS'}</td><td>{c.mode==='real'?'Réel':'Fixture'}</td><td>{c.state==='done'?'Terminé':c.state==='failed'?'Échec':'En cours'}</td><td>{c.mode==='mock'?'Simulé · non facturé':c.estimatedMicros===null?'Non mesuré':usd(c.estimatedMicros)}</td><td>{euro(c.reservedCents)}</td><td>{text(c.error)}</td></tr>)}</tbody></table></div>:<p className="admin-muted">Aucun appel enregistré pour cette génération.</p>}
     {calls.filter(c=>c.provider==='fish').map(c=><details className="admin-request" key={c.id}><summary>Requête Fish Audio · {text(c.voice)}</summary><dl className="admin-facts">{[['Modèle',text(c.model)],['Octets UTF-8',c.inputUtf8Bytes===null?'Non mesurés':num(c.inputUtf8Bytes)],['Durée de l’appel',c.requestDurationMs===null?'Non mesurée':num(c.requestDurationMs)+' ms'],['ID de requête',text(c.providerRequestId)]].map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl></details>)}
     {calls.filter(c=>c.provider==='openai').map((c,index)=><details className="admin-request" key={c.id} open={index===0}><summary>Requête OpenAI · {c.step} <span>{c.mode==='mock'?'Fixture':c.estimatedMicros===null?'Non mesuré':usd(c.estimatedMicros)}</span></summary>
       <dl className="admin-facts">{[

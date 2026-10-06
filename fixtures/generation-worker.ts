@@ -1,8 +1,8 @@
 import {DurableObject} from 'cloudflare:workers';
 import worker,{reconcileBatch,reconcileGeneration,GenerationWorkflow, type GenerationEnv} from '../apps/pipeline/src/generation-worker';
-import {GoogleVoiceConfig,FishVoiceConfig,VideoManifest,VideoReport,videoManifestHash,videoObjectKey,videoPreviewKey} from '../packages/contracts/src/index';
+import {VideoManifest,VideoReport,videoManifestHash,videoObjectKey,videoPreviewKey} from '../packages/contracts/src/index';
 import {DEFAULT_SCRIPT_MODEL} from '../packages/narration/src/index';
-import {googleTts,fishTts} from '../packages/voice/src/index';
+import {googleTts,fishTts,cartesiaTts,frenchVoiceConfig} from '../packages/voice/src/index';
 import {toneFixture} from './voice';
 import {fixturePlan,fixtureScriptMetrics} from './narration';
 import {findGeneration,generationView} from '../packages/db/src/index';
@@ -10,8 +10,9 @@ import {productRenderBudget} from '../apps/pipeline/src/product-render-budget';
 export class FixtureGenerationWorkflow extends GenerationWorkflow {
   protected override diagnostic(error:unknown){console.error(error);}
   protected override async providers(voiceName?:string,voiceEnabled=true){
-    const config=voiceName?.startsWith('fish-')?FishVoiceConfig.parse({voice:voiceName}):GoogleVoiceConfig.parse({projectId:'bienvu-fixture',voice:voiceName});
-    const voice=config.provider==='fish'?fishTts(config,'fixture-key-never-networked',{fetch:async()=>new Response(new Uint8Array(toneFixture(4500)))})
+    const config=frenchVoiceConfig(voiceName??'fish-manon','bienvu-fixture');
+    const voice=config.provider==='cartesia'?cartesiaTts(config,'fixture-key-never-networked',{fetch:async()=>new Response(new Uint8Array(toneFixture(4500)))})
+      :config.provider==='fish'?fishTts(config,'fixture-key-never-networked',{fetch:async()=>new Response(new Uint8Array(toneFixture(4500)))})
       :googleTts(config,async()=>'fixture-token-never-networked', {fetch:async()=>{const bytes=toneFixture(4500);let text='';for(const b of bytes)text+=String.fromCharCode(b);return Response.json({audioContent:btoa(text)});}});
     return {mode:'mock' as const,script:{model:DEFAULT_SCRIPT_MODEL,plan:async(context:Parameters<typeof fixturePlan>[0])=>({plan:fixturePlan(context),metrics:fixtureScriptMetrics()})},voice:{config,synthesize:voiceEnabled?voice.synthesize:async():Promise<never>=>{throw Error('TTS_MUST_NOT_RUN');}}};
   }

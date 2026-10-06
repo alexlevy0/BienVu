@@ -19,9 +19,9 @@ export function guestAgency():AgencyProfile{
   return {id:'editor-guest',ownerUserId:'editor-guest',name:'BienVu',neutral:true,logoAssetId:null,phone:null,email:null,website:null,
     primaryColor:'#638060',secondaryColor:'#E2E9DC',createdAt:'2026-10-03T00:00:00.000Z',updatedAt:'2026-10-03T00:00:00.000Z',brandVersion:1};
 }
-export function newGuestDraft(id:string,kind:'demo'|'empty'):CreationDraftView{
+export function newGuestDraft(id:string,kind:'demo'|'empty',voice?:VideoCustomization['voice']):CreationDraftView{
   const base=kind==='demo'?editorDemo().draft:null,agency=guestAgency(),fields=base?.data.fields??emptyCreationFields(),
-    settings=base?.data.videoCustomization??{...defaultVideoCustomization(agency),photoOrder:[],runwayPhotos:[],editor:createEditorDocument([],{}, {})};
+    settings=base?.data.videoCustomization??{...defaultVideoCustomization(agency,voice),photoOrder:[],runwayPhotos:[],editor:createEditorDocument([],{}, {})};
   return CreationDraftView.parse({id,version:1,status:'needs_input',sourceKind:'manual',sourceUrl:null,expiresAt:'2099-01-01T00:00:00.000Z',
     data:{fields,provenance:{},originalText:null,canonicalUrl:null,warnings:[],videoCustomization:settings},
     photos:base?.photos.map(p=>({...p,agencyId:agency.id,listingId:id,objectKey:`agencies/${agency.id}/imports/${id}/${p.id}.jpg`}))??[]});

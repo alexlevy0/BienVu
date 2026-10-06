@@ -1,13 +1,19 @@
 'use client';
 import {createContext, useCallback, useContext, useEffect, useState} from 'react';
-import {Me, type AgencyProfile} from '@bienvu/contracts';
+import {Me,VoiceCatalog,DEFAULT_VIDEO_VOICE,type VideoCustomization, type AgencyProfile} from '@bienvu/contracts';
 import {clearListingDraft} from '../lib/listing-draft';
 import {clearAgencyDraft} from '../lib/agency-draft';
 
-type AccountState = {me: Me | null; loading: boolean; error: string; refresh: () => Promise<void>; refreshRights: () => Promise<void>; setAgency: (agency: AgencyProfile) => void};
+type AccountState = {me: Me | null; loading: boolean; error: string; refresh: () => Promise<void>; refreshRights: () => Promise<void>; setAgency: (agency: AgencyProfile) => void;
+  defaultVoice:VideoCustomization['voice'];voiceLoading:boolean;voiceCatalog:VoiceCatalog|null;refreshVoices:()=>Promise<void>};
 const AccountContext = createContext<AccountState | null>(null);
 export function AccountProvider({children}: {children: React.ReactNode}) {
   const [me, setMe] = useState<Me | null>(null), [loading, setLoading] = useState(true), [error, setError] = useState('');
+  const [voiceCatalog,setVoiceCatalog]=useState<VoiceCatalog|null>(null),[voiceLoading,setVoiceLoading]=useState(true);
+  const refreshVoices=useCallback(async()=>{const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),5000);
+    try{const response=await fetch('/api/voices',{cache:'no-store',signal:controller.signal});
+    if(response.ok)setVoiceCatalog(VoiceCatalog.parse(await response.json()));}catch{/* Existing voice selections remain available. */}finally{clearTimeout(timer);setVoiceLoading(false);}},[]);
+  useEffect(()=>{void refreshVoices();},[refreshVoices]);
   const refresh = useCallback(async () => {
     setLoading(true); setError('');
     try {
@@ -27,7 +33,8 @@ export function AccountProvider({children}: {children: React.ReactNode}) {
     }catch{/* Keep the last known quota; admission is always checked by the server. */}
   },[]);
   useEffect(() => {void refresh();}, [refresh]);
-  return <AccountContext.Provider value={{me, loading, error, refresh,refreshRights,
+  return <AccountContext.Provider value={{me, loading:loading||voiceLoading, error, refresh,refreshRights,
+    defaultVoice:voiceCatalog?.defaultVoice??DEFAULT_VIDEO_VOICE,voiceCatalog,voiceLoading,refreshVoices,
     setAgency: agency => setMe(current => current ? {...current, agency} : current)}}>{children}</AccountContext.Provider>;
 }
 export function useAccount() {

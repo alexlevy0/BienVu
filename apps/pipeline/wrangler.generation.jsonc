@@ -7,6 +7,7 @@
     "nodejs_compat"
   ],
   "vars": {
+    "CARTESIA_TTS_ENABLED": "false",
     "FISH_TTS_ENABLED": "false",
     "VIDEO_ENABLED": "false",
     "VIDEO_AGENCY_ID": "fixture-agency",

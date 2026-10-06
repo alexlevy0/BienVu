@@ -1,7 +1,7 @@
-import {GoogleVoiceConfig,FishVoiceConfig, NarrationFailure, PreparedNarration, VoiceFailure} from '@bienvu/contracts';
-import {findNarration,generationStoredPermanently} from '@bienvu/db';
+import {NarrationFailure, PreparedNarration, VoiceFailure} from '@bienvu/contracts';
+import {findNarration,generationStoredPermanently,reserveCartesiaVoice,finishCartesiaVoice,type Database} from '@bienvu/db';
 import {openaiScripts} from '@bienvu/narration';
-import {googleServiceAccountAccess, googleTts,fishTts} from '@bienvu/voice';
+import {frenchVoiceConfig,frenchVoiceProvider,type VoiceProviderEnvironment} from '@bienvu/voice';
 import {prepareJobNarration, readNarrationAudio, type NarrationProviders} from './narration';
 
 // Bindings générés depuis Wrangler ; valeurs sensibles via `secret bulk`.
@@ -35,25 +35,21 @@ async function authorized(request: Request, expected?: string) {
   return crypto.subtle.verify('HMAC', key, signature, expectedHash);
 }
 
-export type FishVoiceEnv={FISH_API_KEY?:string;FISH_TTS_ENABLED?:string};
-export async function realProviders(env: Pick<Env,'GOOGLE_SERVICE_ACCOUNT_JSON'|'GOOGLE_CLOUD_PROJECT'|'GOOGLE_TTS_VOICE'|'OPENAI_API_KEY'|'SCRIPT_MODEL'>&FishVoiceEnv,voiceName?:string,voiceEnabled=true): Promise<NarrationProviders> {
-  const fish=voiceName?.startsWith('fish-')===true;
-  const config=fish?FishVoiceConfig.parse({voice:voiceName}):GoogleVoiceConfig.parse({projectId:env.GOOGLE_CLOUD_PROJECT,voice:voiceName??env.GOOGLE_TTS_VOICE});
-  if(!voiceEnabled)return {mode:'real',script:openaiScripts(env.OPENAI_API_KEY??'',env.SCRIPT_MODEL),voice:{
-    config,
-    synthesize:async()=>{throw new VoiceFailure('VOICE_CONFIG_INVALID');}}};
-  if(config.provider==='fish'){
-    if(env.FISH_TTS_ENABLED!=='true')throw new VoiceFailure('VOICE_UNAVAILABLE');
-    const voice=fishTts(config,env.FISH_API_KEY??'');
-    return {mode:'real',script:openaiScripts(env.OPENAI_API_KEY??'',env.SCRIPT_MODEL),voice:{config,synthesize:voice.synthesize}};
-  }
-  const secret = env.GOOGLE_SERVICE_ACCOUNT_JSON;
-  if (!secret || secret.length > 16_384) throw new NarrationFailure('SCRIPT_CONFIG_INVALID');
-  let account: unknown;
-  try {account = JSON.parse(secret);} catch {throw new NarrationFailure('SCRIPT_CONFIG_INVALID');}
-  const access = await googleServiceAccountAccess(account, config.projectId);
-  const voice = googleTts(config, access);
-  return {mode: 'real', script: openaiScripts(env.OPENAI_API_KEY ?? '', env.SCRIPT_MODEL), voice: {config, synthesize: voice.synthesize}};
+export type FishVoiceEnv=VoiceProviderEnvironment;
+export async function realProviders(env: Pick<Env,'GOOGLE_SERVICE_ACCOUNT_JSON'|'GOOGLE_CLOUD_PROJECT'|'GOOGLE_TTS_VOICE'|'OPENAI_API_KEY'|'SCRIPT_MODEL'>&VoiceProviderEnvironment&{DB?:Database},voiceName?:string,voiceEnabled=true): Promise<NarrationProviders> {
+  const config=frenchVoiceConfig(voiceName??env.GOOGLE_TTS_VOICE,env.GOOGLE_CLOUD_PROJECT);
+  const script=openaiScripts(env.OPENAI_API_KEY??'',env.SCRIPT_MODEL);
+  if(!voiceEnabled)return {mode:'real',script,voice:{config,synthesize:async()=>{throw new VoiceFailure('VOICE_CONFIG_INVALID');}}};
+  if(config.provider==='cartesia'&&!env.DB)throw new VoiceFailure('VOICE_CONFIG_INVALID');
+  const voice=await frenchVoiceProvider(env,config.voice);
+  return {mode:'real',script,voice:{config,synthesize:async(text,callId)=>{
+    if(config.provider!=='cartesia')return voice.synthesize(text);
+    const db=env.DB;if(!db)throw new VoiceFailure('VOICE_CONFIG_INVALID');
+    const id='narration:'+(callId??crypto.randomUUID());await reserveCartesiaVoice(db,id,text);
+    let success=false;
+    try{const reply=await voice.synthesize(text);success=true;return reply;}
+    finally{await finishCartesiaVoice(db,id,success);}
+  }}};
 }
 
 // Surface opérateur bornée à un couple agence/job configuré côté serveur.
@@ -77,7 +73,7 @@ export async function handleNarrationRequest(request: Request, env: Env, factory
       const source = await factory(env);
       const providers: NarrationProviders = {...source, script: {...source.script, plan: async (context, correction) => {
         calls.script++; return source.script.plan(context, correction);
-      }}, voice: {...source.voice, synthesize: async text => {calls.voice++; return source.voice.synthesize(text);}}};
+      }}, voice: {...source.voice, synthesize: async (text,callId) => {calls.voice++; return source.voice.synthesize(text,callId);}}};
       // La requête reste ouverte jusqu'au résultat. Pas de travail détaché
       // dans waitUntil (limité à 30 s après déconnexion/réponse).
       const result = await prepareJobNarration(env, scope.agencyId, scope.jobId, providers);

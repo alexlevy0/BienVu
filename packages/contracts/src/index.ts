@@ -18,6 +18,7 @@ export * from './import-sources';
 export * from './import-diagnostics';
 export * from './source-coverage';
 export * from './voice';
+export * from './voice-catalog';
 export * from './narration';
 export * from './video';
 export * from './generation';

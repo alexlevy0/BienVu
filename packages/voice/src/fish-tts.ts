@@ -7,7 +7,7 @@ export const FISH_TTS_PRICE={date:'2026-10-02',currency:'USD',model:'s2.1-pro-fr
 
 // Streaming WAV headers may use unknown lengths. Repair only that encoding,
 // then enforce the same PCM16/duration/silence checks as the Google tracks.
-export function fishWav(input:Uint8Array){
+export function fishWav(input:Uint8Array,maximumDurationMs:35000|300000=35000){
   const bytes=new Uint8Array(input),view=new DataView(bytes.buffer);
   const tag=(at:number)=>String.fromCharCode(...bytes.subarray(at,at+4));
   if(bytes.length<44||tag(0)!=='RIFF'||tag(8)!=='WAVE')throw new VoiceFailure('VOICE_AUDIO_INVALID');
@@ -22,10 +22,10 @@ export function fishWav(input:Uint8Array){
     }
     view.setUint32(4,bytes.length-8,true);
   }
-  measureVoiceWav(bytes);return bytes;
+  measureVoiceWav(bytes,maximumDurationMs);return bytes;
 }
 
-export function fishTts(configInput:unknown,apiKey:string,options:{fetch?:VoiceFetch;timeoutMs?:number}={}){
+export function fishTts(configInput:unknown,apiKey:string,options:{fetch?:VoiceFetch;timeoutMs?:number;maximumDurationMs?:35000|300000}={}){
   const parsed=FishVoiceConfig.safeParse(configInput);
   if(!parsed.success)throw new VoiceFailure('VOICE_CONFIG_INVALID');
   if(!/^[\x21-\x7e]{20,8192}$/.test(apiKey))throw new VoiceFailure('VOICE_AUTH_FAILED');
@@ -54,7 +54,7 @@ export function fishTts(configInput:unknown,apiKey:string,options:{fetch?:VoiceF
         if(size>MAX_VOICE_AUDIO_BYTES)throw new VoiceFailure('VOICE_RESPONSE_INVALID');chunks.push(part.value);}}
       finally{await reader.cancel().catch(()=>undefined);reader.releaseLock();}
       const received=new Uint8Array(size);let offset=0;for(const chunk of chunks){received.set(chunk,offset);offset+=chunk.length;}
-      const bytes=fishWav(received),utf8Bytes=new TextEncoder().encode(text.data).length;
+      const bytes=fishWav(received,options.maximumDurationMs),utf8Bytes=new TextEncoder().encode(text.data).length;
       return {bytes,sha256:await sha256(bytes),cacheKey:await voiceCacheKey(config,text.data),mime:'audio/wav' as const,config,requestId,
         providerRequestId:providerRequestId(response),requestDurationMs:Date.now()-started,
         usage:{inputCharacters:[...text.data].length,inputUtf8Bytes:utf8Bytes,source:'counted_request' as const,providerUsage:null},

@@ -11,6 +11,7 @@
     "binding": "ASSETS"
   },
   "vars": {
+    "CARTESIA_TTS_ENABLED": "false",
     "MAILBOX_ENABLED": "false",
     "MAILBOX_ADDRESS": "contact@bienvu.online",
     "SOCIAL_ENABLED": "false",

@@ -11,7 +11,7 @@ import {admitGeneration,setGenerationProgress,findGeneration,findNarration,gener
 import {videoFixture} from '../fixtures/video';
 import {propertyDescription} from '../fixtures/listing-description';
 import {getJobVideo} from '../apps/pipeline/src/video-manifest';
-import {FishVoiceConfig} from '../packages/contracts/src/index';
+import {CartesiaVoiceConfig,CARTESIA_DEFAULT_VOICE} from '../packages/contracts/src/index';
 import {hashJson,DEFAULT_SCRIPT_MODEL} from '../packages/narration/src/index';
 
 for(const {voiceEnabled,invalidScript} of [{voiceEnabled:true,invalidScript:false},{voiceEnabled:false,invalidScript:false},{voiceEnabled:true,invalidScript:true}])test(`Workflow workerd réel ${invalidScript?'narration invalide et crédit libéré':voiceEnabled?'avec voix':'sans voix ni sous-titres'}, fournisseurs simulés : reprise et erreur publique`,async t=>{
@@ -67,13 +67,13 @@ for(const {voiceEnabled,invalidScript} of [{voiceEnabled:true,invalidScript:fals
   }
   assert.equal(row!.status,'rendering');
   const narration=(await findNarration(env.DB,scope.agencyId,job.id))!;
-  assert.equal(narration.configHash,await hashJson({voice:FishVoiceConfig.parse({voice:'fish-manon'}),
+  assert.equal(narration.configHash,await hashJson({voice:CartesiaVoiceConfig.parse({voice:CARTESIA_DEFAULT_VOICE}),
     scriptModel:DEFAULT_SCRIPT_MODEL,promptVersion:JSON.parse(narration.script!).promptVersion,mode:'mock',...(!voiceEnabled?{voiceEnabled:false}:{}),durationSeconds:40}));
   assert.equal(JSON.parse(narration.script!).copyVersion,'description-copy/2');
   assert.equal((await getJobVideo(env.DB,scope.agencyId,job.id))!.manifest.scenes.reduce((n,s)=>n+s.durationFrames,0),1200);
   const voiceCalls=await env.DB.prepare("SELECT DISTINCT provider FROM narration_calls WHERE job_id=? AND provider!='openai'")
     .bind(job.id).all<{provider:string}>();
-  assert.deepEqual(voiceCalls.results,voiceEnabled?[{provider:'fish'}]:[]);
+  assert.deepEqual(voiceCalls.results,voiceEnabled?[{provider:'cartesia'}]:[]);
   assert.equal((await getJobVideo(env.DB,scope.agencyId,job.id))!.manifest.subtitlesEnabled,false);
   assert.equal((await getJobVideo(env.DB,scope.agencyId,job.id))!.manifest.audio.length===0,!voiceEnabled);
   const progressRow=(await findGeneration(env.DB,scope.agencyId,job.id))!;

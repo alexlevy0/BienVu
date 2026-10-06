@@ -112,7 +112,7 @@ const callMetrics=`SELECT id,provider,provider_mode AS mode,state,error_code AS 
   json_extract(result_json,'$.metrics.cost.priceDate') AS priceDate,
   CASE WHEN provider_mode='real' AND json_extract(result_json,'$.metrics.cost.currency')='USD' THEN
     CASE WHEN provider='openai' THEN ${metricNumber('$.metrics.cost.estimatedMicrosBeforeCacheDiscount')}
-      WHEN provider IN ('google','fish') THEN ${metricNumber('$.metrics.cost.estimatedMicrosBeforeFreeTier')} END END AS estimatedMicros
+      WHEN provider IN ('google','fish','cartesia') THEN ${metricNumber('$.metrics.cost.estimatedMicrosBeforeFreeTier')} END END AS estimatedMicros
   FROM narration_calls`;
 export async function adminVideoDetail(db:Database,id:string):Promise<AdminVideoDetail|null>{
   EntityId.parse(id);

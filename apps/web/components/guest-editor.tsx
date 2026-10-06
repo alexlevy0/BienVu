@@ -9,7 +9,7 @@ import {HomeIcon} from './home-icons';
 import {EditorProjectChoice} from './editor-project-choice';
 
 export function GuestEditor({render}:{render(draft:CreationDraftView,guest:GuestEditorPort):ReactNode}){
-  const {me}=useAccount(),[record,setRecord]=useState<GuestEditorRecord|null>(null),recordRef=useRef(record),
+  const {me,defaultVoice}=useAccount(),[record,setRecord]=useState<GuestEditorRecord|null>(null),recordRef=useRef(record),
     [persisted,setPersisted]=useState(true),persistedRef=useRef(true),
     [choosing,setChoosing]=useState(true),[canResume,setCanResume]=useState(false),[error,setError]=useState(''),[transferring,setTransferring]=useState(false),[attempt,setAttempt]=useState(0),
     transferStarted=useRef(false),queue=useRef(Promise.resolve()),urls=useRef(new Map<string,{blob:Blob;url:string}>());
@@ -35,7 +35,7 @@ export function GuestEditor({render}:{render(draft:CreationDraftView,guest:Guest
   useEffect(()=>{const retained=new Set(record?.files.map(f=>f.id));for(const [id,value] of urls.current)if(!retained.has(id)){URL.revokeObjectURL(value.url);urls.current.delete(id);}},[record?.files]);
   useEffect(()=>()=>{for(const value of urls.current.values())URL.revokeObjectURL(value.url);urls.current.clear();},[]);
   async function choose(kind:'demo'|'empty'){
-    const next=newGuestRecord(kind);try{await update(()=>next);setError('');}catch{recordRef.current=next;setRecord(next);setError('Le stockage local est indisponible. Vos retouches restent ouvertes dans cet onglet.');}
+    const next=newGuestRecord(kind,undefined,defaultVoice);try{await update(()=>next);setError('');}catch{recordRef.current=next;setRecord(next);setError('Le stockage local est indisponible. Vos retouches restent ouvertes dans cet onglet.');}
     setChoosing(false);
   }
   if(!record)return <p className="editor-guest-loading" role="status">Ouverture de l’Éditeur…</p>;

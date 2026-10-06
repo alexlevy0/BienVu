@@ -1,4 +1,6 @@
 import {z} from 'zod';
+import {cartesiaParisianVoices} from './cartesia-voices';
+export * from './cartesia-voices';
 
 export const GoogleProjectId = z.string().regex(/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/);
 export const GoogleVoiceConfig = z.object({
@@ -29,7 +31,16 @@ export const FishVoiceConfig = z.object({
   version:z.literal('fish-s2.1/1').default('fish-s2.1/1'),
 }).strict();
 export type FishVoiceConfig = z.infer<typeof FishVoiceConfig>;
-export const VoiceConfig = z.union([GoogleVoiceConfig,FishVoiceConfig]);
+export const CartesiaVoiceId=z.enum(cartesiaParisianVoices.map(v=>v.id));
+export const CartesiaVoiceConfig=z.object({
+  provider:z.literal('cartesia').default('cartesia'),
+  model:z.literal('sonic-3.6-2026-08-27').default('sonic-3.6-2026-08-27'),
+  voice:CartesiaVoiceId,language:z.literal('fr-FR').default('fr-FR'),
+  accent:z.literal('parisian').default('parisian'),encoding:z.literal('PCM16_WAV').default('PCM16_WAV'),
+  sampleRate:z.literal(24000).default(24000),version:z.literal('cartesia-sonic-3.6/1').default('cartesia-sonic-3.6/1'),
+}).strict();
+export type CartesiaVoiceConfig=z.infer<typeof CartesiaVoiceConfig>;
+export const VoiceConfig = z.union([GoogleVoiceConfig,FishVoiceConfig,CartesiaVoiceConfig]);
 export type VoiceConfig = z.infer<typeof VoiceConfig>;
 
 // Limite BienVu, inférieure aux 5 000 octets Google. Jamais de SSML fourni par un client.
@@ -41,7 +52,7 @@ export const voiceFailureCodes = ['VOICE_CONFIG_INVALID', 'VOICE_AUTH_FAILED', '
   'VOICE_BILLING_DISABLED', 'VOICE_API_DISABLED',
   'VOICE_RATE_LIMITED', 'VOICE_REQUEST_REJECTED', 'VOICE_TIMEOUT', 'VOICE_RESPONSE_INVALID',
   'VOICE_NOT_FOUND', 'VOICE_TEXT_INVALID', 'VOICE_AUDIO_INVALID', 'VOICE_AUDIO_SILENT',
-  'VOICE_DURATION_EXCEEDED', 'VOICE_PROBE_LIMIT', 'VOICE_PROBE_REVIEW_REQUIRED'] as const;
+  'VOICE_DURATION_EXCEEDED', 'VOICE_PROBE_LIMIT', 'VOICE_PROBE_REVIEW_REQUIRED','VOICE_FREE_LIMIT','VOICE_BUSY'] as const;
 export type VoiceFailureCode = typeof voiceFailureCodes[number];
 export class VoiceFailure extends Error {
   constructor(public readonly code: VoiceFailureCode) { super(code); this.name = 'VoiceFailure'; }

@@ -7,6 +7,7 @@
   "preview_urls": false,
   "secrets": {"required":["NARRATION_TOKEN","OPENAI_API_KEY","GOOGLE_SERVICE_ACCOUNT_JSON"]},
   "vars": {
+    "CARTESIA_TTS_ENABLED": "false",
     "NARRATION_ENABLED": "false",
     "NARRATION_AGENCY_ID": "",
     "NARRATION_JOB_ID": "",

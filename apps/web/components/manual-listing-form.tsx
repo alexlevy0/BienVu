@@ -49,7 +49,7 @@ type Props = {busy: boolean; generate?: boolean; setBusy(value: boolean): void;g
 );
 export function ManualListingForm(props: Props) {
   const {busy, setBusy, generate = false} = props;
-  const {me}=useAccount();
+  const {me,defaultVoice,voiceLoading}=useAccount();
   const [transaction, setTransaction] = useState('sale'), [photos, setPhotos] = useState<SelectedPhoto[]>([]);
   const [propertyType,setPropertyType]=useState('apartment'),[hydrated,setHydrated]=useState(false),[photoChecking,setPhotoChecking]=useState(false);
   const [fields,setFields]=useState<ManualDraftFields>(emptyFields),[detailsOpen,setDetailsOpen]=useState(false),[draggedPhoto,setDraggedPhoto]=useState<string|null>(null),[photoDrop,setPhotoDrop]=useState(false);
@@ -199,10 +199,10 @@ export function ManualListingForm(props: Props) {
     void addPhotos(batch.files).then(result=>{if(mounted.current&&result)props.onPhotosReceived?.(batch.id,result);});
   },[hydrated,photoChecking,props.incomingPhotos?.id]);
   useEffect(()=>{
-    if(!props.customizing||!hydrated||!formRef.current||customInitialized.current)return;
+    if(!props.customizing||!hydrated||voiceLoading||!formRef.current||customInitialized.current)return;
     customInitialized.current=true;
-    setCustomization(current=>({...defaultVideoCustomization(props.brand),...current,photoOrder:current?.photoOrder??photos.map(p=>p.slot)}));
-  },[props.customizing,hydrated]);
+    setCustomization(current=>({...defaultVideoCustomization(props.brand,defaultVoice),...current,photoOrder:current?.photoOrder??photos.map(p=>p.slot)}));
+  },[props.customizing,hydrated,voiceLoading,defaultVoice]);
   useEffect(()=>{
     if(!hydrated||!customization||!serverDraft||busy||!VideoCustomization.safeParse(customization).success)return;
     if(JSON.stringify(serverDraft.data.videoCustomization)===JSON.stringify(customization)){setSettingsSaved(true);return;}
@@ -404,7 +404,7 @@ export function ManualListingForm(props: Props) {
     try{await settingsWrite.current;const current=await ensureServerDraft(),raw=draftFields(),number=(value:string)=>value.trim()?Number(value.replace(/\s/g,'').replace(',','.')):null;
       const fields=CreationFields.parse({title:listingTitle(raw.title,raw.locality,propertyType,transaction),locality:raw.locality.trim()||null,propertyType:raw.propertyType||null,transaction:raw.transaction||null,
         description:raw.description.trim()||null,priceCents:number(raw.priceCents)===null?null:Math.round(number(raw.priceCents)!*100),charges:raw.charges||null,area:number(raw.area),rooms:number(raw.rooms)});
-      const settings={...defaultVideoCustomization(props.brand),...customizationRef.current},order=settings.photoOrder??current.photos.map(p=>p.sourceOrder),
+      const settings={...defaultVideoCustomization(props.brand,defaultVoice),...customizationRef.current},order=settings.photoOrder??current.photos.map(p=>p.sourceOrder),
         editor=settings.editor??createEditorDocument(order.flatMap(slot=>current.photos.filter(p=>p.sourceOrder===slot)),fields,{agencyName:props.brand?.name,durationSeconds:props.durationSeconds,aspectRatio:props.aspectRatio,
           voiceEnabled:props.voiceEnabled,subtitlesEnabled:props.subtitlesEnabled});
       const response=await fetch(`/api/imports/${current.id}/draft`,{method:'PATCH',headers:{'Content-Type':'application/json'},
@@ -427,7 +427,7 @@ export function ManualListingForm(props: Props) {
     const photo=orderedPhotos.find(p=>p.id===id);if(!photo||photo.state!=='ready'||photo.removing)return;
     const next=orderedPhotos.filter(p=>p.id!==id);next.splice(Math.max(0,Math.min(next.length,to)),0,photo);
     selected.current=next;setPhotos(next);settingsVersion.current++;setSettingsSaved(false);
-    setCustomization(current=>({...defaultVideoCustomization(props.brand),...current,
+    setCustomization(current=>({...defaultVideoCustomization(props.brand,defaultVoice),...current,
       photoOrder:next.filter(p=>!current?.photoOrder||current.photoOrder.includes(p.slot)).map(p=>p.slot),
       runwayClips:undefined,runwayPhotos:photoAnimations(current,current?.photoOrder??orderedPhotos.map(p=>p.slot))}));
   }
@@ -436,7 +436,7 @@ export function ManualListingForm(props: Props) {
     settingsVersion.current++;setSettingsSaved(false);
     setCustomization(current=>{
       const order=current?.photoOrder??selected.current.map(p=>p.slot),animated=photoAnimations(current,order);
-      return {...defaultVideoCustomization(props.brand),...current,photoOrder:order.includes(photo.slot)?order:[...order,photo.slot],runwayClips:undefined,
+      return {...defaultVideoCustomization(props.brand,defaultVoice),...current,photoOrder:order.includes(photo.slot)?order:[...order,photo.slot],runwayClips:undefined,
         runwayPhotos:animated.includes(photo.slot)?animated.filter(slot=>slot!==photo.slot):[...animated,photo.slot]};
     });
   }
@@ -450,7 +450,7 @@ export function ManualListingForm(props: Props) {
   const price=previewNumber(fields.priceCents),area=previewNumber(fields.area),rooms=previewNumber(fields.rooms),numberFormat=new Intl.NumberFormat('fr-FR');
   const canAdd=hydrated&&!busy&&!photoChecking&&!props.incomingPhotos&&photos.length<MANUAL_PHOTO_LIMITS.maximum;
   const pendingConfirmation=unresolved();
-  return <>{props.customizing&&hydrated&&<VideoCustomizer settings={customization??defaultVideoCustomization(props.brand)}
+  return <>{props.customizing&&hydrated&&<VideoCustomizer settings={customization??defaultVideoCustomization(props.brand,defaultVoice)}
     onChange={value=>{settingsVersion.current++;setSettingsSaved(false);setCustomization(value);}} photos={photos} fields={draftFields()}
     agencyName={props.brand?.name??''} durationSeconds={props.durationSeconds} aspectRatio={props.aspectRatio} voiceEnabled={props.voiceEnabled} onVoice={props.onVoice} subtitlesEnabled={props.subtitlesEnabled!==false} onSubtitles={value=>props.onSubtitles?.(value)}
     onBack={()=>props.onCloseCustomizer?.()} onAdd={files=>void addPhotos(files)}

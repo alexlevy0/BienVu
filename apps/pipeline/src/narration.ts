@@ -2,11 +2,11 @@ import {AgencyBrand,VoiceConfig, NarrationAudio, NarrationFailure, PreparedNarra
 import {assertNarrationLease, checkpointNarrationScript, claimNarrationCall, failNarrationCall, findNarration, finishNarration,
   finishNarrationCall, narrationJobInput, releaseNarration, startNarration,findEditorVoiceSource, type Database, type NarrationLease} from '@bienvu/db';
 import {generateScript, hashJson, scriptContext,scriptPromptVersion,customScript, shortenScript, fitNarrationDuration,fitCachedNarration, validateScript, type ScriptContext, type ScriptProvider, type ScriptReply} from '@bienvu/narration';
-import {googleTts,fishTts, measureVoiceWav, voiceCacheKey, voiceSceneTiming,compactVoiceSceneTiming} from '@bienvu/voice';
+import {googleTts,fishTts,cartesiaTts, measureVoiceWav, voiceCacheKey, voiceSceneTiming,compactVoiceSceneTiming} from '@bienvu/voice';
 
-type VoiceReply = Awaited<ReturnType<ReturnType<typeof googleTts>['synthesize']>>|Awaited<ReturnType<ReturnType<typeof fishTts>['synthesize']>>;
+type VoiceReply = Awaited<ReturnType<ReturnType<typeof googleTts>['synthesize']>>|Awaited<ReturnType<ReturnType<typeof fishTts>['synthesize']>>|Awaited<ReturnType<ReturnType<typeof cartesiaTts>['synthesize']>>;
 export type NarrationProviders = {mode: 'real' | 'mock'; script: ScriptProvider;
-  voice: {config: VoiceConfig; synthesize(text: string): Promise<VoiceReply>}};
+  voice: {config: VoiceConfig; synthesize(text: string,callId?:string): Promise<VoiceReply>}};
 export interface NarrationBucket {
   put(key: string, bytes: Uint8Array, options: {httpMetadata: {contentType: string}; customMetadata: Record<string, string>}): Promise<unknown>;
   get(key: string): Promise<{size: number; arrayBuffer(): Promise<ArrayBuffer>} | null>;
@@ -163,7 +163,7 @@ async function voiceScenes(env: {DB: Database; MEDIA: NarrationBucket}, lease: N
       await readNarrationAudio(env.MEDIA, lease, asset); result.push(asset); continue;
     }
     try {
-      const {bytes, ...metrics} = await providers.voice.synthesize(scene.narrationText);
+      const {bytes, ...metrics} = await providers.voice.synthesize(scene.narrationText,call.row.id);
       const measured = measureVoiceWav(bytes), sha256 = await bytesHash(bytes);
       if (metrics.cacheKey !== cacheKey || metrics.sha256 !== sha256) throw new NarrationFailure('NARRATION_STORAGE_INVALID');
       const asset = NarrationAudio.parse({id: `audio-${call.row.id}`, cacheKey, objectKey: call.row.objectKey, sha256, sizeBytes: bytes.byteLength,

@@ -147,6 +147,9 @@ importers:
       '@bienvu/observability':
         specifier: workspace:*
         version: link:../../packages/observability
+      '@bienvu/voice':
+        specifier: workspace:*
+        version: link:../../packages/voice
       '@opennextjs/cloudflare':
         specifier: 1.20.6
         version: 1.20.6(next@16.3.6(@types/node@24.10.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(wrangler@4.142.0(@types/node@24.10.1))

@@ -87,10 +87,10 @@ export class GenerationWorkflow extends WorkflowEntrypoint<GenerationEnv,{agency
       await step.do('script-and-voice-checkpoints',once,async()=>{
         const row=await active(this.env,agencyId,jobId);await setGenerationStage(this.env.DB,row,'scripting');
         const input=GenerationRequest.parse(JSON.parse(row.input));
-        const providers=await this.providers(input.customization?.voice??DEFAULT_VIDEO_VOICE,input.voiceEnabled!==false),guard=()=>active(this.env,agencyId,jobId);
+        const providers=await this.providers(input.customization?.voice??row.selectedVoice??DEFAULT_VIDEO_VOICE,input.voiceEnabled!==false),guard=()=>active(this.env,agencyId,jobId);
         const source=providers.script,voice=providers.voice;
         providers.script={...source,plan:async(...args)=>{await guard();return source.plan(...args);}};
-        providers.voice={...voice,synthesize:async text=>{await guard();return voice.synthesize(text);}};
+        providers.voice={...voice,synthesize:async(text,callId)=>{await guard();return voice.synthesize(text,callId);}};
         await prepareJobNarration(this.env,agencyId,jobId,providers,{brand:JSON.parse(row.brand),onVoicing:()=>setGenerationStage(this.env.DB,row,'voicing')});
         return {prepared:true};
       });

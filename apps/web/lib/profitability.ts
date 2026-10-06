@@ -6,7 +6,7 @@ import type {AuthEnvironment} from './auth';
 import {billingMode,type BillingEnv} from './billing';
 import {reconcileStripe} from './stripe-accounting';
 const day=z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(s=>!Number.isNaN(Date.parse(s))&&new Date(s).toISOString().slice(0,10)===s);
-const provider=z.enum(['openai','google','fish','runway','cloudflare','other']);
+const provider=z.enum(['openai','google','fish','cartesia','runway','cloudflare','other']);
 const allocation=z.object({jobId:EntityId,units:z.number().int().min(1).max(100000000),covers:z.boolean()}).strict();
 const allocations=z.array(allocation).max(120).refine(a=>new Set(a.map(x=>x.jobId)).size===a.length);
 export const FinanceAction=z.discriminatedUnion('action',[

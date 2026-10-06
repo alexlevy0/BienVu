@@ -35,8 +35,8 @@ function normalizeSettings(settings:VideoCustomization&{editor:EditorDocument}){
   const runwayPhotos=settings.runwayPhotos??selectedAnimationIndices(photoOrder,settings).map(index=>photoOrder[index]);
   return {...settings,photoOrder,runwayClips:undefined,runwayPhotos:runwayPhotos.filter(slot=>photoOrder.includes(slot))};
 }
-function initialModel(draft:CreationDraftView,agency:AgencyProfile):Model{
-  const settings=draft.data.videoCustomization??defaultVideoCustomization(agency),order=settings.photoOrder??draft.photos.map(p=>p.sourceOrder),
+function initialModel(draft:CreationDraftView,agency:AgencyProfile,defaultVoice?:VideoCustomization['voice']):Model{
+  const settings=draft.data.videoCustomization??defaultVideoCustomization(agency,defaultVoice),order=settings.photoOrder??draft.photos.map(p=>p.sourceOrder),
     photos=order.flatMap(slot=>draft.photos.filter(p=>p.sourceOrder===slot));
   const editor=settings.editor?distributeEditorClips(settings.editor,settings.editor.clips.filter(c=>draft.photos.some(p=>p.sourceOrder===c.photoSlot))):
     createEditorDocument(photos,draft.data.fields,{agencyName:agency.name,logo:Boolean(agency.logoAssetId)});
@@ -104,8 +104,8 @@ export function VideoEditor(){
 }
 
 function EditorProject({initial,agency,guest}:{initial:CreationDraftView;agency:AgencyProfile;guest?:GuestEditorPort}){
-  const {me,refreshRights}=useAccount(),store=useGenerationStore(),[draft,setDraft]=useState(initial),draftRef=useRef(initial),
-    [model,setModel]=useState<Model>(()=>initialModel(initial,agency)),modelRef=useRef(model),
+  const {me,refreshRights,defaultVoice,voiceCatalog}=useAccount(),store=useGenerationStore(),[draft,setDraft]=useState(initial),draftRef=useRef(initial),
+    [model,setModel]=useState<Model>(()=>initialModel(initial,agency,defaultVoice)),modelRef=useRef(model),
     saved=useRef(JSON.stringify({fields:initial.data.fields,settings:initial.data.videoCustomization})),
     [past,setPast]=useState<Model[]>([]),[future,setFuture]=useState<Model[]>([]),
     [selection,setSelection]=useState<Selection>(()=>({kind:'text',id:model.settings.editor.layers.find(l=>l.id==='facts')?.id??model.settings.editor.layers[0]?.id??''})),

@@ -12,6 +12,7 @@ out/
 !.env.script.example
 !.env.runway.example
 !.env.fish.example
+!.env.cartesia.example
 !.env.billing.example
 !.env.social.example
 .dev.vars

@@ -50,7 +50,7 @@ export type AdminVideoDetail = {
   video:AdminRow;events:AdminRow[];reports:AdminRow[];calls:AdminNarrationCall[];animations?:AdminRow[];
 };
 export type AdminNarrationCall = {
-  id:string;provider:'openai'|'google'|'fish';mode:'real'|'mock';state:'pending'|'done'|'failed';error:string|null;reservedCents:number;at:string;step:string;
+  id:string;provider:'openai'|'google'|'fish'|'cartesia';mode:'real'|'mock';state:'pending'|'done'|'failed';error:string|null;reservedCents:number;at:string;step:string;
   model:string|null;voice:string|null;requestId:string|null;providerRequestId:string|null;responseId:string|null;requestDurationMs:number|null;
   inputTokens:number|null;outputTokens:number|null;cachedInputTokens:number|null;inputCharacters:number|null;inputUtf8Bytes:number|null;
   currency:'USD'|null;priceDate:string|null;estimatedMicros:number|null;

@@ -1,6 +1,6 @@
 import {z} from 'zod';
 import type {AgencyBrand, NormalizedListing} from './product';
-import {fishFrenchVoices} from './voice';
+import {fishFrenchVoices,CartesiaVoiceId,cartesiaParisianVoices} from './voice';
 import {EditorDocument} from './editor';
 
 export const DEFAULT_VIDEO_VOICE='fish-manon' as const;
@@ -11,7 +11,9 @@ export const videoStyles=[{id:'editorial',name:'Éditorial',description:'Des rep
 export const frenchVoices=[{id:'fr-FR-Chirp3-HD-Aoede',name:'Aoede',provider:'Google · Chirp 3 HD'},
   {id:'fr-FR-Chirp3-HD-Kore',name:'Kore',provider:'Google · Chirp 3 HD'},
   {id:'fr-FR-Chirp3-HD-Charon',name:'Charon',provider:'Google · Chirp 3 HD'},
-  ...fishFrenchVoices.map(voice=>({...voice,provider:'Fish Audio · S2.1 Pro'}))] as const;
+  ...fishFrenchVoices.map(voice=>({...voice,provider:'Fish Audio · S2.1 Pro'})),
+  ...cartesiaParisianVoices.map(voice=>({...voice,provider:'Cartesia · Sonic 3.6'}))] as const;
+export const VideoVoice=z.union([z.enum(['fr-FR-Chirp3-HD-Aoede','fr-FR-Chirp3-HD-Kore','fr-FR-Chirp3-HD-Charon','fish-manon','fish-lucas','fish-camille']),CartesiaVoiceId]);
 export const VideoStyle=z.enum(['editorial','minimal','cinematic']);
 const photoOrder=z.array(z.number().int().min(0).max(11)).max(12)
   .refine(values=>new Set(values).size===values.length,'Une photo ne peut être sélectionnée deux fois.');
@@ -21,7 +23,7 @@ export const CustomNarration=z.array(z.string().trim().min(1).max(500)
   .refine(lines=>lines.join(' ').split(/\s+/).length<=120,'Limitez la narration à 120 mots pour conserver les phrases complètes.');
 // No defaults: historical draft and admission JSON remain unchanged.
 export const VideoCustomization=z.object({style:VideoStyle,
-  voice:z.enum(['fr-FR-Chirp3-HD-Aoede','fr-FR-Chirp3-HD-Kore','fr-FR-Chirp3-HD-Charon','fish-manon','fish-lucas','fish-camille']),
+  voice:VideoVoice,
   primaryColor:z.string().regex(/^#[a-fA-F0-9]{6}$/),secondaryColor:z.string().regex(/^#[a-fA-F0-9]{6}$/),
   photoMotion:z.boolean(),transition:z.enum(['fade','cut']),photoOrder:photoOrder.optional(),
   // Optional to preserve historical request hashes. Generation, never preview, pays for these clips.
@@ -45,8 +47,8 @@ export const GenerationCustomization=VideoCustomization.superRefine((value,conte
   if(value.narration){const parsed=CustomNarration.safeParse(value.narration);if(!parsed.success)
     for(const issue of parsed.error.issues)context.addIssue({code:'custom',path:['narration',...issue.path],message:issue.message});}
 });
-export function defaultVideoCustomization(brand?:{primaryColor:string;secondaryColor:string}):VideoCustomization {
-  return {style:'cinematic',voice:DEFAULT_VIDEO_VOICE,primaryColor:brand?.primaryColor??'#E1E8D9',
+export function defaultVideoCustomization(brand?:{primaryColor:string;secondaryColor:string},voice:VideoCustomization['voice']=DEFAULT_VIDEO_VOICE):VideoCustomization {
+  return {style:'cinematic',voice,primaryColor:brand?.primaryColor??'#E1E8D9',
     secondaryColor:brand?.secondaryColor??'#171714',photoMotion:true,transition:'fade'};
 }
 export function customizedListing(listing:NormalizedListing,settings?:VideoCustomization):NormalizedListing {

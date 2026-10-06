@@ -5,19 +5,20 @@ import {findImport} from './imports';
 import {findEditorVoiceSource} from './editor-voice';
 import {retainedAnimations} from './animation-library';
 import {generationRetained} from './retention';
+import {voiceSettings} from './voices';
 
 export class GenerationFailure extends Error {constructor(public code:PublicErrorCode){super(code);}}
 export type GenerationRow={ownerAgencyId:string|null;anonymousSessionId:string|null;retention:'available'|'expiring'|'expired';creditStatus:'unfunded'|'reserved'|'consumed'|'released';previewKey:string|null;previewReport:string|null;jobId:string;agencyId:string;inputHash:string;input:string;brand:string;deadline:string;expiresAt:string|null;
   status:GenerationView['status'];stage:GenerationView['stage'];progressPercent:number;attempt:number;errorCode:string|null;narrationErrorCode?:string|null;createdAt:string;updatedAt:string;sourceKind:'url'|'manual'|null;
   workflowId:string;listingId:string|null;objectKey:string|null;report:string|null;launchStatus:string;title:string;locality:string|null;
-  creditVersion?:number;creditsReserved?:number;creditsUsed?:number;animationsRequested?:number};
+  creditVersion?:number;creditsReserved?:number;creditsUsed?:number;animationsRequested?:number;selectedVoice?:string};
 const columns=`g.owner_agency_id AS ownerAgencyId,g.anonymous_session_id AS anonymousSessionId,g.retention,r.status AS creditStatus,p.object_key AS previewKey,p.report_json AS previewReport,g.job_id AS jobId,g.agency_id AS agencyId,g.input_hash AS inputHash,g.input_json AS input,g.brand_json AS brand,
   g.deadline,CASE WHEN g.storage_permanent=1 THEN NULL ELSE g.expires_at END AS expiresAt,j.status,j.stage,j.progress_percent AS progressPercent,j.attempt,j.error_code AS errorCode,n.error_code AS narrationErrorCode,j.created_at AS createdAt,j.updated_at AS updatedAt,
   j.workflow_id AS workflowId,j.listing_id AS listingId,a.object_key AS objectKey,a.report_json AS report,l.status AS launchStatus,
   coalesce(json_extract(i.result_json,'$.facts.title.value'),'Votre annonce') AS title,
   json_extract(i.result_json,'$.facts.locality.value') AS locality,
   CASE WHEN json_type(g.input_json,'$.url') IS NOT NULL THEN 'url' ELSE i.source_kind END AS sourceKind,
-  g.credit_version AS creditVersion,r.credit_amount AS creditsReserved,r.credit_used AS creditsUsed,g.animations_requested AS animationsRequested`;
+  g.credit_version AS creditVersion,r.credit_amount AS creditsReserved,r.credit_used AS creditsUsed,g.animations_requested AS animationsRequested,g.selected_voice AS selectedVoice`;
 const joins=`FROM generation_runs g JOIN jobs j ON j.id=g.job_id JOIN job_launch_intents l ON l.job_id=j.id
   JOIN reservations r ON r.job_id=j.id LEFT JOIN narration_runs n ON n.job_id=j.id AND n.agency_id=j.agency_id
   LEFT JOIN generation_previews p ON p.job_id=j.id LEFT JOIN generation_artifacts a ON a.job_id=j.id LEFT JOIN listing_imports i ON i.id=j.listing_id AND i.agency_id=j.agency_id`;
@@ -96,11 +97,11 @@ export async function admitGeneration(db:Database,agencyId:string,key:string,inp
   if(!grant||grant.remaining<credits)throw new GenerationFailure('QUOTA_EXHAUSTED');
   if(saved)try{selectedAnimationIndices((parsed.data.customization?.photoOrder??saved.photos.map(p=>p.sourceOrder)),parsed.data.customization);}catch{throw new GenerationFailure('VALIDATION_ERROR');}
   if(saved&&verifyPhotos)await verifyPhotos(saved);
-  const id=crypto.randomUUID(),at=new Date(now).toISOString();
+  const id=crypto.randomUUID(),at=new Date(now).toISOString(),selectedVoice=parsed.data.customization?.voice??(await voiceSettings(db)).voice;
   try {await db.prepare(`INSERT INTO generation_runs(job_id,agency_id,allocation_id,reservation_id,idempotency_key,input_hash,input_json,brand_json,
-    created_at,deadline,expires_at,month,credit_version,credits_total,animations_requested,reuse_pricing,animations_reused,animation_reuses_json,funding_version,financial_mode) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,1,(SELECT mode FROM credit_payment_policy WHERE id=1))`)
+    created_at,deadline,expires_at,month,credit_version,credits_total,animations_requested,reuse_pricing,animations_reused,animation_reuses_json,funding_version,financial_mode,selected_voice) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,1,(SELECT mode FROM credit_payment_policy WHERE id=1),?)`)
     .bind(id,agencyId,grant.id,crypto.randomUUID(),key,hash,body,JSON.stringify(brand.data),at,new Date(now+900_000).toISOString(),
-      new Date(now+7*86400_000).toISOString(),at.slice(0,7),CREDIT_PRICING_VERSION,credits,animations,reuses.length,JSON.stringify(reuses)).run();
+      new Date(now+7*86400_000).toISOString(),at.slice(0,7),CREDIT_PRICING_VERSION,credits,animations,reuses.length,JSON.stringify(reuses),selectedVoice).run();
   }catch(error){
     // Une course sur la même clé doit converger, même si le trigger voit le slot occupé.
     const winner=await db.prepare('SELECT job_id AS id,input_hash AS hash FROM generation_runs WHERE agency_id=? AND idempotency_key=?')
