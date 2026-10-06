@@ -40,10 +40,12 @@ test('les résultats publiés ont des preuves datées et des compteurs qui exclu
   for (const registered of importSources) assert.ok(coverageSources.some(s => s.id === registered.id));
   for (const source of coverageSources) {
     const result = sourceCoverage[source.id];
+    assert.equal(new Set(result.samples.map(s => `${s.url}-${s.testedAt ?? s.checkedAt}`)).size, result.samples.length);
     assert.equal(result.listingAttempts, result.samples.length);
     assert.equal(result.successfulImports, result.samples.filter(s => s.outcome === 'complete' && s.environment === 'cloudflare').length);
     for (const proof of result.samples) {
       assert.match(proof.checkedAt, /^\d{4}-\d{2}-\d{2}$/);
+      if (proof.testedAt) {assert.ok(Number.isFinite(Date.parse(proof.testedAt))); assert.equal(proof.testedAt.slice(0, 10), proof.checkedAt);}
       assert.equal(new URL(proof.url).protocol, 'https:');
       assert.equal(coverageForHost(new URL(proof.url).hostname)?.id, source.id);
       if (proof.outcome === 'complete') assert.ok(proof.photos >= 3);

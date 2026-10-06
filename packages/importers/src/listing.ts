@@ -7,6 +7,9 @@ import {clean, missing, numeric, unique, verified} from './facts';
 import {extractBienici} from './portals/bienici';
 import {extractFigaro} from './portals/figaro';
 import {extractLadresse} from './agencies/ladresse';
+import {extractCesarBrutus} from './agencies/cesar-brutus';
+import {extractIad} from './agencies/iad';
+import {extractRemax} from './agencies/remax';
 export {verified, missing} from './facts';
 
 type Obj = Record<string, unknown>;
@@ -223,6 +226,10 @@ export function extractListingHtml(html: string, url: string, options: {allowPar
   const scripts = nodes.filter(n => tag(n) === 'script' && attr(n, 'type') === 'application/ld+json');
   if (scripts.length > 20) throw new ImportFailure('NOT_A_LISTING', 'Trop de blocs JSON-LD.');
   const documents = scripts.flatMap(n => {const content = rawText(n); if (content.length > 128_000) throw new ImportFailure('NOT_A_LISTING', 'JSON-LD trop volumineux.'); try {return [JSON.parse(content) as unknown];} catch {return [];}});
+  const specific = adapter.id === 'cesar-brutus' ? extractCesarBrutus(nodes, documents, url, canonicalUrl, adapter.listingId!)
+    : adapter.id === 'iad' ? extractIad(nodes, documents, url, canonicalUrl, adapter.listingId!)
+    : adapter.id === 'remax' ? extractRemax(nodes, documents, url, canonicalUrl, adapter.listingId!) : undefined;
+  if (specific) return checkedGallery(specific, options.allowPartial);
   const figaro = adapter.id === 'figaro' ? extractFigaro(nodes, documents, url, canonicalUrl, adapter.listingId!) : undefined;
   const ladresse = adapter.id === 'ladresse' ? extractLadresse(nodes, url, canonicalUrl, adapter.listingId!) : undefined;
   let output: ExtractedListing | undefined;
@@ -291,9 +298,12 @@ export function extractListingHtml(html: string, url: string, options: {allowPar
     output = dom;
   }
   if (!output) throw new ImportFailure('NOT_A_LISTING', 'Aucune annonce structurée exploitable.', 'structure_changed');
+  return checkedGallery(output, options.allowPartial);
+}
+function checkedGallery(output: ExtractedListing, allowPartial?: boolean) {
   // Les URLs douteuses de la galerie sont refusées avant tout téléchargement.
   output.photoUrls = output.photoUrls.filter(v => !/(?:^|[-_.\/])(?:logo|avatar|floor.?plan|plan|dpe|ges)(?:[-_.\/]|$)/i.test(new URL(v).pathname));
-  if (output.photoUrls.length < 3 && !options.allowPartial)
+  if (output.photoUrls.length < 3 && !allowPartial)
     throw new ImportFailure('INSUFFICIENT_PHOTOS', 'La galerie liée au bien est insuffisante.');
   return output;
 }

@@ -1,5 +1,7 @@
 // Public acceptance results. Raw reports and credentials stay in ignored evidence.
 // Research and methodology: docs/preuves/maintenance/SOURCES-05-10.md.
+// César & Brutus and new iad sample: docs/preuves/maintenance/SOURCES-06-10.md.
+// Adapted readers and successful retests: docs/preuves/maintenance/SOURCES-ADAPTATEURS-06-10.md.
 import type {CoverageSourceId, SourceCoverageEntry} from './source-coverage';
 
 export const sourceCoverageData = {
@@ -190,8 +192,28 @@ export const sourceCoverageData = {
     ]
   },
   "iad": {
-    "summary": "Les informations nécessaires n’ont pas toutes pu être vérifiées. Vous pouvez renseigner le bien et ajouter vos photos manuellement.",
+    "summary": "L’annonce de Lyon 4e a été importée complètement après adaptation : 8 photos et les informations du bien. Les premiers essais restent détaillés ci-dessous ; les autres annonces peuvent varier.",
     "samples": [
+      {
+        "url": "https://www.iadfrance.fr/annonce/appartement-vente-3-pieces-lyon-55m2/r2125326",
+        "label": "Appartement · Lyon 4e · 55 m²",
+        "checkedAt": "2026-10-06",
+        "testedAt": "2026-10-06T15:30:09.867Z",
+        "environment": "cloudflare",
+        "outcome": "complete",
+        "photos": 8,
+        "note": "Après adaptation de l’import : prix, surface, pièces et description récupérés, avec les 8 photos de la galerie vérifiées."
+      },
+      {
+        "url": "https://www.iadfrance.fr/annonce/appartement-vente-3-pieces-lyon-55m2/r2125326",
+        "label": "Appartement · Lyon 4e · 55 m²",
+        "checkedAt": "2026-10-06",
+        "environment": "cloudflare",
+        "outcome": "failed",
+        "photos": 0,
+        "note": "La page a été récupérée, mais l’import échoue à la lecture des informations du bien, avant de télécharger les photos.",
+        "testedAt": "2026-10-06T13:59:57.615Z"
+      },
       {
         "url": "https://www.iadfrance.fr/annonce/appartement-vente-3-pieces-lyon-69m2/r2060690",
         "label": "Appartement · Lyon 8e",
@@ -200,6 +222,56 @@ export const sourceCoverageData = {
         "outcome": "failed",
         "photos": 0,
         "note": "Les informations nécessaires n’ont pas toutes pu être vérifiées."
+      }
+    ]
+  },
+  "cesar-brutus": {
+    "summary": "L’annonce testée a été importée complètement après adaptation : 12 photos et les informations du bien. Les premiers essais restent détaillés ci-dessous.",
+    "samples": [
+      {
+        "url": "https://www.cesaretbrutus.com/bien/vente-dune-maison-de-famille-7-pieces-27165-m%c2%b2-a-limonest-mcl-10287-cesaretbrutus69/",
+        "label": "Maison · Limonest · 7 pièces",
+        "checkedAt": "2026-10-06",
+        "testedAt": "2026-10-06T15:29:42.777Z",
+        "environment": "cloudflare",
+        "outcome": "complete",
+        "photos": 12,
+        "note": "Après adaptation de l’import : prix, surface, pièces et description récupérés, avec 12 photos vérifiées. La galerie est limitée à 12 photos par import."
+      },
+      {
+        "url": "https://www.cesaretbrutus.com/bien/vente-dune-maison-de-famille-7-pieces-27165-m%c2%b2-a-limonest-mcl-10287-cesaretbrutus69/",
+        "label": "Maison · Limonest · 7 pièces",
+        "checkedAt": "2026-10-06",
+        "environment": "cloudflare",
+        "outcome": "failed",
+        "photos": 0,
+        "note": "La page a été récupérée, mais l’import échoue à la lecture des informations du bien, avant de télécharger les photos.",
+        "testedAt": "2026-10-06T13:59:24.824Z"
+      }
+    ]
+  },
+  "remax": {
+    "summary": "L’annonce testée a été importée complètement après adaptation : 12 photos et les informations du bien. Les premiers essais restent détaillés ci-dessous.",
+    "samples": [
+      {
+        "url": "https://remax.fr/fr/mandats/vente-maison-ch3-charente-maritime---17-etaules/749351027-200",
+        "label": "Maison · Étaules · 112 m²",
+        "checkedAt": "2026-10-06",
+        "testedAt": "2026-10-06T15:30:26.187Z",
+        "environment": "cloudflare",
+        "outcome": "complete",
+        "photos": 12,
+        "note": "Après adaptation de l’import : prix, surface, 4 pièces et description récupérés, avec 12 photos de la galerie en haute résolution. La galerie est limitée à 12 photos par import."
+      },
+      {
+        "url": "https://remax.fr/fr/mandats/vente-maison-ch3-charente-maritime---17-etaules/749351027-200",
+        "label": "Maison · Étaules · 112 m²",
+        "checkedAt": "2026-10-06",
+        "testedAt": "2026-10-06T14:16:55.000Z",
+        "environment": "cloudflare",
+        "outcome": "failed",
+        "photos": 0,
+        "note": "Premier essai : la page a été récupérée, mais une ressource externe non prise en charge a interrompu l’import."
       }
     ]
   },

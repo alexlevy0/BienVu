@@ -1,6 +1,6 @@
 // Hôtes et routes explicites, partagés par le contrat, le registre et l'interface.
 // La présence dans ce catalogue n'est pas une promesse de compatibilité.
-export type SourceId = 'espaces-atypiques' | 'orpi' | 'century21' | 'figaro' | 'seloger' | 'leboncoin' | 'bienici' | 'ladresse';
+export type SourceId = 'espaces-atypiques' | 'orpi' | 'century21' | 'figaro' | 'seloger' | 'leboncoin' | 'bienici' | 'ladresse' | 'cesar-brutus' | 'iad' | 'remax';
 export type ImportSource = {id: SourceId; name: string; hosts: readonly string[]; paths: readonly RegExp[];
   mediaHosts: readonly string[]};
 export const importSources: readonly ImportSource[] = [
@@ -22,6 +22,12 @@ export const importSources: readonly ImportSource[] = [
     paths: [/^\/annonce\/(?:vente|location)\/(?:[^/]+\/){2,3}([a-zA-Z0-9_-]+)\/?$/], mediaHosts: ['www.bienici.com', 'file.bienici.com']},
   {id: 'ladresse', name: 'l’Adresse', hosts: ['www.ladresse.com', 'ladresse.com'],
     paths: [/^\/annonce\/achat\/(?:maison|appartement)\/[^/]+\/(\d+)\/?$/], mediaHosts: ['admin.exceladresse.com']},
+  {id: 'cesar-brutus', name: 'César & Brutus', hosts: ['www.cesaretbrutus.com', 'cesaretbrutus.com'],
+    paths: [/^\/bien\/[^/]+?-((?:[a-z]{1,10}-)?\d+-cesaretbrutus\d+)\/?$/i], mediaHosts: []},
+  {id: 'iad', name: 'iad', hosts: ['www.iadfrance.fr', 'iadfrance.fr'],
+    paths: [/^\/annonce\/(?:appartement|maison)-vente-[^/]+\/r(\d+)\/?$/], mediaHosts: ['images.playiad.com', 'images.iadfrance.fr']},
+  {id: 'remax', name: 'RE/MAX', hosts: ['remax.fr', 'www.remax.fr'],
+    paths: [/^\/fr\/mandats\/vente-(?:maison|appartement)-[^/]+\/(\d+-\d+)\/?$/], mediaHosts: ['i.maxwork.fr']},
 ];
 export const sourceForHost = (host: string) => importSources.find(source => source.hosts.includes(host));
 export function sourceListingId(source: ImportSource, path: string): string | null {

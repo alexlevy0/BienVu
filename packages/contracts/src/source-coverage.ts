@@ -18,6 +18,8 @@ export const coverageSources = [
   {id: 'iad', name: 'iad', kind: 'agency', hosts: ['www.iadfrance.fr', 'iadfrance.fr'], domains: []},
   {id: 'safti', name: 'SAFTI', kind: 'agency', hosts: ['www.safti.fr', 'safti.fr'], domains: []},
   {id: 'espaces-atypiques', name: 'Espaces Atypiques', kind: 'agency', hosts: ['www.espaces-atypiques.com', 'espaces-atypiques.com'], domains: []},
+  {id: 'cesar-brutus', name: 'César & Brutus', kind: 'agency', hosts: ['www.cesaretbrutus.com', 'cesaretbrutus.com'], domains: []},
+  {id: 'remax', name: 'RE/MAX', kind: 'agency', hosts: ['remax.fr', 'www.remax.fr'], domains: []},
   {id: 'figaro', name: 'Le Figaro Immobilier', kind: 'portal', hosts: ['immobilier.lefigaro.fr'], domains: []},
   {id: 'seloger', name: 'SeLoger', kind: 'portal', hosts: ['www.seloger.com', 'seloger.com'], domains: []},
   {id: 'leboncoin', name: 'Leboncoin', kind: 'portal', hosts: ['www.leboncoin.fr', 'leboncoin.fr'], domains: []},
@@ -25,7 +27,7 @@ export const coverageSources = [
 ] as const;
 export type CoverageSource = typeof coverageSources[number];
 export type CoverageSourceId = CoverageSource['id'];
-export type SourceSample = {url: string; label: string; checkedAt: string; environment: 'cloudflare' | 'local_https';
+export type SourceSample = {url: string; label: string; checkedAt: string; testedAt?: string; environment: 'cloudflare' | 'local_https';
   outcome: 'complete' | 'partial' | 'failed'; photos: number; note: string};
 export type SourceCoverageEntry = {summary: string; samples: readonly SourceSample[]};
 export const coverageLabels = {sample_tested: 'Import complet testé', partial_import: 'Import à compléter',

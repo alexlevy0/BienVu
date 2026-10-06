@@ -49,10 +49,10 @@ export function SourceDirectory() {
             <span className="source-status"><span aria-hidden="true"/>{coverageLabels[result.status]}</span>
             <p className="source-summary">{result.summary}</p>
             <div className="source-card-evidence"><span>{result.successfulImports} import{result.successfulImports > 1 ? 's' : ''} complet{result.successfulImports > 1 ? 's' : ''}
-              {result.partialImports > 0 && ` · ${result.partialImports} à compléter`} sur {result.listingAttempts} lien{result.listingAttempts > 1 ? 's' : ''}</span>
+              {result.partialImports > 0 && ` · ${result.partialImports} à compléter`} sur {result.listingAttempts} essai{result.listingAttempts > 1 ? 's' : ''}</span>
               <time dateTime={result.checkedAt}>Dernier essai : {date(result.checkedAt)}</time></div>
             <details className="source-samples"><summary>Voir {result.samples.length > 1 ? 'les annonces testées' : 'l’annonce testée'}</summary>
-              <ul>{result.samples.map(sample => <li key={`${sample.url}-${sample.checkedAt}`}>
+              <ul>{result.samples.map(sample => <li key={`${sample.url}-${sample.testedAt ?? sample.checkedAt}`}>
                 <a href={sample.url} target="_blank" rel="noopener noreferrer">{sample.label} <span aria-hidden="true">↗</span><span className="sr-only"> (nouvel onglet)</span></a>
                 <time dateTime={sample.checkedAt}>{date(sample.checkedAt)}</time><p>{sample.note}</p>
                 {sample.environment !== 'cloudflare' && <p>Essai local : résultat non confirmé dans BienVu.</p>}
