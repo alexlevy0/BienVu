@@ -244,7 +244,8 @@
 .editor-welcome>p{color:#71776d;line-height:1.55;font-size:15px;margin:0 0 24px}
 .editor-welcome-options{display:grid;grid-template-columns:1.2fr 1fr;gap:14px}
 .editor-welcome-options>button{border:1px solid #d4deca;border-radius:12px;padding:0;background:#fffefa;color:inherit;text-align:left;overflow:hidden;display:flex;flex-direction:column;transition:border-color .15s,box-shadow .15s;min-width:0;font:inherit;cursor:pointer}
-.editor-welcome-options>button:hover{border-color:#75936a;box-shadow:0 4px 18px #32452c12}
+.editor-welcome-options>button:hover:not(:disabled){border-color:#75936a;box-shadow:0 4px 18px #32452c12}
+.editor-welcome-options>button:disabled{opacity:.65;cursor:wait}
 .editor-welcome-options>button:focus-visible{outline:3px solid #718b62;outline-offset:4px}
 .editor-welcome-demo>img{width:100%;height:150px;object-fit:cover;object-position:center 45%;display:block}
 .editor-welcome-demo>span{padding:19px;display:flex;flex-direction:column;gap:7px;flex:1;background:#edf3e6}

@@ -1,6 +1,6 @@
 'use client';
 import {useEffect, useImperativeHandle, useRef, useState, type ChangeEvent, type FormEvent, type Ref} from 'react';
-import {generationCreditCost,defaultVideoCustomization,createEditorDocument,CreationFields,VideoCustomization,GenerationCustomization,DESCRIPTION_MAX_CHARACTERS, ManualListingInput, PropertyListingInput,MANUAL_PHOTO_LIMITS, publicErrors, type PublicErrorCode,
+import {generationCreditCost,selectedAnimationIndices,defaultVideoCustomization,createEditorDocument,CreationFields,VideoCustomization,GenerationCustomization,DESCRIPTION_MAX_CHARACTERS, ManualListingInput, PropertyListingInput,MANUAL_PHOTO_LIMITS, publicErrors, type PublicErrorCode,
   type CreationDraftData, type CreationDraftView, type NormalizedListing,type VideoDuration,type VideoAspectRatio} from '@bienvu/contracts';
 import {HomeIcon} from './home-icons';
 import type {ImportView} from './generation-form';
@@ -8,6 +8,7 @@ import {manualDraftFields, readManualListingDraft, saveManualListingDraft, type 
 import {inspectManualPhotos} from '../lib/manual-photos';
 import {photoUploadError} from '../lib/photo-upload-error';
 import {VideoCustomizer} from './video-customizer';
+import {useAccount} from './account';
 
 type SelectedPhoto = {id: string; file: File|null; preview: string; sourceHash?:string;remote?:NormalizedListing['photos'][number]; state:'ready'|'sending'|'error'; slot:number; error?:string; removing?:boolean};
 type Guided={description:string;setDescription(value:string):void;onCancel():void;
@@ -30,6 +31,9 @@ function fieldMessage(name:string,code:string,message:string){
 async function photoHash(file:File){
   return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await file.arrayBuffer())),n=>n.toString(16).padStart(2,'0')).join('');
 }
+function photoAnimations(settings:VideoCustomization|undefined,order:number[]){
+  return settings?.runwayPhotos??selectedAnimationIndices(order,settings).map(index=>order[index]).filter(slot=>slot!==undefined);
+}
 const labels: Record<string, string> = {title: 'titre', locality: 'localisation', propertyType: 'type de bien', description: 'description',
   priceCents: 'prix', charges: 'charges', area: 'surface', rooms: 'nombre de pièces', photos: 'photos'};
 type Props = {busy: boolean; generate?: boolean; setBusy(value: boolean): void;guided?:Guided;ref?:Ref<ManualListingFormHandle>;
@@ -45,6 +49,7 @@ type Props = {busy: boolean; generate?: boolean; setBusy(value: boolean): void;g
 );
 export function ManualListingForm(props: Props) {
   const {busy, setBusy, generate = false} = props;
+  const {me}=useAccount();
   const [transaction, setTransaction] = useState('sale'), [photos, setPhotos] = useState<SelectedPhoto[]>([]);
   const [propertyType,setPropertyType]=useState('apartment'),[hydrated,setHydrated]=useState(false),[photoChecking,setPhotoChecking]=useState(false);
   const [fields,setFields]=useState<ManualDraftFields>(emptyFields),[detailsOpen,setDetailsOpen]=useState(false),[draggedPhoto,setDraggedPhoto]=useState<string|null>(null),[photoDrop,setPhotoDrop]=useState(false);
@@ -233,8 +238,11 @@ export function ManualListingForm(props: Props) {
       const used=new Set(selected.current.map(p=>p.slot));
       const additions=accepted.map(file=>{let slot=0;while(used.has(slot))slot++;used.add(slot);
         return {id:crypto.randomUUID(),file,sourceHash:result.hashes.get(file),preview:URL.createObjectURL(file),state:props.guided?.agencyId?'sending' as const:'ready' as const,slot};});
+      const previousSlots=selected.current.map(p=>p.slot);
       selected.current=[...selected.current,...additions];setPhotos(selected.current);
-      setCustomization(current=>current?{...current,photoOrder:[...(current.photoOrder??[]),...additions.map(p=>p.slot)]}:current);
+      settingsVersion.current++;setSettingsSaved(false);
+      setCustomization(current=>current?{...current,photoOrder:[...(current.photoOrder??previousSlots),...additions.map(p=>p.slot)],
+        runwayClips:undefined,runwayPhotos:photoAnimations(current,current.photoOrder??previousSlots)}:current);
       if(props.guided?.agencyId)for(const photo of additions)void uploadSelected(photo);
     }
     return result;
@@ -273,8 +281,10 @@ export function ManualListingForm(props: Props) {
       return;
     }finally{removals.current.delete(photo.id);}
     if(photo.file)URL.revokeObjectURL(photo.preview);
-    selected.current=selected.current.filter(p=>p.id!==photo.id);setPhotos(selected.current);
-    setCustomization(current=>current?{...current,photoOrder:current.photoOrder?.filter(slot=>slot!==photo.slot),runwayPhotos:current.runwayPhotos?.filter(slot=>slot!==photo.slot)}:current);setErrors(current=>({...current,photos:''}));
+    const previousSlots=selected.current.map(p=>p.slot);
+    selected.current=selected.current.filter(p=>p.id!==photo.id);setPhotos(selected.current);settingsVersion.current++;setSettingsSaved(false);
+    setCustomization(current=>current?{...current,photoOrder:current.photoOrder?.filter(slot=>slot!==photo.slot),runwayClips:undefined,
+      runwayPhotos:photoAnimations(current,current.photoOrder??previousSlots).filter(slot=>slot!==photo.slot)}:current);setErrors(current=>({...current,photos:''}));
   }
   function focusError(name:string){requestAnimationFrame(()=>formRef.current?.querySelector<HTMLElement>(name==='photos'?'#manual-photos, .manual-sheet-gallery':`[name="${name}"]`)?.focus());}
   async function cancelGuided(){if(!props.guided)return;
@@ -411,13 +421,24 @@ export function ManualListingForm(props: Props) {
     const first=customization.photoOrder!.indexOf(a.slot),second=customization.photoOrder!.indexOf(b.slot);
     return (first<0?99:first)-(second<0?99:second);
   }):photos;
+  const animatedPhotos=new Set(photoAnimations(customization,customization?.photoOrder??photos.map(photo=>photo.slot)));
   function movePhoto(id:string,to:number){
     if(busy||photoChecking)return;
     const photo=orderedPhotos.find(p=>p.id===id);if(!photo||photo.state!=='ready'||photo.removing)return;
     const next=orderedPhotos.filter(p=>p.id!==id);next.splice(Math.max(0,Math.min(next.length,to)),0,photo);
     selected.current=next;setPhotos(next);settingsVersion.current++;setSettingsSaved(false);
     setCustomization(current=>({...defaultVideoCustomization(props.brand),...current,
-      photoOrder:next.filter(p=>!current?.photoOrder||current.photoOrder.includes(p.slot)).map(p=>p.slot)}));
+      photoOrder:next.filter(p=>!current?.photoOrder||current.photoOrder.includes(p.slot)).map(p=>p.slot),
+      runwayClips:undefined,runwayPhotos:photoAnimations(current,current?.photoOrder??orderedPhotos.map(p=>p.slot))}));
+  }
+  function toggleAnimation(photo:SelectedPhoto){
+    if(!me||me.role==='viewer'||busy||photoChecking||photo.state!=='ready'||photo.removing)return;
+    settingsVersion.current++;setSettingsSaved(false);
+    setCustomization(current=>{
+      const order=current?.photoOrder??selected.current.map(p=>p.slot),animated=photoAnimations(current,order);
+      return {...defaultVideoCustomization(props.brand),...current,photoOrder:order.includes(photo.slot)?order:[...order,photo.slot],runwayClips:undefined,
+        runwayPhotos:animated.includes(photo.slot)?animated.filter(slot=>slot!==photo.slot):[...animated,photo.slot]};
+    });
   }
   function blurField(name:string){
     const input=finalInput();if(!input||input.success)return;
@@ -477,6 +498,11 @@ export function ManualListingForm(props: Props) {
                 onDragEnd={()=>setDraggedPhoto(null)} onDragOver={event=>{if(draggedPhoto){event.preventDefault();event.dataTransfer.dropEffect='move';}}}
                 onDrop={event=>{if(draggedPhoto){event.preventDefault();event.stopPropagation();movePhoto(draggedPhoto,index);setDraggedPhoto(null);}}}>
                 <div className="manual-sheet-thumbnail"><img src={photo.preview} alt={`Photo ${index+1} du bien`} draggable={false}/><span className={`manual-sheet-photo-number${index===0?' is-cover':''}`}>{index+1}</span>
+                  <button type="button" className="manual-sheet-animation-toggle" aria-pressed={animatedPhotos.has(photo.slot)} aria-label={`Animer la photo ${index+1} avec l’IA`}
+                    disabled={!me||me.role==='viewer'||busy||photoChecking||photo.removing||photo.state!=='ready'}
+                    title={!me?'Connectez-vous pour animer vos photos avec l’IA':me.role==='viewer'?'Votre accès Lecteur ne permet pas de modifier les animations':animatedPhotos.has(photo.slot)?'Désactiver l’animation IA':'Animer cette photo avec l’IA · 1 crédit'}
+                    draggable={false} onDragStart={event=>{event.preventDefault();event.stopPropagation();}} onClick={()=>toggleAnimation(photo)}>
+                    <HomeIcon name="sparkle" size={20} filled={animatedPhotos.has(photo.slot)}/></button>
                   {index===0&&<span className="manual-sheet-cover">Couverture</span>}
                   {(photo.state!=='ready'||photo.removing)&&<span className="manual-sheet-photo-status" role="status">{photo.removing?'Retrait…':photo.state==='sending'?'Envoi…':'Envoi interrompu'}</span>}
                   <div className="manual-sheet-photo-actions"><button type="button" disabled={busy||photoChecking||photo.removing||photo.state!=='ready'||index===0} aria-label={`Avancer la photo ${index+1}`} onClick={()=>movePhoto(photo.id,index-1)}><HomeIcon name="arrow" size={15}/></button>
@@ -491,6 +517,7 @@ export function ManualListingForm(props: Props) {
                   onChange={event=>{void addPhotos(event.target.files);event.target.value='';}}/></label></li>}
             </ol>
             <p className="manual-sheet-gallery-help" id="manual-photos-help"><HomeIcon name="settings" size={14}/>{photos.length?'Glissez pour changer l’ordre.':'3 à 12 photos · JPEG, PNG ou WebP · 10 Mo par photo.'}</p>
+            {photos.length>0&&<p className="manual-sheet-gallery-help"><HomeIcon name="sparkle" size={14}/>{me?'Cliquez sur l’étoile pour animer une photo avec l’IA · 1 crédit par photo.':'Connectez-vous pour animer vos photos avec l’IA.'}</p>}
             {photoChecking&&<p role="status" className="field-help">Vérification des images…</p>}
             <div id="manual-photo-feedback" className="form-feedback error" role="alert">{errors.photos}{photoIssues.map(issue=><p key={issue}>{issue}</p>)}</div>
           </section>

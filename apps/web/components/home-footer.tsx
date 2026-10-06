@@ -35,6 +35,7 @@ export function HomeFooter({onCreate}:{onCreate:()=>void}) {
       </nav>
       <nav className="home-premium-footer-column" aria-labelledby="home-footer-resources-title">
         <h3 id="home-footer-resources-title">Ressources</h3>
+        <Link href="/blog">Blog</Link>
         <Link href="/comment-ca-marche">Comment ça marche</Link>
         <Link href="/modeles-video-immobilier">Modèles de vidéos</Link>
         <Link href="/guides">Guides immobiliers</Link>

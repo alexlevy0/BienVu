@@ -24,6 +24,7 @@
     "probe:web": "node scripts/probe-web.mjs",
     "probe:seo": "node scripts/probe-seo.mjs",
     "assets:seo": "node scripts/prepare-seo-assets.mjs",
+    "assets:blog": "tsx scripts/prepare-blog-assets.ts",
     "optimize:homepage": "node scripts/optimize-homepage.mjs",
     "probe:browser": "node scripts/probe-browser.mjs",
     "probe:renderer": "node scripts/probe-renderer.mjs",

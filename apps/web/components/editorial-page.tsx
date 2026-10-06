@@ -22,6 +22,6 @@ export function EditorialPage({page, guide = false}: {page: Content; guide?: boo
     </div>
     <section className="marketing-related"><h2>Pour aller plus loin</h2><div>{page.links.map(link => <Link key={link.path} href={link.path} prefetch={false}>{link.label}<span aria-hidden="true">↗</span></Link>)}</div></section>
     <section className="marketing-cta"><div><h2>Votre prochain bien mérite sa vidéo.</h2><p>Commencez avec l’essai offert, puis choisissez les crédits adaptés à votre activité.</p></div><Link className="marketing-button" href="/">Essayer gratuitement →</Link></section>
-    <nav className="marketing-resources" aria-label="Découvrir BienVu">{featurePages.filter(item => item.slug !== page.slug).map(item => <Link href={`/${item.slug}`} key={item.slug}>{item.heading}</Link>)}<Link href="/guides">Tous les guides ({guidePages.length})</Link><Link href="/sources">Sources d’import testées</Link></nav>
+    <nav className="marketing-resources" aria-label="Découvrir BienVu">{featurePages.filter(item => item.slug !== page.slug).map(item => <Link href={`/${item.slug}`} key={item.slug}>{item.heading}</Link>)}<Link href="/guides">Tous les guides ({guidePages.length})</Link><Link href="/blog">Le blog : méthodes et exemples</Link><Link href="/sources">Sources d’import testées</Link></nav>
   </article></StudioFrame>;
 }

@@ -83,7 +83,7 @@ export function LandingPage() {
         {!conversationActive && <HomeMandateKit onPlay={playSlot} onCreate={focusComposer}/>}
         {!conversationActive && <HomeSharing onPlay={context => playSlot(`share.${context}.video`)} onCreate={focusComposer}/>}
         {!conversationActive && <HomeEditorShowcase paused={modalOpen || heroPlaying} onCreate={focusComposer}/>}
-        {!conversationActive && <section className="home-resource-links" aria-labelledby="home-resources-title"><h2 id="home-resources-title">Le marketing immobilier IA, de l’annonce à la publication.</h2><p>Créez une vidéo à partir de vos annonces et photos, personnalisez-la avec l’identité de votre agence et programmez sa publication sur Instagram et Facebook.</p><nav aria-label="Découvrir les fonctionnalités">{featurePages.map(page=><Link key={page.slug} href={`/${page.slug}`}>{page.heading}</Link>)}<Link href="/guides">Conseils et guides</Link><Link href="/sources">Sources d’import testées</Link></nav></section>}
+        {!conversationActive && <section className="home-resource-links" aria-labelledby="home-resources-title"><h2 id="home-resources-title">Le marketing immobilier IA, de l’annonce à la publication.</h2><p>Créez une vidéo à partir de vos annonces et photos, personnalisez-la avec l’identité de votre agence et programmez sa publication sur Instagram et Facebook.</p><nav aria-label="Découvrir les fonctionnalités">{featurePages.map(page=><Link key={page.slug} href={`/${page.slug}`}>{page.heading}</Link>)}<Link href="/guides">Conseils et guides</Link><Link href="/blog">Le blog BienVu</Link><Link href="/sources">Sources d’import testées</Link></nav></section>}
       </main>
       <HomeFooter onCreate={focusComposer}/>
     </div>

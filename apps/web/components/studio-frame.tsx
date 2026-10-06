@@ -10,7 +10,7 @@ export function StudioFrame({active, children, showFooter=true}: {active: 'creat
     <div className="home-workspace">
       <header className="home-topbar"><span>Le studio marketing IA de votre agence immobilière.</span><a href="mailto:contact@bienvu.online">Aide</a></header>
       <main className="home-content" id="home-content" tabIndex={-1}>{children}</main>
-      {showFooter && <footer className="home-footer"><span>BienVu · L’immobilier, en mouvement.</span><nav aria-label="Informations"><Link href="/">Accueil</Link><Link href="/confidentialite">Confidentialité</Link><Link href="/conditions">Conditions</Link><a href="mailto:contact@bienvu.online">Contact</a></nav></footer>}
+      {showFooter && <footer className="home-footer"><span>BienVu · L’immobilier, en mouvement.</span><nav aria-label="Informations"><Link href="/">Accueil</Link><Link href="/blog">Blog</Link><Link href="/confidentialite">Confidentialité</Link><Link href="/conditions">Conditions</Link><a href="mailto:contact@bienvu.online">Contact</a></nav></footer>}
     </div>
   </div>;
 }

@@ -82,6 +82,7 @@ Explorer permet de découvrir les vidéos partagées volontairement et les exemp
 - [Modèles de vidéos immobilières](https://bienvu.online/modeles-video-immobilier): Identité d’agence et présentations réutilisables.
 - [Comment ça marche](https://bienvu.online/comment-ca-marche): Parcours complet, de l’import à la publication.
 - [Guides](https://bienvu.online/guides): Créer un Reel immobilier, choisir ses photos, organiser ses publications et essayer gratuitement.
+- [Blog BienVu](https://bienvu.online/blog): Vingt articles sur le marketing immobilier IA, les vidéos, les Reels, les Stories, TikTok, YouTube Shorts, les photos, la voix off, les sous-titres, la musique, l’identité d’agence, la validation, les messages clients, la location, le calendrier éditorial et le suivi des performances et du budget.
 - [Exemple de présentation](https://bienvu.online/exemples/paris): Page de lecture d’une vidéo de démonstration ou d’une sélection publique de BienVu.
 - [Éditeur](https://bienvu.online/editeur): Démonstration ou projet local sans compte ; projets d'agence après connexion.
 - [Mon agence](https://bienvu.online/agence): Formulaire d'identité et aperçu ; enregistrement et connexion des réseaux après connexion.

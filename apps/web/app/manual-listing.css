@@ -47,6 +47,12 @@
 .manual-sheet-photo-number {position:absolute;top:7px;left:7px;display:grid;place-items:center;width:21px;height:21px;border-radius:50%;border:1px solid #ffffff5c;background:#242932d4;font-size:11px;color:#fff;pointer-events:none}
 .manual-sheet-photo-number.is-cover {background:#47764d}
 .manual-sheet-cover {position:absolute;bottom:8px;left:7px;padding:4px 9px;background:#edf3e6f2;border-radius:4px;color:#42673d;font-size:11px;font-weight:600}
+.manual-property-sheet .manual-sheet-animation-toggle {position:absolute;top:7px;right:7px;display:grid;place-items:center;width:36px;height:36px;padding:0;border:1px solid #d4dfcd;border-radius:50%;background:#fffefaf2;color:#4b6941;box-shadow:0 1px 5px #17231020;cursor:pointer}
+.manual-sheet-animation-toggle[aria-pressed=true] {background:#e6efde;color:#345a31;border-color:#7c9870}
+.manual-sheet-animation-toggle:hover:not(:disabled) {background:#edf3e6;border-color:#75936a}
+.manual-sheet-animation-toggle:focus-visible {outline:2px solid #638060;outline-offset:2px}
+.manual-sheet-animation-toggle:disabled {opacity:.55;cursor:default}
+@media(pointer:coarse){.manual-property-sheet .manual-sheet-animation-toggle {width:40px;height:40px}}
 .manual-sheet-photo-actions {position:absolute;right:6px;bottom:6px;display:flex;gap:2px;padding:2px;background:#fffffff5;border-radius:5px;box-shadow:0 1px 6px #0002;opacity:0;transition:opacity .15s}
 .manual-sheet-photo:hover .manual-sheet-photo-actions,.manual-sheet-photo:focus-within .manual-sheet-photo-actions {opacity:1}
 .manual-sheet-photo:hover .manual-sheet-cover,.manual-sheet-photo:focus-within .manual-sheet-cover {opacity:0}

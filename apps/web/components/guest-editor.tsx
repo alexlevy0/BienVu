@@ -6,12 +6,13 @@ import {newGuestRecord,readGuestRecord,writeGuestRecord,guestResources,guestPhot
   type GuestEditorRecord,type GuestEditorPort} from '../lib/editor-guest';
 import {useAccount} from './account';
 import {HomeIcon} from './home-icons';
+import {EditorProjectChoice} from './editor-project-choice';
 
 export function GuestEditor({render}:{render(draft:CreationDraftView,guest:GuestEditorPort):ReactNode}){
   const {me}=useAccount(),[record,setRecord]=useState<GuestEditorRecord|null>(null),recordRef=useRef(record),
     [persisted,setPersisted]=useState(true),persistedRef=useRef(true),
     [choosing,setChoosing]=useState(true),[canResume,setCanResume]=useState(false),[error,setError]=useState(''),[transferring,setTransferring]=useState(false),[attempt,setAttempt]=useState(0),
-    transferStarted=useRef(false),dialog=useRef<HTMLDialogElement>(null),queue=useRef(Promise.resolve()),urls=useRef(new Map<string,{blob:Blob;url:string}>());
+    transferStarted=useRef(false),queue=useRef(Promise.resolve()),urls=useRef(new Map<string,{blob:Blob;url:string}>());
   recordRef.current=record;
   useEffect(()=>{let active=true;void readGuestRecord().then(value=>{if(active){setRecord(value??newGuestRecord('demo'));setCanResume(Boolean(value));if(value?.handoff&&me)setChoosing(false);}})
     .catch(()=>{if(active){persistedRef.current=false;setPersisted(false);setRecord(newGuestRecord('demo'));setError('Le stockage de ce navigateur est indisponible. Gardez cet onglet ouvert pendant vos essais.');}});
@@ -23,7 +24,6 @@ export function GuestEditor({render}:{render(draft:CreationDraftView,guest:Guest
       recordRef.current=next;setRecord(next);});
     queue.current=task;await task;
   }
-  useEffect(()=>{if(!choosing||!record)return;dialog.current?.showModal();return()=>dialog.current?.close();},[choosing,Boolean(record)]);
   useEffect(()=>{if(!record?.handoff||!me||transferStarted.current)return;if(me.role==='viewer'){setError('Votre accès Lecteur ne permet pas d’enregistrer un projet.');return;}
     transferStarted.current=true;setChoosing(false);setTransferring(true);setError('');
     void transferGuestEditor(record,me.agency.id,next=>update(()=>next)).then(id=>window.location.assign(`/editeur?draft=${encodeURIComponent(id)}`))
@@ -59,15 +59,7 @@ export function GuestEditor({render}:{render(draft:CreationDraftView,guest:Guest
     {error&&<div className="editor-feedback" role="alert"><span>{error}</span>{me&&record.handoff?<button type="button" onClick={()=>{transferStarted.current=false;setAttempt(n=>n+1);}}>Réessayer le transfert</button>:<button type="button" aria-label="Fermer le message" onClick={()=>setError('')}><HomeIcon name="close" size={17}/></button>}</div>}
     {transferring&&<p className="editor-guest-loading" role="status">Enregistrement de vos photos, de vos animations et de vos pistes audio dans votre compte…</p>}
     <div className="editor-guest-content" inert={choosing||transferring}>{render(record.draft,port)}</div>
-    {choosing&&<dialog ref={dialog} className="editor-welcome" aria-labelledby="editor-welcome-title" onCancel={()=>setChoosing(false)}>
-      <span className="editor-eyebrow">VOTRE STUDIO DE MONTAGE</span><h2 id="editor-welcome-title">À vous de jouer.</h2><p>Découvrez l’Éditeur avec une vidéo prête à retoucher, ou partez de vos propres photos.</p>
-      <div className="editor-welcome-options"><button type="button" className="editor-welcome-demo" onClick={()=>void choose('demo')}>
-        <img src={demoAssetUrl(demo.draft.photos[0].id)} alt="Aperçu du projet de démonstration"/>
-        <span><strong>Utiliser la démo</strong><small>Plans animés, textes, voix off et musique.</small><b>Ouvrir la démo <HomeIcon name="arrow" size={18}/></b></span>
-      </button><button type="button" className="editor-welcome-empty" onClick={()=>void choose('empty')}><HomeIcon name="plus" size={36}/>
-        <strong>Nouveau projet</strong><small>Un éditeur vide pour créer votre propre vidéo.</small><b>Commencer <HomeIcon name="arrow" size={18}/></b></button></div>
-      {canResume&&<button type="button" className="editor-welcome-resume" onClick={()=>setChoosing(false)}>Reprendre mon projet sur cet appareil →</button>}
-      <p className="editor-welcome-note">Vos essais restent sur cet appareil. Connectez-vous pour enregistrer votre projet dans votre compte et exporter une vidéo.</p>
-    </dialog>}
+    {choosing&&<EditorProjectChoice onChoose={kind=>void choose(kind)} onClose={()=>setChoosing(false)}
+      resumeLabel={canResume?'Reprendre mon projet sur cet appareil →':undefined}/>}
   </>;
 }

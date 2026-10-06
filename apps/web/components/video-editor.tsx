@@ -23,8 +23,9 @@ import {EditorMusicControls} from './editor-music-controls';
 import {useEditorAudioGain} from './editor-audio-gain';
 import {distributeEditorClips,editorResponse,editorMusicWav,editorMediaSourcesKey,type EditorResources} from '../lib/editor-client';
 import {GuestEditor} from './guest-editor';
+import {EditorProjectChoice,type EditorProjectKind} from './editor-project-choice';
 import {guestAgency} from '../lib/editor-demo';
-import {type GuestEditorPort} from '../lib/editor-guest';
+import {newGuestRecord,transferGuestEditor,type GuestEditorRecord,type GuestEditorPort} from '../lib/editor-guest';
 
 type Model={fields:Fields;settings:VideoCustomization&{editor:EditorDocument}};
 type Selection={kind:'text'|'photo'|'music';id:string}|null;
@@ -43,7 +44,8 @@ function initialModel(draft:CreationDraftView,agency:AgencyProfile):Model{
 }
 export function VideoEditor(){
   const params=useSearchParams(),{me,loading}=useAccount(),store=useGenerationStore(),
-    [draft,setDraft]=useState<CreationDraftView|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[retry,setRetry]=useState(0);
+    [draft,setDraft]=useState<CreationDraftView|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[retry,setRetry]=useState(0),
+    [choosing,setChoosing]=useState(false),creating=useRef(false),creationKey=useRef<string|null>(null),demoRecord=useRef<GuestEditorRecord|null>(null);
   const draftId=params.get('draft'),videoId=params.get('video');
   useEffect(()=>{setDraft(null);setError('');if(loading||!me||me.role==='viewer'||!draftId&&!videoId)return;
     const controller=new AbortController();setBusy(true);
@@ -65,9 +67,22 @@ export function VideoEditor(){
     }catch(cause){if(!controller.signal.aborted)setError(cause instanceof Error?cause.message:'Le projet n’a pas pu être ouvert.');}
     finally{if(!controller.signal.aborted)setBusy(false);}})();return()=>controller.abort();
   },[me?.agency.id,loading,draftId,videoId,retry]);
-  async function create(){setBusy(true);setError('');try{const value=CreationDraftView.parse(await editorResponse(await fetch('/api/imports/draft',{
-    method:'POST',headers:{'Idempotency-Key':crypto.randomUUID()}})));window.location.assign(`/editeur?draft=${encodeURIComponent(value.id)}`);}
-    catch(cause){setError(cause instanceof Error?cause.message:'La création du projet a échoué.');setBusy(false);}}
+  function openChoice(){creationKey.current=null;demoRecord.current=null;setError('');setChoosing(true);}
+  async function create(kind:EditorProjectKind){
+    if(creating.current||!me||me.role==='viewer')return;
+    creating.current=true;setBusy(true);setError('');
+    try{let id:string;
+      if(kind==='demo'){
+        demoRecord.current??=newGuestRecord('demo');
+        id=await transferGuestEditor(demoRecord.current,me.agency.id,async record=>{demoRecord.current=record;});
+      }else{
+        creationKey.current??=crypto.randomUUID();
+        const value=CreationDraftView.parse(await editorResponse(await fetch('/api/imports/draft',{
+          method:'POST',headers:{'Idempotency-Key':creationKey.current}})));id=value.id;
+      }
+      window.location.assign(`/editeur?draft=${encodeURIComponent(id)}`);
+    }catch(cause){setError(cause instanceof Error?cause.message:'La création du projet a échoué.');creating.current=false;setBusy(false);}
+  }
   return <div className="home-studio editor-shell"><a className="home-skip" href="#editor-content">Aller à l’Éditeur</a><StudioSidebar active="editor"/>
     <main className="editor-workspace" id="editor-content" tabIndex={-1}>
       {!loading&&(!me||params.get('guest')==='1')?<GuestEditor render={(initial,guest)=><EditorProject key={initial.id} initial={initial} agency={guestAgency()} guest={guest}/>}/>:draft&&me?<EditorProject key={`${me.agency.id}:${draft.id}`} initial={draft} agency={me.agency}/>:<section className="editor-start">
@@ -75,14 +90,16 @@ export function VideoEditor(){
         <span className="editor-eyebrow">VOTRE STUDIO DE MONTAGE</span><h1>Chaque détail<br/><em>fait la différence.</em></h1>
         <p>Vos photos, vos textes, votre rythme. Composez une vidéo qui vous ressemble.</p>
         {loading||busy?<p role="status">{videoId?'Préparation d’une version modifiable…':'Ouverture de votre projet…'}</p>:!me?<Link className="editor-primary" href={`/connexion?next=${encodeURIComponent(`/editeur${params.size?`?${params.toString()}`:''}`)}`}>Se connecter pour ouvrir l’Éditeur <HomeIcon name="arrow" size={20}/></Link>:me.role==='viewer'?<p>Votre accès Lecteur permet de consulter les vidéos de l’agence. <Link href="/biens">Ouvrir Mes biens →</Link></p>:<>
-          <button className="editor-primary" type="button" onClick={()=>void create()}><HomeIcon name="plus" size={20}/>Nouveau projet</button>
+          <button className="editor-primary" type="button" onClick={openChoice}><HomeIcon name="plus" size={20}/>Nouveau projet</button>
           <div className="editor-project-list">{store.drafts.length>0&&<h2>Vos brouillons</h2>}{store.drafts.map(d=><Link key={d.id} href={`/editeur?draft=${d.id}`}>
             <span className="editor-project-thumb">{d.previewPhotoId?<img src={`/api/imports/${d.id}/photos/${d.previewPhotoId}`} alt=""/>:<HomeIcon name="pencil"/>}</span><span><strong>{d.title??'Votre annonce'}</strong><small>Brouillon{d.locality?` · ${d.locality}`:''}</small></span><HomeIcon name="arrow" size={18}/></Link>)}
             {store.jobs.some(j=>j.status==='ready'&&j.retention==='available')&&<h2>Retoucher une vidéo</h2>}{store.jobs.filter(j=>j.status==='ready'&&j.retention==='available').map(j=><Link key={j.id} href={`/editeur?video=${j.id}`}>
               <span className="editor-project-thumb"><img src={`/api/generations/${j.id}/source-photo`} alt=""/></span><span><strong>{j.title}</strong><small>Créer une nouvelle version</small></span><HomeIcon name="arrow" size={18}/></Link>)}
           </div></>}
-        {error&&<p className="editor-error" role="alert">{error} <button type="button" onClick={()=>setRetry(n=>n+1)}>Réessayer</button></p>}
+        {error&&!choosing&&<p className="editor-error" role="alert">{error} <button type="button" onClick={()=>setRetry(n=>n+1)}>Réessayer</button></p>}
       </section>}
+      {choosing&&me&&me.role!=='viewer'&&<EditorProjectChoice onChoose={kind=>void create(kind)} onClose={()=>setChoosing(false)} busy={busy} error={error}
+        resumeLabel="Annuler" note="Votre projet sera enregistré dans votre compte. Aucun crédit n’est utilisé à l’ouverture."/>}
     </main></div>;
 }
 

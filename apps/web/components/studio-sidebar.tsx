@@ -45,7 +45,7 @@ export function StudioSidebar({active}: {active: 'create' | 'videos' | 'explore'
     <Link className={`home-nav-item${active === section ? ' home-nav-active' : ''}`} href={href} prefetch={false}
       aria-current={active === section ? 'page' : undefined} onClick={() => {closeMenu();if(active==='create'&&section==='create')window.dispatchEvent(new Event('bienvu:new-video'));}}>
       <HomeIcon name={icon} size={section === 'create' ? 28 : 26}/>{name}
-      {section === 'editor' && <span className="home-nav-badge"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 1.5c1.5 6 4.5 9 10.5 10.5-6 1.5-9 4.5-10.5 10.5C10.5 16.5 7.5 13.5 1.5 12 7.5 10.5 10.5 7.5 12 1.5Z"/></svg>Nouveau</span>}
+      {section === 'editor' && <span className="home-nav-badge"><HomeIcon name="sparkle" size={12} filled/>Nouveau</span>}
     </Link>;
   return <>
     <header className="home-mobile-header"><Link href="/" aria-label="BienVu, accueil"><HomeWordmark/></Link><button ref={menuButton} type="button" aria-expanded={menuOpen} aria-controls="home-sidebar" aria-label={menuOpen ? 'Fermer la navigation' : 'Ouvrir la navigation'} onClick={() => setMenuOpen(value => !value)}><HomeIcon name={menuOpen ? 'close' : 'menu'}/></button></header>
