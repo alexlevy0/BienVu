@@ -10,6 +10,7 @@ import {extractLadresse} from './agencies/ladresse';
 import {extractCesarBrutus} from './agencies/cesar-brutus';
 import {extractIad} from './agencies/iad';
 import {extractRemax} from './agencies/remax';
+import {extractSafti} from './agencies/safti';
 export {verified, missing} from './facts';
 
 type Obj = Record<string, unknown>;
@@ -239,7 +240,8 @@ export function extractListingHtml(html: string, url: string, options: {allowPar
   const documents = scripts.flatMap(n => {const content = rawText(n); if (content.length > 128_000) throw new ImportFailure('NOT_A_LISTING', 'JSON-LD trop volumineux.'); try {return [JSON.parse(content) as unknown];} catch {return [];}});
   const specific = adapter.id === 'cesar-brutus' ? extractCesarBrutus(nodes, documents, url, canonicalUrl, adapter.listingId!)
     : adapter.id === 'iad' ? extractIad(nodes, documents, url, canonicalUrl, adapter.listingId!)
-    : adapter.id === 'remax' ? extractRemax(nodes, documents, url, canonicalUrl, adapter.listingId!) : undefined;
+    : adapter.id === 'remax' ? extractRemax(nodes, documents, url, canonicalUrl, adapter.listingId!)
+    : adapter.id === 'safti' ? extractSafti(nodes, documents, url, canonicalUrl, adapter.listingId!) : undefined;
   if (specific) return checkedGallery(specific, options.allowPartial);
   const figaro = adapter.id === 'figaro' ? extractFigaro(nodes, documents, url, canonicalUrl, adapter.listingId!) : undefined;
   const ladresse = adapter.id === 'ladresse' ? extractLadresse(nodes, url, canonicalUrl, adapter.listingId!) : undefined;

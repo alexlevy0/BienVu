@@ -276,8 +276,18 @@ export const sourceCoverageData = {
     ]
   },
   "safti": {
-    "summary": "Un lien de l’annonce ou de sa galerie n’est pas pris en charge par l’import. Vous pouvez renseigner le bien et ajouter vos photos manuellement.",
+    "summary": "Une annonce importée avec 9 photos. Vérifiez les informations et la galerie avant de créer votre vidéo.",
     "samples": [
+      {
+        "url": "https://www.safti.fr/annonces/achat/maison/villefranche-sur-saone-69400/1724083",
+        "label": "Maison · Villefranche-sur-Saône",
+        "checkedAt": "2026-10-07",
+        "testedAt": "2026-10-07T13:45:06.292Z",
+        "environment": "cloudflare",
+        "outcome": "complete",
+        "photos": 9,
+        "note": "Prix, surface habitable et nombre de pièces récupérés. Vérifiez les informations avant de créer votre vidéo."
+      },
       {
         "url": "https://www.safti.fr/annonces/achat/maison/cergy-95000/1695331",
         "label": "Maison · Cergy",

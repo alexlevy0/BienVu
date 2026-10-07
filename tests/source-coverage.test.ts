@@ -26,7 +26,7 @@ test('un échec récent ne masque pas un précédent succès et conserve la date
 });
 
 test('la reconnaissance du catalogue public ne change aucune permission du transport', () => {
-  for (const host of ['www.laforet.com', 'courbevoie.guy-hoquet.com', 'www.safti.fr']) {
+  for (const host of ['www.laforet.com', 'courbevoie.guy-hoquet.com']) {
     assert.ok(coverageForHost(host)); assert.equal(sourceForHost(host), undefined);
     assert.deepEqual(sourcePolicy(`https://${host}/annonce`), {pageHosts: [host], imageHosts: [host]});
   }

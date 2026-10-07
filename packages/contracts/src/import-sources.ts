@@ -1,6 +1,6 @@
 // Hôtes et routes explicites, partagés par le contrat, le registre et l'interface.
 // La présence dans ce catalogue n'est pas une promesse de compatibilité.
-export type SourceId = 'espaces-atypiques' | 'orpi' | 'century21' | 'figaro' | 'seloger' | 'leboncoin' | 'bienici' | 'ladresse' | 'cesar-brutus' | 'iad' | 'remax';
+export type SourceId = 'espaces-atypiques' | 'orpi' | 'century21' | 'figaro' | 'seloger' | 'leboncoin' | 'bienici' | 'ladresse' | 'cesar-brutus' | 'iad' | 'remax' | 'safti';
 export type ImportSource = {id: SourceId; name: string; hosts: readonly string[]; paths: readonly RegExp[];
   mediaHosts: readonly string[]};
 export const importSources: readonly ImportSource[] = [
@@ -28,6 +28,8 @@ export const importSources: readonly ImportSource[] = [
     paths: [/^\/annonce\/(?:appartement|maison)-vente-[^/]+\/r(\d+)\/?$/], mediaHosts: ['images.playiad.com', 'images.iadfrance.fr']},
   {id: 'remax', name: 'RE/MAX', hosts: ['remax.fr', 'www.remax.fr'],
     paths: [/^\/fr\/mandats\/vente-(?:maison|appartement)-[^/]+\/(\d+-\d+)\/?$/], mediaHosts: ['i.maxwork.fr']},
+  {id: 'safti', name: 'SAFTI', hosts: ['www.safti.fr', 'safti.fr'],
+    paths: [/^\/annonces\/achat\/(?:maison|appartement)\/[^/]+\/(\d+)\/?$/], mediaHosts: ['cdn.safti.fr']},
 ];
 export const sourceForHost = (host: string) => importSources.find(source => source.hosts.includes(host));
 export function sourceListingId(source: ImportSource, path: string): string | null {
