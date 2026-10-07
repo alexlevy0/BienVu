@@ -9,11 +9,11 @@ import {createAnonymousSession,claimTrial,fundOwnedTrial,creditGrant,creditPerio
   findOwnedGeneration,failGeneration,trialForSession,listGenerations,generationView,anonymousSession} from '../packages/db/src/index';
 import {trialInput} from '../packages/db/src/anonymous';
 const input={url:'https://www.century21.fr/trouver_logement/detail/123456789/'};
-test('essai Orpi : slash final optionnel, recherche distinguée d’une source non autorisée', () => {
+test('essai Orpi : slash final optionnel et recherche refusée ; les autres domaines restent des imports génériques', () => {
   const url='https://www.orpi.com/annonce-vente-appartement-test-12345678-1234-1234-1234-123456789012';
-  for(const value of [url,url+'/',url.replace('annonce-vente-', 'annonce-location-')])assert.equal(trialInput({url:value}).url,value);
+  for(const value of [url,url+'/',url.replace('annonce-vente-', 'annonce-location-')]){const parsed=trialInput({url:value});assert.equal('url' in parsed&&parsed.url,value);}
   assert.throws(()=>trialInput({url:'https://www.orpi.com/annonces-immobilieres/'}),/NOT_A_LISTING/);
-  assert.throws(()=>trialInput({url:'https://www.orpi.com.evil.example/annonce-vente-test/'}),/TRIAL_SOURCE_UNSUPPORTED/);
+  const generic=trialInput({url:'https://agence.example/annonce/123'});assert.equal('url' in generic&&generic.url,'https://agence.example/annonce/123');
 });
 async function setup(t:any) {
   const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:'export default {fetch(){return new Response("fixture")}}',compatibilityDate:'2026-09-27',d1Databases:['DB'],r2Buckets:['MEDIA']}));t.after(()=>mf.dispose());

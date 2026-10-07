@@ -15,6 +15,7 @@ type Guided={description:string;setDescription(value:string):void;onCancel():voi
   agencyId?:string;initialDraft?:CreationDraftView|null;initialData?:CreationDraftData|null;
   onReadyChange?(ready:boolean,reason:string):void;onDraftChange?():void};
 export type ManualListingFormHandle = {cancel():Promise<void>;isDraft(id:string):boolean;customization():VideoCustomization|undefined};
+export type PreparedManualListing={listing:ManualListingInput;photos:File[];customization?:VideoCustomization};
 class FormFailure extends Error {}
 const emptyFields:ManualDraftFields={title:'',locality:'',propertyType:'',transaction:'',priceCents:'',charges:'',area:'',rooms:'',description:''};
 const propertyNames:Record<string,string>={apartment:'Appartement',house:'Maison',other:'Bien immobilier'};
@@ -44,7 +45,7 @@ type Props = {busy: boolean; generate?: boolean; setBusy(value: boolean): void;g
   subtitlesEnabled?:boolean;onSubtitles?(value:boolean):void;voiceEnabled?:boolean;onVoice?(value:boolean):void;
   durationSeconds?:VideoDuration;aspectRatio?:VideoAspectRatio;
   incomingPhotos?:{id:string;files:File[]}|null;onPhotosReceived?(id:string,result:{accepted:File[];issues:string[]}):void} & (
-  {prepareGuest: true; onPrepared(): void; onCreated?: never} |
+  {prepareGuest: true; onPrepared(value:PreparedManualListing):Promise<void>|void; onCreated?: never} |
   {prepareGuest?: false; onCreated(value: ImportView): Promise<void>; onPrepared?: never}
 );
 export function ManualListingForm(props: Props) {
@@ -288,6 +289,7 @@ export function ManualListingForm(props: Props) {
   }
   function focusError(name:string){requestAnimationFrame(()=>formRef.current?.querySelector<HTMLElement>(name==='photos'?'#manual-photos, .manual-sheet-gallery':`[name="${name}"]`)?.focus());}
   async function cancelGuided(){if(!props.guided)return;
+    if(busy)return;
     if(photoLock.current||props.incomingPhotos){setFeedback('Patientez pendant l’ajout de vos photos.');return;}
     if(!hydrated){setFeedback('Chargement du brouillon en cours. Réessayez dans un instant.');return;}
     if(!await saveManualListingDraft(draftFields(),props.guided.agencyId?[]:photos.flatMap(p=>p.file?[p.file]:[]),
@@ -363,7 +365,7 @@ export function ManualListingForm(props: Props) {
       }
       const price = number('priceCents');
       const parsed = ManualListingInput.safeParse({title:listingTitle(text('title'),text('locality'),propertyType,transaction),propertyType,transaction,
-        locality: text('locality'), description: text('description'), priceCents: price === null ? null : Math.round(price * 100),
+        locality: text('locality'), description: props.guided?props.guided.description:text('description'), priceCents: price === null ? null : Math.round(price * 100),
         charges: transaction === 'rent' ? text('charges') || null : null, area: number('area'), rooms: number('rooms'), photos: files});
       if (!parsed.success) {
         const fields: Record<string, string> = {};
@@ -381,7 +383,12 @@ export function ManualListingForm(props: Props) {
           name==='description'&&props.guided?props.guided.description:text(name)])) as Record<typeof manualDraftFields[number], string>;
         if (!await saveManualListingDraft(fields, photos.flatMap(photo=>photo.file?[photo.file]:[]),4,undefined,undefined,undefined,customization,photos.map(p=>p.slot)))
           throw new FormFailure('Impossible de conserver votre annonce sur cet appareil. Gardez cette page ouverte et réessayez.');
-        props.onPrepared(); return;
+        // Local slots remain stable while removing/reordering photos. The
+        // immutable upload manifest uses contiguous slots, so translate once.
+        const settings=customization?{...customization,
+          ...(customization.photoOrder?{photoOrder:customization.photoOrder.map(slot=>photos.findIndex(photo=>photo.slot===slot))}:{}),
+          ...(customization.runwayPhotos?{runwayPhotos:customization.runwayPhotos.map(slot=>photos.findIndex(photo=>photo.slot===slot))}:{})}:undefined;
+        await props.onPrepared({listing:parsed.data,photos:photos.flatMap(photo=>photo.file?[photo.file]:[]),customization:settings}); return;
       }
       const fingerprint = JSON.stringify(parsed.data);
       if (pending.current?.fingerprint !== fingerprint) pending.current = {fingerprint, key: crypto.randomUUID()};

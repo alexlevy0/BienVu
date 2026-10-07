@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {GenerationView,publicErrors,requestedAnimations,type PublicErrorCode} from '@bienvu/contracts';
 import {generationActive} from './generation-progress';
 import {anonymousGenerationScope,useGenerationStore} from './generation-store';
+import {submitTrialManual,TrialManualFailure,type TrialManualSettings,type TrialManualInput,type TrialManualIntent} from '../lib/anonymous-manual-client';
 // The token lives only in memory. The HttpOnly session is the ownership proof.
 type Turnstile={render:(container:HTMLElement,options:Record<string,unknown>)=>string;remove:(id:string)=>void;reset:(id:string)=>void};
 declare global {interface Window {turnstile?:Turnstile}}
@@ -20,6 +21,9 @@ export function useAnonymousTrial(enabled:boolean) {
   const {setJob:storeJob}=useGenerationStore();
   const [job,setJob]=useState<GenerationView|null>(null),[siteKey,setSiteKey]=useState<string|null>(null),[available,setAvailable]=useState(false),[used,setUsed]=useState(false),[failure,setFailure]=useState(''),[loaded,setLoaded]=useState(false);
   const [token,setToken]=useState(''),[challenge,setChallenge]=useState(false),[widgetVersion,setWidgetVersion]=useState(0);
+  const [pendingManual,setPendingManual]=useState<{input:TrialManualInput;settings:TrialManualSettings}|null>(null),
+    [preparingManual,setPreparingManual]=useState(false),[manualProgress,setManualProgress]=useState('');
+  const manualIntent=useRef<TrialManualIntent|null>(null);
   const lock=useRef(false),intent=useRef<{url:string;key:string;subtitlesEnabled:boolean;voiceEnabled:boolean;durationSeconds:VideoDuration;aspectRatio:VideoAspectRatio;customization?:VideoCustomization}|null>(null);
   const refresh=useCallback(async()=>{try{const data=await value(await fetch('/api/trial',{cache:'no-store'}));setAvailable(data.enabled);setSiteKey(data.siteKey);setUsed(data.used);setJob(data.job?GenerationView.parse(data.job):null);setLoaded(true);setFailure('');}catch{setFailure('Impossible de retrouver votre essai. Réessayez.');setLoaded(true);}},[]);
   useEffect(()=>{if(enabled)void refresh();},[enabled,refresh]);
@@ -43,7 +47,38 @@ export function useAnonymousTrial(enabled:boolean) {
     }catch(e){setFailure(e instanceof Error?e.message:'La connexion a été interrompue. Réessayez pour retrouver votre demande.');}
     finally{setToken('');setWidgetVersion(n=>n+1);lock.current=false;}
   }
-  return {job,siteKey,available,used,failure,challenge,setChallenge,widgetVersion,setWidgetVersion,loaded,token,setToken,setFailure,start,refresh};
+  async function startManual(input:TrialManualInput,settings:TrialManualSettings,verifiedToken?:string){
+    if(lock.current)return null;setFailure('');
+    if(requestedAnimations(settings.customization)){setFailure(publicErrors.RUNWAY_LOGIN_REQUIRED[1]);return null;}
+    if(!loaded){setFailure('Votre navigateur est en cours de vérification. Réessayez dans un instant.');return null;}
+    if(!available){setFailure(publicErrors.ANONYMOUS_UNAVAILABLE[1]);return null;}
+    if(used){setFailure(publicErrors.TRIAL_USED[1]);return null;}
+    if(job&&generationActive(job)){setFailure(publicErrors.GENERATION_BUSY[1]);return null;}
+    const fingerprint=JSON.stringify({listing:input.listing,...settings});
+    if(!manualIntent.current){try{const saved=JSON.parse(sessionStorage.getItem('bienvu:trial-manual-request')??'null') as TrialManualIntent|null;
+      if(saved&&typeof saved.fingerprint==='string'&&typeof saved.key==='string')manualIntent.current=saved;
+    }catch{/* Optional retry cache. Ownership remains in the HttpOnly cookie. */}}
+    if(manualIntent.current?.fingerprint!==fingerprint)manualIntent.current=null;
+    const currentToken=verifiedToken??token;
+    if(!currentToken&&!manualIntent.current){setPendingManual({input,settings});setChallenge(true);return null;}
+    manualIntent.current??={fingerprint,key:crypto.randomUUID()};
+    try{sessionStorage.setItem('bienvu:trial-manual-request',JSON.stringify(manualIntent.current));}catch{}
+    lock.current=true;setPreparingManual(true);setPendingManual(null);setChallenge(false);
+    try{
+      const result=await submitTrialManual(input,settings,manualIntent.current,currentToken,setManualProgress);
+      setJob(result);manualIntent.current=null;try{sessionStorage.removeItem('bienvu:trial-manual-request');}catch{}return result;
+    }catch(error){
+      if(error instanceof TrialManualFailure){
+        if(error.code==='BOT_VERIFICATION_FAILED'){setPendingManual({input,settings});setChallenge(true);}
+        if(error.code==='CONFLICT'||error.code==='NOT_FOUND'){manualIntent.current=null;try{sessionStorage.removeItem('bienvu:trial-manual-request');}catch{}}
+      }
+      setFailure(error instanceof Error?error.message:'L’envoi a été interrompu. Réessayez pour reprendre votre annonce.');return null;
+    }finally{setPreparingManual(false);setManualProgress('');setToken('');setWidgetVersion(n=>n+1);lock.current=false;}
+  }
+  function cancelManual(){setPendingManual(null);setChallenge(false);setToken('');setWidgetVersion(n=>n+1);}
+  const continueManual=(verifiedToken:string)=>pendingManual?startManual(pendingManual.input,pendingManual.settings,verifiedToken):Promise.resolve(null);
+  return {job,siteKey,available,used,failure,challenge,setChallenge,widgetVersion,setWidgetVersion,loaded,token,setToken,setFailure,start,refresh,
+    startManual,continueManual,cancelManual,pendingManual,preparingManual,manualProgress};
 }
 export function TrialChallenge({siteKey,version,onToken,onError,purpose='trial'}:{siteKey:string;version:number;onToken:(token:string)=>void;
   onError:(text:string)=>void;purpose?:'trial'|'description'}) {

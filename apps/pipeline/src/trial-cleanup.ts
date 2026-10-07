@@ -6,6 +6,13 @@ export async function cleanupAnonymousTrials(env:{DB:D1Database;MEDIA:R2Bucket},
     WHERE anonymous_session_id IS NOT NULL AND created_at<? AND (ip_hmac IS NOT NULL OR turnstile_hash IS NOT NULL)`)
     .bind(new Date(now-48*3600_000).toISOString()).run();
   await env.DB.prepare('UPDATE anonymous_sessions SET proof_hash=NULL,claim_job_id=NULL WHERE expires_at<=? AND proof_hash IS NOT NULL').bind(at).run();
+  await env.DB.prepare(`UPDATE anonymous_manual_imports SET ip_hmac=NULL,turnstile_hash=NULL,input_json='{}'
+    WHERE created_at<? AND (ip_hmac IS NOT NULL OR turnstile_hash IS NOT NULL OR input_json!='{}')`)
+    .bind(new Date(now-48*3600_000).toISOString()).run();
+  await env.DB.prepare(`DELETE FROM anonymous_manual_imports WHERE created_at<?
+    AND EXISTS(SELECT 1 FROM anonymous_sessions s WHERE s.id=session_id AND s.expires_at<=?)
+    AND NOT EXISTS(SELECT 1 FROM listing_imports i WHERE i.id=import_id)`)
+    .bind(new Date(now-31*86400_000).toISOString(),at).run();
   const expired=await env.DB.prepare(`SELECT g.job_id AS id,g.agency_id AS scope FROM generation_runs g JOIN jobs j ON j.id=g.job_id
     WHERE g.anonymous_session_id IS NOT NULL AND g.owner_agency_id IS NULL AND g.retention!='expired'
     AND g.storage_permanent=0 AND g.expires_at<=? AND j.status IN ('ready','failed') ORDER BY g.expires_at LIMIT 10`).bind(at).all<{id:string;scope:string}>();
@@ -16,9 +23,10 @@ export async function cleanupAnonymousTrials(env:{DB:D1Database;MEDIA:R2Bucket},
     // Scope IDs are server-generated and never change on claim. No bucket-wide
     // deletion or shared agency prefix: only this exact job's private objects.
     await removePrefix(env.MEDIA,`agencies/${job.scope}/jobs/${job.id}/`);
-    const imported=await env.DB.prepare(`SELECT i.id FROM listing_imports i WHERE i.agency_id=? AND i.idempotency_key=?
+    const imported=await env.DB.prepare(`SELECT i.id FROM listing_imports i WHERE i.agency_id=?
+      AND (i.idempotency_key=? OR i.id=(SELECT listing_id FROM jobs WHERE id=?))
       AND NOT EXISTS(SELECT 1 FROM jobs j WHERE j.agency_id=i.agency_id AND j.listing_id=i.id AND j.id!=?)`)
-      .bind(job.scope,`generation-${job.id}`,job.id).first<{id:string}>();
+      .bind(job.scope,`generation-${job.id}`,job.id,job.id).first<{id:string}>();
     // Unlink before marking an import deleting; the existing preservation
     // trigger then arbitrates against any concurrent, valid import reference.
     await env.DB.batch([

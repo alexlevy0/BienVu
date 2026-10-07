@@ -6,7 +6,7 @@ import {VideoDuration,ImportUrl, GenerationView, defaultVideoCustomization,Gener
 import {useAnonymousTrial, TrialChallenge} from './anonymous-trial';
 import {useAccount} from './account';
 import {HomeIcon} from './home-icons';
-import {ManualListingForm, type ManualListingFormHandle} from './manual-listing-form';
+import {ManualListingForm, type ManualListingFormHandle,type PreparedManualListing} from './manual-listing-form';
 import {generationActive, useGenerationProgress} from './generation-progress';
 import {ConversationGeneration} from './conversation-generation';
 import {requestGeneration} from '../lib/generation-client';
@@ -65,7 +65,8 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   const selectedJob = screen.kind === 'job' ? me?jobs.find(item=>item.id===screen.id)??null:
     currentJob?.id===screen.id?currentJob:null:null;
   const activeOtherJob = Boolean(currentJob && generationActive(currentJob) && screen.kind !== 'job');
-  const busy = screen.kind === 'sending' || screen.kind==='extracting' || manualBusy;
+  const guestManualBusy=trial.preparingManual||Boolean(trial.pendingManual);
+  const busy = screen.kind === 'sending' || screen.kind==='extracting' || manualBusy||guestManualBusy;
   const canGenerate = Boolean(me?.rights.generationEnabled);
   const creditCost=screen.kind==='manual'?manualCredits:generationCreditCost(guestSettings);
   const noCredits = !editingProperty && canGenerate && (me?.rights.developmentRemaining??0)<creditCost;
@@ -132,7 +133,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   useEffect(() => {
     const draft = readListingDraft();
     if (draft?.kind === 'url') setUrl(draft.url);
-    if (draft?.kind === 'manual') setScreen({kind: 'manual'});
+    if (draft?.kind === 'manual'&&!remembered()) setScreen({kind: 'manual'});
   }, []);
   useEffect(()=>{
     if(loading||autoFocusHandled.current)return;
@@ -200,7 +201,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     current.startsWith('Les informations du bien ont été récupérées.')||
     current.startsWith('Certaines informations du bien sont à compléter')?'':current);},[manual]);
   useEffect(() => {
-    if (!me || startFresh.current || readListingDraft()?.kind==='manual') return;
+    if (!me || startFresh.current || readListingDraft()?.kind==='manual'&&!remembered()) return;
     const saved=remembered();if(!saved)return;
     const controller=new AbortController();
     void fetch(`/api/generations/${saved.id}`,{cache:'no-store',signal:controller.signal}).then(async response=>{
@@ -213,7 +214,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     return()=>controller.abort();
   },[me?.agency.id]);
   useEffect(() => {
-    if (!currentJob || startFresh.current || readListingDraft()?.kind==='manual'||screen.kind==='manual'||
+    if (!currentJob || startFresh.current || readListingDraft()?.kind==='manual'&&!remembered()||screen.kind==='manual'||
       screen.kind === 'sending' || screen.kind==='guest-customizing' || screen.kind === 'error') return;
     const saved = remembered();
     if (screen.kind === 'job') return;
@@ -222,6 +223,9 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
       setScreen({kind: 'job', id: currentJob.id, request}); remember(currentJob.id, request);
     }
   }, [currentJob?.id, currentJob?.status, screen.kind]);
+  useEffect(()=>{
+    if(!me&&screen.kind==='job'&&trial.job?.id===screen.id&&trial.job.status==='ready'&&trial.job.sourceKind==='manual')clearListingDraft();
+  },[me,screen.kind,trial.job?.id,trial.job?.status]);
   useEffect(() => {
     if (!trial.job || me || screen.kind !== 'sending') return;
     setScreen({kind: 'job', id: trial.job.id, request: screen.request}); remember(trial.job.id, screen.request);
@@ -233,13 +237,14 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   }, [trial.failure, screen.kind, me]);
   useEffect(() => {
     const fresh = () => {
+      if(trial.preparingManual)return;
       interactionVersion.current++;lock.current=false;startFresh.current = true; forget(); setFeedback('');guestPending.current=null;
-      trial.setToken('');trial.setChallenge(false);
+      trial.cancelManual();
       if (screen.kind !== 'manual') {setScreen({kind: 'landing'});setUrl('');setDescription('');}
     };
     window.addEventListener('bienvu:new-video', fresh);
     return () => window.removeEventListener('bienvu:new-video', fresh);
-  }, [screen.kind]);
+  }, [screen.kind,trial.preparingManual]);
 
   async function create(input: GenerationRequest, request: RequestMessage) {
     const customization=manualForm.current?.customization();
@@ -250,12 +255,23 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     setUrl('');
   }
   function openManual(fromText = '',initialData:CreationDraftData|null=null) {
-    if (manualBusy||screen.kind==='sending'||(screen.kind === 'job' && generationActive(selectedJob))) return;
+    if (manualBusy||guestManualBusy||screen.kind==='sending'||(screen.kind === 'job' && generationActive(selectedJob))) return;
     previousComposer.current=composerDock.current?.getBoundingClientRect()??null;
     interactionVersion.current++;lock.current=false;startFresh.current = true;forget();
     if (fromText) setDescription(fromText);
     setEditingProperty(false);setImportDraft(null);setGuestExtraction(initialData);guestPending.current=null;trial.setToken('');trial.setChallenge(false);
     setCustomizing(false);setFeedback('');setScreen({kind: 'manual'});
+  }
+  function showManualTrial(next:GenerationView|null){
+    if(!next)return;
+    const request:RequestMessage={kind:'manual',text:'Je souhaite ajouter mon annonce manuellement.'};
+    startFresh.current=false;setScreen({kind:'job',id:next.id,request});remember(next.id,request);
+    // Keep the browser's fields/photos until the export succeeds, so a failed
+    // anonymous generation can be retried from the manual form.
+    setCustomizing(false);setFeedback('');
+  }
+  async function prepareManualTrial(value:PreparedManualListing){
+    showManualTrial(await trial.startManual(value,{subtitlesEnabled,voiceEnabled,durationSeconds,aspectRatio,customization:value.customization}));
   }
   const manualNavigation=useRef(false);
   useEffect(()=>{if(loading||manualNavigation.current||new URLSearchParams(window.location.search).get('manuel')!=='1')return;
@@ -437,7 +453,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     {manual && <div className="home-conversation-manual home-manual-sheet-view">
       <div className="home-manual-panel">
         {!me ? <ManualListingForm onCreditCost={setManualCredits} ref={manualForm} key="guest" initialCustomization={guestSettings} customizing={customizing} onCloseCustomizer={closeCustomization} subtitlesEnabled={subtitlesEnabled} onSubtitles={setSubtitlesEnabled} voiceEnabled={voiceEnabled} onVoice={setVoiceEnabled} durationSeconds={durationSeconds} aspectRatio={aspectRatio} prepareGuest incomingPhotos={incomingPhotos} onPhotosReceived={receivePhotos} guided={{description,setDescription,initialData:guestExtraction,onCancel:()=>{previousComposer.current=composerDock.current?.getBoundingClientRect()??null;setCustomizing(false);setScreen({kind:'landing'});},
-          onReadyChange:(ready,reason)=>{setManualReady(ready);setManualReason(reason);}}} busy={manualBusy} setBusy={setManualBusy} onPrepared={() => window.location.assign('/connexion?mode=signup')}/>
+          onReadyChange:(ready,reason)=>{setManualReady(ready);setManualReason(reason);}}} busy={manualBusy||guestManualBusy} setBusy={setManualBusy} onPrepared={prepareManualTrial}/>
           : <ManualListingForm saveOnly={editingProperty} onSaved={draft=>{clearListingDraft();void refreshDrafts();window.location.assign(`/biens/${encodeURIComponent(`listing:${draft.id}`)}`);}} onCreditCost={setManualCredits} ref={manualForm} customizing={customizing} onCloseCustomizer={closeCustomization} brand={me.agency} subtitlesEnabled={subtitlesEnabled} onSubtitles={setSubtitlesEnabled} voiceEnabled={voiceEnabled} onVoice={setVoiceEnabled} durationSeconds={durationSeconds} aspectRatio={aspectRatio} key={`agency:${me.agency.id}:${importDraft?.id??'manual'}`} incomingPhotos={incomingPhotos} onPhotosReceived={receivePhotos} generate={canGenerate} guided={{description,setDescription,agencyId:me.agency.id,initialDraft:importDraft,
             onReadyChange:(ready,reason)=>{setManualReady(ready);setManualReason(reason);},onDraftChange:()=>void refreshDrafts(),
             onCancel:()=>{previousComposer.current=composerDock.current?.getBoundingClientRect()??null;setCustomizing(false);setScreen({kind:'landing'});}}} busy={manualBusy} setBusy={setManualBusy} onCreated={async value => {
@@ -465,7 +481,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
         </fieldset></details></div>
       <p className="home-manual-settings-summary">{aspectRatio==='16:9'?'Horizontal':'Vertical'} · {durationSeconds} s{voiceEnabled?' · Voix off':''}{subtitlesEnabled?' · Sous-titres':''}</p>
       <span className="home-credit-cost" aria-live="polite">{editingProperty?'Sans crédit':`${creditCost} crédit${creditCost>1?'s':''}`}</span>
-      <button type="submit" className="home-primary-button" disabled={composerDisabled} aria-describedby={!manualReady?'home-manual-action-note':undefined}>{manualBusy?'Enregistrement…':editingProperty?'Enregistrer le bien':me&&!canGenerate?'Enregistrer mon annonce':'Créer ma vidéo'}<HomeIcon name="arrow" size={19}/></button>
+      <button type="submit" className="home-primary-button" disabled={composerDisabled} aria-describedby={!manualReady?'home-manual-action-note':undefined}>{trial.preparingManual?'Envoi des photos…':manualBusy?'Enregistrement…':editingProperty?'Enregistrer le bien':me&&!canGenerate?'Enregistrer mon annonce':'Créer ma vidéo'}<HomeIcon name="arrow" size={19}/></button>
     </form>:<><form className={`home-composer home-composer-modern${feedback || screen.kind === 'error' ? ' home-composer-invalid' : ''}${dropActive?' home-composer-dropping':''}`} onSubmit={submit} noValidate aria-label="Créer une vidéo depuis une annonce"
       onDragEnter={event=>{if(draggingFiles(event)&&canDropPhotos){event.preventDefault();dropDepth.current++;setDropActive(true);}}}
       onDragOver={event=>{if(draggingFiles(event)){event.preventDefault();event.dataTransfer.dropEffect=canDropPhotos?'copy':'none';}}}
@@ -507,15 +523,18 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     {feedback && <p className="home-form-feedback" id="home-url-error" role="alert">{feedback}</p>}
     {!me && trial.challenge && trial.siteKey && <TrialChallenge siteKey={trial.siteKey} version={trial.widgetVersion}
       purpose={guestPending.current?'description':'trial'} onToken={token=>{trial.setToken(token);if(!token)return;
+        if(trial.pendingManual){void trial.continueManual(token).then(showManualTrial);return;}
         const pending=guestPending.current;if(pending){trial.setChallenge(false);void analyzeGuest(pending.text,pending.key,token);return;}
         const parsed=ImportUrl.safeParse(url.trim());if(!parsed.success){trial.setChallenge(false);setFeedback('Collez un lien HTTPS public valide.');return;}
         trial.setChallenge(false);setScreen({kind:'sending',request:{kind:'url',text:parsed.data}});
         void trial.start(parsed.data,token,subtitlesEnabled,guestSettings,voiceEnabled,durationSeconds,aspectRatio);
       }} onError={trial.setFailure}/>}
+    {!me&&trial.pendingManual&&<button type="button" className="text-button" onClick={trial.cancelManual}>Revenir à mon annonce</button>}
+    {!me&&trial.manualProgress&&<p className="home-form-note" role="status">{trial.manualProgress}</p>}
     {!me && trial.failure && screen.kind !== 'error' && <p className="home-form-feedback" role="alert">{trial.failure} <Link href="/connexion">Se connecter</Link></p>}
     {importPaused&&!manual && <p className="home-form-note" role="status">La limite des imports par lien est atteinte jusqu’au {new Date(me!.rights.importRetryAt!).toLocaleString('fr-FR')}. Vous pouvez ajouter vos informations et photos en saisie manuelle.</p>}
     {activeOtherJob && <p className="home-form-note">Une vidéo est déjà en cours de création. <Link href="/biens">Suivez-la dans Mes biens</Link>.</p>}
-    <p className="home-create-note" id="home-create-note" hidden={manual?Boolean(me):!(screen.kind==='job'&&generationActive(selectedJob))&&!contextNote}>{manual ? 'Votre saisie est conservée ici. La connexion sera demandée pour créer la vidéo.' : screen.kind === 'job' && generationActive(selectedJob) ? 'Votre création sera enregistrée dans Mes biens.' : contextNote}</p>
+    <p className="home-create-note" id="home-create-note" hidden={manual?Boolean(me):!(screen.kind==='job'&&generationActive(selectedJob))&&!contextNote}>{manual ? '1 crédit offert pour créer votre vidéo sans compte. Connectez-vous pour la télécharger sans filigrane.' : screen.kind === 'job' && generationActive(selectedJob) ? me?'Votre création sera enregistrée dans Mes biens.':'Votre aperçu avec filigrane sera disponible dans ce navigateur.' : contextNote}</p>
     </div>
   </div>;
 }

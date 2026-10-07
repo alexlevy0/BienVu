@@ -8,10 +8,12 @@ import {pathToFileURL} from 'node:url';
 import sharp from 'sharp';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import {migrateNarrationProbe} from '../scripts/narration-fixtures';
-import {admitAnonymous,createAnonymousSession,claimTrial,creditGrant,ensureAgency,listGenerations,findOwnedGeneration} from '../packages/db/src/index';
+import {admitAnonymous,admitAnonymousManual,createAnonymousSession,claimTrial,creditGrant,ensureAgency,listGenerations,findOwnedGeneration,opaqueHash} from '../packages/db/src/index';
+import {uploadManualPhoto,finishManualListing,contentHash} from '../apps/web/lib/manual-listings';
+import {normalizePhoto} from '../scripts/import-transport';
 import {generationVideo} from '../apps/web/lib/generations';
 import {getJobVideo} from '../apps/pipeline/src/video-manifest';
-test('Workflow anonyme complet workerd : import/voix/rendu simulés une fois, claim pendant rendu et reprise après crash',async t=>{
+for(const source of ['url','manual'] as const)test(`Workflow anonyme ${source} complet workerd : voix/rendu simulés une fois, claim pendant rendu et reprise après crash`,async t=>{
   const directory=await mkdtemp(path.join(tmpdir(),'bienvu-trial-workflow-'));t.after(()=>rm(directory,{recursive:true,force:true}));
   const require=createRequire(import.meta.url),wrangler=createRequire(require.resolve('wrangler/package.json'));
   const esbuild=await import(pathToFileURL(wrangler.resolve('esbuild')).href) as {build:(o:unknown)=>Promise<unknown>};
@@ -23,12 +25,20 @@ test('Workflow anonyme complet workerd : import/voix/rendu simulés une fois, cl
     durableObjects:{RENDERER:{className:'FixtureGenerationRenderer',useSQLite:true}},workflows:{GENERATION_WORKFLOW:{name:'fixture-trial',className:'FixtureGenerationWorkflow'}}}),resourcePersistencePath:path.join(directory,'storage')};
   let mf=new Miniflare(options);t.after(()=>mf.dispose());let env=await mf.getBindings<{DB:D1Database;MEDIA:R2Bucket}>();await migrateNarrationProbe(env.DB);
   await env.DB.prepare('INSERT INTO hosted_import_budget VALUES(?,0,2500,0)').bind(new Date().toISOString().slice(0,7)).run();await env.DB.exec('UPDATE generation_control SET enabled=1; UPDATE trial_policy SET enabled=1,free_enabled=1');
-  const {session}=await createAnonymousSession(env.DB),input={url:'https://www.century21.fr/trouver_logement/detail/123456/',subtitlesEnabled:false},proof={ipHmac:'a'.repeat(64),turnstileHash:'b'.repeat(64)};
+  const {session}=await createAnonymousSession(env.DB),proof={ipHmac:'a'.repeat(64),turnstileHash:'b'.repeat(64)};
+  let input:{url:string;subtitlesEnabled:boolean}|{listingId:string;subtitlesEnabled:boolean}={url:'https://www.century21.fr/trouver_logement/detail/123456/',subtitlesEnabled:false};
+  if(source==='manual'){
+    const listing={title:'Maison de Lyon',locality:'Lyon',propertyType:'house' as const,transaction:'sale' as const,description:'Une maison lumineuse avec jardin.',
+      priceCents:20_000_000,area:85,rooms:3,charges:null,photos:await Promise.all(images.map(async bytes=>({hash:await contentHash(new Uint8Array(bytes)),size:bytes.length,mime:'image/jpeg' as const})))};
+    const draft=await admitAnonymousManual(env.DB,session,'workflow-manual-upload-key',listing,{...proof,turnstileHash:await opaqueHash('manual-upload-fixture')});
+    for(const [index,bytes] of images.entries())await uploadManualPhoto(env,session.scopeId,draft.id,index,new Uint8Array(bytes),'image/jpeg',normalizePhoto,AbortSignal.timeout(20_000));
+    await finishManualListing(env,session.scopeId,draft.id);input={listingId:draft.id,subtitlesEnabled:false};
+  }
   const pending=await admitAnonymous(env.DB,session,'workflow-anonymous-key',input,proof,'true');
   const headers={Authorization:'Bearer fixture-generation-token-1234567890','X-Agency-ID':session.scopeId};
   await mf.dispose();mf=new Miniflare(options);env=await mf.getBindings<{DB:D1Database;MEDIA:R2Bucket}>();await mf.dispatchFetch('https://test/tick',{headers});
   let status='queued';for(let i=0;i<100;i++){status=(await env.DB.prepare('SELECT status FROM jobs WHERE id=?').bind(pending.jobId).first<{status:string}>())!.status;if(['rendering','ready','failed'].includes(status))break;await new Promise(r=>setTimeout(r,100));}
-  assert.equal(status,'rendering');assert.equal(imports,4);
+  assert.equal(status,'rendering');assert.equal(imports,source==='manual'?0:4);
   assert.equal((await getJobVideo(env.DB,session.scopeId,pending.jobId))!.manifest.subtitlesEnabled,false);
   const user={id:'workflow-trial-owner',email:'owner@example.com'};await env.DB.prepare('INSERT INTO auth_user VALUES(?,?,?,1,NULL,?,?)').bind(user.id,'Owner',user.email,Date.now()-1000,Date.now()).run();const agency=await ensureAgency(env.DB,user);
   assert.equal((await claimTrial(env.DB,session,agency.id,pending.jobId)).creditStatus,'unfunded');
@@ -38,7 +48,7 @@ test('Workflow anonyme complet workerd : import/voix/rendu simulés une fois, cl
   const done=(await findOwnedGeneration(env.DB,agency.id,pending.jobId))!;assert.equal(done.status,'ready');assert.equal(done.creditStatus,'unfunded');assert.ok(done.previewKey);assert.ok(done.objectKey);
   const [a,b]=await Promise.all([1,2].map(()=>claimTrial(env.DB,session,agency.id,pending.jobId)));assert.equal(a.jobId,b.jobId);
   assert.equal((await creditGrant(env.DB,agency.id))!.remaining,3);assert.equal((await listGenerations(env.DB,agency.id)).jobs.length,1);
-  assert.equal((await env.DB.prepare('SELECT count(*) AS n FROM narration_calls').first<{n:number}>())!.n,before);assert.equal(imports,4);
+  assert.equal((await env.DB.prepare('SELECT count(*) AS n FROM narration_calls').first<{n:number}>())!.n,before);assert.equal(imports,source==='manual'?0:4);
   const {RENDERER}=await mf.getBindings<{RENDERER:DurableObjectNamespace}>();assert.equal((await (await RENDERER.get(RENDERER.idFromName('generation-single-slot-v1')).fetch('https://fixture/count')).json() as {starts:number}).starts,1);
   const master=await generationVideo(new Request('https://test?download=1'),env,agency.id,pending.jobId);assert.deepEqual(new Uint8Array(await master.arrayBuffer()),new Uint8Array([1,2,3,4]));
   assert.equal((await env.DB.prepare('SELECT count(*) AS n FROM generation_shares').first<{n:number}>())!.n,0);

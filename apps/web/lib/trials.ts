@@ -1,4 +1,4 @@
-import {admitAnonymous,anonymousSession,createAnonymousSession,generationEvent,generationView,generationRetained,GenerationFailure,listAnonymousGenerationPage,opaqueHash,priorTrial,trialForSession,trialPolicy,type AnonymousSession} from '@bienvu/db';
+import {admitAnonymous,anonymousManualPermit,anonymousSession,createAnonymousSession,generationEvent,generationView,generationRetained,GenerationFailure,listAnonymousGenerationPage,opaqueHash,priorTrial,trialForSession,trialPolicy,type AnonymousSession} from '@bienvu/db';
 import {authOrigin} from './auth';
 import {assertSameOrigin,boundedJson,RequestFailure} from './http';
 import {callGeneration,streamGenerationMedia} from './generations';
@@ -9,6 +9,7 @@ export const sessionFromRequest=(request:Request,env:TrialEnv)=>anonymousSession
 export async function requireTrial(request:Request,env:TrialEnv){const session=await sessionFromRequest(request,env);if(!session)throw new RequestFailure('NOT_FOUND');return session;}
 export async function trialResponse(action:()=>Promise<Response>){try{return await action();}catch(e){if(e instanceof GenerationFailure)throw new RequestFailure(e.code);throw e;}}
 function configured(env:TrialEnv){return env.ANONYMOUS_TRIALS_ENABLED==='true'&&env.GENERATIONS_ENABLED==='true'&&Boolean(env.TURNSTILE_SITE_KEY&&env.TURNSTILE_SECRET_KEY&&(env.TRIAL_IP_HMAC_SECRET?.length??0)>=32);}
+export function assertTrialEnabled(env:TrialEnv){if(!configured(env))throw new RequestFailure('ANONYMOUS_UNAVAILABLE');}
 export async function trialHistoryResponse(request:Request,env:TrialEnv) {
   if(new URL(request.url).origin!==authOrigin(env)||request.headers.get('sec-fetch-site')==='cross-site')throw new RequestFailure('FORBIDDEN');
   const session=await sessionFromRequest(request,env);
@@ -54,14 +55,20 @@ export async function verifyTrialBot(env:TrialEnv,token:unknown,idempotency:stri
 }
 export async function startTrial(request:Request,env:TrialEnv,trustedCloudflare:boolean,verify=verifyTrialBot){
   assertSameOrigin(request,env);const session=await requireTrial(request,env),body=await boundedJson(request,8192);
-  if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).some(k=>!['url','turnstileToken','subtitlesEnabled','voiceEnabled','durationSeconds','aspectRatio','customization'].includes(k))||!('url' in body))throw new RequestFailure('VALIDATION_ERROR');
-  const key=request.headers.get('Idempotency-Key')??'',input={url:body.url,...('voiceEnabled' in body?{voiceEnabled:body.voiceEnabled}:{}),...('subtitlesEnabled' in body?{subtitlesEnabled:body.subtitlesEnabled}:{}),...('durationSeconds' in body?{durationSeconds:body.durationSeconds}:{}),...('aspectRatio' in body?{aspectRatio:body.aspectRatio}:{}),...('customization' in body?{customization:body.customization}:{})};
+  if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).some(k=>!['url','listingId','turnstileToken','subtitlesEnabled','voiceEnabled','durationSeconds','aspectRatio','customization'].includes(k))||('url' in body)===('listingId' in body))throw new RequestFailure('VALIDATION_ERROR');
+  const key=request.headers.get('Idempotency-Key')??'',input={...('url' in body?{url:body.url}:'listingId' in body?{listingId:body.listingId}:{}),...('voiceEnabled' in body?{voiceEnabled:body.voiceEnabled}:{}),...('subtitlesEnabled' in body?{subtitlesEnabled:body.subtitlesEnabled}:{}),...('durationSeconds' in body?{durationSeconds:body.durationSeconds}:{}),...('aspectRatio' in body?{aspectRatio:body.aspectRatio}:{}),...('customization' in body?{customization:body.customization}:{})};
   const prior=await priorTrial(env.DB,session,key,input);
   let row=prior.row;
   if(!row){
-    if(!configured(env))throw new RequestFailure('ANONYMOUS_UNAVAILABLE');
+    assertTrialEnabled(env);
     const ipHmac=await ipFingerprint(request,env,trustedCloudflare);
-    const turnstileHash=await verify(env,'turnstileToken' in body?body.turnstileToken:undefined,session.id+':'+key);
+    const permit='listingId' in body&&typeof body.listingId==='string'?await anonymousManualPermit(env.DB,session,body.listingId):null;
+    if('listingId' in body&&!permit)throw new RequestFailure('NOT_FOUND');
+    // The first manual generation consumes the proof already verified before
+    // uploads. It is bound to this session, import, IP and idempotency key;
+    // the unique generation proof prevents reuse for any other paid work.
+    const turnstileHash=permit?.key===key&&permit.ipHmac===ipHmac&&permit.turnstileHash&&permit.verifiedUntil>new Date().toISOString()
+      ?permit.turnstileHash:await verify(env,'turnstileToken' in body?body.turnstileToken:undefined,session.id+':'+key);
     row=await admitAnonymous(env.DB,session,key,input,{ipHmac,turnstileHash},env.ANONYMOUS_TRIALS_ENABLED);
   }
   if(row.status==='queued'&&row.launchStatus==='pending'){

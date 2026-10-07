@@ -44,12 +44,14 @@ export async function listAnonymousGenerationPage(db:Database,session:AnonymousS
 }
 export function trialInput(input:unknown) {
   const parsed=GenerationRequest.safeParse(input);
-  if(!parsed.success||!('url' in parsed.data))throw new GenerationFailure('INVALID_URL');
+  if(!parsed.success)throw new GenerationFailure('INVALID_URL');
   if(requestedAnimations(parsed.data.customization))throw new GenerationFailure('RUNWAY_LOGIN_REQUIRED');
-  const url=new URL(parsed.data.url),source=sourceForHost(url.hostname);
-  // The anonymous pilot never falls back to a generic arbitrary-host importer.
-  if(!source||!['espaces-atypiques','orpi','century21'].includes(source.id))throw new GenerationFailure('TRIAL_SOURCE_UNSUPPORTED');
-  if(!sourceListingId(source,url.pathname))throw new GenerationFailure('NOT_A_LISTING');
+  if('url' in parsed.data){
+    const url=new URL(parsed.data.url),source=sourceForHost(url.hostname);
+    // Same catalogue and generic importer as signed-in generation. The import
+    // transport still verifies DNS, redirects and every image destination.
+    if(source&&!sourceListingId(source,url.pathname))throw new GenerationFailure('NOT_A_LISTING');
+  }
   return parsed.data;
 }
 export async function priorTrial(db:Database,session:AnonymousSession,key:string,input:unknown) {
@@ -62,6 +64,10 @@ export async function priorTrial(db:Database,session:AnonymousSession,key:string
 export async function admitAnonymous(db:Database,session:AnonymousSession,key:string,input:unknown,proof:{ipHmac:string;turnstileHash:string},flag:string|undefined,now=Date.now()):Promise<GenerationRow> {
   const old=await priorTrial(db,session,key,input);if(old.row)return old.row;
   if(flag!=='true')throw new GenerationFailure('ANONYMOUS_UNAVAILABLE');
+  const parsed=trialInput(input);
+  if('listingId' in parsed&&!await db.prepare(`SELECT i.id FROM listing_imports i JOIN anonymous_manual_imports m ON m.import_id=i.id
+    WHERE i.id=? AND i.agency_id=? AND m.session_id=? AND i.source_kind='manual' AND i.status='ready' AND i.expires_at>?`)
+    .bind(parsed.listingId,session.scopeId,session.id,new Date(now).toISOString()).first())throw new GenerationFailure('NOT_FOUND');
   const policy=await trialPolicy(db),id=crypto.randomUUID(),at=new Date(now).toISOString(),deadline=new Date(now+policy.active_minutes*60_000).toISOString();
   const brand=AgencyBrand.parse({id:session.scopeId,ownerUserId:session.id,name:'BienVu',neutral:true,logoAssetId:null,
     primaryColor:'#E1E8D9',secondaryColor:'#171714',phone:null,email:null,website:null,createdAt:at});
