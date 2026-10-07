@@ -41,7 +41,7 @@ export function StudioSidebar({active}: {active: 'create' | 'videos' | 'explore'
   const closeMenu = () => setMenuOpen(false);
   const initials = me?.user.name.trim().split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase() || 'BV';
   const accountName = me?.user.name.trim().split(/\s+/)[0] || 'Mon compte';
-  const item = (href: string, name: string, icon: 'plus' | 'video' | 'compass' | 'house' | 'clapper' | 'calendar', section: typeof active) =>
+  const item = (href: string, name: string, icon: 'plus' | 'video' | 'compass' | 'house' | 'building' | 'folder' | 'clapper' | 'calendar', section: typeof active) =>
     <Link className={`home-nav-item${active === section ? ' home-nav-active' : ''}`} href={href} prefetch={false}
       aria-current={active === section ? 'page' : undefined} onClick={() => {closeMenu();if(active==='create'&&section==='create')window.dispatchEvent(new Event('bienvu:new-video'));}}>
       <HomeIcon name={icon} size={section === 'create' ? 28 : 26}/>{name}
@@ -56,9 +56,9 @@ export function StudioSidebar({active}: {active: 'create' | 'videos' | 'explore'
         {item('/', 'Créer une vidéo', 'plus', 'create')}
         {item('/biens', 'Mes biens', 'house', 'videos')}
         {item('/explorer', 'Explorer', 'compass', 'explore')}
-        {item('/agence', 'Mon agence', 'house', 'agency')}
+        {item('/agence', 'Mon agence', 'building', 'agency')}
         {item('/editeur', 'Éditeur', 'clapper', 'editor')}
-        {item('/projets', 'Dossiers & modèles', 'house', 'projects')}
+        {item('/projets', 'Dossiers & modèles', 'folder', 'projects')}
         {item('/publications', 'Publications', 'calendar', 'social')}
       </nav>
       <section className="home-recents" aria-labelledby="home-recents-title"><h2 id="home-recents-title">RÉCENTS</h2>
