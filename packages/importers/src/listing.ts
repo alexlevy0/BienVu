@@ -131,8 +131,18 @@ function espaces(nodes: HtmlNode[], url: string, canonicalUrl: string): Extracte
     if (!match) return []; try {return list(JSON.parse(match[1])).map(obj);} catch {return [];}
   }).filter(n => typeof n.reference === 'string' && typeof n.type_de_bien === 'string');
   if (records.length !== 1) throw new ImportFailure('CONFLICTING_FACTS', 'Identité embarquée ambiguë.');
-  const d = records[0], reference = clean(d.reference), path = new URL(url).pathname;
-  if (!path.endsWith(`-${reference}/`)) throw new ImportFailure('CONFLICTING_FACTS', 'Référence incohérente.');
+  const d = records[0], reference = clean(d.reference), routeReference = selectAdapter(url).listingId!;
+  if (!/^[a-z0-9]+$/i.test(reference)) throw new ImportFailure('CONFLICTING_FACTS', 'Référence incohérente.');
+  const referenceKey = reference.toLowerCase(), routeKey = routeReference.toLowerCase();
+  const visibleReference = unique(scoped.filter(n => hasClass(n, 'reference'))
+    .map(n => text(n).match(/^R[ÉE]F\.?\s*:?\s*([a-z0-9]+)$/i)?.[1].toLowerCase())
+    .filter((v): v is string => v !== undefined), 'Références affichées contradictoires.');
+  // Une remise en vente peut changer la référence commerciale en conservant
+  // le canonique et les photos de l'ancienne référence. Le canonique est déjà
+  // contrôlé ; une référence différente doit aussi être confirmée dans l'article.
+  if (visibleReference !== undefined && visibleReference !== referenceKey
+    || referenceKey !== routeKey && visibleReference !== referenceKey)
+    throw new ImportFailure('CONFLICTING_FACTS', 'Référence incohérente.');
   if (d.status !== 'envente') throw new ImportFailure('SOURCE_UNAVAILABLE', 'Annonce non disponible à la vente.');
   const property = d.type_de_bien === 'Appartement' ? 'apartment' : d.type_de_bien === 'Maison' ? 'house' : null;
   if (!title || !property || !clean(d.ville)) throw new ImportFailure('INCOMPLETE_LISTING', 'Faits essentiels absents.');
@@ -141,9 +151,10 @@ function espaces(nodes: HtmlNode[], url: string, canonicalUrl: string): Extracte
   const displayed = [...summary.matchAll(/([\d\s\u00a0\u202f]+)\s*€/g)].map(m => numeric(m[1])).filter(v => v !== null);
   unique([...(amount === null ? [] : [amount]), ...displayed], 'Prix affiché et embarqué contradictoires.');
   const galleries = scoped.filter(n => attr(n, 'id') === 'gallery');
+  const galleryReferences = new Set([referenceKey, routeKey]);
   const photoUrls = galleries.flatMap(g => descendants(g)).filter(n => tag(n) === 'a' && hasClass(n, 'rsImg'))
-    .map(n => absolute(attr(n, 'href'), url)).filter(v => new URL(v).pathname.includes(`/${reference}/`));
-  return {canonicalUrl, sourceListingId: reference, adapterVersion: 'espaces-atypiques/3.2', transaction: 'sale',
+    .map(n => absolute(attr(n, 'href'), url)).filter(v => new URL(v).pathname.split('/').some(p => galleryReferences.has(p.toLowerCase())));
+  return {canonicalUrl, sourceListingId: reference, adapterVersion: 'espaces-atypiques/3.3', transaction: 'sale',
     description: descriptionFromNodes(scoped.filter(n => attr(n, 'id') === 'annonce-description'), 'article.vente #annonce-description'),
     facts: {title: verified(title, 'text', 'article.vente h1.annonce-title'), propertyType: verified(property, 'category', 'dataLayer.type_de_bien'),
       locality: verified(clean(d.ville), 'text', 'dataLayer.ville'), area: missing('m2'),
