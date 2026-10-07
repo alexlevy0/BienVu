@@ -1,5 +1,6 @@
 import {z} from 'zod';
 import {MUSIC_LIMITS,MusicWaveform} from './music-library';
+import {mapInterval,mapFrame,type VideoMap} from './maps';
 
 // Portable, bounded timeline data. No URLs, object keys, HTML or render code
 // supplied by a client: media references resolve through the owning import.
@@ -56,9 +57,22 @@ export function rebalanceEditorClips(total:number,clips:EditorClip[]):EditorClip
     return {...clip,durationFrames:minimum+Math.floor(used*remaining/divisor)-Math.floor(previous*remaining/divisor)};
   });
 }
-export function editorClipStarts(doc:Pick<EditorDocument,'clips'>){let at=0;return doc.clips.map(clip=>{
+export function editorClipStarts(doc:Pick<EditorDocument,'clips'>,map?:VideoMap){const total=doc.clips.reduce((sum,c)=>sum+c.durationFrames,0),interval=mapInterval(map,total);
+  let at=interval.photoStartFrame;const clips=map&&doc.clips.length?rebalanceEditorClips(interval.photoFrames,doc.clips):doc.clips;return clips.map(clip=>{
   const startFrame=at;at+=clip.durationFrames;return {...clip,startFrame};});}
-export function editorActiveClip(doc:EditorDocument,at:number){return editorClipStarts(doc).find(c=>at>=c.startFrame&&at<c.startFrame+c.durationFrames)??doc.clips.at(-1);}
+export function editorActiveClip(doc:EditorDocument,at:number,map?:VideoMap){if(mapFrame(map,doc.durationSeconds*30,at)!==null)return undefined;
+  return editorClipStarts(doc,map).find(c=>at>=c.startFrame&&at<c.startFrame+c.durationFrames)??doc.clips.at(-1);}
+export function editorSourceFrame(doc:EditorDocument,at:number,map?:VideoMap){
+  if(!map)return at;const clip=editorClipStarts(doc,map).find(c=>at>=c.startFrame&&at<c.startFrame+c.durationFrames);
+  if(!clip)return null;const source=editorClipStarts(doc).find(c=>c.id===clip.id)!;
+  return source.startFrame+Math.round((at-clip.startFrame)/clip.durationFrames*source.durationFrames);
+}
+export function resizeEditorVisualClip(doc:EditorDocument,id:string,frames:number,map?:VideoMap){
+  if(!map)return resizeEditorClip(doc,id,frames);
+  const clip=editorClipStarts(doc,map).find(c=>c.id===id),source=doc.clips.find(c=>c.id===id);if(!clip||!source)return doc;
+  return resizeEditorClip(doc,id,Math.round(source.durationFrames+(frames-clip.durationFrames)*
+    (doc.durationSeconds*30-doc.clips.length*15)/(doc.durationSeconds*30-map.durationSeconds*30-doc.clips.length*15)));
+}
 export function editorFont(font:EditorLayer['font']){return font==='serif'?'"BienVu Serif", Georgia, serif':font==='display'?'"BienVu Display", Impact, sans-serif':'"BienVu Video", Arial, sans-serif';}
 export function editorLayerStyle(layer:EditorLayer,at:number){
   const elapsed=at-layer.startFrame,end=layer.durationFrames-elapsed;

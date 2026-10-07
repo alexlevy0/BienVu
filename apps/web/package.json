@@ -3,9 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build --webpack",
-    "build:worker": "opennextjs-cloudflare build",
+    "dev": "node ../../scripts/prepare-maplibre-assets.mjs && next dev",
+    "build": "node ../../scripts/prepare-maplibre-assets.mjs && next build --webpack",
+    "build:worker": "node ../../scripts/prepare-maplibre-assets.mjs && opennextjs-cloudflare build",
     "preview": "wrangler dev --port 8787 --local",
     "typegen": "wrangler types --strict-vars false --env-interface CloudflareEnv cloudflare-env.d.ts",
     "typecheck": "tsc --noEmit"
@@ -26,6 +26,8 @@
     "react-dom": "19.3.0",
     "stripe": "23.0.0",
     "web-vitals": "6.2.3",
-    "zod": "4.6.5"
+    "zod": "4.6.5",
+    "@bienvu/maps": "workspace:*",
+    "maplibre-gl": "6.12.0"
   }
 }

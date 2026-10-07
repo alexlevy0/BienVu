@@ -1,6 +1,8 @@
 import {z} from 'zod';
 
 export const publicErrors = {
+  MAP_UNAVAILABLE: [503, 'La carte est momentanément indisponible. Réessayez ou désactivez la séquence de carte.'],
+  MAP_RATE_LIMIT: [429, 'Trop de recherches de carte. Réessayez dans quelques instants.'],
   MAILBOX_UNAVAILABLE: [503, 'La messagerie est momentanément indisponible. Aucun message n’a été envoyé.'],
   MAIL_ATTACHMENTS_TOO_LARGE: [413, 'Les pièces jointes ne doivent pas dépasser 3 Mo au total.'],
   ANONYMOUS_UNAVAILABLE: [503, 'L’essai sans compte est momentanément indisponible. Vous pouvez vous connecter.'],

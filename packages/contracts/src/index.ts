@@ -10,6 +10,7 @@ export * from './manual-listing';
 export * from './creation-draft';
 export * from './customization';
 export * from './editor';
+export * from './maps';
 export * from './editor-voice';
 export * from './editor-quality';
 export * from './music-library';

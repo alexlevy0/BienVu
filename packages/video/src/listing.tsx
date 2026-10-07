@@ -1,14 +1,15 @@
 import React, {useEffect, useState} from 'react';
 import {AbsoluteFill, Audio, Img, OffthreadVideo, Freeze, Sequence, cancelRender, continueRender, delayRender, interpolate, useCurrentFrame} from 'remotion';
-import {VideoManifest, type VideoPresentation} from '@bienvu/contracts';
+import {VideoManifest, mapFrame, type VideoPresentation} from '@bienvu/contracts';
 import {contrastInk, displayArea, displayLocation, displayPrice, displayRooms, fitDisplayFont, fitFont, subtitleGroups, VIDEO_SAFE as safe} from './layout';
 import {cameraMotion} from './camera-motion';
 import {HorizontalPhotoScene} from './horizontal';
 import {EditorFilm} from './editor';
+import {MapOverlay} from './map';
 
 // Ces URL sont résolues uniquement par le renderer Node vers son serveur
 // loopback privé. Le manifeste serveur n'accepte jamais d'URL d'asset cliente.
-export type ListingVideoProps = {manifest: VideoManifest | null; media: Record<string, string>; logoBackground: string; fontUrl: string; displayFontUrl: string;serifFontUrl?:string};
+export type ListingVideoProps = {manifest: VideoManifest | null; media: Record<string, string>; logoBackground: string; fontUrl: string; displayFontUrl: string;serifFontUrl?:string;maplibreModuleUrl?:string;maplibreWorkerUrl?:string};
 const dark = '#132a23', paper = '#f5f7f0';
 function PhotoScene({manifest: m, media, index}: {manifest: VideoManifest; media: Record<string,string>; index: number}) {
   const f = useCurrentFrame(), scene = m.scenes[index], photo = m.photos.find(a => a.id === scene.photoAssetId)!;
@@ -65,7 +66,7 @@ function posterLabel(kind: VideoManifest['scenes'][number]['kind'], p: VideoPres
   return contact?'VOTRE CONTACT':'POUR EN SAVOIR PLUS';
 }
 function GalleryBackground({manifest:m,media}: {manifest:VideoManifest;media:Record<string,string>}) {
-  let at=0;
+  let at=m.map?.settings.position==='start'?m.map.settings.durationSeconds*30:0;
   return <AbsoluteFill style={{overflow:'hidden'}}>
     {m.photoTimeline!.map((photo,index)=>{const from=at;at+=photo.durationFrames;
       return <Sequence key={photo.photoAssetId} from={from} durationInFrames={photo.durationFrames+(m.photoTransition==='cut'?0:12)} premountFor={30}>
@@ -200,7 +201,7 @@ export function ListingFilm(props: ListingVideoProps) {
     Promise.all(faces.map(face=>face.load())).then(loaded=>{for(const face of loaded)document.fonts.add(face);
       setFontLoaded(true);requestAnimationFrame(()=>continueRender(fontWait));}).catch(cancelRender);
   }, [fontWait, props.fontUrl, props.displayFontUrl,props.serifFontUrl, m.templateVersion,Boolean(m.editor)]);
-  if(m.editor)return <EditorFilm manifest={m} media={props.media}/>;
+  if(m.editor)return <EditorFilm manifest={m} media={props.media} moduleUrl={props.maplibreModuleUrl} workerUrl={props.maplibreWorkerUrl}/>;
   let at = 0;
   const scenes = m.scenes.map((s, index) => {const from = at; at += s.durationFrames; return {s,index,from};});
   const horizontal=m.templateVersion==='bienvu-horizontal/1';
@@ -232,9 +233,10 @@ export function ListingFilm(props: ListingVideoProps) {
     {!cinematic&&<><div style={{position:'absolute',left:safe.left,right:safe.right,top:editorial?118:338,height:4,background:m.brand.primaryColor}}/>
       <div style={{position:'absolute',left:safe.left,right:safe.right,top:editorial?118:338,height:4,background:m.brand.secondaryColor,
         transformOrigin:'left center',transform:`scaleX(${f / Math.max(1,at-1)})`}}/></>}
-    {m.rights.watermarked && <div style={{position:'absolute',left:editorial?235:262,top:editorial?785:f >= scenes.at(-1)!.from ? 540 : 780,transform:'rotate(-14deg)',
+    </>}
+    <MapOverlay manifest={m} media={props.media} moduleUrl={props.maplibreModuleUrl} workerUrl={props.maplibreWorkerUrl}/>
+    {m.rights.watermarked && (!horizontal||mapFrame(m.map?.settings,at,f)!==null) && <div style={{position:'absolute',left:editorial?235:262,top:editorial?785:f >= scenes.at(-1)!.from ? 540 : 780,transform:'rotate(-14deg)',
       background:'#132a23d9',border:'2px solid #ffffffa0',borderRadius:12,padding:'18px 30px',color:'#fff',
       fontWeight:750,fontSize:35,letterSpacing:2}}>BIENVU · VIDÉO D’ESSAI</div>}
-    </>}
   </AbsoluteFill>;
 }

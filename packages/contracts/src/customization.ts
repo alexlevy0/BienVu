@@ -2,6 +2,7 @@ import {z} from 'zod';
 import type {AgencyBrand, NormalizedListing} from './product';
 import {fishFrenchVoices,CartesiaVoiceId,cartesiaParisianVoices} from './voice';
 import {EditorDocument} from './editor';
+import {VideoMap} from './maps';
 
 export const DEFAULT_VIDEO_VOICE='fish-manon' as const;
 
@@ -30,10 +31,11 @@ export const VideoCustomization=z.object({style:VideoStyle,
   runwayClips:z.number().int().min(0).max(2).optional(),
   runwayPhotos:photoOrder.optional(),
   // Draft text may be incomplete while editing; generation validates it below.
-  narration:z.array(z.string().max(500)).min(4).max(6).optional(),editor:EditorDocument.optional(),
+  narration:z.array(z.string().max(500)).min(4).max(6).optional(),editor:EditorDocument.optional(),map:VideoMap.optional(),
   voiceSourceId:z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/).optional()}).strict();
 export type VideoCustomization=z.infer<typeof VideoCustomization>;
 export const GenerationCustomization=VideoCustomization.superRefine((value,context)=>{
+  if(value.map&&!value.map.location)context.addIssue({code:'custom',path:['map','location'],message:'Confirmez la localisation de la carte avant de créer la vidéo.'});
   if(value.voiceSourceId&&!value.editor)context.addIssue({code:'custom',path:['voiceSourceId'],message:'La voix conservée nécessite un projet d’éditeur.'});
   if(value.runwayPhotos&&value.runwayClips!==undefined&&value.runwayClips!==value.runwayPhotos.length)
     context.addIssue({code:'custom',path:['runwayPhotos'],message:'Choisissez une seule liste de photos à animer.'});

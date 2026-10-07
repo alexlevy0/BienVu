@@ -96,7 +96,7 @@ export function ManualListingForm(props: Props) {
       (!customization.photoOrder||customization.photoOrder.every(slot=>photos.some(photo=>photo.slot===slot&&photo.state==='ready')));
     const ready=(completed||hydrated&&fieldsValid&&unresolved().length===0&&(props.saveOnly||photos.filter(photo=>photo.state==='ready').length>=3)&&
       !photos.some(photo=>photo.state!=='ready'||photo.removing)&&(!props.guided.agencyId||Boolean(serverDraft)));
-    const reason=!selectionValid?'Vérifiez la narration et sélectionnez au moins trois photos.':completed?'':!hydrated?'Chargement du brouillon en cours.':
+    const reason=customization?.map&&!customization.map.location?'Confirmez la localisation dans Personnaliser → Carte.':!selectionValid?'Vérifiez la narration et sélectionnez au moins trois photos.':completed?'':!hydrated?'Chargement du brouillon en cours.':
       unresolved().length?'Confirmez les informations signalées avant la création.':
       photos.some(photo=>photo.removing)?'Retrait des photos en cours.':photos.some(photo=>photo.state==='sending')?'Envoi des photos en cours.':photos.some(photo=>photo.state==='error')?
       'Réessayez ou retirez les photos en erreur.':issue?fieldMessage(String(issue.path[0]),issue.code,issue.message):!props.saveOnly&&photos.length<3?'Ajoutez au moins trois photos.':!serverDraft&&props.guided.agencyId?

@@ -1,6 +1,7 @@
 import type {ReactNode} from 'react';
 
 const shapes = {
+  pin: <><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/></>,
   sparkle: <path d="M12 1.5c1.5 6 4.5 9 10.5 10.5-6 1.5-9 4.5-10.5 10.5C10.5 16.5 7.5 13.5 1.5 12 7.5 10.5 10.5 7.5 12 1.5Z"/>,
   grid: <>{[3,14].flatMap(x=>[3,14].map(y=><rect key={`${x}-${y}`} x={x} y={y} width="7" height="7" rx="1"/>))}</>,
   list: <><path d="M8 5h13M8 12h13M8 19h13M3 5h1M3 12h1M3 19h1"/></>,

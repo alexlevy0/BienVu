@@ -40,3 +40,6 @@ fixtures/generated/
 apps/pipeline/wrangler.staging*.jsonc
 apps/web/wrangler.staging*.jsonc
 apps/mail/wrangler.staging*.jsonc
+
+# Rebuilt from the pinned MapLibre dependency before dev/build.
+apps/web/public/maplibre/

@@ -3,7 +3,7 @@ import Link from 'next/link';
 import {useSearchParams} from 'next/navigation';
 import {useCallback,useEffect,useRef,useState,type ChangeEvent} from 'react';
 import {CreationDraftView,CreationFields,VideoCustomization as VideoCustomizationSchema,DESCRIPTION_MAX_CHARACTERS,EntityId,GenerationCustomization,GenerationView,PhotoAsset,ManualListingInput,createEditorDocument,defaultVideoCustomization,
-  editorClipStarts,editorFrames,generationCreditCost,selectedAnimationIndices,newEditorLayer,resizeEditorClip,resizeEditorDocument,frenchVoices,CustomNarration,editorMusicGain,editorMusicSourceFrame,editorQuality,defaultEditorMix,
+  editorClipStarts,editorFrames,generationCreditCost,selectedAnimationIndices,newEditorLayer,resizeEditorVisualClip,resizeEditorDocument,frenchVoices,CustomNarration,editorMusicGain,editorMusicSourceFrame,editorQuality,defaultEditorMix,
   type CreationFields as Fields,type EditorMusicUpload,type EditorDocument,type EditorLayer,type VideoCustomization,type AgencyProfile} from '@bienvu/contracts';
 import {suggestedNarration} from '@bienvu/narration/suggestion';
 import {useAccount} from './account';
@@ -121,7 +121,7 @@ function EditorProject({initial,agency,guest}:{initial:CreationDraftView;agency:
     previewAnimations=availableAnimations.filter(a=>selectedAnimations.has(a.slot)),
     recoverableAnimations=availableAnimations.filter(a=>model.settings.photoOrder?.includes(a.slot)&&!model.settings.runwayPhotos?.includes(a.slot)),
     existingExport=fullPreview?.version===draft.version&&saveState==='saved'&&fullPreview.job&&fullPreview.job.status!=='failed'&&fullPreview.job.retention==='available'&&(fullPreview.job.expiresAt===null||Date.parse(fullPreview.job.expiresAt)>Date.now()),cost=existingExport?0:generationCreditCost(model.settings)-(currentResources?previewAnimations.length:0),selectedLayer=selection?.kind==='text'?doc.layers.find(l=>l.id===selection.id)??null:null,
-    selectedClip=selection?.kind==='photo'?editorClipStarts(doc).find(c=>c.id===selection.id)??null:null,
+    selectedClip=selection?.kind==='photo'?editorClipStarts(doc,model.settings.map).find(c=>c.id===selection.id)??null:null,
     selectedClipLabel=previewAnimations.some(a=>a.slot===selectedClip?.photoSlot)?'Vidéo IA':'Photo';
   const restoredVoice=useEditorVoice(draft.id,model.settings,guest?.voice),voice=restoredVoice.voice;
   useEffect(()=>{if(guest)return;const controller=new AbortController();setResourcesError('');
@@ -208,7 +208,7 @@ function EditorProject({initial,agency,guest}:{initial:CreationDraftView;agency:
   }
   function addClip(slot:number,index=doc.clips.length){if(doc.clips.length>=24){setError('La timeline peut contenir jusqu’à 24 plans.');return;}
     const clip={id:crypto.randomUUID(),photoSlot:slot,durationFrames:Math.floor(total/Math.max(1,doc.clips.length+1))},clips=[...doc.clips];
-    clips.splice(index,0,clip);const next=distributeEditorClips(doc,clips);changeDoc(next);setSelection({kind:'photo',id:clip.id});seek(editorClipStarts(next).find(c=>c.id===clip.id)!.startFrame);
+    clips.splice(index,0,clip);const next=distributeEditorClips(doc,clips);changeDoc(next);setSelection({kind:'photo',id:clip.id});seek(editorClipStarts(next,model.settings.map).find(c=>c.id===clip.id)!.startFrame);
   }
   async function uploadPhoto(photo:PendingPhoto){if(uploads.current.has(photo.id))return;
     const controller=new AbortController();uploads.current.set(photo.id,controller);setPending(values=>values.map(p=>p.id===photo.id?{...p,state:'uploading',error:''}:p));
@@ -270,7 +270,7 @@ function EditorProject({initial,agency,guest}:{initial:CreationDraftView;agency:
   const fieldsValid=ManualListingInput.safeParse({...model.fields,description:model.fields.description??'',photos:draft.photos.map(p=>({hash:p.contentHash,size:p.sizeBytes,mime:p.mime}))});
   const quality=editorQuality(doc,draft.photos,restoredVoice.reusable?voice:null,model.settings.narration);
   function inspectIssue(issue:typeof quality[number]){setConfirm(false);setPlaying(false);setTab(issue.kind==='audio'?'audio':issue.kind==='photo'?'photos':'text');setMobilePanel('media');
-    if(issue.targetId){setSelection({kind:issue.kind==='photo'?'photo':'text',id:issue.targetId});const layer=doc.layers.find(l=>l.id===issue.targetId),clip=editorClipStarts(doc).find(c=>c.id===issue.targetId);seek(layer?.startFrame??clip?.startFrame??0);}}
+    if(issue.targetId){setSelection({kind:issue.kind==='photo'?'photo':'text',id:issue.targetId});const layer=doc.layers.find(l=>l.id===issue.targetId),clip=editorClipStarts(doc,model.settings.map).find(c=>c.id===issue.targetId);seek(layer?.startFrame??clip?.startFrame??0);}}
   const canExport=fieldsValid.success&&GenerationCustomization.safeParse(model.settings).success&&Boolean(model.fields.title&&model.fields.locality&&model.fields.propertyType&&model.fields.transaction)&&
     !pending.length&&!musicBusy&&!conflict&&!exporting&&doc.clips.every(c=>draft.photos.some(p=>p.sourceOrder===c.photoSlot));
   const setField=(name:keyof Fields,value:Fields[keyof Fields])=>change(m=>({...m,fields:{...m.fields,[name]:value,...(name==='transaction'?{priceCents:null,charges:null}:{})}}));
@@ -296,7 +296,7 @@ function EditorProject({initial,agency,guest}:{initial:CreationDraftView;agency:
           <div className="editor-media-grid" onDragOver={e=>{if(e.dataTransfer.types.includes('Files'))e.preventDefault();}} onDrop={e=>{if(e.dataTransfer.files.length){e.preventDefault();choosePhotos(e.dataTransfer.files);}}}>
             {draft.photos.map(photo=>{const at=doc.clips.findIndex(c=>c.photoSlot===photo.sourceOrder),clip=doc.clips[at];return <div className={`editor-media-photo${clip&&selection?.id===clip.id?' is-selected':''}`} key={photo.id}>
               <button type="button" draggable onDragStart={e=>{e.dataTransfer.setData('application/x-bienvu-photo',String(photo.sourceOrder));e.dataTransfer.effectAllowed='copy';}}
-                aria-label={`Photo ${photo.sourceOrder+1}${at>=0?', présente dans la vidéo':', ajouter à la vidéo'}`} onClick={()=>{if(clip){setSelection({kind:'photo',id:clip.id});seek(editorClipStarts(doc)[at].startFrame);}else addClip(photo.sourceOrder);}}>
+                aria-label={`Photo ${photo.sourceOrder+1}${at>=0?', présente dans la vidéo':', ajouter à la vidéo'}`} onClick={()=>{if(clip){setSelection({kind:'photo',id:clip.id});seek(editorClipStarts(doc,model.settings.map)[at].startFrame);}else addClip(photo.sourceOrder);}}>
                 <img src={photoUrl(photo.id)} alt={`Photo ${photo.sourceOrder+1} du bien`} draggable={false}/>{at>=0&&<span className="editor-photo-number">{at+1}</span>}</button>
               <button type="button" className="editor-media-remove" aria-label={`Retirer la photo ${photo.sourceOrder+1}`} onClick={()=>void removePhoto(photo.id,photo.sourceOrder)}><HomeIcon name="close" size={13}/></button>
             </div>;})}
@@ -361,13 +361,13 @@ function EditorProject({initial,agency,guest}:{initial:CreationDraftView;agency:
         <label className="editor-duration"><span className="sr-only">Durée de la vidéo</span><select value={doc.durationSeconds} onChange={e=>{setPlaying(false);changeDoc(resizeEditorDocument(doc,Number(e.target.value) as 20|30|40));}}><option value={20}>20 s</option><option value={30}>30 s</option><option value={40}>40 s</option></select></label>
         <div className="editor-canvas-zoom"><button type="button" aria-label="Réduire l’aperçu" onClick={()=>setZoom(z=>Math.max(25,z-10))}>−</button><span>{zoom} %</span><button type="button" aria-label="Agrandir l’aperçu" onClick={()=>setZoom(z=>Math.min(75,z+10))}>+</button></div>
       </div>
-        <EditorPreview doc={doc} voice={voice} voiceReusable={restoredVoice.reusable} draftId={draft.id} photos={draft.photos} photoUrls={guest?.photoUrls} logoId={agency.logoAssetId} frame={frame} playing={playing} zoom={zoom}
+        <EditorPreview map={model.settings.map} primaryColor={model.settings.primaryColor} secondaryColor={model.settings.secondaryColor} agencyName={agency.name} doc={doc} voice={voice} voiceReusable={restoredVoice.reusable} draftId={draft.id} photos={draft.photos} photoUrls={guest?.photoUrls} logoId={agency.logoAssetId} frame={frame} playing={playing} zoom={zoom}
           animations={previewAnimations} photoMotion={model.settings.photoMotion} transition={model.settings.transition} selected={selection?.kind==='text'?selection.id:null} onSelect={id=>setSelection({kind:'text',id})} onSeek={seek} onPlay={()=>{if(frame>=total-1)setFrame(0);setPlaying(p=>!p);}}
           onCheckpoint={checkpoint} onMove={layer=>change(m=>({...m,settings:{...m.settings,editor:{...m.settings.editor,layers:m.settings.editor.layers.map(l=>l.id===layer.id?layer:l)}}}),false)}/>
       </div>
       {selection?.kind==='music'&&doc.music?<aside className="editor-inspector"><div className="editor-panel-heading"><h2>Musique sélectionnée</h2><button type="button" aria-label="Fermer les réglages" onClick={()=>setSelection(null)}><HomeIcon name="close" size={18}/></button></div><EditorMusicControls doc={doc} onChange={next=>{changeDoc(next);if(!next.music)setSelection(null);}}/></aside>:selectedClip?<aside className="editor-inspector"><div className="editor-panel-heading"><h2>{selectedClipLabel} sélectionnée</h2><button type="button" aria-label="Fermer les réglages" onClick={()=>setSelection(null)}><HomeIcon name="close" size={18}/></button></div>
         <div className="editor-selected-photo">{draft.photos.find(p=>p.sourceOrder===selectedClip.photoSlot)&&<img src={photoUrl(draft.photos.find(p=>p.sourceOrder===selectedClip.photoSlot)!.id)} alt={`${selectedClipLabel} sélectionnée`}/>}</div>
-        <label>Durée du plan (s)<EditorNumberInput key={selectedClip.id} min={.5} max={doc.durationSeconds} step={.1} value={Number((selectedClip.durationFrames/30).toFixed(1))} onValue={n=>changeDoc(resizeEditorClip(doc,selectedClip.id,Math.round(n*30)))}/></label>
+        <label>Durée du plan (s)<EditorNumberInput key={selectedClip.id} min={.5} max={doc.durationSeconds} step={.1} value={Number((selectedClip.durationFrames/30).toFixed(1))} onValue={n=>changeDoc(resizeEditorVisualClip(doc,selectedClip.id,Math.round(n*30),model.settings.map))}/></label>
         <p className="editor-media-hint">La durée totale reste fixe ; le plan voisin s’ajuste.</p>
         <EditorCameraControls camera={selectedClip.camera} onChange={camera=>changeDoc({...doc,clips:doc.clips.map(c=>c.id===selectedClip.id?{...c,camera}:c)})}/>
         <label className="editor-check"><input type="checkbox" checked={model.settings.runwayPhotos?.includes(selectedClip.photoSlot)??false} onChange={e=>change(m=>({...m,settings:{...m.settings,
@@ -382,7 +382,7 @@ function EditorProject({initial,agency,guest}:{initial:CreationDraftView;agency:
         onDelete={()=>{if(!selectedLayer)return;changeDoc({...doc,layers:doc.layers.filter(l=>l.id!==selectedLayer.id)});setSelection(null);}}/>}
     </div>
     {voice&&doc.voiceEnabled&&!restoredVoice.reusable&&<div className="editor-feedback" role="status"><span>Voix d’origine conservée dans la timeline. Le texte, la voix ou la durée a changé : l’export utilisera une nouvelle narration.</span><button type="button" onClick={restoreOriginalVoice}>Reprendre la voix d’origine</button></div>}
-    <EditorTimeline doc={doc} voice={voice} voiceLoading={restoredVoice.loading} voiceError={Boolean(restoredVoice.error)} animatedSlots={previewAnimations.map(a=>a.slot)} photos={draft.photos} photoUrls={guest?.photoUrls} draftId={draft.id} frame={frame} selected={selection} onSelect={setSelection} onSeek={seek} onChange={changeDoc} onCheckpoint={checkpoint} onAddPhoto={addClip} musicBusy={musicBusy} onAddMusic={addLibraryMusic}/>
+    <EditorTimeline map={model.settings.map} doc={doc} voice={voice} voiceLoading={restoredVoice.loading} voiceError={Boolean(restoredVoice.error)} animatedSlots={previewAnimations.map(a=>a.slot)} photos={draft.photos} photoUrls={guest?.photoUrls} draftId={draft.id} frame={frame} selected={selection} onSelect={setSelection} onSeek={seek} onChange={changeDoc} onCheckpoint={checkpoint} onAddPhoto={addClip} musicBusy={musicBusy} onAddMusic={addLibraryMusic}/>
     <footer className="editor-statusbar"><span>{canExport?'Votre projet est prêt à être exporté.':!model.fields.title||!model.fields.locality||!model.fields.propertyType||!model.fields.transaction?'Complétez les informations du bien dans l’onglet Texte.':'Ajoutez au moins trois photos et vérifiez la narration.'}</span><span>{guest?'Aucun crédit pendant vos essais':`${cost} crédit${cost>1?'s':''} à l’export`}</span></footer>
     {musicUrl&&<audio key={musicUrl} ref={audio} src={musicUrl} preload="metadata" hidden/>}
     <EditorVoicePlayback draftId={draft.id} voice={doc.voiceEnabled?voice:null} audioUrls={guest?.voiceUrls} frame={frame} playing={playing} volume={doc.voiceVolume} normalize={doc.audioMix?.normalize}

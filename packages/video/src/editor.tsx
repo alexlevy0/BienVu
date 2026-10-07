@@ -2,6 +2,7 @@ import React from 'react';
 import {AbsoluteFill,Audio,Img,OffthreadVideo,Freeze,Sequence,useCurrentFrame} from 'remotion';
 import {editorClipStarts,editorLayerStyle,editorPhotoMotion,editorCaptionStyle,editorMusicGain,editorMusicFrames,type VideoManifest,type EditorCamera} from '@bienvu/contracts';
 import {subtitleGroups} from './layout';
+import {MapOverlay} from './map';
 
 function EditorPhoto({m,media,slot,index,duration,camera}:{m:VideoManifest;media:Record<string,string>;slot:number;index:number;duration:number;camera?:EditorCamera}){
   const frame=useCurrentFrame(),photo=m.photos[slot],animation=m.photoAnimations?.find(a=>a.photoAssetId===photo.id),
@@ -18,13 +19,13 @@ function EditorSpeech({m,media,index}:{m:VideoManifest;media:Record<string,strin
   return <>{audio&&<Audio src={media[audio.id]} volume={m.editor!.voiceVolume*(m.editor!.audioMix?.normalize?audio.normalizationGain??1:1)}/>}
     {m.editor!.textsVisible&&m.subtitlesEnabled!==false&&frame<voiceFrames&&<div data-bienvu-subtitle="true" style={editorCaptionStyle(m.width)}>{line}</div>}</>;
 }
-export function EditorFilm({manifest:m,media}:{manifest:VideoManifest;media:Record<string,string>}){
+export function EditorFilm({manifest:m,media,moduleUrl,workerUrl}:{manifest:VideoManifest;media:Record<string,string>;moduleUrl?:string;workerUrl?:string}){
   const doc=m.editor!,frame=useCurrentFrame(),total=doc.durationSeconds*30;let at=0;
   const music=doc.music&&m.music?{...doc.music,asset:m.music.asset}:null,
     musicFrames=editorMusicFrames(doc);
   let speechAt=0;const intervals=m.scenes.map(scene=>{const startFrame=speechAt;speechAt+=scene.durationFrames;return {startFrame,durationMs:m.audio.find(a=>a.id===scene.audioAssetId)?.durationMs??0};});
   return <AbsoluteFill style={{background:'#151b16',overflow:'hidden'}}>
-    {doc.photosVisible&&editorClipStarts(doc).map((clip,index)=><Sequence key={clip.id} from={clip.startFrame}
+    {doc.photosVisible&&editorClipStarts(doc,m.map?.settings).map((clip,index)=><Sequence key={clip.id} from={clip.startFrame}
       durationInFrames={Math.min(total-clip.startFrame,clip.durationFrames+(m.photoTransition==='cut'?0:12))} premountFor={30}>
       <EditorPhoto m={m} media={media} slot={clip.photoSlot} index={index} duration={clip.durationFrames} camera={clip.camera}/>
     </Sequence>)}
@@ -38,6 +39,7 @@ export function EditorFilm({manifest:m,media}:{manifest:VideoManifest;media:Reco
       <Audio src={media[music.asset.id]} trimBefore={music.trimFromFrame} trimAfter={Math.floor(music.durationMs*30/1000)} loop={music.loop??false} loopVolumeCurveBehavior="extend"
         volume={f=>editorMusicGain({...doc,music:{...music,normalizationGain:music.asset.normalizationGain??music.normalizationGain}},music.startFrame+f,intervals)}/>
     </Sequence>}
+    <MapOverlay manifest={m} media={media} moduleUrl={moduleUrl} workerUrl={workerUrl}/>
     {m.rights.watermarked&&<div style={{position:'absolute',top:'45%',left:'15%',width:'70%',textAlign:'center',fontSize:42,color:'#fff',background:'#132a23d9',padding:24,
       transform:'rotate(-14deg)'}}>BIENVU · VIDÉO D’ESSAI</div>}
   </AbsoluteFill>;

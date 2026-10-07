@@ -133,7 +133,7 @@ export async function editExistingVideo(env:Env,agencyId:string,jobId:string,key
   if(m.music&&old?.editor?.music){const music=await copyMusic(env,agencyId,draft.id,m.music.asset,`agencies/${job.agencyId}/jobs/${jobId}/`);
     editor.music={...old.editor.music,...music};}
   const voiceSourceId=await restoreVideoVoice(env,agencyId,draft.id,m,sourceVoice,seconds,signal);
-  const settings:VideoCustomization={...defaultVideoCustomization(m.brand),...old,editor,voice:sourceVoice,voiceSourceId,
+  const settings:VideoCustomization={...defaultVideoCustomization(m.brand),...old,...(m.map?{map:m.map.settings}:{}),editor,voice:sourceVoice,voiceSourceId,
     ...(voiceSourceId?{narration:m.scenes.map(s=>s.narrationText)}:{}),photoOrder:[...new Set(editor.clips.map(c=>c.photoSlot))],
     runwayClips:undefined,runwayPhotos:m.photoAnimations?.length?m.photos.flatMap((photo,slot)=>
       m.photoAnimations!.some(clip=>clip.photoAssetId===photo.id&&clip.sourceSha256===photo.sha256)?[slot]:[]):

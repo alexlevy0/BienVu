@@ -7,8 +7,8 @@ const root = process.cwd();
 const failures = [];
 const modules = new Set(builtinModules.flatMap(name => [name, `node:${name}`]));
 const forbidden = /^(?:@remotion\/(?:renderer|bundler|compositor[^/]*)|remotion|sharp|fluent-ffmpeg|ffmpeg[^/]*|puppeteer[^/]*|playwright(?:-core)?|@bienvu\/(?:renderer|video))(?:\/|$)/;
-const roots = ['apps/web', 'apps/mail', 'apps/pipeline', 'packages/contracts', 'packages/db', 'packages/importers', 'packages/observability', 'packages/voice', 'packages/narration'];
-const portable = ['packages/contracts', 'packages/db', 'packages/importers', 'packages/observability', 'packages/voice', 'packages/narration'];
+const roots = ['apps/web', 'apps/mail', 'apps/pipeline', 'packages/contracts', 'packages/db', 'packages/importers', 'packages/observability', 'packages/voice', 'packages/narration', 'packages/maps'];
+const portable = ['packages/contracts', 'packages/db', 'packages/importers', 'packages/observability', 'packages/voice', 'packages/narration', 'packages/maps'];
 const skip = new Set(['node_modules', '.next', '.open-next', '.wrangler', 'dist', 'out', 'evidence']);
 const options = {moduleResolution: ts.ModuleResolutionKind.Bundler, target: ts.ScriptTarget.ES2022, allowJs: true};
 let count = 0;
@@ -36,6 +36,8 @@ async function inspectFile(path, scope) {
   }
 }
 async function walk(path, scope) {
+  // Generated browser worker files come from the pinned, independently bundled SDK.
+  if (relative(root,path) === 'apps/web/public/maplibre') return;
   for (const entry of await readdir(path, {withFileTypes: true})) {
     if (skip.has(entry.name)) continue;
     const full = resolve(path, entry.name);

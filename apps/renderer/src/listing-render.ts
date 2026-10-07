@@ -7,17 +7,17 @@ import {promisify} from 'node:util';
 import path from 'node:path';
 import sharp from 'sharp';
 import {renderMedia, renderStill, selectComposition} from '@remotion/renderer';
-import {VideoManifest, VideoReport, videoAssets, videoAssetFile, videoManifestHash,editorHasAudio} from '@bienvu/contracts';
+import {VideoManifest, VideoReport, videoAssets, videoAssetFile, videoManifestHash,editorHasAudio,MapBuildings,mapCredits} from '@bienvu/contracts';
 import {measureVoiceWav} from '@bienvu/voice';
 import {bundleDir} from './paths';
 import type {ListingVideoProps} from '../../../packages/video/src/listing';
 const exec = promisify(execFile), sha = (b: Uint8Array) => createHash('sha256').update(b).digest('hex');
 const binary = (name: 'ffmpeg' | 'ffprobe') => process.env[name === 'ffmpeg' ? 'BIENVU_FFMPEG_PATH' : 'BIENVU_FFPROBE_PATH'] ?? name;
 const cwd = (name: string) => path.isAbsolute(name) ? path.dirname(name) : undefined;
-const browser = () => {
+const browser = (manifest?:VideoManifest) => {
   const browserExecutable=process.env.REMOTION_BROWSER_EXECUTABLE;
   return {browserExecutable,chromeMode:browserExecutable&&!browserExecutable.includes('chrome-headless-shell')
-    ? 'chrome-for-testing' as const : 'headless-shell' as const};
+    ? 'chrome-for-testing' as const : 'headless-shell' as const,...(manifest?.map?.settings.view==='buildings-3d'?{chromiumOptions:{gl:process.platform==='linux'?'swangle' as const:'angle' as const}}:{})};
 };
 
 export function parseRange(value: string | undefined, size: number): {start: number; end: number} | null | false {
@@ -58,6 +58,9 @@ export async function withVideoAssets<T>(input: unknown, directory: string, use:
       const duration=Number(metadata.format.duration);
       if(video.length!==1||video[0].codec_name!=='h264'||video[0].width!==asset.width||video[0].height!==asset.height
         ||!Number.isFinite(duration)||Math.abs(duration*1000-asset.durationMs!)>200)throw Error('VIDEO_ANIMATION_INVALID');
+    } else if(asset.mime==='application/json'){
+      if(bytes.length>4*1024*1024||asset.id!==manifest.map?.buildings?.id)throw new Error('VIDEO_BUILDINGS_INVALID');
+      MapBuildings.parse(JSON.parse(bytes.toString('utf8')));
     } else {
       const meta = await sharp(bytes, {limitInputPixels: 40_000_000}).metadata();
       if (meta.format !== ({'image/jpeg':'jpeg','image/png':'png','image/webp':'webp'} as const)[asset.mime]
@@ -77,6 +80,9 @@ export async function withVideoAssets<T>(input: unknown, directory: string, use:
   files.set('display.ttf',{file:displayFont,mime:'font/ttf',size:(await stat(displayFont)).size});
   const serifFont=path.join(bundleDir,'public/video-serif.woff2');
   files.set('serif.woff2',{file:serifFont,mime:'font/woff2',size:(await stat(serifFont)).size});
+  if(manifest.map?.buildings)for(const name of ['maplibre-gl.mjs','maplibre-gl-worker.mjs','maplibre-gl-shared.mjs']){
+    const file=path.join(bundleDir,'public',name);files.set(name,{file,mime:'text/javascript',size:(await stat(file)).size});
+  }
   const server = createServer((req,res) => {
     const prefix=`/${token}/`, key=req.url?.startsWith(prefix) ? req.url.slice(prefix.length) : '';
     const asset=files.get(key);
@@ -93,7 +99,8 @@ export async function withVideoAssets<T>(input: unknown, directory: string, use:
     const address=server.address();if(!address || typeof address==='string')throw new Error('VIDEO_ASSET_SERVER_FAILED');
     const base=`http://127.0.0.1:${address.port}/${token}/`;
     for(const asset of videoAssets(manifest))media[asset.id]=base+videoAssetFile(asset);
-    return await use({manifest,media,logoBackground,fontUrl:base+'font.woff2',displayFontUrl:base+'display.ttf',serifFontUrl:base+'serif.woff2'});
+    return await use({manifest,media,logoBackground,fontUrl:base+'font.woff2',displayFontUrl:base+'display.ttf',serifFontUrl:base+'serif.woff2',
+      ...(manifest.map?.buildings?{maplibreModuleUrl:base+'maplibre-gl.mjs',maplibreWorkerUrl:base+'maplibre-gl-worker.mjs'}:{})});
   }finally{server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));}
 }
 export async function verifyVideoArtifact(file:string,id:string,frames:number,watermarked:boolean,startedAt:string,start:number,voiceEnabled=true,dimensions:Pick<VideoManifest,'width'|'height'>={width:1080,height:1920},minimumVolumeDb=-50) {
@@ -166,15 +173,17 @@ export async function renderListingVideo(input: unknown, directory: string): Pro
   try {
     progress(0);
     await withVideoAssets(manifest,directory,async props=>{
-      const composition=await selectComposition({serveUrl:bundleDir,id:'BienVuListing',inputProps:props,...browser()});
-      await renderMedia({serveUrl:bundleDir,composition,inputProps:props,...browser(),codec:'h264',audioCodec:'aac',muted:!editorHasAudio(manifest),
+      const composition=await selectComposition({serveUrl:bundleDir,id:'BienVuListing',inputProps:props,...browser(manifest)});
+      await renderMedia({serveUrl:bundleDir,composition,inputProps:props,...browser(manifest),codec:'h264',audioCodec:'aac',muted:!editorHasAudio(manifest),
         pixelFormat:'yuv420p',outputLocation:raw,concurrency:1,timeoutInMilliseconds:120_000,
         audioBitrate:'192k',crf:21,logLevel:'error',onProgress:state=>progress(state.progress*85)});
     });
     progress(85);
     if((await stat(raw)).size>50*1024*1024)throw new Error('VIDEO_TOO_LARGE');
-    if(isFastStart(await readFile(raw)))await rename(raw,partial);
-    else await exec(binary('ffmpeg'),['-v','error','-i',raw,'-map','0','-c','copy','-movflags','+faststart','-y',partial],{cwd:cwd(binary('ffmpeg')),timeout:60_000});
+    if(!manifest.map&&isFastStart(await readFile(raw)))await rename(raw,partial);
+    else await exec(binary('ffmpeg'),['-v','error','-i',raw,'-map','0','-c','copy',
+      ...(manifest.map?['-metadata',`copyright=${mapCredits(manifest.map.capturedAt,manifest.map.settings.view)}`,'-metadata',`comment=${mapCredits(manifest.map.capturedAt,manifest.map.settings.view)}`]:[]),
+      '-movflags','+faststart','-y',partial],{cwd:cwd(binary('ffmpeg')),timeout:60_000});
     const dimensions={width:manifest.width,height:manifest.height};
     // Sources are measured before rendering. An editor can intentionally keep a
     // short, quiet music passage or reduce voice gain; retain the silence guard.
@@ -191,8 +200,8 @@ export async function renderListingVideo(input: unknown, directory: string): Pro
 export async function renderListingStills(input: unknown, directory: string, output: string, frames: number[]) {
   await mkdir(output,{recursive:true,mode:0o700});
   await withVideoAssets(input,directory,async props=>{
-    const composition=await selectComposition({serveUrl:bundleDir,id:'BienVuListing',inputProps:props,...browser()});
-    for(const frame of frames)await renderStill({serveUrl:bundleDir,composition,inputProps:props,...browser(),frame,
+    const composition=await selectComposition({serveUrl:bundleDir,id:'BienVuListing',inputProps:props,...browser(props.manifest!)});
+    for(const frame of frames)await renderStill({serveUrl:bundleDir,composition,inputProps:props,...browser(props.manifest!),frame,
       imageFormat:'png',output:path.join(output,`frame-${frame}.png`),logLevel:'error'});
   });
 }
