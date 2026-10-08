@@ -32,4 +32,12 @@ Les aperçus courts accessibles aux utilisateurs sont des fichiers MP3 déjà en
 
 Tests : `tests/cartesia-voice.test.ts`, scénarios complets de workflow, essais anonymes et régressions de crédits. Les résultats réels et les limites sont consignés dans [la recette du 6 octobre](preuves/cartesia-2026-10-06/RESULTATS.md).
 
+## Prononciation des villes — 9 octobre 2026
+
+Pour les nouvelles narrations Cartesia, les occurrences entièrement en majuscules de la ville connue de l’annonce sont converties avant la synthèse : `LYON` devient `Lyon`, `SAINT-ÉTIENNE` devient `Saint-étienne`. Les accents, espaces, tirets et apostrophes sont conservés. Un suffixe d’arrondissement comme `LYON 6e` est pris en charge. Les sigles extérieurs au nom de ville, dont DPE et GES, et les noms déjà en casse normale restent inchangés. Le texte de comparaison construit depuis une annonce dans le superadmin applique la même règle.
+
+La transformation concerne le texte envoyé au fournisseur, sans modifier les faits de l’annonce ni les légendes. Les clés de cache et le quota Cartesia utilisent ce texte réellement envoyé. La politique `locality-case/1` est figée dans le snapshot de narration : les anciens traitements reprennent avec leur politique et leurs WAV d’origine. Lors d’un nouvel export depuis l’éditeur, une ancienne voix dont la ville n’était pas normalisée est régénérée ; une voix déjà corrigée reste réutilisable.
+
+`tests/voice-locality.test.ts` vérifie les cas français, le transcript de la requête Cartesia, la reprise D1/R2, les pistes historiques et la réutilisation des pistes corrigées avec des appels fournisseur entièrement simulés.
+
 Références officielles : [modèle Sonic 3.6](https://docs.cartesia.ai/build-with-cartesia/tts-models/latest), [API](https://docs.cartesia.ai/api-reference/tts/bytes), [offres Cartesia](https://cartesia.ai/pricing). L’autorisation d’utiliser Free pour des essais ne remplace pas les conditions de licence du fournisseur pour un usage commercial.

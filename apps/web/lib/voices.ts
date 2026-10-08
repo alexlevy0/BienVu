@@ -1,7 +1,7 @@
 import {z} from 'zod';
 import {VoiceCatalog,AdminVoices,VoiceSample,VoiceText,VideoVoice,frenchVoices,NormalizedListing,VoiceFailure} from '@bienvu/contracts';
 import {voiceSettings,setDefaultVoice,cartesiaFreeUsage,reserveCartesiaVoice,finishCartesiaVoice,type Database} from '@bienvu/db';
-import {frenchVoiceProvider,frenchVoiceConfig,voiceCacheKey,measureVoiceWav,type VoiceProviderEnvironment} from '@bienvu/voice';
+import {frenchVoiceProvider,frenchVoiceConfig,voiceCacheKey,measureVoiceWav,localitySpeechText,type VoiceProviderEnvironment} from '@bienvu/voice';
 import {requireAdmin} from './admin-access';
 import {respond,RequestFailure,assertSameOrigin,boundedJson} from './http';
 import type {AuthEnvironment} from './auth';
@@ -22,8 +22,9 @@ export function announcementVoiceText(listing:NormalizedListing){
     f.area.value?`${f.area.value} mètres carrés`:null,f.rooms?.value?`${f.rooms.value} pièces`:null,
     amount?`${new Intl.NumberFormat('fr-FR',{maximumFractionDigits:2}).format(amount.amountCents/100)} euros${amount.period==='month'?' par mois':''}`:null,
     listing.description?.text].filter(Boolean).join('. ').replace(/\s+/g,' ').replace(/[<>\u0000-\u001f\u007f]/g,' ').trim();
-  if(details.length<=900)return details;
-  const part=details.slice(0,895),stop=Math.max(part.lastIndexOf('. '),part.lastIndexOf('! '),part.lastIndexOf('? '));
+  const spoken=localitySpeechText(details,f.locality.value);
+  if(spoken.length<=900)return spoken;
+  const part=spoken.slice(0,895),stop=Math.max(part.lastIndexOf('. '),part.lastIndexOf('! '),part.lastIndexOf('? '));
   return (stop>250?part.slice(0,stop+1):part.slice(0,part.lastIndexOf(' '))+'.').trim();
 }
 export async function adminVoiceCatalog(env:Env,q=''){

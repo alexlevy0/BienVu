@@ -2,7 +2,7 @@ import {AgencyBrand,VoiceConfig, NarrationAudio, NarrationFailure, PreparedNarra
 import {assertNarrationLease, checkpointNarrationScript, claimNarrationCall, failNarrationCall, findNarration, finishNarration,
   finishNarrationCall, narrationJobInput, releaseNarration, startNarration,findEditorVoiceSource, type Database, type NarrationLease} from '@bienvu/db';
 import {generateScript, hashJson, scriptContext,scriptPromptVersion,customScript, shortenScript, fitNarrationDuration,fitCachedNarration, validateScript, type ScriptContext, type ScriptProvider, type ScriptReply} from '@bienvu/narration';
-import {googleTts,fishTts,cartesiaTts, measureVoiceWav, voiceCacheKey, voiceSceneTiming,compactVoiceSceneTiming} from '@bienvu/voice';
+import {googleTts,fishTts,cartesiaTts, measureVoiceWav, voiceCacheKey, voiceSceneTiming,compactVoiceSceneTiming,localitySpeechText,LOCALITY_SPEECH_VERSION} from '@bienvu/voice';
 
 type VoiceReply = Awaited<ReturnType<ReturnType<typeof googleTts>['synthesize']>>|Awaited<ReturnType<ReturnType<typeof fishTts>['synthesize']>>|Awaited<ReturnType<ReturnType<typeof cartesiaTts>['synthesize']>>;
 export type NarrationProviders = {mode: 'real' | 'mock'; script: ScriptProvider;
@@ -25,12 +25,12 @@ export async function prepareJobNarration(env: {DB: Database; MEDIA: NarrationBu
   const now = options.now ?? Date.now;
   const job = await narrationJobInput(env.DB, agencyId, jobId);
   const existing = await findNarration(env.DB, agencyId, jobId);
-  const snapshot = existing ? parseJson(existing.snapshot) as {listing: unknown; brand: unknown; contact: ScriptContext['contact']; copyVersion?: ScriptContext['copyVersion'];customNarration?:string[]} : null;
+  const snapshot = existing ? parseJson(existing.snapshot) as {listing: unknown; brand: unknown; contact: ScriptContext['contact']; copyVersion?: ScriptContext['copyVersion'];customNarration?:string[];localitySpeechVersion?:string} : null;
   const input=job.generationInput?GenerationRequest.parse(JSON.parse(job.generationInput)):undefined;
   const customization=input?.customization,voiceEnabled=input?.voiceEnabled!==false,durationSeconds=input?.durationSeconds;
   const source=customization?.voiceSourceId?await findEditorVoiceSource(env.DB,agencyId,job.listing.id,customization.voiceSourceId):null;
   if(customization?.voiceSourceId&&!source)throw new NarrationFailure('NARRATION_STORAGE_INVALID');
-  const reuse=voiceEnabled&&Boolean(customization&&editorCanReuseVoice(customization,source?.preview??null));
+  const requestedReuse=voiceEnabled&&Boolean(customization&&editorCanReuseVoice(customization,source?.preview??null));
   // Les snapshots antérieurs au catalogue oral n'avaient pas de copyVersion.
   // Ils gardent leur texte et leurs clés de cache, y compris après un crash.
   const context = await scriptContext(snapshot?.listing ?? customizedListing(job.listing,customization), snapshot?.brand ?? customizedBrand(AgencyBrand.parse(options.brand??job.brand),customization), snapshot?.contact ?? options.contact,
@@ -38,10 +38,22 @@ export async function prepareJobNarration(env: {DB: Database; MEDIA: NarrationBu
   if (context.listing.agencyId !== agencyId || context.listing.id !== job.listing.id) throw new NarrationFailure('NARRATION_CONFLICT');
   if (existing && options.contact && options.contact !== context.contact) throw new NarrationFailure('NARRATION_CONFLICT');
   const config = VoiceConfig.parse(providers.voice.config);
-  const configHash = await hashJson({voice: config, scriptModel: providers.script.model, promptVersion: scriptPromptVersion(context), mode: providers.mode,...(!voiceEnabled?{voiceEnabled:false}:{}),...(durationSeconds!==undefined?{durationSeconds}:{}),...(reuse?{reusedVoiceHash:await hashJson(source)}:{})});
+  // Existing runs retain their pronunciation policy and WAV keys. New Cartesia
+  // runs hash the exact normalized text sent to TTS, including on crash/retry.
+  const localitySpeechVersion = config.provider==='cartesia'&&voiceEnabled&&(!snapshot||snapshot.localitySpeechVersion===LOCALITY_SPEECH_VERSION)
+    ? LOCALITY_SPEECH_VERSION : undefined;
+  const spokenText = (text:string) => localitySpeechVersion ? localitySpeechText(text,context.listing.facts.locality.value) : text;
+  let reuse=requestedReuse;
+  // Reuse corrected audio, but regenerate an older track whose city was spelled
+  // out. Compare its actual cache key instead of guessing from the caption case.
+  if(reuse&&localitySpeechVersion&&source)for(const [index,clip] of source.preview.clips.entries()){
+    const text=spokenText(clip.text);
+    if(text!==clip.text&&source.audio[index]?.cacheKey!==await voiceCacheKey(config,text)){reuse=false;break;}
+  }
+  const configHash = await hashJson({voice: config, scriptModel: providers.script.model, promptVersion: scriptPromptVersion(context), mode: providers.mode,...(!voiceEnabled?{voiceEnabled:false}:{}),...(durationSeconds!==undefined?{durationSeconds}:{}),...(reuse?{reusedVoiceHash:await hashJson(source)}:{}),...(localitySpeechVersion?{localitySpeechVersion}:{})});
   const {row, lease} = await startNarration(env.DB, {agencyId, jobId, inputHash: context.inputHash, configHash,
     snapshot: JSON.stringify({listing: {...context.listing, description: context.copyVersion.startsWith('description-copy/')?context.listing.description:null}, brand: context.brand, contact: context.contact, copyVersion: context.copyVersion,
-      ...(context.customNarration?{customNarration:context.customNarration}:{})}),
+      ...(context.customNarration?{customNarration:context.customNarration}:{}),...(localitySpeechVersion?{localitySpeechVersion}:{})}),
     mode: providers.mode, attempt: job.attempt}, now());
   let failure: string | undefined;
   const timingFor=(audio:PreparedNarration['audio'])=>context.copyVersion==='description-copy/2'
@@ -53,7 +65,7 @@ export async function prepareJobNarration(env: {DB: Database; MEDIA: NarrationBu
       if((result.voiceEnabled!==false)!==voiceEnabled)throw new NarrationFailure('NARRATION_CONFLICT');
       if(result.durationSeconds!==durationSeconds)throw new NarrationFailure('NARRATION_CONFLICT');
       for (let index = 0; index < result.audio.length; index++) {
-        if (!reuse&&result.audio[index].cacheKey !== await voiceCacheKey(config, result.script.scenes[index].narrationText)) throw new NarrationFailure('NARRATION_STORAGE_INVALID');
+        if (!reuse&&result.audio[index].cacheKey !== await voiceCacheKey(config, spokenText(result.script.scenes[index].narrationText))) throw new NarrationFailure('NARRATION_STORAGE_INVALID');
         await readNarrationAudio(env.MEDIA, lease, result.audio[index]);
       }
       await assertNarrationLease(env.DB, lease, now());
@@ -108,7 +120,7 @@ export async function prepareJobNarration(env: {DB: Database; MEDIA: NarrationBu
     }
     let audio: PreparedNarration['audio'], durationFrames: number[];
     if(context.copyVersion==='description-copy/2'){
-      audio=await voiceScenes(env,lease,script,providers,now);
+      audio=await voiceScenes(env,lease,script,providers,now,spokenText);
       const measured=script.scenes.map((s,index)=>({text:s.narrationText,durationMs:audio[index].durationMs,asset:audio[index]}));
       const fitted=fitNarrationDuration(context,script,audio.map(a=>a.durationMs));
       if(fitted){
@@ -116,7 +128,7 @@ export async function prepareJobNarration(env: {DB: Database; MEDIA: NarrationBu
         // Persist the one measured adaptation before further TTS. Unchanged
         // opening/contact tracks reuse their journal and private WAV cache.
         await checkpointNarrationScript(env.DB,lease,script,now());
-        audio=await voiceScenes(env,lease,script,providers,now);
+        audio=await voiceScenes(env,lease,script,providers,now,spokenText);
       }
       measured.push(...script.scenes.map((s,index)=>({text:s.narrationText,durationMs:audio[index].durationMs,asset:audio[index]})));
       const cached=fitCachedNarration(context,script,measured);
@@ -127,7 +139,7 @@ export async function prepareJobNarration(env: {DB: Database; MEDIA: NarrationBu
       durationFrames=timingFor(audio);
     }else{
     try {
-      audio = await voiceScenes(env, lease, script, providers, now);
+      audio = await voiceScenes(env, lease, script, providers, now,spokenText);
       durationFrames = timingFor(audio);
     } catch (error) {
       if (!(error instanceof VoiceFailure) || error.code !== 'VOICE_DURATION_EXCEEDED' || script.version !== 1 || context.customNarration) throw error;
@@ -135,7 +147,7 @@ export async function prepareJobNarration(env: {DB: Database; MEDIA: NarrationBu
       // La version 2 est persistée avant le premier nouvel appel. Un crash ne
       // remet pas à zéro l'unique raccourcissement autorisé.
       await checkpointNarrationScript(env.DB, lease, script, now());
-      audio = await voiceScenes(env, lease, script, providers, now);
+      audio = await voiceScenes(env, lease, script, providers, now,spokenText);
       durationFrames = timingFor(audio);
     }
     }
@@ -150,10 +162,10 @@ export async function prepareJobNarration(env: {DB: Database; MEDIA: NarrationBu
 }
 
 async function voiceScenes(env: {DB: Database; MEDIA: NarrationBucket}, lease: NarrationLease, script: ListingScript,
-  providers: NarrationProviders, now: () => number): Promise<PreparedNarration['audio']> {
+  providers: NarrationProviders, now: () => number,spokenText:(text:string)=>string): Promise<PreparedNarration['audio']> {
   const result: PreparedNarration['audio'] = [];
   for (const scene of script.scenes) {
-    const cacheKey = await voiceCacheKey(providers.voice.config, scene.narrationText);
+    const text=spokenText(scene.narrationText),cacheKey = await voiceCacheKey(providers.voice.config,text);
     const call = await claimNarrationCall(env.DB, lease, {stepKey: `voice/${cacheKey}`, requestHash: cacheKey, provider: providers.voice.config.provider, mode: providers.mode,
       objectKey: id => `agencies/${lease.agencyId}/jobs/${lease.jobId}/audio/${cacheKey}-${id}.wav`}, now());
     if (!call.fresh) {
@@ -163,7 +175,7 @@ async function voiceScenes(env: {DB: Database; MEDIA: NarrationBucket}, lease: N
       await readNarrationAudio(env.MEDIA, lease, asset); result.push(asset); continue;
     }
     try {
-      const {bytes, ...metrics} = await providers.voice.synthesize(scene.narrationText,call.row.id);
+      const {bytes, ...metrics} = await providers.voice.synthesize(text,call.row.id);
       const measured = measureVoiceWav(bytes), sha256 = await bytesHash(bytes);
       if (metrics.cacheKey !== cacheKey || metrics.sha256 !== sha256) throw new NarrationFailure('NARRATION_STORAGE_INVALID');
       const asset = NarrationAudio.parse({id: `audio-${call.row.id}`, cacheKey, objectKey: call.row.objectKey, sha256, sizeBytes: bytes.byteLength,
