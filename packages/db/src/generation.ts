@@ -1,4 +1,4 @@
-import {AgencyBrand, EntityId, Timestamp, GeneratableListing, GenerationRequest, GenerationView, VideoReport, VideoAsset, publicErrors,customizedListing,generationCreditCost,requestedAnimations,CREDIT_PRICING_VERSION,selectedAnimationIndices, type PublicErrorCode,type NormalizedListing} from '@bienvu/contracts';
+import {AgencyBrand, EntityId, Timestamp, GeneratableListing, GenerationRequest, GenerationView, VideoReport, VideoAsset, publicErrors,customizedListing,generationCreditCost,requestedAnimations,CREDIT_PRICING_VERSION,selectedAnimationIndices,URL_IMPORT_QUOTAS, type PublicErrorCode,type NormalizedListing} from '@bienvu/contracts';
 import type {Database} from './index';
 import {creditGrant,creditBalance} from './credits';
 import {findImport} from './imports';
@@ -59,7 +59,7 @@ export async function generationRights(db:Database,agencyId:string,flag:string|u
     .bind(at.slice(0,10),at.slice(0,7)).first<{month:number;day:number}>();
   const nextDay=new Date(at.slice(0,10)+'T00:00:00Z').getTime()+86400_000;
   const nextMonth=Date.UTC(new Date(now).getUTCFullYear(),new Date(now).getUTCMonth()+1,1);
-  const importRetryAt=usage&&usage.month>=60?new Date(nextMonth).toISOString():usage&&usage.day>=20?new Date(nextDay).toISOString():null;
+  const importRetryAt=usage&&usage.month>=URL_IMPORT_QUOTAS.monthly?new Date(nextMonth).toISOString():usage&&usage.day>=URL_IMPORT_QUOTAS.daily?new Date(nextDay).toISOString():null;
   const balance=await creditBalance(db,agencyId,now);
   return {generationEnabled:flag==='true'&&grant?.enabled===1&&gate?.enabled===1,developmentRemaining:balance.available,creditReserved:balance.reserved,creditConsumed:balance.consumed,creditTotal:balance.total,creditPurchased:balance.purchasedAvailable,creditMonthly:balance.monthlyAvailable,renewalAt:balance.renewalAt,creditKind:grant?.kind??null,importRetryAt};
 }

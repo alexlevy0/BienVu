@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile, readdir} from 'node:fs/promises';
 import {Miniflare, convertV4MiniflareOptions} from 'miniflare';
 import {beginImport, beginManualImport, failImport, generationRights} from '../packages/db/src/index';
+import {URL_IMPORT_QUOTAS} from '../packages/contracts/src/import-quotas';
 
 test('migration 0010 : compteurs conservés, imports 6 à 10 autorisés, plafonds quotidien et mensuel maintenus', async t => {
   const mf = new Miniflare(convertV4MiniflareOptions({modules: true,
@@ -52,7 +53,7 @@ test('migration 0010 : compteurs conservés, imports 6 à 10 autorisés, plafond
   assert.deepEqual((await usage()).results, [{day: '2026-09-27', attempts: 20}, {day: '2026-09-28', attempts: 10}]);
 });
 
-test('migration 0029 : historique conservé, 20/jour et 60/mois, droits synchronisés et renouvellement UTC', async t => {
+test('migration historique 0029 : compteurs conservés, 20/jour et 60/mois, renouvellement UTC', async t => {
   const mf = new Miniflare(convertV4MiniflareOptions({modules: true,
     script: 'export default {fetch(){return new Response("test")}}',
     compatibilityDate: '2026-09-27', d1Databases: ['DB']}));
@@ -74,7 +75,7 @@ test('migration 0029 : historique conservé, 20/jour et 60/mois, droits synchron
   assert.deepEqual(await usage(), before);
   // The current rights API also reads the billing ledger. Upgrade the remaining
   // schema before calling it, while proving both upgrades preserve old usage.
-  for (const file of (await readdir(directory)).filter(f => f.endsWith('.sql') && f > '0029_double_import_limits.sql').sort()) await migrate(file);
+  for (const file of (await readdir(directory)).filter(f => f.endsWith('.sql') && f > '0029_double_import_limits.sql' && f < '0053').sort()) await migrate(file);
   assert.deepEqual(await usage(), before);
   assert.equal((await generationRights(DB, 'double-quota', 'true', now)).importRetryAt, null);
   // Attempts 11–20 are usable immediately; failures and idempotent replays
@@ -96,7 +97,6 @@ test('migration 0029 : historique conservé, 20/jour et 60/mois, droits synchron
   const sixtieth = await beginImport(DB, 'double-quota', source, 'sixtieth-monthly-attempt', tomorrow);
   await failImport(DB, 'double-quota', sixtieth.row.id, 'SOURCE_BLOCKED', {});
   const atMonthlyLimit = await usage();
-  assert.equal((await generationRights(DB, 'double-quota', 'true', tomorrow)).importRetryAt, '2026-11-01T00:00:00.000Z');
   await assert.rejects(beginImport(DB, 'double-quota', source, 'sixty-first-monthly-attempt', tomorrow), /IMPORT_LIMIT/);
   await assert.rejects(beginImport(DB, 'double-quota', source, 'next-day-month-still-full', tomorrow + 86400_000), /IMPORT_LIMIT/);
   const manual = await beginManualImport(DB, 'double-quota', 'manual-after-monthly-quota', '{}', 'a'.repeat(64), tomorrow);
@@ -105,4 +105,89 @@ test('migration 0029 : historique conservé, 20/jour et 60/mois, droits synchron
   const nextMonth = Date.parse('2026-11-01T00:00:00Z');
   assert.equal((await generationRights(DB, 'double-quota', 'true', nextMonth)).importRetryAt, null);
   assert.equal((await beginImport(DB, 'double-quota', source, 'next-month-available-again', nextMonth)).fresh, true);
+});
+
+test('migration 0053 : 55 essais conservés, ancien plafond de 60 débloqué, 20/jour maintenus', async t => {
+  const mf = new Miniflare(convertV4MiniflareOptions({modules: true,
+    script: 'export default {fetch(){return new Response("test")}}',
+    compatibilityDate: '2026-09-27', d1Databases: ['DB']}));
+  t.after(() => mf.dispose());
+  const {DB} = await mf.getBindings<Pick<CloudflareEnv, 'DB'>>();
+  const directory = new URL('../packages/db/migrations/', import.meta.url);
+  const migrate = async (file: string) => DB.exec((await readFile(new URL(file, directory), 'utf8'))
+    .replace(/^--.*$/gm, '').replace(/\n/g, ' '));
+  for (const file of (await readdir(directory)).filter(f => f.endsWith('.sql') && f < '0053').sort()) await migrate(file);
+  const now = Date.parse('2026-10-08T12:00:00Z'), source = 'https://fixtures.bienvu.example/vente';
+  const at = new Date(now).toISOString();
+  await DB.prepare('INSERT INTO agencies(id,owner_user_id,name,created_at,updated_at) VALUES(?,?,?,?,?)')
+    .bind('monthly-quota', 'monthly-owner', 'Fixture quota', at, at).run();
+  await DB.exec("INSERT INTO import_usage(day,attempts) VALUES('2026-09-30',20),('2026-10-01',20),('2026-10-02',20),('2026-10-03',10),('2026-10-08',5)");
+  const usage = async () => (await DB.prepare('SELECT day,attempts FROM import_usage ORDER BY day').all()).results;
+  // Reach the old limit using failed imports; the migration must not refund any.
+  for (let i = 0; i < 5; i++) {
+    const row = (await beginImport(DB, 'monthly-quota', source, `before-monthly-raise-${i}`, now)).row;
+    await failImport(DB, 'monthly-quota', row.id, 'SOURCE_BLOCKED', {});
+  }
+  await assert.rejects(beginImport(DB, 'monthly-quota', source, 'before-monthly-raise-blocked', now), /IMPORT_LIMIT/);
+  const before = await usage();
+  await migrate('0053_monthly_import_allowance.sql');
+  assert.deepEqual(await usage(), before);
+  assert.equal((await generationRights(DB, 'monthly-quota', 'true', now)).importRetryAt, null);
+  const accepted = await beginImport(DB, 'monthly-quota', source, 'monthly-sixty-first-import', now);
+  await failImport(DB, 'monthly-quota', accepted.row.id, 'SOURCE_BLOCKED', {});
+  const replay = await beginImport(DB, 'monthly-quota', source, 'monthly-sixty-first-import', now);
+  assert.equal(replay.fresh, false);
+  assert.equal(replay.row.id, accepted.row.id);
+  for (let attempt = 12; attempt <= URL_IMPORT_QUOTAS.daily; attempt++) {
+    const row = (await beginImport(DB, 'monthly-quota', source, `raised-monthly-daily-${attempt}`, now)).row;
+    await failImport(DB, 'monthly-quota', row.id, 'SOURCE_BLOCKED', {});
+  }
+  const fullDay = await usage();
+  assert.equal((await generationRights(DB, 'monthly-quota', 'true', now)).importRetryAt, '2026-10-09T00:00:00.000Z');
+  await assert.rejects(beginImport(DB, 'monthly-quota', source, 'raised-monthly-daily-overflow', now), /IMPORT_LIMIT/);
+  assert.deepEqual(await usage(), fullDay);
+  assert.equal((await generationRights(DB, 'monthly-quota', 'true', now + 86400_000)).importRetryAt, null);
+});
+
+test('quota mensuel 300 : dernière place atomique entre agences, rejeu et formulaire hors compteur, renouvellement UTC', async t => {
+  const mf = new Miniflare(convertV4MiniflareOptions({modules: true,
+    script: 'export default {fetch(){return new Response("test")}}',
+    compatibilityDate: '2026-09-27', d1Databases: ['DB']}));
+  t.after(() => mf.dispose());
+  const {DB} = await mf.getBindings<Pick<CloudflareEnv, 'DB'>>();
+  const directory = new URL('../packages/db/migrations/', import.meta.url);
+  for (const file of (await readdir(directory)).filter(f => f.endsWith('.sql')).sort())
+    await DB.exec((await readFile(new URL(file, directory), 'utf8')).replace(/^--.*$/gm, '').replace(/\n/g, ' '));
+  const now = Date.parse('2026-10-16T12:00:00Z'), source = 'https://fixtures.bienvu.example/vente';
+  for (const agency of ['first-agency', 'second-agency']) {
+    const at = new Date(now).toISOString();
+    await DB.prepare('INSERT INTO agencies(id,owner_user_id,name,created_at,updated_at) VALUES(?,?,?,?,?)')
+      .bind(agency, agency, agency, at, at).run();
+  }
+  // Fourteen complete days plus nineteen attempts: every daily count is valid.
+  for (let day = 1; day <= 15; day++)
+    await DB.prepare('INSERT INTO import_usage(day,attempts) VALUES(?,?)')
+      .bind(`2026-10-${String(day).padStart(2, '0')}`, day < 15 ? URL_IMPORT_QUOTAS.daily : URL_IMPORT_QUOTAS.daily - 1).run();
+  const usage = () => DB.prepare("SELECT coalesce(sum(attempts),0) AS n FROM import_usage WHERE substr(day,1,7)='2026-10'").first<{n:number}>();
+  assert.equal((await usage())?.n, URL_IMPORT_QUOTAS.monthly - 1);
+  assert.equal((await generationRights(DB, 'first-agency', 'true', now)).importRetryAt, null);
+  const attempts = await Promise.allSettled(['first-agency', 'second-agency'].map(agency =>
+    beginImport(DB, agency, source, `last-monthly-slot-${agency}`, now)));
+  assert.equal(attempts.filter(result => result.status === 'fulfilled').length, 1);
+  const refused = attempts.find(result => result.status === 'rejected');
+  assert.ok(refused?.status === 'rejected');
+  assert.match(String(refused.reason), /IMPORT_LIMIT/);
+  const winner = attempts.find(result => result.status === 'fulfilled');
+  assert.ok(winner?.status === 'fulfilled');
+  await failImport(DB, winner.value.row.agencyId, winner.value.row.id, 'SOURCE_BLOCKED', {});
+  const replay = await beginImport(DB, winner.value.row.agencyId, source, `last-monthly-slot-${winner.value.row.agencyId}`, now);
+  assert.equal(replay.fresh, false);
+  assert.equal((await usage())?.n, URL_IMPORT_QUOTAS.monthly);
+  assert.equal((await generationRights(DB, 'first-agency', 'true', now)).importRetryAt, '2026-11-01T00:00:00.000Z');
+  await assert.rejects(beginImport(DB, 'first-agency', source, 'monthly-three-hundred-first', now + 86400_000), /IMPORT_LIMIT/);
+  await beginManualImport(DB, 'first-agency', 'manual-monthly-quota-independent', '{}', 'a'.repeat(64), now);
+  assert.equal((await usage())?.n, URL_IMPORT_QUOTAS.monthly);
+  const nextMonth = Date.parse('2026-11-01T00:00:00Z');
+  assert.equal((await generationRights(DB, 'first-agency', 'true', nextMonth)).importRetryAt, null);
+  assert.equal((await beginImport(DB, 'first-agency', source, 'new-month-allowance', nextMonth)).fresh, true);
 });

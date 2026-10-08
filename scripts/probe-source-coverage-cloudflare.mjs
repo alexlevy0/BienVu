@@ -2,6 +2,7 @@
 // Closed sample, one attempt per URL, sequential requests, no generation or email.
 // Never reset import counters, change limits, or release incurred provisions.
 import assert from 'node:assert/strict';
+import {URL_IMPORT_QUOTAS} from '../packages/contracts/src/import-quotas.ts';
 import {randomUUID, randomBytes, createHash} from 'node:crypto';
 import {mkdir, readFile, writeFile, access, unlink} from 'node:fs/promises';
 import {createRequire} from 'node:module';
@@ -46,7 +47,7 @@ if (step === 'init') {
   assert.equal(user, null, 'Existing fixture: reuse it, never create duplicate identities.');
   const before = await allowance();
   // Leave at least four imports for normal customer activity today.
-  assert.ok(before.usage.daily + samples.length <= 16 && before.usage.monthly + samples.length <= 60, 'IMPORT_ALLOWANCE_REQUIRED');
+  assert.ok(before.usage.daily + samples.length <= 16 && before.usage.monthly + samples.length <= URL_IMPORT_QUOTAS.monthly, 'IMPORT_ALLOWANCE_REQUIRED');
   assert.ok(before.budget.paused === 0 && before.budget.baseline_cents + before.budget.reserved_cents + 50 * samples.length <= before.budget.ceiling_cents, 'IMPORT_BUDGET_REQUIRED');
   user = {id: randomUUID(), password: randomBytes(32).toString('base64url')};
   user.email = `source-coverage-${user.id}@example.invalid`;
@@ -95,7 +96,7 @@ if (step === 'init') {
       const file = `import-${sample.id}`;
       if (await exists(`${folder}/${file}.json`)) {console.log(`${sample.name}: tentative déjà journalisée, ignorée.`); continue;}
       const before = await allowance();
-      assert.ok(before.usage.daily < 16 && before.usage.monthly < 60, 'IMPORT_ALLOWANCE_REQUIRED');
+      assert.ok(before.usage.daily < 16 && before.usage.monthly < URL_IMPORT_QUOTAS.monthly, 'IMPORT_ALLOWANCE_REQUIRED');
       assert.ok(before.budget.paused === 0 && before.budget.baseline_cents + before.budget.reserved_cents + 50 <= before.budget.ceiling_cents, 'IMPORT_BUDGET_REQUIRED');
       const report = {...sample, at: new Date().toISOString(), environment: 'cloudflare', idempotencyKey: randomUUID(), before};
       await save(file, report, 'wx');
