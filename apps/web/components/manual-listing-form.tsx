@@ -8,6 +8,7 @@ import {manualDraftFields, readManualListingDraft, saveManualListingDraft, type 
 import {inspectManualPhotos} from '../lib/manual-photos';
 import {photoUploadError} from '../lib/photo-upload-error';
 import {VideoCustomizer} from './video-customizer';
+import {PhotoPreviewImage} from './photo-preview-image';
 import {useAccount} from './account';
 
 type SelectedPhoto = {id: string; file: File|null; preview: string; sourceHash?:string;remote?:NormalizedListing['photos'][number]; state:'ready'|'sending'|'error'; slot:number; error?:string; removing?:boolean};
@@ -504,7 +505,7 @@ export function ManualListingForm(props: Props) {
                 draggable={!busy&&!photoChecking&&photo.state==='ready'&&!photo.removing} onDragStart={event=>{event.dataTransfer.setData('application/x-bienvu-manual-photo',photo.id);event.dataTransfer.effectAllowed='move';setDraggedPhoto(photo.id);}}
                 onDragEnd={()=>setDraggedPhoto(null)} onDragOver={event=>{if(draggedPhoto){event.preventDefault();event.dataTransfer.dropEffect='move';}}}
                 onDrop={event=>{if(draggedPhoto){event.preventDefault();event.stopPropagation();movePhoto(draggedPhoto,index);setDraggedPhoto(null);}}}>
-                <div className="manual-sheet-thumbnail"><img src={photo.preview} alt={`Photo ${index+1} du bien`} draggable={false}/><span className={`manual-sheet-photo-number${index===0?' is-cover':''}`}>{index+1}</span>
+                <div className="manual-sheet-thumbnail"><PhotoPreviewImage src={photo.preview} alt={`Photo ${index+1} du bien`} draggable={false} loading={props.customizing||index>2?'lazy':'eager'}/><span className={`manual-sheet-photo-number${index===0?' is-cover':''}`}>{index+1}</span>
                   <button type="button" className="manual-sheet-animation-toggle" aria-pressed={animatedPhotos.has(photo.slot)} aria-label={`Animer la photo ${index+1} avec l’IA`}
                     disabled={!me||me.role==='viewer'||busy||photoChecking||photo.removing||photo.state!=='ready'}
                     title={!me?'Connectez-vous pour animer vos photos avec l’IA':me.role==='viewer'?'Votre accès Lecteur ne permet pas de modifier les animations':animatedPhotos.has(photo.slot)?'Désactiver l’animation IA':'Animer cette photo avec l’IA · 1 crédit'}
@@ -541,7 +542,7 @@ export function ManualListingForm(props: Props) {
         </fieldset>
         <aside className={`manual-sheet-preview${props.aspectRatio==='16:9'?' is-horizontal':''}`} aria-labelledby="manual-preview-title"><h3 id="manual-preview-title">Aperçu de la mise en page</h3>
           <div className={`manual-sheet-poster${previewPhoto?'':' is-empty'}`}>
-            {previewPhoto?<img src={previewPhoto.preview} alt="Aperçu de la photo de couverture"/>:<div className="manual-sheet-preview-empty"><HomeIcon name="image" size={38}/><p>Vos photos prennent place ici.</p></div>}
+            {previewPhoto?<PhotoPreviewImage src={previewPhoto.preview} alt="Aperçu de la photo de couverture" loading={props.customizing?'lazy':'eager'}/>:<div className="manual-sheet-preview-empty"><HomeIcon name="image" size={38}/><p>Vos photos prennent place ici.</p></div>}
             <div className="manual-sheet-poster-copy"><h4>{fields.locality.trim()||'Votre bien'}</h4>
               {(area||rooms)&&<p>{[area?`${numberFormat.format(area)} m²`:'',rooms?`${numberFormat.format(rooms)} pièce${rooms>1?'s':''}`:''].filter(Boolean).join(' · ')}</p>}
               {price&&<strong>{numberFormat.format(price)} €{transaction==='rent'&&<small> / mois</small>}</strong>}

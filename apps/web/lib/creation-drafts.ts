@@ -64,7 +64,7 @@ export async function customizeImportedListing(env:Env&{MEDIA:Env['MEDIA']&Pick<
   catch(error){if(error instanceof ImportStateFailure)throw new RequestFailure(error.code);throw error;}
   if(row.status==='ready')throw new RequestFailure('CONFLICT');
   await startCreationDraft(env.DB,agencyId,row.id,draftFromListing(listing));
-  for(const photo of listing.photos){
+  const copy=async(photo:typeof listing.photos[number])=>{
     signal.throwIfAborted();
     if(!photo.objectKey.startsWith(`agencies/${agencyId}/imports/${id}/`))throw new RequestFailure('NOT_FOUND');
     const object=await env.MEDIA.get(photo.objectKey);
@@ -74,6 +74,13 @@ export async function customizeImportedListing(env:Env&{MEDIA:Env['MEDIA']&Pick<
     const uploadId=(await contentHash(new TextEncoder().encode(`${row.id}:${photo.id}`))).slice(0,32);
     await uploadCreationPhoto(env,agencyId,row.id,photo.sourceOrder,uploadId,bytes,photo.mime,
       async()=>({bytes,width:photo.width,height:photo.height,mime:photo.mime}),signal);
+  };
+  // Two independent, journaled photos at a time. Await both even when one
+  // fails, so a cancelled request cannot leave untracked background writes.
+  for(let offset=0;offset<listing.photos.length;offset+=2){
+    const copied=await Promise.allSettled(listing.photos.slice(offset,offset+2).map(copy));
+    const failure=copied.find(result=>result.status==='rejected');
+    if(failure?.status==='rejected')throw failure.reason;
   }
   return required(await findImport(env.DB,agencyId,row.id));
 }

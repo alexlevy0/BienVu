@@ -57,12 +57,13 @@ export async function importListing(url: string, context: {agencyId: string; imp
   try {
     selectAdapter(source);
     const page = await load(source, 'page');
+    diagnostics.browserUsed = page.browserUsed === true;
     assertListingDestination(source, page.url);
     stage = 'extraction';
     let extracted;
     try {extracted = extractListingHtml(new TextDecoder('utf-8', {fatal: true}).decode(page.bytes), page.url,
       {allowPartial: options.allowPartial});} catch (error) {
-      if (!(error instanceof ImportFailure) || error.code !== 'NOT_A_LISTING' || error.reason === 'not_listing' || !ports.browserHtml) throw error;
+      if (!(error instanceof ImportFailure) || error.code !== 'NOT_A_LISTING' || error.reason === 'not_listing' || page.browserUsed || !ports.browserHtml) throw error;
       diagnostics.browserUsed = true;
       stage = 'browser';
       const browserHtml = await abortable(ports.browserHtml(page.url, signal), signal);
@@ -137,6 +138,7 @@ export async function importListing(url: string, context: {agencyId: string; imp
     diagnostics.stage = stage;
     const failure = signal.aborted ? new ImportFailure('IMPORT_TIMEOUT', 'Temps maximal d’import dépassé.')
       : error instanceof ImportFailure ? error : new ImportFailure('INCOMPLETE_LISTING', 'Les données ne respectent pas le contrat d’import.');
+    if (error instanceof ImportFailure && error.browserUsed) diagnostics.browserUsed = true;
     if (failure.reason) diagnostics.failureReason = failure.reason;
     if (failure.resource) diagnostics.failureResource = failure.resource;
     throw Object.assign(failure, {diagnostics});

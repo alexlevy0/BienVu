@@ -7,6 +7,7 @@ import {HomeIcon} from './home-icons';
 import {VoicePreview} from './voice-preview';
 import {useAccount} from './account';
 import {MapScenePreview,VideoMapControls} from './video-map';
+import {PhotoPreviewImage} from './photo-preview-image';
 
 export type CustomizerPhoto={id:string;preview:string;slot:number;state:string;file?:File|null;error?:string;removing?:boolean};
 export {suggestedNarration};
@@ -40,7 +41,7 @@ export function VideoCustomizer(p:Props){
     <div className="customizer-topline"><button type="button" onClick={p.onBack} disabled={p.busy}><span>←</span> Retour</button>
       <span role="status">{p.saved?'✓ Réglages enregistrés':'Brouillon · Réglages conservés sur cet appareil'}</span></div>
     <header className="customizer-heading"><h1>Personnalisez votre vidéo</h1><p>Vos photos, votre style. BienVu s’occupe du montage.</p>
-      <div className="customizer-property">{p.photos[0]&&<img src={chosen[0]?.preview??p.photos[0].preview} alt=""/>}<div><strong>{p.sourceUrl?new URL(p.sourceUrl).hostname:p.fields.title||'Votre annonce'}</strong>
+      <div className="customizer-property">{p.photos[0]&&<PhotoPreviewImage src={chosen[0]?.preview??p.photos[0].preview} alt=""/>}<div><strong>{p.sourceUrl?new URL(p.sourceUrl).hostname:p.fields.title||'Votre annonce'}</strong>
         <span>{[price,p.fields.area?`${p.fields.area} m²`:'',p.fields.rooms?`${p.fields.rooms} pièces`:''].filter(Boolean).join(' · ')||'Complétez les informations du bien'}</span></div></div></header>
     <div className={`customizer-panel${p.aspectRatio==='16:9'?' is-horizontal':''}`}><div className="customizer-controls">
       <div className="customizer-tabs" role="tablist" aria-label="Réglages vidéo">{([['photos','Photos','image'],['style','Style','palette'],['voice','Voix et texte','microphone'],['map','Carte','pin']] as const).map(([id,label,icon])=>
@@ -50,11 +51,11 @@ export function VideoCustomizer(p:Props){
           onClick={()=>setTab(id)}><HomeIcon name={icon} size={21}/>{label}</button>)}</div>
       <div role="tabpanel" id={`customizer-panel-${tab}`} aria-labelledby={`customizer-tab-${tab}`}>
       {tab==='photos'&&<><div className="customizer-section-title"><strong>{p.sourceUrl?'Photos de votre annonce':`${chosen.length} photo${chosen.length>1?'s':''} sélectionnée${chosen.length>1?'s':''}`}</strong><p>{p.sourceUrl?'Les photos seront récupérées avec l’annonce à la génération. Connectez-vous pour les choisir et les réordonner avant génération.':'Glissez les photos pour changer leur ordre. Gardez au moins 3 photos.'}</p></div>
-        {p.photos.length?<div className="customizer-photos">{ordered.map(photo=>{const at=order.indexOf(photo.slot),selected=at>=0;return <div key={photo.id} className={`customizer-photo${selected?' is-selected':''}${drag===photo.slot?' is-dragging':''}`}
+        {p.photos.length?<div className="customizer-photos">{ordered.map((photo,index)=>{const at=order.indexOf(photo.slot),selected=at>=0;return <div key={photo.id} className={`customizer-photo${selected?' is-selected':''}${drag===photo.slot?' is-dragging':''}`}
           draggable={selected&&!p.busy&&!photo.removing&&photo.state==='ready'} onDragStart={event=>{event.dataTransfer.setData('text/plain',String(photo.slot));event.dataTransfer.effectAllowed='move';setDrag(photo.slot);}}
           onDragEnd={()=>setDrag(null)} onDragOver={event=>{if(drag!==null&&selected){event.preventDefault();event.dataTransfer.dropEffect='move';}}}
           onDrop={event=>{if(drag!==null&&selected){event.preventDefault();move(drag,at);setDrag(null);}}}>
-          <img src={photo.preview} alt={`Photo ${photo.slot+1}`} draggable={false}/>{selected&&<span className="customizer-photo-number">{at+1}</span>}
+          <div className="customizer-photo-visual"><PhotoPreviewImage src={photo.preview} alt={`Photo ${photo.slot+1}`} draggable={false} loading={index<3?'eager':'lazy'} fetchPriority={at===0?'high':'auto'}/></div>{selected&&<span className="customizer-photo-number">{at+1}</span>}
           <button type="button" className="customizer-photo-check" aria-pressed={selected} aria-label={`${selected?'Désélectionner':'Sélectionner'} la photo ${photo.slot+1}`} onClick={()=>toggle(photo.slot)} disabled={p.busy||photo.removing||photo.state!=='ready'}>{selected?'✓':'+'}</button>
           {selected&&<button type="button" className={`customizer-photo-animate${animated.includes(photo.slot)?' is-active':''}`} aria-pressed={animated.includes(photo.slot)} aria-label={`Animer la photo ${photo.slot+1} avec l’IA`} disabled={!me||p.busy||photo.removing||photo.state!=='ready'} title={!me?'Connectez-vous pour animer vos photos':'1 crédit supplémentaire'} onClick={()=>animate(photo.slot)}>{animated.includes(photo.slot)?'✓ Animée':'Animer'} · 1 crédit</button>}
           {at===0&&<span className="customizer-first-photo">Première image</span>}{photo.state!=='ready'&&<span className="customizer-photo-state">{photo.state==='error'?'Envoi interrompu':'Envoi…'}</span>}
@@ -70,7 +71,7 @@ export function VideoCustomizer(p:Props){
       </>}
       {tab==='style'&&<><div className="customizer-section-title"><strong>Un style pour votre bien</strong><p>Les photos restent en plein écran dans les trois styles.</p></div>
         <div className="customizer-styles">{videoStyles.map(style=><button type="button" key={style.id} aria-pressed={p.settings.style===style.id} onClick={()=>patch({style:style.id})} disabled={p.busy}>
-          <div className={`customizer-style-sample sample-${style.id}`} style={{'--preview-accent':p.settings.primaryColor} as CSSProperties}>{chosen[0]&&<img src={chosen[0].preview} alt=""/>}<span>{style.id==='editorial'?'LYON':style.id==='minimal'?'Une nouvelle adresse':'La visite'}</span></div>
+          <div className={`customizer-style-sample sample-${style.id}`} style={{'--preview-accent':p.settings.primaryColor} as CSSProperties}>{chosen[0]&&<PhotoPreviewImage src={chosen[0].preview} alt=""/>}<span>{style.id==='editorial'?'LYON':style.id==='minimal'?'Une nouvelle adresse':'La visite'}</span></div>
           <strong>{style.name}<span>{p.settings.style===style.id?'✓':''}</span></strong><small>{style.description}</small></button>)}</div>
         <div className="customizer-colors">{([['primaryColor','Couleur principale'],['secondaryColor','Couleur secondaire']] as const).map(([key,label])=><label key={key}>{label}<span><input type="color" value={p.settings[key]} onChange={event=>patch({[key]:event.target.value})} disabled={p.busy}/>{p.settings[key].toUpperCase()}</span></label>)}</div><p className="customizer-hint">Ces couleurs s’appliquent à cette vidéo. Votre charte d’agence est conservée.</p>
         <div className="customizer-animation"><div className="customizer-section-title"><strong>Donnez vie aux photos</strong><p>Une visite plus immersive, avec des mouvements de caméra doux.</p></div>
@@ -97,7 +98,7 @@ export function VideoCustomizer(p:Props){
       {!p.ready&&<p className="customizer-incomplete">Votre annonce reste à compléter. <button type="button" onClick={p.onEdit}>Revenir aux informations du bien →</button></p>}
     </div><aside className={`customizer-preview${p.aspectRatio==='16:9'?' is-horizontal':''}`}><div className="customizer-preview-title"><strong>Aperçu de votre vidéo</strong><span>{p.aspectRatio??'9:16'}</span></div>
       <div ref={preview} className={`customizer-poster poster-${p.settings.style}${playing&&p.settings.photoMotion?' is-playing':''}${time>=duration*.8?' is-ending':''}`} style={{'--preview-accent':p.settings.primaryColor,'--preview-secondary':p.settings.secondaryColor,'--preview-ink':secondaryInk()} as CSSProperties}>
-        {photo?<img key={photo.id} src={photo.preview} alt="Aperçu de la photo sélectionnée"/>:<div className="customizer-preview-empty"><HomeIcon name="image" size={40}/></div>}
+        {photo?<PhotoPreviewImage key={photo.id} src={photo.preview} alt="Aperçu de la photo sélectionnée" fetchPriority="high"/>:<div className="customizer-preview-empty"><HomeIcon name="image" size={40}/></div>}
         <div className="customizer-poster-location">⌖ {p.fields.locality||'Votre localisation'}</div><button type="button" className="customizer-play" aria-label={playing?'Mettre l’aperçu en pause':'Lire l’aperçu visuel'} disabled={!chosen.length} onClick={()=>{if(time>=duration)setTime(0);setPlaying(!playing);}}>{playing?'Ⅱ':'▶'}</button>
         {p.subtitlesEnabled&&!p.sourceUrl&&<div className="customizer-preview-subtitle">{narration[line]}</div>}
         <div className="customizer-poster-copy"><h2>{p.settings.style==='cinematic'?p.fields.title||'Une nouvelle adresse':time>=duration*.8?p.agencyName||'Découvrez le bien':p.fields.title||'Une nouvelle adresse'}</h2><p>{[p.fields.area?`${p.fields.area} m²`:'',p.fields.rooms?`${p.fields.rooms} pièces`:''].filter(Boolean).join(' · ')}</p><strong>{price}</strong></div>

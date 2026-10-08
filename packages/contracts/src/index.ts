@@ -43,6 +43,8 @@ export function importFailureReason(value: unknown): ImportFailureReason | undef
   return importFailureReasons.find(reason => reason === value);
 }
 export class ImportFailure extends Error {
+  // Private transport diagnostic, never an instruction to retry a refusal.
+  browserUsed = false;
   constructor(public code: ImportErrorCode, message: string, public reason?: ImportFailureReason,
     public resource?: ImportResourceDiagnostic) {super(message);}
 }

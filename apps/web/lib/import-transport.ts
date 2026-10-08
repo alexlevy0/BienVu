@@ -18,18 +18,31 @@ export async function reserveCloudflareImport(env: HostedEnv, agencyId: string, 
   }
 }
 async function hostedCall(env: HostedEnv, agencyId: string, id: string, path: string, body: BodyInit, mime: string, signal: AbortSignal) {
-  const response = await env.IMPORT_SERVICE!.fetch(new Request(`https://import.internal${path}`, {method: 'POST', body,
+  const init:RequestInit={method:'POST',body,
     signal: AbortSignal.any([signal, AbortSignal.timeout(58_000)]), headers: {'Content-Type': mime,
-      Authorization: `Bearer ${env.IMPORT_TOKEN}`, 'X-Agency-ID': agencyId, 'X-Import-ID': id}}));
+      Authorization: `Bearer ${env.IMPORT_TOKEN}`, 'X-Agency-ID': agencyId, 'X-Import-ID': id}};
+  const response = await env.IMPORT_SERVICE!.fetch(new Request(`https://import.internal${path}`,init));
   if (!response.ok) {
     const code = response.headers.get('X-Import-Error'); await response.body?.cancel();
     if(code==='IMPORT_BUDGET_LIMIT'||code==='IMPORT_RESOURCE_LIMIT'||code==='PROJECT_RATE_LIMIT')throw new RequestFailure(code);
     if (response.status === 429) throw new RequestFailure('IMPORT_LIMIT');
-    throw new ImportFailure(code === 'UNSAFE_URL' || code === 'SOURCE_BLOCKED' || code === 'IMPORT_TIMEOUT'
+    const failure = new ImportFailure(code === 'UNSAFE_URL' || code === 'SOURCE_BLOCKED' || code === 'IMPORT_TIMEOUT'
       || code === 'INSUFFICIENT_PHOTOS' || code === 'NOT_A_LISTING' ? code : 'SOURCE_UNAVAILABLE', 'Import hébergé indisponible.', importFailureReason(response.headers.get('X-Import-Reason')),
       parseImportResourceHeader(response.headers.get('X-Import-Resource')));
+    failure.browserUsed = response.headers.get('X-Import-Browser') === '1'; throw failure;
   }
   return response;
+}
+export function photoPreviewer(request:Request,env:HostedEnv,agencyId:string,id:string){
+  const mode=assertImportMode(request,env);
+  return async(body:Uint8Array<ArrayBuffer>,signal:AbortSignal)=>{
+    if(mode==='cloudflare')return hostedCall(env,agencyId,id,'/photo-preview',body,'image/jpeg',signal);
+    const init:RequestInit={method:'POST',body,redirect:'manual',signal,
+      headers:{'Content-Type':'image/jpeg',Authorization:`Bearer ${localToken(request,env)}`}};
+    const response=await fetch('http://127.0.0.1:8791/photo-preview',init);
+    if(!response.ok){await response.body?.cancel();throw new RequestFailure('INVALID_PHOTO');}
+    return response;
+  };
 }
 export function importPorts(request: Request, env: HostedEnv, agencyId: string) {
   const mode = assertImportMode(request, env);
@@ -40,6 +53,7 @@ export function importPorts(request: Request, env: HostedEnv, agencyId: string) 
     return {url: response.headers.get('X-Source-Url') ?? url, mime: response.headers.get('Content-Type') ?? '',
       sourceBytes: Number(response.headers.get('X-Source-Bytes')), width: Number(response.headers.get('X-Image-Width')) || undefined,
       height: Number(response.headers.get('X-Image-Height')) || undefined,
+      browserUsed: response.headers.get('X-Import-Browser') === '1',
       bytes: await readLimited(response, kind === 'image' ? IMPORT_LIMITS.imageBytes : IMPORT_LIMITS.htmlBytes)};
   }};
   return {transport, mode, beforeStart: async (importId: string) => {id = importId; await reserveCloudflareImport(env, agencyId, id);},
@@ -73,13 +87,15 @@ export function localImportTransport(request: Request, env: ImportEnv): ImportTr
     } catch {throw new ImportFailure(signal.aborted ? 'IMPORT_TIMEOUT' : 'SOURCE_UNAVAILABLE', 'Transport local indisponible.');}
     if (!response.ok) {
       const code = response.headers.get('X-Import-Error'); await response.body?.cancel();
-      throw new ImportFailure(code === 'UNSAFE_URL' || code === 'SOURCE_BLOCKED' || code === 'IMPORT_TIMEOUT'
+      const failure = new ImportFailure(code === 'UNSAFE_URL' || code === 'SOURCE_BLOCKED' || code === 'IMPORT_TIMEOUT'
         || code === 'INSUFFICIENT_PHOTOS' || code === 'NOT_A_LISTING' ? code : 'SOURCE_UNAVAILABLE', 'Ressource non importable.', importFailureReason(response.headers.get('X-Import-Reason')),
         parseImportResourceHeader(response.headers.get('X-Import-Resource')));
+      failure.browserUsed = response.headers.get('X-Import-Browser') === '1'; throw failure;
     }
     return {url: response.headers.get('X-Source-Url') ?? url, mime: response.headers.get('Content-Type') ?? '',
       sourceBytes: Number(response.headers.get('X-Source-Bytes')), width: Number(response.headers.get('X-Image-Width')) || undefined,
       height: Number(response.headers.get('X-Image-Height')) || undefined,
+      browserUsed: response.headers.get('X-Import-Browser') === '1',
       bytes: await readLimited(response, kind === 'image' ? IMPORT_LIMITS.imageBytes : IMPORT_LIMITS.htmlBytes)};
   }};
 }

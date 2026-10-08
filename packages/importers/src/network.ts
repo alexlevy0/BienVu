@@ -35,7 +35,7 @@ export function publicAddresses(addresses: readonly {address: string; family: nu
 }
 
 export type Resource = {url: string; bytes: Uint8Array<ArrayBuffer>; mime: string; sourceBytes: number;
-  width?: number; height?: number};
+  width?: number; height?: number; browserUsed?: boolean};
 // Le transport garantit : IP épinglée, TLS, redirections contrôlées, flux bornés,
 // aucun cookie, puis décodage/réencodage raster pour les images. Pas de fetch implicite.
 export interface ImportTransport {

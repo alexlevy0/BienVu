@@ -54,6 +54,9 @@ test('l’essai accepte toutes les sources du registre connecté et conserve les
     'https://www.iadfrance.fr/annonce/appartement-vente-3-pieces-lyon-55m2/r2125326',
     'https://remax.fr/fr/mandats/vente-maison-ch3-charente-maritime---17-etaules/749351027-200',
     'https://www.safti.fr/annonces/achat/maison/villefranche-sur-saone-69400/1724083',
+    'https://nestenn.com/appartement-3-pieces-de-65m2-avec-balcon-place-de-stationnement-cave-ref-39584333',
+    'https://www.human-immobilier.fr/annonce-achat-appartement-tulle_259-4183',
+    'https://www.citya.com/annonces/vente/appartement/toulouse-31555/TAPP176-971928',
   ];
   assert.deepEqual(new Set(urls.map(url=>selectAdapter(url).id)),new Set(importSources.map(source=>source.id)));
   for(const url of [...urls,'https://agence.example/annonce/123']){const parsed=trialInput({url});assert.equal('url' in parsed&&parsed.url,url);}

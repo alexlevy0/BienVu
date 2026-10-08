@@ -15,13 +15,15 @@ export async function loadGenerationListing(env:GenerationImportEnv,row:Generati
           const response=await env.IMPORT_SERVICE.fetch(`https://import.internal${path}`,{method:'POST',body:JSON.stringify(body),
             signal,headers:{'Content-Type':'application/json',Authorization:`Bearer ${env.IMPORT_TOKEN}`,'X-Agency-ID':row.agencyId,'X-Import-ID':id!}});
           if(!response.ok){const code=errorCodes.find(c=>c===response.headers.get('X-Import-Error'))??'SOURCE_UNAVAILABLE';await response.body?.cancel();
-            throw new ImportFailure(code,'Import indisponible',importFailureReason(response.headers.get('X-Import-Reason')),parseImportResourceHeader(response.headers.get('X-Import-Resource')));}
+            const failure=new ImportFailure(code,'Import indisponible',importFailureReason(response.headers.get('X-Import-Reason')),parseImportResourceHeader(response.headers.get('X-Import-Resource')));
+            failure.browserUsed=response.headers.get('X-Import-Browser')==='1';throw failure;}
           return response;
         };
         const transport:ImportTransport={load:async(url,kind,_hosts,signal,maxBytes)=>{
           const response=await call('/resource',{url,kind,maxBytes},signal);
           return {url:response.headers.get('X-Source-Url')??url,mime:response.headers.get('Content-Type')??'',
             sourceBytes:Number(response.headers.get('X-Source-Bytes')),width:Number(response.headers.get('X-Image-Width'))||undefined,
+            browserUsed:response.headers.get('X-Import-Browser')==='1',
             height:Number(response.headers.get('X-Image-Height'))||undefined,bytes:await readLimited(response,kind==='image'?IMPORT_LIMITS.imageBytes:IMPORT_LIMITS.htmlBytes)};
         }};
         const {listing,diagnostics}=await importListing(input.url,{agencyId:row.agencyId,importId:id},{transport,

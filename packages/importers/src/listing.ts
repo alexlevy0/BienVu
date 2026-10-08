@@ -11,6 +11,9 @@ import {extractCesarBrutus} from './agencies/cesar-brutus';
 import {extractIad} from './agencies/iad';
 import {extractRemax} from './agencies/remax';
 import {extractSafti} from './agencies/safti';
+import {extractNestenn} from './agencies/nestenn';
+import {extractHuman} from './agencies/human';
+import {extractCitya} from './agencies/citya';
 export {verified, missing} from './facts';
 
 type Obj = Record<string, unknown>;
@@ -269,7 +272,10 @@ export function extractListingHtml(html: string, url: string, options: {allowPar
   const specific = adapter.id === 'cesar-brutus' ? extractCesarBrutus(nodes, documents, url, canonicalUrl, adapter.listingId!)
     : adapter.id === 'iad' ? extractIad(nodes, documents, url, canonicalUrl, adapter.listingId!)
     : adapter.id === 'remax' ? extractRemax(nodes, documents, url, canonicalUrl, adapter.listingId!)
-    : adapter.id === 'safti' ? extractSafti(nodes, documents, url, canonicalUrl, adapter.listingId!) : undefined;
+    : adapter.id === 'safti' ? extractSafti(nodes, documents, url, canonicalUrl, adapter.listingId!)
+    : adapter.id === 'nestenn' ? extractNestenn(nodes, url, canonicalUrl, adapter.listingId!)
+    : adapter.id === 'human' ? extractHuman(nodes, documents, url, canonicalUrl, adapter.listingId!)
+    : adapter.id === 'citya' ? extractCitya(nodes, documents, url, canonicalUrl, adapter.listingId!) : undefined;
   if (specific) return checkedGallery(specific, options.allowPartial);
   const figaro = adapter.id === 'figaro' ? extractFigaro(nodes, documents, url, canonicalUrl, adapter.listingId!) : undefined;
   const ladresse = adapter.id === 'ladresse' ? extractLadresse(nodes, url, canonicalUrl, adapter.listingId!) : undefined;

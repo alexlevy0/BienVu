@@ -1,8 +1,8 @@
 // Hôtes et routes explicites, partagés par le contrat, le registre et l'interface.
 // La présence dans ce catalogue n'est pas une promesse de compatibilité.
-export type SourceId = 'espaces-atypiques' | 'orpi' | 'century21' | 'figaro' | 'seloger' | 'leboncoin' | 'bienici' | 'ladresse' | 'cesar-brutus' | 'iad' | 'remax' | 'safti';
+export type SourceId = 'espaces-atypiques' | 'orpi' | 'century21' | 'figaro' | 'seloger' | 'leboncoin' | 'bienici' | 'ladresse' | 'cesar-brutus' | 'iad' | 'remax' | 'safti' | 'nestenn' | 'human' | 'citya';
 export type ImportSource = {id: SourceId; name: string; hosts: readonly string[]; paths: readonly RegExp[];
-  mediaHosts: readonly string[]};
+  mediaHosts: readonly string[]; documentTransport?: 'browser'};
 export const importSources: readonly ImportSource[] = [
   {id: 'espaces-atypiques', name: 'Espaces Atypiques', hosts: ['www.espaces-atypiques.com', 'espaces-atypiques.com'],
     paths: [/^\/(?:ventes|locations)\/[^/]+-([a-zA-Z0-9]+)\/$/], mediaHosts: ['www.espaces-atypiques.com']},
@@ -30,6 +30,12 @@ export const importSources: readonly ImportSource[] = [
     paths: [/^\/fr\/mandats\/vente-(?:maison|appartement)-[^/]+\/(\d+-\d+)\/?$/], mediaHosts: ['i.maxwork.fr']},
   {id: 'safti', name: 'SAFTI', hosts: ['www.safti.fr', 'safti.fr'],
     paths: [/^\/annonces\/achat\/(?:maison|appartement)\/[^/]+\/(\d+)\/?$/], mediaHosts: ['cdn.safti.fr']},
+  {id: 'nestenn', name: 'Nestenn', hosts: ['nestenn.com', 'www.nestenn.com', 'immobilier-lyon-8.nestenn.com'],
+    paths: [/^\/[^/]+-ref-(\d+)$/], mediaHosts: ['media-nestenn.immo-facile.com']},
+  {id: 'human', name: 'HUMAN Immobilier', hosts: ['www.human-immobilier.fr', 'human-immobilier.fr'],
+    paths: [/^\/annonce-achat-(?:appartement|maison)-[^/]+_(\d+-\d+)$/], mediaHosts: ['humanimmobilier-images.s3.fr-par.scw.cloud'], documentTransport: 'browser'},
+  {id: 'citya', name: 'Citya', hosts: ['www.citya.com', 'citya.com'],
+    paths: [/^\/annonces\/vente\/appartement\/[^/]+\/(TAPP\d+-\d+)$/], mediaHosts: []},
 ];
 export const sourceForHost = (host: string) => importSources.find(source => source.hosts.includes(host));
 export function sourceListingId(source: ImportSource, path: string): string | null {

@@ -31,7 +31,7 @@ async function inspectFile(path, scope) {
     if (name.startsWith('.') || name.startsWith('@/')) {
       const target = ts.resolveModuleName(name, path, options, ts.sys).resolvedModule?.resolvedFileName ?? resolve(dirname(path), name);
       if (/(?:apps\/(?:renderer|importer)|packages\/video)\//.test(relative(root, target))) failures.push(`${relative(root, path)} : traverse la frontière Node/Workers`);
-      if (/^scripts\/(?:import-transport|serve-imports|import-fixtures)\./.test(relative(root, target))) failures.push(`${relative(root, path)} : importe le transport Node local dans un Worker`);
+      if (/^scripts\/(?:import-transport|import-browser-transport|import-photo-preview|serve-imports|import-fixtures)\./.test(relative(root, target))) failures.push(`${relative(root, path)} : importe le transport Node local dans un Worker`);
     }
   }
 }

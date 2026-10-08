@@ -2,6 +2,7 @@
 // Research and methodology: docs/preuves/maintenance/SOURCES-05-10.md.
 // César & Brutus and new iad sample: docs/preuves/maintenance/SOURCES-06-10.md.
 // Adapted readers and successful retests: docs/preuves/maintenance/SOURCES-ADAPTATEURS-06-10.md.
+// New hosted retests: docs/preuves/maintenance/SOURCES-NAVIGATEUR-08-10.md.
 import type {CoverageSourceId, SourceCoverageEntry} from './source-coverage';
 
 export const sourceCoverageData = {
@@ -52,8 +53,18 @@ export const sourceCoverageData = {
     ]
   },
   "laforet": {
-    "summary": "Un lien de l’annonce ou de sa galerie n’est pas pris en charge par l’import. Vous pouvez renseigner le bien et ajouter vos photos manuellement.",
+    "summary": "La page est récupérée, mais sa lecture et ses ressources ne sont pas encore prises en charge par l’import. Vous pouvez renseigner le bien et ajouter vos photos manuellement.",
     "samples": [
+      {
+        "url": "https://www.laforet.com/agence-immobiliere/caluire/acheter/lyon-03/appartement-3-pieces-52297980",
+        "label": "Appartement · Lyon 3e",
+        "checkedAt": "2026-10-08",
+        "testedAt": "2026-10-08T17:20:51.338Z",
+        "environment": "cloudflare",
+        "outcome": "failed",
+        "photos": 0,
+        "note": "La page est récupérée, mais sa lecture et ses ressources ne sont pas encore prises en charge par l’import."
+      },
       {
         "url": "https://www.laforet.com/agence-immobiliere/caluire/acheter/lyon-03/appartement-3-pieces-52297980",
         "label": "Appartement · Lyon 3e",
@@ -66,8 +77,27 @@ export const sourceCoverageData = {
     ]
   },
   "human": {
-    "summary": "Le site a refusé l’accès à l’import lors de l’essai. Vous pouvez renseigner le bien et ajouter vos photos manuellement.",
+    "summary": "Import complet confirmé sur l’annonce de Tulle : informations du bien, description et 6 photos. Les autres formats du site restent à vérifier.",
     "samples": [
+      {
+        "url": "https://www.human-immobilier.fr/annonce-achat-appartement-tulle_259-4183",
+        "label": "Appartement · Tulle",
+        "checkedAt": "2026-10-08",
+        "testedAt": "2026-10-08T16:39:00.355Z",
+        "environment": "cloudflare",
+        "outcome": "complete",
+        "photos": 6,
+        "note": "Fiche importée automatiquement avec le prix, la surface, les pièces, la description et 6 photos."
+      },
+      {
+        "url": "https://www.human-immobilier.fr/annonce-achat-appartement-tulle_259-4183",
+        "label": "Appartement · Tulle",
+        "checkedAt": "2026-10-08",
+        "environment": "cloudflare",
+        "outcome": "failed",
+        "photos": 0,
+        "note": "Essai avant la correction du transport : accès à la fiche refusé, aucune photo importée."
+      },
       {
         "url": "https://www.human-immobilier.fr/annonce-achat-appartement-tulle_259-4183",
         "label": "Appartement · Tulle",
@@ -80,8 +110,18 @@ export const sourceCoverageData = {
     ]
   },
   "guy-hoquet": {
-    "summary": "Un lien de l’annonce ou de sa galerie n’est pas pris en charge par l’import. Vous pouvez renseigner le bien et ajouter vos photos manuellement.",
+    "summary": "La page est récupérée, mais sa lecture et ses ressources ne sont pas encore prises en charge par l’import. Vous pouvez renseigner le bien et ajouter vos photos manuellement.",
     "samples": [
+      {
+        "url": "https://courbevoie.guy-hoquet.com/achat-vente/appartement-3-pieces-courbevoie-92400-1894440",
+        "label": "Appartement · Courbevoie",
+        "checkedAt": "2026-10-08",
+        "testedAt": "2026-10-08T17:21:03.806Z",
+        "environment": "cloudflare",
+        "outcome": "failed",
+        "photos": 0,
+        "note": "La page est récupérée, mais sa lecture et ses ressources ne sont pas encore prises en charge par l’import."
+      },
       {
         "url": "https://courbevoie.guy-hoquet.com/achat-vente/appartement-3-pieces-courbevoie-92400-1894440",
         "label": "Appartement · Courbevoie",
@@ -94,8 +134,18 @@ export const sourceCoverageData = {
     ]
   },
   "nestenn": {
-    "summary": "Des informations contradictoires empêchent de valider l’annonce. Vous pouvez renseigner le bien et ajouter vos photos manuellement.",
+    "summary": "Le lien testé est importé avec ses informations et ses 7 photos. Le portail Nestenn et le sous-domaine de l’agence Lyon 8 sont pris en charge ; les autres formats et sous-domaines restent à vérifier.",
     "samples": [
+      {
+        "url": "https://nestenn.com/appartement-3-pieces-de-65m2-avec-balcon-place-de-stationnement-cave-ref-39584333",
+        "label": "Appartement · Lyon 8e",
+        "checkedAt": "2026-10-08",
+        "testedAt": "2026-10-08T13:34:23.063Z",
+        "environment": "cloudflare",
+        "outcome": "complete",
+        "photos": 7,
+        "note": "Après adaptation Nestenn : 199 000 €, 65 m², 3 pièces, description et 7 photos enregistrées et vérifiées."
+      },
       {
         "url": "https://nestenn.com/appartement-3-pieces-de-65m2-avec-balcon-place-de-stationnement-cave-ref-39584333",
         "label": "Appartement · Lyon 8e",
@@ -108,8 +158,18 @@ export const sourceCoverageData = {
     ]
   },
   "era": {
-    "summary": "Un lien de l’annonce ou de sa galerie n’est pas pris en charge par l’import. Vous pouvez renseigner le bien et ajouter vos photos manuellement.",
+    "summary": "La fiche et les ressources de sa galerie ne sont pas encore prises en charge automatiquement. Vous pouvez renseigner le bien et ajouter vos photos manuellement.",
     "samples": [
+      {
+        "url": "https://www.eraimmobilier.com/agence-immobiliere-saint-nazaire-133/annonces/576636",
+        "label": "Appartement · Saint-Nazaire",
+        "checkedAt": "2026-10-08",
+        "testedAt": "2026-10-08T17:21:12.071Z",
+        "environment": "cloudflare",
+        "outcome": "failed",
+        "photos": 0,
+        "note": "La fiche et les ressources de sa galerie ne sont pas encore prises en charge automatiquement."
+      },
       {
         "url": "https://www.eraimmobilier.com/agence-immobiliere-saint-nazaire-133/annonces/576636",
         "label": "Appartement · Saint-Nazaire",
@@ -136,8 +196,18 @@ export const sourceCoverageData = {
     ]
   },
   "foncia": {
-    "summary": "Le lien testé n’était pas accessible lors de l’essai. Vous pouvez renseigner le bien et ajouter vos photos manuellement.",
+    "summary": "Le lien testé renvoie une annonce introuvable. Essayez le lien direct d’un bien encore en ligne. Vous pouvez renseigner le bien et ajouter vos photos manuellement.",
     "samples": [
+      {
+        "url": "https://fr.foncia.com/achat/toulouse-31300/appartement/00669388.htm",
+        "label": "Appartement · Toulouse",
+        "checkedAt": "2026-10-08",
+        "testedAt": "2026-10-08T17:21:18.353Z",
+        "environment": "cloudflare",
+        "outcome": "failed",
+        "photos": 0,
+        "note": "Le lien testé renvoie une annonce introuvable. Essayez le lien direct d’un bien encore en ligne."
+      },
       {
         "url": "https://fr.foncia.com/achat/toulouse-31300/appartement/00669388.htm",
         "label": "Appartement · Toulouse",
@@ -150,8 +220,18 @@ export const sourceCoverageData = {
     ]
   },
   "citya": {
-    "summary": "Les informations nécessaires n’ont pas toutes pu être vérifiées. Vous pouvez renseigner le bien et ajouter vos photos manuellement.",
+    "summary": "Import complet confirmé sur l’annonce de Toulouse : prix, surface, pièces, description et 11 photos. Les fiches d’appartements à vendre de ce format sont prises en charge ; les autres formats restent à vérifier.",
     "samples": [
+      {
+        "url": "https://www.citya.com/annonces/vente/appartement/toulouse-31555/TAPP176-971928",
+        "label": "Appartement · Toulouse",
+        "checkedAt": "2026-10-08",
+        "testedAt": "2026-10-08T17:21:22.009Z",
+        "environment": "cloudflare",
+        "outcome": "complete",
+        "photos": 11,
+        "note": "Après adaptation Citya : 240 000 €, 45 m², 2 pièces, description et 11 photos récupérées et vérifiées."
+      },
       {
         "url": "https://www.citya.com/annonces/vente/appartement/toulouse-31555/TAPP176-971928",
         "label": "Appartement · Toulouse",
@@ -164,8 +244,18 @@ export const sourceCoverageData = {
     ]
   },
   "square-habitat": {
-    "summary": "Des informations contradictoires empêchent de valider l’annonce. Vous pouvez renseigner le bien et ajouter vos photos manuellement.",
+    "summary": "Des informations contradictoires empêchent de valider cette annonce lors du nouvel essai. Vous pouvez renseigner le bien et ajouter vos photos manuellement.",
     "samples": [
+      {
+        "url": "https://www.squarehabitat.fr/square-habitat-anjou-maine/annonces/biens/achat-ancien/appartement/angers/bbebaa4f-9a09-41ce-b887-9ab93ed28a73",
+        "label": "Appartement · Angers",
+        "checkedAt": "2026-10-08",
+        "testedAt": "2026-10-08T17:21:41.970Z",
+        "environment": "cloudflare",
+        "outcome": "failed",
+        "photos": 0,
+        "note": "Des informations contradictoires empêchent de valider cette annonce lors du nouvel essai."
+      },
       {
         "url": "https://www.squarehabitat.fr/square-habitat-anjou-maine/annonces/biens/achat-ancien/appartement/angers/bbebaa4f-9a09-41ce-b887-9ab93ed28a73",
         "label": "Appartement · Angers",
@@ -178,8 +268,18 @@ export const sourceCoverageData = {
     ]
   },
   "arthurimmo": {
-    "summary": "BienVu n’a pas pu récupérer cette annonce lors de l’essai. Vous pouvez renseigner le bien et ajouter vos photos manuellement.",
+    "summary": "Le nouvel essai ne permet toujours pas de récupérer une fiche exploitable. Vous pouvez renseigner le bien et ajouter vos photos manuellement.",
     "samples": [
+      {
+        "url": "https://www.arthurimmo.com/annonces/achat/appartement/nantes-44000/33839703.htm",
+        "label": "Appartement · Nantes",
+        "checkedAt": "2026-10-08",
+        "testedAt": "2026-10-08T17:21:45.243Z",
+        "environment": "cloudflare",
+        "outcome": "failed",
+        "photos": 0,
+        "note": "Le nouvel essai ne permet toujours pas de récupérer une fiche exploitable."
+      },
       {
         "url": "https://www.arthurimmo.com/annonces/achat/appartement/nantes-44000/33839703.htm",
         "label": "Appartement · Nantes",
@@ -314,8 +414,18 @@ export const sourceCoverageData = {
     ]
   },
   "figaro": {
-    "summary": "Le site a refusé l’accès à l’import lors de l’essai. Privilégiez le lien du même bien sur le site de son agence ou la saisie manuelle.",
+    "summary": "Le serveur du site a refusé l’accès à l’import, y compris avec la nouvelle lecture par navigateur. Privilégiez le lien du même bien sur le site de son agence ou la saisie manuelle.",
     "samples": [
+      {
+        "url": "https://immobilier.lefigaro.fr/annonces/annonce-109267703.html",
+        "label": "Annonce n° 109267703",
+        "checkedAt": "2026-10-08",
+        "testedAt": "2026-10-08T17:21:50.073Z",
+        "environment": "cloudflare",
+        "outcome": "failed",
+        "photos": 0,
+        "note": "Le serveur du site a refusé l’accès à l’import, y compris avec la nouvelle lecture par navigateur."
+      },
       {
         "url": "https://immobilier.lefigaro.fr/annonces/annonce-109267703.html",
         "label": "Annonce n° 109267703",
@@ -328,8 +438,18 @@ export const sourceCoverageData = {
     ]
   },
   "seloger": {
-    "summary": "Le site a refusé l’accès à l’import lors de l’essai. Privilégiez le lien du même bien sur le site de son agence ou la saisie manuelle.",
+    "summary": "Le site a de nouveau refusé l’accès à l’import lors de cet essai. Privilégiez le lien du même bien sur le site de son agence ou la saisie manuelle.",
     "samples": [
+      {
+        "url": "https://www.seloger.com/annonce/achat/auvergne-rhone-alpes/rhone-69/lyon-69000/26M7SYHC5MVH",
+        "label": "Appartement · Lyon",
+        "checkedAt": "2026-10-08",
+        "testedAt": "2026-10-08T17:22:03.191Z",
+        "environment": "cloudflare",
+        "outcome": "failed",
+        "photos": 0,
+        "note": "Le site a de nouveau refusé l’accès à l’import lors de cet essai."
+      },
       {
         "url": "https://www.seloger.com/annonce/achat/auvergne-rhone-alpes/rhone-69/lyon-69000/26M7SYHC5MVH",
         "label": "Appartement · Lyon",
@@ -342,8 +462,18 @@ export const sourceCoverageData = {
     ]
   },
   "leboncoin": {
-    "summary": "Le site a refusé l’accès à l’import lors de l’essai. Privilégiez le lien du même bien sur le site de son agence ou la saisie manuelle.",
+    "summary": "Le site a de nouveau refusé l’accès à l’import lors de cet essai. Privilégiez le lien du même bien sur le site de son agence ou la saisie manuelle.",
     "samples": [
+      {
+        "url": "https://www.leboncoin.fr/ad/ventes_immobilieres/3222183771",
+        "label": "Annonce n° 3222183771",
+        "checkedAt": "2026-10-08",
+        "testedAt": "2026-10-08T17:22:06.100Z",
+        "environment": "cloudflare",
+        "outcome": "failed",
+        "photos": 0,
+        "note": "Le site a de nouveau refusé l’accès à l’import lors de cet essai."
+      },
       {
         "url": "https://www.leboncoin.fr/ad/ventes_immobilieres/3222183771",
         "label": "Annonce n° 3222183771",
@@ -356,8 +486,18 @@ export const sourceCoverageData = {
     ]
   },
   "bienici": {
-    "summary": "BienVu n’a pas pu récupérer les informations et les photos de cette annonce. Privilégiez le lien du même bien sur le site de son agence ou la saisie manuelle.",
+    "summary": "Les informations de l’annonce et les ressources nécessaires à sa lecture ne sont pas encore prises en charge automatiquement. Privilégiez le lien du même bien sur le site de son agence ou la saisie manuelle.",
     "samples": [
+      {
+        "url": "https://www.bienici.com/annonce/vente/nice/appartement/2pieces/apimo-86775374",
+        "label": "Appartement · Nice",
+        "checkedAt": "2026-10-08",
+        "testedAt": "2026-10-08T17:22:09.188Z",
+        "environment": "cloudflare",
+        "outcome": "failed",
+        "photos": 0,
+        "note": "Les informations de l’annonce et les ressources nécessaires à sa lecture ne sont pas encore prises en charge automatiquement."
+      },
       {
         "url": "https://www.bienici.com/annonce/vente/nice/appartement/2pieces/apimo-86775374",
         "label": "Appartement · Nice",
