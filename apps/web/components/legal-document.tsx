@@ -4,9 +4,10 @@ import {HomeIcon, HomeWordmark} from './home-icons';
 
 export type LegalContents = readonly {id: string; title: string}[];
 
-export function LegalDocument({kind, title, introduction, contents, children}: {
+export function LegalDocument({kind, title, introduction, contents, children,updatedAt='2026-10-03'}: {
   kind: 'conditions' | 'confidentialite'; title: string; introduction: string;
   contents: LegalContents; children: ReactNode;
+  updatedAt?:string;
 }) {
   return <div className="legal-page">
     <a className="legal-skip" href="#legal-content">Aller au contenu</a>
@@ -19,7 +20,7 @@ export function LegalDocument({kind, title, introduction, contents, children}: {
         <p className="legal-kicker">BIENVU · INFORMATIONS</p>
         <h1>{title}</h1>
         <p className="legal-introduction">{introduction}</p>
-        <p className="legal-updated">Dernière mise à jour : <time dateTime="2026-10-03">3 octobre 2026</time></p>
+        <p className="legal-updated">Dernière mise à jour : <time dateTime={updatedAt}>{new Intl.DateTimeFormat('fr-FR',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(updatedAt))}</time></p>
         <nav className="legal-tabs" aria-label="Documents BienVu">
           <Link href="/conditions" aria-current={kind === 'conditions' ? 'page' : undefined}>Conditions d’utilisation</Link>
           <Link href="/confidentialite" aria-current={kind === 'confidentialite' ? 'page' : undefined}>Politique de confidentialité</Link>

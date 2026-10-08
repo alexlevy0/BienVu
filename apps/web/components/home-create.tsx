@@ -1,4 +1,5 @@
 'use client';
+import {analyticsFetch as fetch,trackProductEvent} from '../lib/product-analytics';
 
 import Link from 'next/link';
 import {useEffect, useLayoutEffect, useRef, useState, type DragEvent, type FormEvent} from 'react';
@@ -256,6 +257,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   }
   function openManual(fromText = '',initialData:CreationDraftData|null=null) {
     if (manualBusy||guestManualBusy||screen.kind==='sending'||(screen.kind === 'job' && generationActive(selectedJob))) return;
+    trackProductEvent('manual_form_opened',{source_kind:fromText?'description':'manual'});
     previousComposer.current=composerDock.current?.getBoundingClientRect()??null;
     interactionVersion.current++;lock.current=false;startFresh.current = true;forget();
     if (fromText) setDescription(fromText);

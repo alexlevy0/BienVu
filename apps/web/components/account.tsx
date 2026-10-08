@@ -3,6 +3,7 @@ import {createContext, useCallback, useContext, useEffect, useState} from 'react
 import {Me,VoiceCatalog,DEFAULT_VIDEO_VOICE,type VideoCustomization, type AgencyProfile} from '@bienvu/contracts';
 import {clearListingDraft} from '../lib/listing-draft';
 import {clearAgencyDraft} from '../lib/agency-draft';
+import {trackProductEvent,suspendProductAnalytics} from '../lib/product-analytics';
 
 type AccountState = {me: Me | null; loading: boolean; error: string; refresh: () => Promise<void>; refreshRights: () => Promise<void>; setAgency: (agency: AgencyProfile) => void;
   defaultVoice:VideoCustomization['voice'];voiceLoading:boolean;voiceCatalog:VoiceCatalog|null;refreshVoices:()=>Promise<void>};
@@ -50,6 +51,7 @@ export function SignOut() {
     try {
       const response = await fetch('/api/auth/sign-out', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'});
       if (!response.ok) throw new Error();
+      trackProductEvent('logout_completed');suspendProductAnalytics();
       clearListingDraft();await clearAgencyDraft();await refresh(); window.location.assign('/connexion');
     } catch {setError('La déconnexion a échoué. Réessayez.'); setBusy(false);}
   }

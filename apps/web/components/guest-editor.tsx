@@ -1,4 +1,5 @@
 'use client';
+import {trackProductEvent} from '../lib/product-analytics';
 import {useEffect,useRef,useState,type ReactNode} from 'react';
 import {type CreationDraftView} from '@bienvu/contracts';
 import {editorDemo,demoAssetUrl} from '../lib/editor-demo';
@@ -35,6 +36,7 @@ export function GuestEditor({render}:{render(draft:CreationDraftView,guest:Guest
   useEffect(()=>{const retained=new Set(record?.files.map(f=>f.id));for(const [id,value] of urls.current)if(!retained.has(id)){URL.revokeObjectURL(value.url);urls.current.delete(id);}},[record?.files]);
   useEffect(()=>()=>{for(const value of urls.current.values())URL.revokeObjectURL(value.url);urls.current.clear();},[]);
   async function choose(kind:'demo'|'empty'){
+    trackProductEvent('editor_project_selected',{source_kind:kind});
     const next=newGuestRecord(kind,undefined,defaultVoice);try{await update(()=>next);setError('');}catch{recordRef.current=next;setRecord(next);setError('Le stockage local est indisponible. Vos retouches restent ouvertes dans cet onglet.');}
     setChoosing(false);
   }

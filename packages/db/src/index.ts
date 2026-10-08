@@ -10,6 +10,7 @@ export * from './animation-library';
 export * from './retention';
 export * from './homepage';
 export * from './mailbox';
+export * from './partners';
 export * from './voices';
 
 // Port structurel minimal compatible D1 ; pas de transaction interactive.

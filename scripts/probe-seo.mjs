@@ -10,7 +10,7 @@ const guides=['creer-reel-immobilier-instagram','choisir-photos-video-immobilier
 const indexResponse=await fetch(base+'/blog',{headers});assert.equal(indexResponse.status,200,'Blog index');
 const indexHtml=await indexResponse.text(),articles=[...new Set([...indexHtml.matchAll(/href="(\/blog\/[a-z0-9-]+)"/g)].map(match=>match[1]))];
 assert.equal(articles.length,20,'Les vingt articles sont accessibles dans le HTML sans JavaScript');
-const paths=['/','/explorer','/abonnement','/sources','/guides','/blog',...articles,...features.map(slug=>`/${slug}`),...guides.map(slug=>`/guides/${slug}`),...['paris','sud','lyon','bordeaux'].map(id=>`/exemples/${id}`)];
+const paths=['/','/explorer','/abonnement','/sources','/guides','/blog','/partenaires',...articles,...features.map(slug=>`/${slug}`),...guides.map(slug=>`/guides/${slug}`),...['paris','sud','lyon','bordeaux'].map(id=>`/exemples/${id}`)];
 const titles=new Set();
 for(const path of paths){const response=await fetch(base+path,{headers}),html=await response.text();assert.equal(response.status,200,path);
  const title=html.match(/<title>([^<]+)<\/title>/)?.[1];assert.ok(title,path+' title');assert.ok(!titles.has(title),path+' duplicate title');titles.add(title);
@@ -22,6 +22,7 @@ for(const path of paths){const response=await fetch(base+path,{headers}),html=aw
  if(path==='/'){
   const footer=html.match(/<footer class="home-premium-footer"[\s\S]*?<\/footer>/)?.[0];
   assert.ok(footer,'Pied de page de la home');assert.match(footer,/href="\/blog"/,'Lien Blog dans le footer');
+  assert.match(footer,/href="\/partenaires"/,'Lien Partenaires dans le footer');
  }
  if(path==='/explorer'){assert.match(html,/href="\/exemples\/paris"/);assert.doesNotMatch(html,/>Chargement des vidéos…</);}
  if(path.startsWith('/exemples/')){assert.match(html,/"@type":"VideoObject"/);assert.match(html,/<video/);}

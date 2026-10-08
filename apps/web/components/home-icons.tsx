@@ -38,6 +38,7 @@ const shapes = {
   folder: <path d="M20 20H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4l2 3h10a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2Z"/>,
   pencil: <><path d="m3 21 4.5-1 12-12a2.5 2.5 0 0 0-3.5-3.5l-12 12L3 21Zm11-15 4 4"/></>,
   document: <><path d="M13 2H5a1 1 0 0 0-1 1v18a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9l-7-7Z"/><path d="M13 2v7h7"/></>,
+  coins: <><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v7c0 4 16 4 16 0V5M4 12v7c0 4 16 4 16 0v-7"/></>,
   microphone: <><rect x="9" y="2" width="6" height="13" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2m-7 9v3m-4 0h8"/></>,
   subtitles: <><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 11h4m4 0h4M6 15h7m3 0h2"/></>,
   phone: <><rect x="6" y="1.5" width="12" height="21" rx="2"/><path d="M10 4h4m-3 16h2"/></>,

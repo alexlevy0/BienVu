@@ -1,0 +1,6 @@
+export const partnerFaq = [
+  {question:'Faut-il être client de BienVu ?',answer:'Non. Le programme s’adresse aux photographes, formateurs, consultants et professionnels de l’immobilier qui souhaitent recommander BienVu à leur réseau. Vous pouvez candidater sans compte BienVu. Notre équipe étudie chaque candidature et vous accompagne pour démarrer.'},
+  {question:'Comment un client m’est-il attribué ?',answer:'Vous présentez vos recommandations à notre équipe. Nous vérifions et validons manuellement l’attribution du client avant de confirmer votre commission. Il n’y a pas d’attribution automatique par un lien de parrainage : notre équipe vous précise la marche à suivre après validation de votre candidature.'},
+  {question:'Quand suis-je rémunéré ?',answer:'Vous recevez 15 % des paiements hors taxes effectivement encaissés pour les clients dont la recommandation a été validée, pendant 12 mois à partir de leur premier paiement. Les versements sont mensuels. Un compte gratuit ou un paiement non encaissé ne génère pas de commission.'},
+  {question:'Que se passe-t-il si le client résilie ?',answer:'La commission dépend des paiements effectivement encaissés. Si le client ne paie plus, il n’y a plus de nouvelle commission liée à ce client. La période de commission reste limitée aux 12 mois suivant son premier paiement.'},
+] as const;

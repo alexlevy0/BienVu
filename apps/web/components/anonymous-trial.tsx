@@ -1,4 +1,5 @@
 'use client';
+import {analyticsFetch as fetch} from '../lib/product-analytics';
 import type {VideoCustomization,VideoDuration,VideoAspectRatio} from '@bienvu/contracts';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import Link from 'next/link';
@@ -6,15 +7,8 @@ import {GenerationView,publicErrors,requestedAnimations,type PublicErrorCode} fr
 import {generationActive} from './generation-progress';
 import {anonymousGenerationScope,useGenerationStore} from './generation-store';
 import {submitTrialManual,TrialManualFailure,type TrialManualSettings,type TrialManualInput,type TrialManualIntent} from '../lib/anonymous-manual-client';
+import {TurnstileCheck} from './turnstile-check';
 // The token lives only in memory. The HttpOnly session is the ownership proof.
-type Turnstile={render:(container:HTMLElement,options:Record<string,unknown>)=>string;remove:(id:string)=>void;reset:(id:string)=>void};
-declare global {interface Window {turnstile?:Turnstile}}
-let scriptLoading:Promise<void>|undefined;
-function loadTurnstile(){return scriptLoading??=(new Promise<void>((resolve,reject)=>{
-  if(window.turnstile){resolve();return;}
-  const script=document.createElement('script');script.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';script.async=true;
-  script.onload=()=>resolve();script.onerror=()=>{scriptLoading=undefined;reject(new Error('Vérification indisponible. Réessayez.'));};document.head.appendChild(script);
-}));}
 type TrialReply={error?:{message?:string};enabled:boolean;siteKey:string|null;used:boolean;job:unknown};
 async function value(response:Response){const body=await response.json() as TrialReply;if(!response.ok)throw new Error(body.error?.message??'La demande a été interrompue. Réessayez.');return body;}
 export function useAnonymousTrial(enabled:boolean) {
@@ -82,18 +76,8 @@ export function useAnonymousTrial(enabled:boolean) {
 }
 export function TrialChallenge({siteKey,version,onToken,onError,purpose='trial'}:{siteKey:string;version:number;onToken:(token:string)=>void;
   onError:(text:string)=>void;purpose?:'trial'|'description'}) {
-  const container=useRef<HTMLDivElement>(null);
-  const callbacks=useRef({onToken,onError});
-  useEffect(()=>{callbacks.current={onToken,onError};},[onToken,onError]);
-  useEffect(()=>{let disposed=false,id:string|undefined;void loadTurnstile().then(()=>{
-    if(disposed||!container.current||!window.turnstile)return;
-    id=window.turnstile.render(container.current,{sitekey:siteKey,action:'anonymous_trial',theme:'light',size:'flexible',
-      callback:(token:string)=>callbacks.current.onToken(token),
-      'expired-callback':()=>callbacks.current.onToken(''),
-      'error-callback':()=>{callbacks.current.onToken('');callbacks.current.onError('La vérification a échoué. Rechargez-la et réessayez.');}});
-  }).catch(e=>{if(!disposed)callbacks.current.onError(e.message);});
-  return()=>{disposed=true;if(id)window.turnstile?.remove(id);};},[siteKey,version]);
-  return <div className="trial-challenge"><p>{purpose==='description'?'Vérifiez que vous êtes humain pour préparer votre annonce.':'Vérifiez que vous êtes humain pour lancer la création.'}</p><div ref={container}/></div>;
+  return <div className="trial-challenge"><p>{purpose==='description'?'Vérifiez que vous êtes humain pour préparer votre annonce.':'Vérifiez que vous êtes humain pour lancer la création.'}</p>
+    <TurnstileCheck siteKey={siteKey} action="anonymous_trial" version={version} onToken={onToken} onError={onError}/></div>;
 }
 const steps:Record<GenerationView['status'],string>={queued:'Votre vidéo attend son démarrage',importing:'Lecture de l’annonce',scripting:'Rédaction de la narration',voicing:'Création de la voix off',rendering:'Préparation de la vidéo',retry_wait:'Reprise en attente',ready:'Votre vidéo est prête',failed:'La création n’a pas abouti'};
 export function AnonymousTrialResult({job}:{job:GenerationView}) {

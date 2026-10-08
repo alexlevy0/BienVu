@@ -1,4 +1,5 @@
 'use client';
+import {trackProductEvent} from '../lib/product-analytics';
 import Link from 'next/link';
 import {useEffect,useRef,useState} from 'react';
 import {SocialPublication,socialStatusLabels,socialErrorMessages,type SocialPublication as Publication,type SocialTarget} from '@bienvu/contracts';
@@ -19,6 +20,7 @@ export function SocialCalendar(){const {me,loading,error,refresh}=useAccount();
 function CalendarPanel({editable,demo=false}:{editable:boolean;demo?:boolean}){
   const [month,setMonth]=useState(()=>new Date(new Date().getFullYear(),new Date().getMonth(),1)),[posts,setPosts]=useState<CalendarPublication[]>([]),[selectedDay,setSelectedDay]=useState<string|null>(null);
   const [filter,setFilter]=useState<Filter>('all'),[feedback,setFeedback]=useState(''),[loaded,setLoaded]=useState(false),[busy,setBusy]=useState(false),[revision,setRevision]=useState(0);
+  const previousTargets=useRef(new Map<string,string>());
   const [alerts,setAlerts]=useState(0),[configured,setConfigured]=useState(false);
   const [preview,setPreview]=useState<Publication|null>(null),[edit,setEdit]=useState<Publication|null>(null),[confirm,setConfirm]=useState<{post:Publication;target?:SocialTarget;action:'cancel'|'retry'|'confirm-published'}|null>(null);
   const [caption,setCaption]=useState(''),[when,setWhen]=useState(''),[permalink,setPermalink]=useState('');
@@ -33,6 +35,11 @@ function CalendarPanel({editable,demo=false}:{editable:boolean;demo?:boolean}){
         if(!active)return;collected.push(...socialPublicationsData(value));cursor=typeof value.nextCursor==='string'?value.nextCursor:null;
         if(cursor){if(seen.has(cursor))throw new Error('Le calendrier a changé. Actualisez-le.');seen.add(cursor);}
       }while(cursor);
+      for(const post of collected)for(const target of post.targets){
+        const before=previousTargets.current.get(target.id);
+        if(before&&before!=='published'&&target.status==='published')trackProductEvent('publication_completed',{platform:target.platform},target.id);
+        previousTargets.current.set(target.id,target.status);
+      }
       setPosts([...new Map(collected.map(post=>[post.id,post])).values()]);setAlerts(Number(value.alerts??0));setConfigured(value.configured===true);setLoaded(true);
     }catch(error){if(active){setFeedback(error instanceof Error?error.message:'Chargement interrompu.');setLoaded(true);}}finally{refreshing=false;}}
     void refresh();const timer=setInterval(()=>void refresh(),20000);return()=>{active=false;controller.abort();clearInterval(timer);};

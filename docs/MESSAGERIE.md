@@ -31,3 +31,18 @@ pnpm --filter @bienvu/mail exec wrangler deploy --dry-run
 Avec `wrangler dev`, une réception simulée utilise `POST /cdn-cgi/local/email?from=client%40example.com&to=contact%40bienvu.online` et un corps RFC 5322 incluant `Message-ID`. Aucun email n’est envoyé à un destinataire réel par ces tests.
 
 Appliquer `0045_mailbox.sql` à la base partagée avant d’activer la réception ou le site. Les configurations de production restent dans les fichiers `wrangler.staging*.jsonc` ignorés par Git ; les configurations suivies utilisent uniquement des ressources locales et un envoi simulé.
+
+## Candidatures au programme partenaires
+
+La page publique `/partenaires` propose un formulaire sans compte : nom, e-mail professionnel et activité. La candidature crée une conversation non lue avec l’objet « Candidature partenaire — Nom ». Son texte indique sa provenance et précise que l’adresse déclarée n’est pas vérifiée. Aucun e-mail n’est envoyé automatiquement : une réponse depuis la Messagerie utilise le parcours d’envoi existant. L’acceptation du partenaire et l’attribution des clients restent manuelles ; cette première version ne calcule pas les commissions réelles et ne déclenche pas de versements.
+
+`GET /api/partners/applications` expose uniquement la disponibilité du formulaire et la clé publique Turnstile. Le POST contrôle l’origine, un corps JSON borné, les champs autorisés, une clé d’idempotence et une preuve Turnstile liée à l’action `partner_application` et au domaine BienVu. Les clés et bindings Turnstile de l’essai existant sont réutilisés, sans dépendre de l’activation des générations anonymes.
+
+Appliquer `0054_partner_applications.sql` avant de déployer ce formulaire. Le fil, le message, son événement et le reçu d’idempotence sont enregistrés dans un même batch D1. Un rejet annule l’ensemble ; la répétition d’une intention acceptée retrouve sa confirmation sans créer de doublon. Les limites sont de 3 candidatures par IP par heure, 3 par e-mail par jour et 100 au total par jour ; 30 tentatives par IP par heure peuvent atteindre Siteverify. Seules des empreintes HMAC sont conservées pour ces contrôles. Le nettoyage quotidien efface les empreintes anti-abus après 48 heures et conserve les échanges et la déduplication, jusqu’à une demande de suppression.
+
+```sh
+pnpm exec tsx --test tests/partners.test.ts tests/trial-api.test.ts tests/mailbox.test.ts
+pnpm probe:partners:ui
+```
+
+La recette UI charge les composants réels avec des réponses HTTP et un contrôle anti-robot simulés exclusivement en local. Le dernier essai de réception sur le site public doit utiliser une vérification Turnstile réelle ; aucun contournement ni clé de test en production n’est prévu.

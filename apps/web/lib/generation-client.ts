@@ -1,3 +1,4 @@
+import {analyticsFetch as fetch} from './product-analytics';
 import {GenerationView, publicErrors, type GenerationRequest, type PublicErrorCode} from '@bienvu/contracts';
 import {clearListingDraft} from './listing-draft';
 

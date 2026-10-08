@@ -1,4 +1,5 @@
 'use client';
+import {trackProductEvent} from '../lib/product-analytics';
 import {useEffect,useRef,useState,type CSSProperties} from 'react';
 import {CustomNarration,videoStyles,frenchVoices,requestedAnimations,generationCreditCost,selectedAnimationIndices,mapFrame,mapInterval,mapInk,type VideoCustomization,type VideoDuration,type VideoAspectRatio} from '@bienvu/contracts';
 import {suggestedNarration,narrationWordLimit,wordCount} from '@bienvu/narration/suggestion';
@@ -29,8 +30,8 @@ export function VideoCustomizer(p:Props){
   const narration=p.settings.narration??(p.sourceUrl?['','','','']:suggestedNarration(p.fields,p.agencyName,duration)),validNarration=CustomNarration.safeParse(narration);
   const patch=(next:Partial<VideoCustomization>)=>p.onChange({...p.settings,...next});
   function toggle(slot:number){patch({photoOrder:order.includes(slot)?order.filter(s=>s!==slot):[...order,slot],runwayClips:undefined,runwayPhotos:animated.filter(s=>s!==slot)});}
-  function animate(slot:number){patch({runwayClips:undefined,runwayPhotos:animated.includes(slot)?animated.filter(s=>s!==slot):[...animated,slot]});}
-  function move(slot:number,target:number){const next=order.filter(s=>s!==slot);next.splice(Math.max(0,Math.min(next.length,target)),0,slot);patch({photoOrder:next});}
+  function animate(slot:number){trackProductEvent('editor_action',{action:'animation_toggled'});patch({runwayClips:undefined,runwayPhotos:animated.includes(slot)?animated.filter(s=>s!==slot):[...animated,slot]});}
+  function move(slot:number,target:number){trackProductEvent('editor_action',{action:'photo_reordered'});const next=order.filter(s=>s!==slot);next.splice(Math.max(0,Math.min(next.length,target)),0,slot);patch({photoOrder:next});}
   useEffect(()=>{setPlaying(false);setTime(0);},[duration]);
   useEffect(()=>{if(!playing)return;const timer=setInterval(()=>setTime(t=>{if(t>=duration-.2){setPlaying(false);return duration;}return t+.1;}),100);return()=>clearInterval(timer);},[playing,duration]);
   const interval=mapInterval(p.settings.map,duration*30),mapAt=mapFrame(p.settings.map,duration*30,Math.min(duration*30-1,Math.round(time*30))),

@@ -15,6 +15,7 @@ out/
 !.env.cartesia.example
 !.env.billing.example
 !.env.social.example
+!.env.posthog.example
 .dev.vars
 .dev.vars.*
 !.dev.vars.example

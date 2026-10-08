@@ -1,3 +1,4 @@
+import {analyticsFetch as fetch} from './product-analytics';
 import {GenerationView,publicErrors,type PublicErrorCode,type VideoCustomization,type VideoDuration,type VideoAspectRatio,type ManualListingInput} from '@bienvu/contracts';
 
 export type TrialManualSettings={subtitlesEnabled:boolean;voiceEnabled:boolean;durationSeconds:VideoDuration;aspectRatio:VideoAspectRatio;customization?:VideoCustomization};

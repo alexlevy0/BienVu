@@ -1,4 +1,5 @@
 'use client';
+import {analyticsFetch as fetch} from '../lib/product-analytics';
 import Link from 'next/link';
 import {useEffect,useRef,useState} from 'react';
 import {creditPacks,type CreditPackCode} from '@bienvu/contracts';

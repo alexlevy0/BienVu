@@ -1,4 +1,5 @@
 'use client';
+import {trackProductEvent} from '../lib/product-analytics';
 import Link from 'next/link';
 import {useEffect,useRef,useState} from 'react';
 import {SocialPublication,type GenerationView,type SocialConnection,type SocialPublication as Publication} from '@bienvu/contracts';
@@ -22,10 +23,14 @@ export function SocialPublishDialog({job,onClose,onPublished}:{job:GenerationVie
   },[job.id]);
   const eligible=(connection:SocialConnection)=>connection.status==='active'&&!(connection.platform==='facebook'&&job.aspectRatio==='16:9');
   async function submit(event:React.FormEvent){event.preventDefault();setBusy(true);setFeedback('');
+    const platforms=new Set(connections.filter(c=>selected.includes(c.id)).map(c=>c.platform));
+    const properties={mode,platform:platforms.size>1?'both':[...platforms][0],destination_count:selected.length};
+    trackProductEvent('publication_requested',properties,key.current);
     try{const scheduledAt=mode==='later'?new Date(when).toISOString():null;
       const value=await socialRequest('/api/social/publications',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key.current},body:JSON.stringify({jobId:job.id,connectionIds:selected,caption,scheduledAt,timezone})});
       const post=SocialPublication.parse(value.publication);setResult(post);onPublished?.(post);
-    }catch(error){setFeedback(error instanceof Error?error.message:'La publication n’a pas été préparée.');}finally{setBusy(false);}
+      trackProductEvent('publication_created',properties,post.id);
+    }catch(error){trackProductEvent('publication_failed',properties,key.current);setFeedback(error instanceof Error?error.message:'La publication n’a pas été préparée.');}finally{setBusy(false);}
   }
   function changed(){key.current=crypto.randomUUID();setFeedback('');}
   return <dialog ref={dialog} className="social-dialog social-compose-dialog" onCancel={event=>{if(busy)event.preventDefault();else onClose();}} aria-labelledby="social-compose-title">

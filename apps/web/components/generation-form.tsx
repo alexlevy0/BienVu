@@ -1,4 +1,5 @@
 'use client';
+import {analyticsFetch as fetch} from '../lib/product-analytics';
 import Link from 'next/link';
 import {useCallback, useEffect, useRef, useState, type FormEvent} from 'react';
 import {ImportUrl, publicErrors, type CreationDraftView, type NormalizedListing, type PublicErrorCode} from '@bienvu/contracts';

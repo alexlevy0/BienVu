@@ -1,4 +1,5 @@
 'use client';
+import {analyticsFetch as fetch,trackProductEvent} from '../lib/product-analytics';
 import Link from 'next/link';
 import {useSearchParams} from 'next/navigation';
 import {useCallback,useEffect,useRef,useState,type ChangeEvent} from 'react';
@@ -70,6 +71,7 @@ export function VideoEditor(){
   function openChoice(){creationKey.current=null;demoRecord.current=null;setError('');setChoosing(true);}
   async function create(kind:EditorProjectKind){
     if(creating.current||!me||me.role==='viewer')return;
+    trackProductEvent('editor_project_selected',{source_kind:kind});
     creating.current=true;setBusy(true);setError('');
     try{let id:string;
       if(kind==='demo'){
@@ -141,10 +143,10 @@ function EditorProject({initial,agency,guest}:{initial:CreationDraftView;agency:
   function changeDoc(editor:EditorDocument,remember=true){change(m=>({...m,settings:{...m.settings,editor}}),remember);}
   function restoreOriginalVoice(){if(!voice)return;setPlaying(false);change(m=>({...m,settings:{...m.settings,
     voice:voice.voice as VideoCustomization['voice'],narration:voice.clips.map(c=>c.text),editor:resizeEditorDocument(m.settings.editor,voice.durationSeconds)}}));}
-  function patchLayer(patch:Partial<EditorLayer>){if(!selectedLayer)return;change(m=>({...m,settings:{...m.settings,editor:{...m.settings.editor,
+  function patchLayer(patch:Partial<EditorLayer>){if(!selectedLayer)return;trackProductEvent('editor_action',{action:'text_changed'});change(m=>({...m,settings:{...m.settings,editor:{...m.settings.editor,
     layers:m.settings.editor.layers.map(l=>l.id===selectedLayer.id?{...l,...patch}:l)}}}));}
-  function undo(){const previous=past.at(-1);if(!previous)return;setPlaying(false);setPast(past.slice(0,-1));setFuture([modelRef.current,...future]);modelRef.current=previous;setModel(previous);setSaveState('unsaved');}
-  function redo(){const next=future[0];if(!next)return;setPlaying(false);setPast([...past,modelRef.current]);setFuture(future.slice(1));modelRef.current=next;setModel(next);setSaveState('unsaved');}
+  function undo(){const previous=past.at(-1);if(!previous)return;trackProductEvent('editor_action',{action:'undo'});setPlaying(false);setPast(past.slice(0,-1));setFuture([modelRef.current,...future]);modelRef.current=previous;setModel(previous);setSaveState('unsaved');}
+  function redo(){const next=future[0];if(!next)return;trackProductEvent('editor_action',{action:'redo'});setPlaying(false);setPast([...past,modelRef.current]);setFuture(future.slice(1));modelRef.current=next;setModel(next);setSaveState('unsaved');}
   const save=useCallback(async()=>{
     if(write.current)return write.current;
     if(conflictRef.current)throw new Error('Rechargez le projet avant de l’enregistrer à nouveau.');
@@ -245,7 +247,7 @@ function EditorProject({initial,agency,guest}:{initial:CreationDraftView;agency:
       method:'PUT',headers:{'Content-Type':'audio/wav'},body:wav}));installMusic(value,file.name.slice(0,100),0);
     }catch(cause){setError(cause instanceof Error?cause.message:'La musique n’a pas pu être importée.');}finally{setMusicBusy(false);}
   }
-  function installMusic(value:EditorMusicUpload,name:string,startFrame:number){change(m=>{const editor=m.settings.editor,start=Math.max(0,Math.min(editor.durationSeconds*30-15,startFrame)),length=editor.durationSeconds*30-start;
+  function installMusic(value:EditorMusicUpload,name:string,startFrame:number){trackProductEvent('editor_action',{action:'music_added'});change(m=>{const editor=m.settings.editor,start=Math.max(0,Math.min(editor.durationSeconds*30-15,startFrame)),length=editor.durationSeconds*30-start;
     return {...m,settings:{...m.settings,editor:{...editor,music:{...value,name,volume:.15,startFrame:start,trimFromFrame:0,
       durationFrames:length,loop:Math.floor(value.durationMs*30/1000)<length}}}};});setSelection({kind:'music',id:value.assetId});}
   async function addLibraryMusic(id:string,startFrame=0){if(guest){setError('Connectez-vous pour utiliser la banque de musiques. Vous pouvez déjà importer votre propre piste.');return;}if(musicBusy)return;setPlaying(false);setMusicBusy(true);setError('');try{
@@ -289,7 +291,7 @@ function EditorProject({initial,agency,guest}:{initial:CreationDraftView;agency:
     <details className="editor-quality"><summary>Contrôle avant export · {quality.length?`${quality.length} point(s) à vérifier`:'aucun problème détecté'}</summary><p>Contrôle de cadrage, de résolution et d’équilibre audio. Vérifiez aussi l’aperçu à l’œil et à l’écoute.</p>{quality.map(issue=><button type="button" key={issue.id} onClick={()=>inspectIssue(issue)}>{issue.message} <span>Vérifier →</span></button>)}</details>
     {fullPreview?.job&&fullPreview.version===draft.version&&saveState==='saved'&&<details className="editor-complete-preview" open><summary>Aperçu complet · {fullPreview.job.status==='ready'?'prêt':fullPreview.job.status==='failed'?'interrompu':'préparation en cours'}</summary>{fullPreview.job.videoUrl?<><video src={fullPreview.job.videoUrl} controls playsInline preload="metadata"/><a href={fullPreview.job.downloadUrl??`/historique/${fullPreview.job.id}`}>Télécharger cet export</a><p>Ce fichier est l’export final. Le télécharger à nouveau ne consomme aucun crédit.</p></>:<p role="status">{fullPreview.job.status==='failed'?'La préparation a échoué. Retrouvez le détail dans Mes biens.':`Création du montage : ${fullPreview.job.progressPercent} %`}</p>}<a href={`/historique/${fullPreview.job.id}`}>Voir le suivi</a></details>}
     <div className="editor-main">
-      <aside className="editor-media" aria-label="Médias du projet"><h2>Médias</h2><div className="editor-media-tabs" role="tablist" aria-label="Types de médias">{(['photos','text','audio'] as const).map((value,i)=><button key={value} type="button" role="tab" aria-selected={tab===value} aria-controls={`editor-media-${value}`} id={`editor-tab-${value}`} onClick={()=>setTab(value)}>{['Photos','Texte','Audio'][i]}</button>)}</div>
+      <aside className="editor-media" aria-label="Médias du projet"><h2>Médias</h2><div className="editor-media-tabs" role="tablist" aria-label="Types de médias">{(['photos','text','audio'] as const).map((value,i)=><button key={value} type="button" role="tab" aria-selected={tab===value} aria-controls={`editor-media-${value}`} id={`editor-tab-${value}`} onClick={()=>{trackProductEvent('editor_action',{tab:value});setTab(value);}}>{['Photos','Texte','Audio'][i]}</button>)}</div>
         <div role="tabpanel" id={`editor-media-${tab}`} aria-labelledby={`editor-tab-${tab}`}>
         {tab==='photos'?<><button type="button" className="editor-import" disabled={draft.photos.length+pending.length>=12} onClick={()=>photoInput.current?.click()}><HomeIcon name="plus" size={23}/>Importer des photos</button>
           <input type="file" ref={photoInput} accept="image/jpeg,image/png,image/webp" multiple hidden onChange={e=>{choosePhotos(e.target.files);e.target.value='';}}/>

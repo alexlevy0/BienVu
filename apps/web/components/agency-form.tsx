@@ -1,4 +1,5 @@
 'use client';
+import {trackProductEvent} from '../lib/product-analytics';
 
 import Link from 'next/link';
 import {useEffect, useRef, useState} from 'react';
@@ -103,7 +104,8 @@ export function AgencyForm() {
       setAgency(profile); setValues(fromProfile(profile));
       await clearAgencyDraft(); guestEdited.current = false; setResuming(false); setStorageFailed(false);
       setFeedback('Votre identité est enregistrée pour vos prochaines vidéos.');
-    } catch (cause) {setFailed(true); setFeedback(cause instanceof Error ? cause.message : 'La sauvegarde a échoué. Réessayez.');}
+      trackProductEvent('agency_saved');
+    } catch (cause) {trackProductEvent('agency_save_failed');setFailed(true); setFeedback(cause instanceof Error ? cause.message : 'La sauvegarde a échoué. Réessayez.');}
     finally {setBusy(false);}
   }
   async function upload(file?: File) {

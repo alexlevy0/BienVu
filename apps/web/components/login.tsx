@@ -1,4 +1,5 @@
 'use client';
+import {analyticsFetch as fetch} from '../lib/product-analytics';
 import {useEffect, useState, type FormEvent} from 'react';
 import Link from 'next/link';
 import {useAccount, SignOut} from './account';

@@ -52,7 +52,7 @@ export function StudioSidebar({active}: {active: 'create' | 'videos' | 'explore'
     {menuOpen && <button type="button" className="home-menu-backdrop" aria-label="Fermer la navigation" onClick={closeMenu} tabIndex={-1}/>}
     <aside id="home-sidebar" ref={sidebar} className={`home-sidebar${menuOpen ? ' home-sidebar-open' : ''}`} aria-label="Votre studio BienVu">
       <Link className="home-brand-link" href="/" aria-label="BienVu, accueil" onClick={closeMenu}><HomeWordmark/></Link>
-      <nav className="home-navigation" aria-label="Navigation principale">
+      <nav className="home-navigation" aria-label="Navigation principale" data-analytics-public>
         {item('/', 'Créer une vidéo', 'plus', 'create')}
         {item('/biens', 'Mes biens', 'house', 'videos')}
         {item('/explorer', 'Explorer', 'compass', 'explore')}

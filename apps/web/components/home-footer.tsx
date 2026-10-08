@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import {HomeIcon, HomeWordmark} from './home-icons';
+import {CookiePreferencesButton} from './product-analytics';
 
 export function HomeFooter({onCreate}:{onCreate:()=>void}) {
   const backToTop=()=>{
@@ -36,6 +37,7 @@ export function HomeFooter({onCreate}:{onCreate:()=>void}) {
       <nav className="home-premium-footer-column" aria-labelledby="home-footer-resources-title">
         <h3 id="home-footer-resources-title">Ressources</h3>
         <Link href="/blog">Blog</Link>
+        <Link href="/partenaires">Programme partenaires</Link>
         <Link href="/comment-ca-marche">Comment ça marche</Link>
         <Link href="/modeles-video-immobilier">Modèles de vidéos</Link>
         <Link href="/guides">Guides immobiliers</Link>
@@ -60,7 +62,7 @@ export function HomeFooter({onCreate}:{onCreate:()=>void}) {
         <Link href="/confidentialite">Confidentialité</Link>
         <Link href="/conditions">CGU</Link>
         <Link href="/conditions#offres">CGV</Link>
-        <Link href="/confidentialite#cookies">Cookies</Link>
+        <CookiePreferencesButton/>
       </nav>
       <button type="button" className="home-premium-footer-back-top" onClick={backToTop} aria-label="Retour en haut de page"><HomeIcon name="arrow" size={20}/></button>
     </div>

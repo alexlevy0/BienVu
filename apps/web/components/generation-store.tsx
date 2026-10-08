@@ -4,6 +4,7 @@ import {createContext,useCallback,useContext,useEffect,useRef,useState} from 're
 import {GenerationView,type PropertySummary} from '@bienvu/contracts';
 import {useAccount} from './account';
 import {readRecentPages} from '../lib/recent-pages';
+import {trackGenerationOutcome} from '../lib/product-analytics';
 
 export type RecentDraft={id:string;sourceKind:'url'|'manual';title:string|null;locality:string|null;previewPhotoId:string|null;
   createdAt:string;status:'needs_input'};
@@ -28,6 +29,7 @@ export function GenerationStoreProvider({children}:{children:React.ReactNode}){
   },[owner]);
   const put=useCallback((job:GenerationView,expectedOwner:string)=>{
     if(ownerRef.current!==expectedOwner)return;
+    const old=jobsRef.current.find(item=>item.id===job.id);if(old&&active(old)&&!active(job))trackGenerationOutcome(job);
     setJobs(current=>[job,...current.filter(item=>item.id!==job.id)].sort((a,b)=>b.createdAt.localeCompare(a.createdAt)));
     if(expectedOwner!==anonymousGenerationScope)void refreshRights();
   },[refreshRights]);
@@ -54,6 +56,7 @@ export function GenerationStoreProvider({children}:{children:React.ReactNode}){
         const old=jobsRef.current.find(job=>job.id===fresh.id);return old&&active(old)&&!active(fresh);
       }))void refreshRights();
       if(wasInitialized){for(const fresh of next){const old=jobsRef.current.find(job=>job.id===fresh.id);
+        if(old&&active(old)&&!active(fresh))trackGenerationOutcome(fresh);
         if(old&&active(old)&&fresh.status==='ready'&&!seen.current.has(fresh.id)){
           seen.current.add(fresh.id);setNotification(fresh);
         }}}

@@ -75,6 +75,7 @@ Explorer permet de découvrir les vidéos partagées volontairement et les exemp
 - [Explorer](https://bienvu.online/explorer): Vidéos partagées et exemples de rendu.
 - [Offres et crédits](https://bienvu.online/abonnement): Offres Gratuit, Plus et Pro, estimateur, recharges et disponibilité des paiements.
 - [Sources testées](https://bienvu.online/sources): Compatibilité des sites d'annonces, limites connues et alternatives à l'import par lien.
+- [Programme partenaires](https://bienvu.online/partenaires): Candidature ouverte aux professionnels qui recommandent BienVu, validation manuelle des recommandations, simulateur indicatif et commission de 15 % des paiements HT encaissés pendant 12 mois à partir du premier paiement du client, avec des versements mensuels.
 - [Vidéo immobilière IA](https://bienvu.online/video-immobiliere-ia): Création à partir d’une annonce et de ses photos, formats et crédits.
 - [Animation des photos immobilières](https://bienvu.online/animation-photo-immobiliere): Sélection des nouvelles animations IA, coût et contrôle du résultat.
 - [Éditeur vidéo immobilier](https://bienvu.online/editeur-video-immobilier): Présentation des retouches, de la timeline, des cadrages et du mixage audio.
