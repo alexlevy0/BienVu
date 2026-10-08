@@ -10,6 +10,7 @@ import './admin.css';
 import './homepage.css';
 import './mailbox.css';
 import './voices.css';
+import './pricing.css';
 export const dynamic='force-dynamic';
 export const metadata={title:'Super admin — BienVu',robots:{index:false,follow:false}};
 export default async function Page(){

@@ -50,7 +50,8 @@
     "preview:video": "node scripts/preview-video.mjs",
     "probe:trial:video": "tsx scripts/probe-anonymous-video.ts",
     "probe:trial:media": "tsx scripts/probe-trial-media.ts",
-    "probe:trial:ui": "node scripts/probe-trial-ui.mjs"
+    "probe:trial:ui": "node scripts/probe-trial-ui.mjs",
+    "probe:pricing:ui": "node --import tsx scripts/probe-pricing-ui.mjs"
   },
   "devDependencies": {
     "@types/node": "24.10.1",
