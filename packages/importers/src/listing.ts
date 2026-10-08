@@ -123,7 +123,11 @@ function microdata(root: HtmlNode): Obj {
 }
 
 function espaces(nodes: HtmlNode[], url: string, canonicalUrl: string): ExtractedListing {
-  const articles = nodes.filter(n => tag(n) === 'article' && hasClass(n, 'vente'));
+  const transaction = new URL(url).pathname.startsWith('/locations/') ? 'rent' : 'sale';
+  const articleClass = transaction === 'rent' ? 'location' : 'vente', articlePath = `article.${articleClass}`;
+  const articles = nodes.filter(n => tag(n) === 'article' && hasClass(n, articleClass));
+  if (!articles.length && nodes.some(n => tag(n) === 'article' && hasClass(n, transaction === 'rent' ? 'vente' : 'location')))
+    throw new ImportFailure('CONFLICTING_FACTS', 'Vente et location contradictoires.');
   if (articles.length !== 1) throw new ImportFailure('NOT_A_LISTING', 'Article d’annonce absent.');
   const scoped = descendants(articles[0]);
   const title = text(scoped.find(n => tag(n) === 'h1' && hasClass(n, 'annonce-title')));
@@ -144,24 +148,48 @@ function espaces(nodes: HtmlNode[], url: string, canonicalUrl: string): Extracte
   if (visibleReference !== undefined && visibleReference !== referenceKey
     || referenceKey !== routeKey && visibleReference !== referenceKey)
     throw new ImportFailure('CONFLICTING_FACTS', 'Référence incohérente.');
-  if (d.status !== 'envente') throw new ImportFailure('SOURCE_UNAVAILABLE', 'Annonce non disponible à la vente.');
+  const expectedStatus = transaction === 'rent' ? 'enlocation' : 'envente';
+  if (d.status !== expectedStatus) {
+    if (d.status === 'enlocation' || d.status === 'envente') throw new ImportFailure('CONFLICTING_FACTS', 'Vente et location contradictoires.');
+    throw new ImportFailure('SOURCE_UNAVAILABLE', 'Annonce non disponible.');
+  }
   const property = d.type_de_bien === 'Appartement' ? 'apartment' : d.type_de_bien === 'Maison' ? 'house' : null;
   if (!title || !property || !clean(d.ville)) throw new ImportFailure('INCOMPLETE_LISTING', 'Faits essentiels absents.');
-  const summary = scoped.filter(n => hasClass(n, 'info-resume')).map(text).join(' ');
-  const amount = numeric(d.prix_vente);
-  const displayed = [...summary.matchAll(/([\d\s\u00a0\u202f]+)\s*€/g)].map(m => numeric(m[1])).filter(v => v !== null);
+  const priceKey = transaction === 'rent' ? 'loyer' : 'prix_vente', amount = numeric(d[priceKey]);
+  const euroAmounts = (value: string) => [...value.matchAll(/([\d\s\u00a0\u202f]+(?:[.,]\d{1,2})?)\s*€/g)]
+    .map(m => numeric(m[1])).filter((v): v is number => v !== null);
+  const displayed = scoped.filter(n => hasClass(n, 'info-resume')).flatMap(n => euroAmounts(text(n)));
   unique([...(amount === null ? [] : [amount]), ...displayed], 'Prix affiché et embarqué contradictoires.');
+  // The agency's Loyer CC/HC field describes the recurring rental amount.
+  // Deposits, optional utility packages and parking fees are separate fields.
+  const rentFields = transaction === 'rent' ? scoped.filter(n => hasClass(n, 'info-cle')).flatMap(n => {
+    const label = text(descendants(n).find(child => hasClass(child, 'info-label')));
+    const match = label.match(/^Loyer(?: mensuel)?\s+(CC|HC|charges comprises|charges incluses|hors charges)$/i);
+    if (!match) return [];
+    return [{label, charges: /^(CC|charges comprises|charges incluses)$/i.test(match[1]) ? 'included' as const : 'excluded' as const,
+      amounts: euroAmounts(text(n))}];
+  }) : [];
+  const charges = unique(rentFields.map(field => field.charges), 'Charges du loyer contradictoires.');
+  const rentAmounts = rentFields.flatMap(field => field.amounts);
+  unique([...(amount === null ? [] : [amount]), ...rentAmounts], 'Loyer affiché et embarqué contradictoires.');
+  const price = amount && displayed.includes(amount) && (transaction === 'sale' || charges && rentAmounts.includes(amount))
+    ? verified({amountCents: Math.round(amount * 100), currency: 'EUR' as const, period: transaction === 'rent' ? 'month' as const : 'total' as const,
+      charges: transaction === 'rent' ? charges! : 'not_applicable' as const}, 'EUR_cent',
+    `dataLayer.${priceKey} + ${articlePath} .info-resume${transaction === 'rent' ? ' + .info-cle' : ''}`,
+    `${d[priceKey]} €${transaction === 'rent' ? ` ; ${rentFields.map(field => field.label).join(' / ')}` : ''}`)
+    : missing('EUR_cent');
   const galleries = scoped.filter(n => attr(n, 'id') === 'gallery');
   const galleryReferences = new Set([referenceKey, routeKey]);
   const photoUrls = galleries.flatMap(g => descendants(g)).filter(n => tag(n) === 'a' && hasClass(n, 'rsImg'))
     .map(n => absolute(attr(n, 'href'), url)).filter(v => new URL(v).pathname.split('/').some(p => galleryReferences.has(p.toLowerCase())));
-  return {canonicalUrl, sourceListingId: reference, adapterVersion: 'espaces-atypiques/3.3', transaction: 'sale',
-    description: descriptionFromNodes(scoped.filter(n => attr(n, 'id') === 'annonce-description'), 'article.vente #annonce-description'),
-    facts: {title: verified(title, 'text', 'article.vente h1.annonce-title'), propertyType: verified(property, 'category', 'dataLayer.type_de_bien'),
+  return {canonicalUrl, sourceListingId: reference, adapterVersion: 'espaces-atypiques/3.4', transaction,
+    description: descriptionFromNodes(scoped.filter(n => attr(n, 'id') === 'annonce-description'), `${articlePath} #annonce-description`),
+    facts: {title: verified(title, 'text', `${articlePath} h1.annonce-title`), propertyType: verified(property, 'category', 'dataLayer.type_de_bien'),
       locality: verified(clean(d.ville), 'text', 'dataLayer.ville'), area: missing('m2'),
       rooms: numeric(d.nb_pieces) && Number.isInteger(numeric(d.nb_pieces)) ? verified(numeric(d.nb_pieces)!, 'rooms', 'dataLayer.nb_pieces', d.nb_pieces) : missing('rooms'),
-      price: amount && displayed.includes(amount) ? verified({amountCents: amount * 100, currency: 'EUR', period: 'total', charges: 'not_applicable'}, 'EUR_cent', 'dataLayer.prix_vente + .info-resume') : missing('EUR_cent')},
-    photoUrls: [...new Set(photoUrls)].slice(0, IMPORT_LIMITS.candidates), warnings: ['Surface omise : les surfaces Carrez, au sol et pondérées ne sont pas assimilées.']};
+      price},
+    photoUrls: [...new Set(photoUrls)].slice(0, IMPORT_LIMITS.candidates), warnings: ['Surface omise : les surfaces Carrez, au sol et pondérées ne sont pas assimilées.',
+      ...(transaction === 'rent' && price.status === 'missing' ? ['Loyer omis : le montant mensuel et ses charges ne sont pas vérifiables.'] : [])]};
 }
 
 function domAgency(nodes: HtmlNode[], url: string, canonicalUrl: string, allowPartial = false): ExtractedListing | undefined {
@@ -245,14 +273,15 @@ export function extractListingHtml(html: string, url: string, options: {allowPar
   if (specific) return checkedGallery(specific, options.allowPartial);
   const figaro = adapter.id === 'figaro' ? extractFigaro(nodes, documents, url, canonicalUrl, adapter.listingId!) : undefined;
   const ladresse = adapter.id === 'ladresse' ? extractLadresse(nodes, url, canonicalUrl, adapter.listingId!) : undefined;
+  const atypiques = adapter.id === 'espaces-atypiques' ? espaces(nodes, url, canonicalUrl) : undefined;
   let output: ExtractedListing | undefined;
-  try {if (documents.length) output = structured(documents, url, canonicalUrl, (figaro ?? ladresse)?.transaction);} catch (error) {
+  try {if (documents.length) output = structured(documents, url, canonicalUrl, (figaro ?? ladresse ?? atypiques)?.transaction);} catch (error) {
     if (!(error instanceof ImportFailure) || error.code !== 'NOT_A_LISTING' || error.reason === 'not_listing') throw error;
   }
   const microHomes = nodes.filter(n => /\/(House|Apartment|SingleFamilyResidence|Residence)$/.test(attr(n, 'itemtype')));
   if (microHomes.length > 1) throw new ImportFailure('CONFLICTING_FACTS', 'Plusieurs biens dans le DOM.');
   if (microHomes.length === 1) {
-    const home = microHomes[0], micro = structured([microdata(home)], url, canonicalUrl, (figaro ?? ladresse)?.transaction);
+    const home = microHomes[0], micro = structured([microdata(home)], url, canonicalUrl, (figaro ?? ladresse ?? atypiques)?.transaction);
     micro.adapterVersion = 'microdata/3.2';
     // Le texte riche est lu dans le DOM pour conserver ses paragraphes.
     const descriptionNodes = descendants(home).filter(n => attr(n, 'itemprop').split(/\s+/).includes('description') && attr(n, 'content') === '')
@@ -279,8 +308,8 @@ export function extractListingHtml(html: string, url: string, options: {allowPar
       output.description ??= micro.description;
     } else output = micro;
   }
-  if (adapter.id === 'espaces-atypiques') {
-    const agency = espaces(nodes, url, canonicalUrl);
+  if (atypiques) {
+    const agency = atypiques;
     if (output) for (const field of ['price', 'propertyType', 'locality'] as const) {
       const a = output.facts[field], b = agency.facts[field];
       if (a.status === 'verified' && b.status === 'verified') unique([a.value, b.value], `Contradiction des faits : ${field}.`);

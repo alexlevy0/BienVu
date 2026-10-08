@@ -14,7 +14,9 @@ export function assertListingDestination(sourceUrl: string, destination: string)
   const selected = selectAdapter(sourceUrl), final = publicUrl(destination);
   if (!selected.source) return;
   const id = sourceListingId(selected.source, final.pathname);
-  const transactionChanged = selected.id === 'orpi' && new URL(sourceUrl).pathname.startsWith('/annonce-location-') !== final.pathname.startsWith('/annonce-location-');
+  const initial = new URL(sourceUrl);
+  const transactionChanged = selected.id === 'orpi' ? initial.pathname.startsWith('/annonce-location-') !== final.pathname.startsWith('/annonce-location-')
+    : selected.id === 'espaces-atypiques' && initial.pathname.startsWith('/locations/') !== final.pathname.startsWith('/locations/');
   if (!selected.source.hosts.includes(final.hostname) || id !== selected.listingId || transactionChanged)
     throw new ImportFailure('SOURCE_UNAVAILABLE', 'Le lien ne mène plus à la même annonce.', 'listing_redirect');
 }

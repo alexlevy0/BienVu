@@ -8,6 +8,8 @@ Le parcours local ou Cloudflare transforme un lien en annonce privée et galerie
 
 **Maintenance du 02/10 — Orpi Sanary :** l’adaptateur `orpi-dom/4.2` accepte désormais un titre sans surface, en conservant celle-ci comme manquante. L’import réel Cloudflare du lien signalé récupère le prix, les 5 pièces, la description et 12 photos. Après un échec terminal, un nouvel essai explicite crée une nouvelle requête ; une réponse réseau incertaine conserve sa clé pour éviter un doublon. [Diagnostic et recette](preuves/maintenance/ORPI-SANARY-02-10.md).
 
+**Maintenance du 08/10 — Espaces Atypiques, locations :** le registre accepte aussi `/locations/`, et l’adaptateur `espaces-atypiques/3.4` recoupe la route, l’article et le statut de location. Les champs `Loyer CC`/`HC` de la fiche distinguent le loyer mensuel et les charges ; dépôt, stationnement et forfaits facultatifs restent séparés. Le lien lyonnais fourni par Alex produit un import réel `ready` avec **1 900 €/mois charges comprises, 3 pièces et 11 photos**, sans navigateur ni appel IA. Surface toujours à confirmer manuellement selon la politique existante. [Vérifications et limites](preuves/maintenance/ESPACES-LOCATION-08-10.md).
+
 ## Lancer et utiliser
 
 La tranche locale du **sprint 04** ajoute le [registre et la couverture datée](preuves/sprint-04/RAPPORT.md), visibles sur `/sources` et sous le champ d’URL. Les trois agences ci-dessus disposent d’une preuve Cloudflare du sprint 03. Aucun des quatre portails n’a encore produit un import automatique complet validé ; la nouvelle tranche n’est pas encore déployée.
