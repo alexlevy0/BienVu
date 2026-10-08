@@ -26,7 +26,7 @@ assert.ok(memory>=3*1024**3,'LINUX_PROBE_REQUIRES_3_GIB');
 const manifest=VideoManifest.parse(JSON.parse(await readFile(`${source}/manifest.json`,'utf8')));
 const existingProof=JSON.parse(await readFile(`${source}/report.json`,'utf8').catch(()=> '{}'));
 const realRunwayClipReused=existingProof.realRunwayClipReused===true;
-assert.equal(manifest.photoAnimations.length,1);
+assert.ok(manifest.photoAnimations.length>=1&&manifest.photoAnimations.length<=12);
 const assets=await Promise.all(videoAssets(manifest).map(async asset=>({file:videoAssetFile(asset),
   bytes:(await readFile(`${source}/${videoAssetFile(asset)}`)).toString('base64')})));
 // Bytes travel over stdin into this disposable container, without changing

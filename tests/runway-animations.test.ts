@@ -1,9 +1,11 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
+import {readFile,readdir} from 'node:fs/promises';
 import sharp from 'sharp';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
-import {GenerationRequest,defaultVideoCustomization,VideoManifest,videoAssets,videoPhotoTimeline,editorCanReuseVoice} from '../packages/contracts/src/index';
+import {GenerationRequest,defaultVideoCustomization,VideoManifest,videoAssets,videoPhotoTimeline,editorCanReuseVoice,runwayDurationForFrames,
+  createEditorDocument,editorClipStarts,type VideoCustomization} from '../packages/contracts/src/index';
 import {findImport,admitGeneration,failGeneration,findGeneration,adminVideoDetail,findEditorVoiceSource} from '../packages/db/src/index';
 import {migrateNarrationProbe,seedNarrationFixture} from '../scripts/narration-fixtures';
 import {videoFixture,videoReport} from '../fixtures/video';
@@ -14,7 +16,8 @@ import {DEFAULT_SCRIPT_MODEL} from '../packages/narration/src/index';
 import {prepareJobNarration} from '../apps/pipeline/src/narration';
 import {prepareJobVideo} from '../apps/pipeline/src/video-manifest';
 import {prepareJobAnimations,animationIndices} from '../apps/pipeline/src/photo-animations';
-import {allowedRunwayOutput,downloadRunwayOutput,runwayProvider,RUNWAY_PROMPT,type AnimationProvider} from '../apps/pipeline/src/runway';
+import {allowedRunwayOutput,downloadRunwayOutput,runwayProvider,RUNWAY_PROMPT,runwayClipCost,type AnimationProvider} from '../apps/pipeline/src/runway';
+import {plannedAnimationSeconds,findAnimationTiming} from '../apps/pipeline/src/animation-timing';
 import {cameraMotion} from '../packages/video/src/camera-motion';
 import {editExistingVideo,editorResources,snapshotEditorExport} from '../apps/web/lib/video-editor';
 import {patchCreationDraft} from '../apps/web/lib/creation-drafts';
@@ -40,19 +43,28 @@ test('animation : coûts bornés, URL privées refusées et caméra sans bords v
   assert.deepEqual(cameraMotion(120,300,2,false),{scale:1,x:0,y:0});
 });
 
-async function setup(t:{after(fn:()=>Promise<void>):void},label:string,clips:number|number[]=2,photoOrder?:number[]){
+async function setup(t:{after(fn:()=>Promise<void>):void},label:string,clips:number|number[]=2,photoOrder?:number[],
+  options:{photoCount?:number;durationSeconds?:20|30|40;customization?:Partial<VideoCustomization>;legacySchema?:boolean}={}){
   const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:'export default {fetch(){return new Response("fixture")}}',compatibilityDate:'2026-09-27',d1Databases:['DB'],r2Buckets:['MEDIA']}));
-  t.after(()=>mf.dispose());const env=await mf.getBindings<{DB:D1Database;MEDIA:R2Bucket}>();await migrateNarrationProbe(env.DB);
+  t.after(()=>mf.dispose());const env=await mf.getBindings<{DB:D1Database;MEDIA:R2Bucket}>();
+  if(options.legacySchema){for(const file of (await readdir(new URL('../packages/db/migrations/',import.meta.url))).filter(f=>/^\d{4}_.*\.sql$/.test(f)&&f<'0055').sort())
+    await env.DB.exec((await readFile(new URL(`../packages/db/migrations/${file}`,import.meta.url),'utf8')).replace(/^--.*$/gm,'').replace(/\n/g,' '));
+  }else await migrateNarrationProbe(env.DB);
   const seed=await seedNarrationFixture(env.DB,label,true);await env.DB.prepare("UPDATE jobs SET status='failed',error_code='FIXTURE',lease_until=NULL WHERE id=?").bind(seed.jobId).run();
   const month=new Date().toISOString().slice(0,7),at=new Date().toISOString();
   await env.DB.prepare('INSERT INTO hosted_import_budget(month,baseline_cents,ceiling_cents,paused) VALUES(?,0,9000,0)').bind(month).run();
   await env.DB.exec("UPDATE generation_control SET enabled=1; UPDATE allocations SET kind='paid',quota_limit=40");await env.DB.prepare('INSERT INTO generation_access(agency_id,allocation_id,enabled) VALUES(?,?,1)').bind(seed.agencyId,`allocation-${label}`).run();
   const listing=JSON.parse((await findImport(env.DB,seed.agencyId,`listing-${label}`))!.result!),fixture=await videoFixture('paid');
-  for(const [i,p] of listing.photos.entries()){const asset=fixture.manifest.photos[i],bytes=photoOrder?new Uint8Array(await sharp(fixture.files.get(asset.id)!).jpeg().toBuffer()):fixture.files.get(asset.id)!;
-    Object.assign(p,{contentHash:createHash('sha256').update(bytes).digest('hex'),sizeBytes:bytes.length,width:asset.width,height:asset.height,...(photoOrder?{mime:'image/jpeg'}:{})});await env.MEDIA.put(p.objectKey,bytes);}
+  if(options.photoCount){const original=listing.photos;listing.photos=Array.from({length:options.photoCount},(_,i)=>({...original[i%original.length],id:`photo-${i}`,
+    sourceOrder:i,objectKey:`agencies/${listing.agencyId}/imports/${listing.id}/photo-${i}.jpg`}));}
+  for(const [i,p] of listing.photos.entries()){const asset=fixture.manifest.photos[i%fixture.manifest.photos.length],bytes=photoOrder||options.photoCount?
+    new Uint8Array(await sharp(fixture.files.get(asset.id)!).modulate({brightness:options.photoCount?1+i*.015:1}).jpeg().toBuffer()):fixture.files.get(asset.id)!;
+    Object.assign(p,{contentHash:createHash('sha256').update(bytes).digest('hex'),sizeBytes:bytes.length,width:asset.width,height:asset.height,...(photoOrder||options.photoCount?{mime:'image/jpeg'}:{})});await env.MEDIA.put(p.objectKey,bytes);}
   await env.DB.prepare('UPDATE listing_imports SET result_json=? WHERE id=?').bind(JSON.stringify(listing),listing.id).run();
   const lines=['Découvrez cet appartement à Lyon.','Son prix et sa surface sont présentés dans cette annonce.','La visite se poursuit en images.','Contactez votre agence pour en savoir plus.'];
-  const job=await admitGeneration(env.DB,seed.agencyId,'runway-fixture-key-001',{listingId:listing.id,...(photoOrder?{durationSeconds:20}:{}),customization:{...defaultVideoCustomization(),...(Array.isArray(clips)?{runwayPhotos:clips}:{runwayClips:clips}),...(photoOrder?{photoOrder}:{}),narration:lines}},'true');
+  const job=await admitGeneration(env.DB,seed.agencyId,'runway-fixture-key-001',{listingId:listing.id,...(photoOrder||options.durationSeconds?{durationSeconds:options.durationSeconds??20}:{}),
+    ...(options.customization?.editor?{aspectRatio:options.customization.editor.aspectRatio,voiceEnabled:options.customization.editor.voiceEnabled,subtitlesEnabled:options.customization.editor.subtitlesEnabled}:{}),
+    customization:{...defaultVideoCustomization(),...(Array.isArray(clips)?{runwayPhotos:clips}:{runwayClips:clips}),...(photoOrder?{photoOrder}:{}),narration:lines,...options.customization}},'true');
   await env.DB.prepare("UPDATE jobs SET status='scripting',stage='scripting',listing_id=? WHERE id=?").bind(listing.id,job.jobId).run();
   const config=GoogleVoiceConfig.parse({projectId:'runway-fixture',voice:'fr-FR-Chirp3-HD-Aoede'});
   const google=googleTts(config,async()=> 'fixture-token-never-networked',{fetch:async()=>Response.json({audioContent:Buffer.from(toneFixture(photoOrder?4000:5000)).toString('base64')})});
@@ -69,6 +81,89 @@ test('sélection par photo : trois animations, ordre exact et manifeste sans lim
   const prepared=await prepareJobVideo(env,job.agencyId,job.jobId);
   assert.equal(prepared.manifest.photoAnimations?.length,3);
   assert.equal(prepared.manifest.photoTimeline?.reduce((sum,p)=>sum+p.durationFrames,0),prepared.manifest.scenes.reduce((sum,s)=>sum+s.durationFrames,0));
+});
+
+test('Durée Runway : secondes entières minimales, budget plafonné et timing de l’éditeur avec carte',()=>{
+  for(const [frames,seconds] of [[15,2],[60,2],[61,3],[90,3],[91,4],[120,4],[121,5],[150,5],[600,5]]){
+    assert.equal(runwayDurationForFrames(frames),seconds);assert.deepEqual(runwayClipCost(seconds),{credits:seconds*5,reservedCents:seconds*7});
+  }
+  for(const frames of [0,-1,1.5,1201,NaN])assert.throws(()=>runwayDurationForFrames(frames));
+  for(const seconds of [1,2.5,6,10])assert.throws(()=>runwayClipCost(seconds));
+  const photos=Array.from({length:10},(_,i)=>({id:`photo-${i}`,sourceOrder:i})),timeline=videoPhotoTimeline(photos,600,photos.map(p=>p.id));
+  assert.deepEqual(timeline.map(p=>p.durationFrames),Array(10).fill(60));
+  const editor=createEditorDocument(photos,{},{}),settings={...defaultVideoCustomization(),editor};
+  assert.equal(plannedAnimationSeconds(timeline,'photo-0',0,settings),2);
+  // Both occurrences restart the animation, so 3 s + 3 s still requires 3 s.
+  editor.clips=[{...editor.clips[0],durationFrames:90},{...editor.clips[0],id:'split-photo-0',durationFrames:90},
+    ...editor.clips.slice(1).map((c,i)=>({...c,durationFrames:i===8?60:45}))];
+  assert.equal(plannedAnimationSeconds(timeline,'photo-0',0,settings),3);
+  const map={position:'start' as const,durationSeconds:4,location:null};
+  assert.equal(editorClipStarts(editor,map).reduce((sum,c)=>sum+c.durationFrames,0),480);
+  assert.equal(plannedAnimationSeconds(timeline,'photo-0',0,{...settings,map}),3);
+  for(const durationMs of [1000,2500,6000])assert.equal(VideoManifest.shape.photoAnimations.unwrap().element.safeParse({photoAssetId:'photo-0',sourceSha256:'f'.repeat(64),
+    provider:'runway',model:'gen4_turbo',asset:{id:'animation-test',objectKey:'agencies/a/jobs/j/a.mp4',sha256:'f'.repeat(64),sizeBytes:512,mime:'video/mp4',width:720,height:1280,durationMs}}).success,false);
+});
+
+test('Dix animations sur 20 s : dix appels de 2 s, 100 crédits fournisseur, reprise et retouche sans nouvelle dépense',async t=>{
+  const slots=Array.from({length:10},(_,i)=>i),{env,job,month,at}=await setup(t,'runway-ten-short',slots,slots,{photoCount:10});
+  // Exactly enough for the new policy; ten five-second clips would exceed it.
+  await env.DB.prepare('INSERT INTO runway_budget(month,prepaid_cents,api_credits,paused,created_at) VALUES(?,140,100,0,?)').bind(month,at).run();
+  let calls=0;const durations:number[]=[];const provider:AnimationProvider={mode:'real',generate:async(_bytes,_mime,checkpoint,_signal,_motion,_ratio,seconds)=>{
+    calls++;durations.push(seconds!);await checkpoint(taskId);return clip;},resume:async()=>clip};
+  assert.deepEqual(await prepareJobAnimations(env,job.agencyId,job.jobId,provider),{requested:10,ready:10});
+  assert.deepEqual(durations,Array(10).fill(2));
+  assert.deepEqual(await env.DB.prepare('SELECT sum(credits) AS credits,sum(reserved_cents) AS cents FROM photo_animations').first(),{credits:100,cents:140});
+  assert.deepEqual((await findAnimationTiming(env.DB,job.agencyId,job.jobId))!.map(p=>p.durationFrames),Array(10).fill(60));
+  await assert.rejects(env.DB.prepare('UPDATE generation_animation_timing SET photo_timeline_json=? WHERE job_id=?').bind('[]',job.jobId).run(),/IMMUTABLE/);
+  await assert.rejects(env.DB.prepare('UPDATE photo_animations SET duration_seconds=5,credits=25,reserved_cents=35 WHERE job_id=?').bind(job.jobId).run(),/IMMUTABLE/);
+  // A read interrupted after submission retrieves the same two-second task.
+  await env.DB.prepare("UPDATE photo_animations SET state='submitted',animation_json=NULL WHERE job_id=? AND slot=0").bind(job.jobId).run();
+  assert.equal((await prepareJobAnimations(env,job.agencyId,job.jobId,provider)).ready,10);assert.equal(calls,10);
+  const frozen=await prepareJobVideo(env,job.agencyId,job.jobId);
+  assert.deepEqual(frozen.manifest.photoAnimations!.map(a=>a.asset.durationMs),Array(10).fill(2000));
+  assert.deepEqual(frozen.manifest.photoTimeline!.map(p=>p.durationFrames),Array(10).fill(60));
+  await failGeneration(env.DB,job,'GENERATION_FAILED');
+  const next=await admitGeneration(env.DB,job.agencyId,'runway-ten-short-reuse-001',{listingId:job.listingId!,durationSeconds:20,
+    customization:{...defaultVideoCustomization(),photoOrder:slots,runwayPhotos:slots}},'true');
+  assert.equal(next.creditsReserved,1,'Les dix clips de deux secondes déjà créés restent réutilisables');
+});
+
+test('Durée prévue conservée si plusieurs animations échouent : les clips réussis restent dans leurs slots courts',async t=>{
+  const slots=Array.from({length:10},(_,i)=>i),{env,job}=await setup(t,'runway-short-fail',slots,slots,{photoCount:10});
+  let calls=0;const provider:AnimationProvider={mode:'mock',generate:async(_bytes,_mime,checkpoint,_signal,_motion,_ratio,seconds)=>{
+    assert.equal(seconds,2);await checkpoint(taskId);if(++calls>2)throw Error('RUNWAY_TASK_FAILED');return clip;},resume:async()=>clip};
+  assert.equal((await prepareJobAnimations(env,job.agencyId,job.jobId,provider)).ready,2);
+  const frozen=await prepareJobVideo(env,job.agencyId,job.jobId);
+  assert.equal(frozen.manifest.photoAnimations!.length,2);assert.deepEqual(frozen.manifest.photoTimeline!.map(p=>p.durationFrames),Array(10).fill(60));
+});
+
+test('Durées de l’éditeur : après réordonnancement la bonne photo conserve son plan personnalisé',async t=>{
+  const order=[2,0,1],editor=createEditorDocument(order.map(sourceOrder=>({sourceOrder})),{});
+  editor.clips=editor.clips.map((c,i)=>({...c,durationFrames:[60,91,449][i]}));
+  const {env,job,listing}=await setup(t,'runway-editor-duration',order,order,{customization:{editor}});
+  const seconds:number[]=[];await prepareJobAnimations(env,job.agencyId,job.jobId,{mode:'mock',generate:async(_bytes,_mime,checkpoint,_signal,_motion,_ratio,duration)=>{
+    seconds.push(duration!);await checkpoint(taskId);return clip;},resume:async()=>clip});
+  assert.deepEqual(seconds,[2,4,5]);
+  const rendered=await prepareJobVideo(env,job.agencyId,job.jobId);
+  const byPhoto=new Map(rendered.manifest.photoAnimations!.map(a=>[a.photoAssetId,a.asset.durationMs]));
+  assert.equal(byPhoto.get(listing.photos[2].id),2000);assert.equal(byPhoto.get(listing.photos[0].id),4000);
+});
+
+test('Migration des anciennes animations : durée de 5 s, coût et tâche conservés sans nouvelle soumission',async t=>{
+  const {env,job,month,at,listing}=await setup(t,'runway-old-duration',1,undefined,{legacySchema:true});
+  await env.DB.prepare('INSERT INTO runway_budget(month,prepaid_cents,api_credits,paused,created_at) VALUES(?,35,25,0,?)').bind(month,at).run();
+  await env.DB.prepare(`INSERT INTO photo_animations(id,agency_id,job_id,photo_id,source_sha256,slot,month,mode,model,credits,reserved_cents,state,task_id,created_at,updated_at)
+    VALUES('legacy-clip',?,?,?,?,0,?,'real','gen4_turbo',25,35,'submitted',?,?,?)`)
+    .bind(job.agencyId,job.jobId,listing.photos[0].id,listing.photos[0].contentHash,month,taskId,at,at).run();
+  await env.DB.exec((await readFile(new URL('../packages/db/migrations/0055_adaptive_animation_duration.sql',import.meta.url),'utf8')).replace(/^--.*$/gm,'').replace(/\n/g,' '));
+  assert.deepEqual(await env.DB.prepare('SELECT duration_seconds AS seconds,credits,reserved_cents AS cents,task_id AS task FROM photo_animations').first(),{seconds:5,credits:25,cents:35,task:taskId});
+  let resumes=0;assert.equal((await prepareJobAnimations(env,job.agencyId,job.jobId,{mode:'real',generate:async()=>{throw Error('NO_NEW_RUNWAY');},resume:async id=>{assert.equal(id,taskId);resumes++;return clip;}})).ready,1);
+  assert.equal(resumes,1);assert.equal(await findAnimationTiming(env.DB,job.agencyId,job.jobId),null);
+  const frozen=await prepareJobVideo(env,job.agencyId,job.jobId);assert.equal(frozen.manifest.photoAnimations![0].asset.durationMs,5000);
+  assert.equal(frozen.manifest.photoTimeline![0].durationFrames,150);
+  await failGeneration(env.DB,job,'GENERATION_FAILED');
+  assert.equal((await env.DB.prepare('SELECT status FROM reservations WHERE job_id=?').bind(job.jobId).first<{status:string}>())!.status,'consumed');
+  assert.ok((await env.DB.prepare("SELECT provider FROM finance_expected_providers WHERE job_id=? AND provider='runway'").bind(job.jobId).first()),'La comptabilité retrouve encore le fournisseur historique');
 });
 
 test('Retouche : retrouve tous les clips, la voix et leurs timings après réordonnancement, sans nouvelle dépense',async t=>{
@@ -198,19 +293,19 @@ test('SDK Runway : un HTTP 500 à la création ne déclenche aucun nouvel envoi'
   assert.equal(creates,1);
 });
 test('SDK Runway réel, transport fixture : upload privé, contrat exact, tâche persistée avant lecture',async()=>{
-  for(const aspectRatio of ['9:16','16:9'] as const){
+  for(const [durationSeconds,aspectRatio] of [[2,'9:16'],[3,'16:9'],[5,'9:16']] as const){
   const paths:string[]=[],checkpoints:string[]=[];
   const provider=runwayProvider('fixture-secret-never-networked',async(input,init)=>{
     const url=new URL(typeof input==='string'?input:input instanceof URL?input.href:input.url);paths.push(url.pathname);
     if(url.pathname==='/v1/uploads')return Response.json({runwayUri:'runway://fixture-upload-token',uploadUrl:'https://upload.runwayml.com/upload-fixture',fields:{}});
     if(url.pathname==='/upload-fixture'){assert.equal(new Headers(init?.headers).has('authorization'),false);assert.ok(init?.body instanceof FormData);return new Response(null,{status:204});}
     if(url.pathname==='/v1/image_to_video'){
-      assert.deepEqual(JSON.parse(String(init?.body)),{model:'gen4_turbo',promptImage:'runway://fixture-upload-token',promptText:RUNWAY_PROMPT,ratio:aspectRatio==='16:9'?'1280:720':'720:1280',duration:5});return Response.json({id:taskId});}
+      assert.deepEqual(JSON.parse(String(init?.body)),{model:'gen4_turbo',promptImage:'runway://fixture-upload-token',promptText:RUNWAY_PROMPT,ratio:aspectRatio==='16:9'?'1280:720':'720:1280',duration:durationSeconds});return Response.json({id:taskId});}
     if(url.pathname.startsWith('/v1/tasks/')){assert.deepEqual(checkpoints,[taskId]);return Response.json({id:taskId,status:'SUCCEEDED',createdAt:new Date().toISOString(),output:['https://cdn.cloudfront.net/video.mp4']});}
     if(url.pathname==='/video.mp4')return new Response(clip,{headers:{'Content-Type':'video/mp4'}});
     throw Error('UNEXPECTED_NETWORK');
   });
-  assert.deepEqual(await provider.generate(new Uint8Array(1024),'image/jpeg',async id=>{checkpoints.push(id);},AbortSignal.timeout(20_000),'dolly',aspectRatio),clip);
+  assert.deepEqual(await provider.generate(new Uint8Array(1024),'image/jpeg',async id=>{checkpoints.push(id);},AbortSignal.timeout(20_000),'dolly',aspectRatio,durationSeconds),clip);
   assert.equal(paths.filter(p=>p==='/v1/image_to_video').length,1);
   }
 });

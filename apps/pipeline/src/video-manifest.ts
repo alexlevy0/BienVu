@@ -5,6 +5,7 @@ import {scriptContext, validateScript, type ScriptContext} from '@bienvu/narrati
 import type {NarrationBucket} from './narration';
 import {prepareMapImage} from '@bienvu/maps';
 import {ConfirmedVideoMap,mapPublicLocation} from '@bienvu/contracts';
+import {findAnimationTiming} from './animation-timing';
 
 export type FrozenVideo = {hash: string; manifest: VideoManifest; state: 'preparing' | 'prepared'};
 type Row = {manifest: string; hash: string; sources: string; attempt: number; state: FrozenVideo['state']; expires: string};
@@ -134,7 +135,7 @@ export async function prepareJobVideo(env: {DB: Database; MEDIA: NarrationBucket
       brand:context.brand,contact:context.contact,logo,...videoDimensions(input?.aspectRatio),fps:30,disclosure:prepared.script.disclosure,
       rights:entitlement.kind==='anonymous'?{kind:'anonymous',watermarked:false,previewProvisionCents:entitlement.previewProvisionCents}:{kind:entitlement.kind,allocationId:entitlement.allocationId,watermarked:entitlement.kind==='trial'},photos,audio,
       scenes:prepared.script.scenes.map((s,i)=>({...s,audioAssetId:audio[i]?.id??null,durationFrames:prepared.durationFrames[i]})),
-      photoTimeline:videoPhotoTimeline(photos,prepared.durationFrames.reduce((n,frames)=>n+frames,0),animations.map(a=>a.photoAssetId),(map?.settings.durationSeconds??0)*30),
+      photoTimeline:await findAnimationTiming(env.DB,agency,job)??videoPhotoTimeline(photos,prepared.durationFrames.reduce((n,frames)=>n+frames,0),animations.map(a=>a.photoAssetId),(map?.settings.durationSeconds??0)*30),
       presentation:videoPresentation(context.listing),
       subtitlesEnabled:input?.voiceEnabled===false?false:input?.subtitlesEnabled??true,
       ...(input?.voiceEnabled===false?{voiceEnabled:false}:{}),

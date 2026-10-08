@@ -2,6 +2,10 @@ import RunwayML,{TaskFailedError,TaskTimedOutError,toFile} from '@runwayml/sdk';
 import {VideoAspectRatio} from '@bienvu/contracts';
 
 export const RUNWAY_MODEL='gen4_turbo',RUNWAY_SECONDS=5,RUNWAY_CREDITS=25;
+export function runwayClipCost(seconds:number){
+  if(!Number.isInteger(seconds)||seconds<2||seconds>RUNWAY_SECONDS)throw Error('RUNWAY_DURATION_INVALID');
+  return {credits:seconds*5,reservedCents:seconds*7};
+}
 export const RUNWAY_MAX_BYTES=10*1024*1024;
 export const RUNWAY_PROMPTS={
   dolly:'The camera slowly dollies forward with gentle natural parallax, staying close to the original viewpoint. A single continuous, steady real estate shot. The original architecture, furniture, materials and lighting remain consistent. Photorealistic.',
@@ -10,7 +14,7 @@ export const RUNWAY_PROMPTS={
 export const RUNWAY_PROMPT=RUNWAY_PROMPTS.dolly;
 export type RunwayMotion=keyof typeof RUNWAY_PROMPTS;
 const taskId=(value:unknown)=>{if(typeof value!=='string'||!/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(value))throw Error('RUNWAY_TASK_INVALID');return value;};
-export type AnimationProvider={mode:'real'|'mock';generate:(image:Uint8Array,mime:string,checkpoint:(taskId:string)=>Promise<void>,signal:AbortSignal,motion?:RunwayMotion,aspectRatio?:VideoAspectRatio)=>Promise<Uint8Array>;
+export type AnimationProvider={mode:'real'|'mock';generate:(image:Uint8Array,mime:string,checkpoint:(taskId:string)=>Promise<void>,signal:AbortSignal,motion?:RunwayMotion,aspectRatio?:VideoAspectRatio,durationSeconds?:number)=>Promise<Uint8Array>;
   resume:(taskId:string,signal:AbortSignal)=>Promise<Uint8Array>};
 export function runwayError(error:unknown){
   if(error instanceof TaskFailedError)return 'RUNWAY_TASK_FAILED';
@@ -61,13 +65,14 @@ export function runwayProvider(secret:string,fetcher:typeof fetch=fetch):Animati
     taskId(result.id);if(result.output.length!==1)throw Error('RUNWAY_OUTPUT_INVALID');
     return downloadRunwayOutput(result.output[0],signal,fetcher);
   };
-  return {mode:'real',generate:async(image,mime,checkpoint,signal,motion='dolly',aspectRatio='9:16')=>{
+  return {mode:'real',generate:async(image,mime,checkpoint,signal,motion='dolly',aspectRatio='9:16',durationSeconds=RUNWAY_SECONDS)=>{
     VideoAspectRatio.parse(aspectRatio);
+    runwayClipCost(durationSeconds);
     if(image.length<512||image.length>10*1024*1024||!['image/jpeg','image/png','image/webp'].includes(mime))throw Error('RUNWAY_INPUT_INVALID');
     const sdk=client(signal,checkpoint),extension=mime==='image/jpeg'?'jpg':mime==='image/png'?'png':'webp';
     const {uri}=await sdk.uploads.createEphemeral({file:await toFile(image,`property.${extension}`,{type:mime})},{signal});
     const task=sdk.imageToVideo.create({model:RUNWAY_MODEL,promptImage:uri,promptText:RUNWAY_PROMPTS[motion],
-      ratio:aspectRatio==='16:9'?'1280:720':'720:1280',duration:RUNWAY_SECONDS},{signal});
+      ratio:aspectRatio==='16:9'?'1280:720':'720:1280',duration:durationSeconds},{signal});
     // SDK 4.20.1 waits ~6 s before awaiting creation. Observe rejection now
     // to avoid an unhandled 4xx/5xx during that wait; the helper still throws
     // the original error and owns polling. Never await or resubmit creation.

@@ -19,8 +19,17 @@ export const VideoAsset = z.object({id: EntityId, objectKey: ObjectKey, sha256: 
 });
 export type VideoAsset = z.infer<typeof VideoAsset>;
 export const PhotoAnimation=z.object({photoAssetId:EntityId,sourceSha256:Sha256,
-  provider:z.literal('runway'),model:z.literal('gen4_turbo'),asset:VideoAsset}).strict();
+  provider:z.literal('runway'),model:z.literal('gen4_turbo'),asset:VideoAsset}).strict().superRefine((animation,ctx)=>{
+    if(![2000,3000,4000,5000].includes(animation.asset.durationMs??0))
+      ctx.addIssue({code:'custom',message:'Durée d’animation invalide.'});
+  });
 export type PhotoAnimation=z.infer<typeof PhotoAnimation>;
+// Gen-4 Turbo accepts whole seconds from 2 to 10. Keep the existing five-second
+// spending ceiling and slow longer shots rather than increasing their cost.
+export function runwayDurationForFrames(frames:number){
+  if(!Number.isInteger(frames)||frames<1||frames>1200)throw Error('RUNWAY_DURATION_INVALID');
+  return Math.max(2,Math.min(5,Math.ceil(frames/30)));
+}
 export const VideoPresentation = z.object({
   transaction: z.enum(['sale', 'rent']), propertyType: z.enum(['apartment', 'house', 'other']),
   locality: z.string().trim().min(1).max(200), title: z.string().trim().min(1).max(200),
@@ -80,7 +89,7 @@ export const VideoManifest = z.object({schemaVersion: z.literal(2), templateVers
   if(m.photoAnimations?.length&&(!m.photoTimeline||m.templateVersion==='bienvu-vertical/1'
     ||new Set(m.photoAnimations.map(c=>c.photoAssetId)).size!==m.photoAnimations.length
     ||m.photoAnimations.some(c=>!m.photos.some(p=>p.id===c.photoAssetId&&p.sha256===c.sourceSha256)
-      ||c.asset.mime!=='video/mp4'||!((c.asset.width===720&&c.asset.height===1280)||(m.width===1920&&c.asset.width===1280&&c.asset.height===720))||c.asset.durationMs!==5000)))fail('Animation hors périmètre ou invalide.');
+      ||c.asset.mime!=='video/mp4'||!((c.asset.width===720&&c.asset.height===1280)||(m.width===1920&&c.asset.width===1280&&c.asset.height===720)))))fail('Animation hors périmètre ou invalide.');
   if ([...m.photos, ...(m.logo ? [m.logo] : [])].some(a => !a.mime.startsWith('image/') || !a.width || !a.height || a.durationMs)
     || m.audio.some(a => a.mime !== 'audio/wav' || !a.durationMs || a.durationMs>35000 || a.width || a.height)) fail('Type de média invalide.');
   if(Boolean(m.music)!==Boolean(m.editor?.music)||m.music&&(!m.editor||m.music.asset.mime!=='audio/wav'||

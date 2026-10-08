@@ -7,10 +7,11 @@ export const editorTime=(frames:number)=>`${Math.floor(frames/30/60).toString().
 function RetainedClip(p:{url:string;poster?:string;frame:number;playing:boolean;style:CSSProperties}){
  const ref=useRef<HTMLVideoElement>(null),[error,setError]=useState(false);
  useEffect(()=>setError(false),[p.url]);
- useEffect(()=>{const player=ref.current;if(!player)return;const elapsed=Math.min(4.96,Math.max(0,p.frame/30));
+ useEffect(()=>{const player=ref.current;if(!player)return;
   let alive=true;
-  const sync=()=>{if(player.readyState>0&&Math.abs(player.currentTime-elapsed)>.12)player.currentTime=elapsed;
-   if(p.playing&&p.frame>=0&&p.frame<149)void player.play().catch(cause=>{if(alive&&cause?.name!=='AbortError')setError(true);});else player.pause();};
+  const sync=()=>{const end=Number.isFinite(player.duration)?Math.max(0,player.duration-1/30):0,elapsed=Math.min(end,Math.max(0,p.frame/30));
+   if(player.readyState>0&&Math.abs(player.currentTime-elapsed)>.12)player.currentTime=elapsed;
+   if(player.readyState>0&&p.playing&&p.frame>=0&&p.frame/30<end)void player.play().catch(cause=>{if(alive&&cause?.name!=='AbortError')setError(true);});else player.pause();};
   sync();player.addEventListener('loadedmetadata',sync);return()=>{alive=false;player.removeEventListener('loadedmetadata',sync);};
  },[p.frame,p.playing,p.url]);
  return <>{error&&<span className="editor-media-unavailable" role="alert">Ce clip ne peut pas être lu. Rechargez l’aperçu.</span>}<video ref={ref} src={p.url} poster={p.poster} muted playsInline preload="metadata" style={p.style} onError={()=>setError(true)}/></>;

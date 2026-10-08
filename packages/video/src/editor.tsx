@@ -7,7 +7,7 @@ import {MapOverlay} from './map';
 function EditorPhoto({m,media,slot,index,duration,camera}:{m:VideoManifest;media:Record<string,string>;slot:number;index:number;duration:number;camera?:EditorCamera}){
   const frame=useCurrentFrame(),photo=m.photos[slot],animation=m.photoAnimations?.find(a=>a.photoAssetId===photo.id),
     motion=editorPhotoMotion(frame,duration,index,m.photoMotion!==false,camera),fade=m.photoTransition==='cut'||index===0?1:Math.min(1,frame/12);
-  return <AbsoluteFill style={{opacity:fade,overflow:'hidden'}}>{animation?<Freeze frame={Math.min(frame,149)}>
+  return <AbsoluteFill style={{opacity:fade,overflow:'hidden'}}>{animation?<Freeze frame={Math.min(frame,Math.ceil(animation.asset.durationMs!*30/1000)-1)}>
     <OffthreadVideo src={media[animation.asset.id]} muted style={{width:'100%',height:'100%',objectFit:'cover'}}/>
     </Freeze>:<Img src={media[photo.id]} style={{width:'100%',height:'100%',objectFit:'cover',...motion}}/>}</AbsoluteFill>;
 }

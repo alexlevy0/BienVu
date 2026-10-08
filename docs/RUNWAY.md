@@ -1,5 +1,19 @@
 # Animation des photos avec Runway
 
+## Durée adaptée au montage — 09/10/2026
+
+Les nouvelles animations demandent à `gen4_turbo` **2 à 5 secondes entières**, selon la durée réelle du plan : arrondi à la seconde supérieure, minimum deux secondes et plafond historique de cinq secondes. Le [contrat officiel](https://docs.dev.runwayml.com/openapi.json) et le catalogue MCP du projet confirment une plage fournisseur de 2 à 10 secondes ; BienVu conserve son plafond pour éviter d’augmenter le coût des plans longs. Résolution, mouvements, nombre de photos sélectionnées et prix en crédits BienVu restent identiques.
+
+Exemple sans carte : **dix photos animées dans vingt secondes → dix clips de deux secondes**, soit 100 crédits Runway / 1 $ au tarif API de 5 crédits par seconde et 0,01 $ par crédit, au lieu de 250 crédits / 2,50 $. Les durées fractionnaires sont arrondies ; un plan de 0,5 seconde exige quand même un clip de deux secondes. Source : [tarifs API](https://docs.dev.runwayml.com/guides/pricing/).
+
+La planification utilise la narration terminée et retire la séquence de carte. Avec un document d’éditeur, elle respecte les durées personnalisées et choisit la plus longue occurrence d’une photo divisée en plusieurs plans, dont la source recommence à chaque occurrence. Les montages automatiques conservent leur répartition existante : jusqu’à deux animations, cinq secondes par plan lorsque la durée le permet ; au-delà, partage de la durée entre toutes les photos.
+
+La migration `0055_adaptive_animation_duration.sql` conserve les journaux historiques, les tâches soumises, les 25 crédits et provisions de 35 centimes des anciennes animations. Les nouvelles provisions deviennent 5 crédits API et 7 centimes de provision prudente par seconde ; elles ne changent ni le solde prépayé ni les plafonds globaux. Le timing est figé avant le premier appel ; un repli sur photo conserve ce timing et une reprise utilise la durée enregistrée. Les anciennes tâches soumises restent à cinq secondes. Les clips conservés de toutes ces durées sont réutilisés sans nouvelle création payante.
+
+Le manifeste accepte les clips de deux, trois, quatre et cinq secondes. L’éditeur et son rendu tiennent la dernière image réelle d’un clip court, et le montage automatique conserve sa lecture à vitesse normale ou ralentie selon le plan. Les manifestes et vidéos déjà figés ne sont pas réécrits.
+
+Vérification : tests D1/R2 de dix clips avec exactement 100 crédits disponibles, reprise, réutilisation, échecs partiels, migration de tâche historique, payload SDK à deux/trois/cinq secondes et timings d’éditeur avec carte. La sonde `scripts/probe-runway-duration.ts` utilise uniquement un MP4 H.264 simulé de deux secondes et de l’audio synthétique : aucun appel payant fournisseur.
+
 Implémentation du 1 octobre 2026, demandée par Alex après un achat déclaré de **10 € de crédits API**. Cette intégration ne relève pas le plafond mensuel de 100 € / coupure à 90 €. La génération reste un montage automatique.
 
 ## Parcours et médias
