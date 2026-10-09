@@ -9,6 +9,7 @@ import {AdminSeo} from './admin-seo';
 import {AdminFinance,AdminVideoProfit} from './admin-finance';
 import {AdminPricingSimulator} from './admin-pricing-simulator';
 import {AdminBudgetSettings} from './admin-budget-settings';
+import {AdminVideoMapDefaults} from './admin-video-map-settings';
 import {AdminVoiceLibrary} from './admin-voices';
 import {AdminMusicLibrary} from './admin-music-library';
 import {AdminHomepage} from './admin-homepage';
@@ -130,6 +131,7 @@ export function AdminPanel(){
     {view==='music'&&accountId&&<AdminMusicLibrary key={revision}/>}
     {view==='homepage'&&accountId&&<AdminHomepage key={revision}/>}
     {view==='mailbox'&&accountId&&<AdminMailbox revision={revision}/>}
+    {view==='videos'&&accountId&&<AdminVideoMapDefaults key={accountId+':'+revision}/>}
     {failure&&<p role="alert" className="admin-error">{failure}</p>}
     {busy||loading?<div className="admin-loading" role="status"><span className="admin-spinner"/>Lecture des données…</div>:<>
       {overview&&view==='overview'&&<><AdminAttention data={overview} onFocus={focus}/><Overview data={overview} choose={choose}/></>}

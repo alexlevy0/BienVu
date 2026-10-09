@@ -3,7 +3,7 @@ import {mkdir,writeFile} from 'node:fs/promises';
 import {resolve,dirname} from 'node:path';
 import {createRequire} from 'node:module';
 import {videoFixture} from '../fixtures/video';
-import {VideoManifest,videoAssets,videoAssetFile,videoPhotoTimeline,createEditorDocument,mapDefaultZooms,mapRasterLevels} from '../packages/contracts/src/index';
+import {VideoManifest,videoAssets,videoAssetFile,videoPhotoTimeline,createEditorDocument,mapDefaultZooms,mapRasterLevels,DEFAULT_VIDEO_MAP} from '../packages/contracts/src/index';
 import {geocodeMap,fetchMapPlate,fetchMapBuildings,mapHash} from '../packages/maps/src/index';
 
 const require=createRequire(new URL('../apps/renderer/package.json',import.meta.url));
@@ -12,14 +12,14 @@ if(process.platform==='darwin'){
     bin=dirname(rendererRequire.resolve(`@remotion/compositor-darwin-${process.arch}/package.json`));
   process.env.BIENVU_FFPROBE_PATH??=resolve(bin,'ffprobe');process.env.BIENVU_FFMPEG_PATH??=resolve(bin,'ffmpeg');
 }
-const render=process.argv.includes('--render'),view=process.argv.includes('--3d')?'buildings-3d' as const:process.argv.includes('--satellite')?'satellite' as const:'plan' as const,
+const render=process.argv.includes('--render'),defaultMap=process.argv.includes('--default-map'),view=process.argv.includes('--3d')?'buildings-3d' as const:process.argv.includes('--satellite')||defaultMap?'satellite' as const:'plan' as const,
   custom=process.argv.includes('--zooms')||view==='satellite',zoomOut=process.argv.includes('--zoom-out'),{renderListingVideo,renderListingStills}=await import('../apps/renderer/src/listing-render');
 const location=(await geocodeMap('Lyon 6e')).find(l=>l.sourceType==='municipality');if(!location)throw Error('MAP_PROBE_GEOCODE_FAILED');
-const base=resolve(`evidence/local/maps${view==='buildings-3d'?'-3d':view==='satellite'?'-satellite':''}${custom?'-zoom':''}${zoomOut?'-out':''}`);await mkdir(base,{recursive:true,mode:0o700});
+const base=resolve(defaultMap?'evidence/local/default-video-map-2026-10-09/render':`evidence/local/maps${view==='buildings-3d'?'-3d':view==='satellite'?'-satellite':''}${custom?'-zoom':''}${zoomOut?'-out':''}`);await mkdir(base,{recursive:true,mode:0o700});
 const buildingData=view==='buildings-3d'?await fetchMapBuildings(location):undefined;
 const reports=[];
 for(const aspectRatio of ['9:16','16:9'] as const){
-  const defaults=mapDefaultZooms(view,location.precision),zooms=custom?(zoomOut?{zoomStart:defaults.zoomEnd,zoomEnd:defaults.zoomStart}:defaults):{},
+  const defaults=defaultMap?{zoomStart:DEFAULT_VIDEO_MAP.zoomStart,zoomEnd:DEFAULT_VIDEO_MAP.zoomEnd}:mapDefaultZooms(view,location.precision),zooms=custom?(zoomOut?{zoomStart:defaults.zoomEnd,zoomEnd:defaults.zoomStart}:defaults):{},
     levels=custom?mapRasterLevels({view,...zooms},location.precision):[],
     {manifest:m,files}=await videoFixture('paid',4),{bytes,geometry,mime}=await fetchMapPlate(location,aspectRatio,fetch,view,levels[0]),sha256=await mapHash(bytes),
     directory=resolve(base,aspectRatio==='9:16'?'portrait':'landscape'),total=600,position=aspectRatio==='9:16'?'start':'end';

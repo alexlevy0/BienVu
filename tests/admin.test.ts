@@ -4,7 +4,7 @@ import {randomBytes,createHmac} from 'node:crypto';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import {migrateNarrationProbe,seedNarrationFixture} from '../scripts/narration-fixtures';
 import {adminPage,adminOverview,adminAction,adminVideoDetail,ensureAgency,admitGeneration,findGeneration,beginImport,failImport,findImport} from '../packages/db/src/index';
-import {AdminQuery,Me,VideoReport} from '../packages/contracts/src/index';
+import {AdminQuery,Me,VideoReport,DEFAULT_VIDEO_MAP} from '../packages/contracts/src/index';
 import {isSuperAdmin,requireAdmin} from '../apps/web/lib/admin-access';
 import {financeRequest} from '../apps/web/lib/profitability';
 import {adminRequest,adminJobRequest} from '../apps/web/lib/admin';
@@ -12,6 +12,7 @@ import {createAuth} from '../apps/web/lib/auth';
 import {videoFixture,videoReport} from '../fixtures/video';
 import {RequestFailure} from '../apps/web/lib/http';
 import {importResult} from '../apps/web/lib/imports';
+import {adminVideoMapRequest} from '../apps/web/lib/video-map-settings';
 
 test('Super admin : accès fermé par défaut, adresse exacte et vérification obligatoires',()=>{
   const user={id:'admin',email:'Owner@Example.com',emailVerified:true};
@@ -42,12 +43,26 @@ test('Admin avec Better Auth/D1/R2 locaux : isolation, pagination globale, actio
   const req=(path:string,cookie=cookies[0],options:RequestInit={})=>new Request(env.BETTER_AUTH_URL+path,{...options,headers:{cookie,...options.headers}});
   await t.test('toutes les routes privées refusent anonyme, autre compte et adresse non vérifiée',async()=>{
     for(const [cookie,expected] of [['',401],[cookies[1],403],[cookies[2],401]] as const){
-      for(const response of [await financeRequest(req('/api/admin/finance?mode=test',cookie),env),await financeRequest(req('/api/admin/finance',cookie,{method:'POST',headers:{origin:env.BETTER_AUTH_URL,'Content-Type':'application/json'},body:JSON.stringify({action:'stripe_sync'})}),env),await adminRequest(req('/api/admin?section=overview',cookie),env),await adminRequest(req('/api/admin?section=traffic',cookie),env),await adminRequest(req('/api/admin',cookie,{method:'POST',headers:{origin:env.BETTER_AUTH_URL,'Content-Type':'application/json'},body:JSON.stringify({action:'generation_gate',expected:true,enabled:false,reason:'Fixture'})}),env),await adminJobRequest(req('/api/admin/jobs/missing',cookie),env,'missing'),await adminJobRequest(req('/api/admin/jobs/missing/video',cookie),env,'missing',true)]){
+      for(const response of [await financeRequest(req('/api/admin/finance?mode=test',cookie),env),await financeRequest(req('/api/admin/finance',cookie,{method:'POST',headers:{origin:env.BETTER_AUTH_URL,'Content-Type':'application/json'},body:JSON.stringify({action:'stripe_sync'})}),env),await adminRequest(req('/api/admin?section=overview',cookie),env),await adminRequest(req('/api/admin?section=traffic',cookie),env),await adminRequest(req('/api/admin',cookie,{method:'POST',headers:{origin:env.BETTER_AUTH_URL,'Content-Type':'application/json'},body:JSON.stringify({action:'generation_gate',expected:true,enabled:false,reason:'Fixture'})}),env),await adminJobRequest(req('/api/admin/jobs/missing',cookie),env,'missing'),await adminJobRequest(req('/api/admin/jobs/missing/video',cookie),env,'missing',true),await adminVideoMapRequest(req('/api/admin/video-map',cookie),env),await adminVideoMapRequest(req('/api/admin/video-map',cookie,{method:'PATCH',headers:{origin:env.BETTER_AUTH_URL,'Content-Type':'application/json'},body:'{}'}),env)]){
         assert.equal(response.status,expected);assert.equal(response.headers.get('cache-control'),'private, no-store');}
     }
     await assert.rejects(requireAdmin(req('/api/admin'),{...env,SUPER_ADMIN_EMAIL:''}),e=>e instanceof RequestFailure&&e.code==='FORBIDDEN');
     await db.prepare('UPDATE auth_user SET emailVerified=0 WHERE id=?').bind(users[0].id).run();assert.equal((await adminRequest(req('/api/admin'),env)).status,401);
     await db.prepare('UPDATE auth_user SET emailVerified=1 WHERE id=?').bind(users[0].id).run();
+  });
+  await t.test('carte par défaut : accès admin, validation, origine et sauvegarde sans écrasement concurrent',async()=>{
+    const response=await adminVideoMapRequest(req('/api/admin/video-map'),env);assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'private, no-store');
+    const current=await response.json() as {settings:typeof DEFAULT_VIDEO_MAP;revision:number};assert.deepEqual(current.settings,DEFAULT_VIDEO_MAP);
+    const update={settings:{...DEFAULT_VIDEO_MAP,enabled:false,position:'end',zoomStart:13,zoomEnd:16},revision:current.revision};
+    const patch=(body:unknown,origin=env.BETTER_AUTH_URL)=>adminVideoMapRequest(req('/api/admin/video-map',cookies[0],{method:'PATCH',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify(body)}),env);
+    assert.equal((await patch(update,'https://evil.example')).status,403);
+    assert.equal((await patch({...update,actorId:users[1].id})).status,422);
+    assert.equal((await patch({...update,settings:{...update.settings,zoomEnd:19}})).status,422);
+    const saved=await patch(update);assert.equal(saved.status,200);
+    const state=await saved.json() as {settings:typeof DEFAULT_VIDEO_MAP;revision:number};assert.deepEqual(state.settings,update.settings);assert.equal(state.revision,current.revision+1);
+    assert.equal((await patch(update)).status,409);
+    assert.equal((await db.prepare('SELECT actor_id FROM video_map_setting_events').first<{actor_id:string}>())?.actor_id,users[0].id);
+    assert.equal((await patch({settings:DEFAULT_VIDEO_MAP,revision:state.revision})).status,200);
   });
   await t.test('toutes les sections se lisent sans secrets et les mauvais paramètres sont refusés',async()=>{
     for(const section of ['traffic','overview','videos','agencies','users','subscriptions','quotas','imports','reports','audit']){

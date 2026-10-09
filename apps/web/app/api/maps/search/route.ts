@@ -8,5 +8,5 @@ export async function POST(request:Request){return respond(()=>mapAction(async()
   const env=(await getCloudflareContext({async:true})).env;
   await authorizeMapRequest(request,env);
   const input=MapSearch.safeParse(await boundedJson(request));if(!input.success)throw new RequestFailure('VALIDATION_ERROR');
-  return Response.json({locations:await geocodeMap(input.data.query)});
+  return Response.json({locations:await geocodeMap(input.data.query,fetch,input.data.municipalityOnly)});
 }));}

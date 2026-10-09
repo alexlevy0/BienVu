@@ -11,6 +11,7 @@ import {cleanupAnonymousTrials} from './trial-cleanup';
 import {extractDescription,EXTRACTION_TEXT_MAX} from '@bienvu/narration';
 import {loadGenerationListing} from './generation-import';
 import {prepareJobAnimations} from './photo-animations';
+import {prepareDefaultGenerationMap} from './default-video-map';
 export {VideoRenderer};
 export type GenerationEnv=VideoEnv&Pick<NarrationEnv,'GOOGLE_SERVICE_ACCOUNT_JSON'|'GOOGLE_CLOUD_PROJECT'|'GOOGLE_TTS_VOICE'|'OPENAI_API_KEY'|'SCRIPT_MODEL'>&FishVoiceEnv&{
   GENERATIONS_ENABLED:string;GENERATION_TOKEN:string;IMPORT_TOKEN:string;IMPORT_SERVICE:Fetcher;GENERATION_WORKFLOW:Workflow<{agencyId:string;jobId:string}>;
@@ -78,12 +79,16 @@ export class GenerationWorkflow extends WorkflowEntrypoint<GenerationEnv,{agency
   protected diagnostic(_error:unknown){}
   protected providers(voiceName?:string,voiceEnabled=true){return realProviders(this.env,voiceName,voiceEnabled);}
   protected animations(agencyId:string,jobId:string){return prepareJobAnimations(this.env,agencyId,jobId);}
+  protected defaultMap(row:GenerationRow){return prepareDefaultGenerationMap(this.env,row);}
   async run(event:WorkflowEvent<{agencyId:string;jobId:string}>,step:WorkflowStep){
     const {agencyId,jobId}=event.payload;
     const once={retries:{limit:0,delay:'1 second' as const},timeout:'10 minutes' as const};
     try {
       await step.do('import-or-load',once,async()=>{const row=await active(this.env,agencyId,jobId);await setGenerationStage(this.env.DB,row,'importing');
         return loadGenerationListing(this.env,row);});
+      await step.do('resolve-default-map',{...once,timeout:'3 minutes'},async()=>{
+        const row=await active(this.env,agencyId,jobId);await this.defaultMap(row);return {prepared:true};
+      });
       await step.do('script-and-voice-checkpoints',once,async()=>{
         const row=await active(this.env,agencyId,jobId);await setGenerationStage(this.env.DB,row,'scripting');
         const input=GenerationRequest.parse(JSON.parse(row.input));

@@ -1,6 +1,6 @@
 import {EntityId, GenerationRequest, PreparedNarration, PhotoAnimation, VideoAsset, VideoManifest, VideoFailure, videoAssets, videoManifestHash, videoPresentation, videoPhotoTimeline,videoDimensions,audioNormalizationGain} from '@bienvu/contracts';
 import {measureVoiceWav} from '@bienvu/voice';
-import {findNarration,retainedAnimation,generationStoredPermanently,type AnimationReuse, type Database} from '@bienvu/db';
+import {findNarration,retainedAnimation,generationStoredPermanently,findDefaultGenerationMap,type AnimationReuse, type Database} from '@bienvu/db';
 import {scriptContext, validateScript, type ScriptContext} from '@bienvu/narration';
 import type {NarrationBucket} from './narration';
 import {prepareMapImage} from '@bienvu/maps';
@@ -79,9 +79,10 @@ export async function prepareJobVideo(env: {DB: Database; MEDIA: NarrationBucket
       return VideoAsset.parse({id:a.id,objectKey:a.objectKey,sha256:a.sha256,sizeBytes:a.sizeBytes,mime:'audio/wav',durationMs:a.durationMs,...(normalizationGain!==undefined?{normalizationGain}:{})});
     }));
     const customization=input?.customization;
+    const mapSettings=customization?.map?.location?customization.map:await findDefaultGenerationMap(env.DB,agency,job);
     let map:VideoManifest['map'];
-    if(customization?.map){
-      const settings=ConfirmedVideoMap.parse(customization.map),location=mapPublicLocation(settings.location);
+    if(mapSettings){
+      const settings=ConfirmedVideoMap.parse(mapSettings),location=mapPublicLocation(settings.location);
       const image=await prepareMapImage(env,location,input?.aspectRatio??'9:16',fetch,settings.view,{zoomStart:settings.zoomStart,zoomEnd:settings.zoomEnd});
       const asset=VideoAsset.parse({id:`map-${image.info.id.slice(0,40)}`,objectKey:`${prefix}map/${image.sha256}.${image.mime==='image/jpeg'?'jpg':'png'}`,sha256:image.sha256,
         sizeBytes:image.sizeBytes,mime:image.mime,width:image.info.width,height:image.info.height});

@@ -1,13 +1,13 @@
 'use client';
 import {trackProductEvent} from '../lib/product-analytics';
 import {useEffect,useRef,useState,type CSSProperties} from 'react';
-import {CustomNarration,videoStyles,frenchVoices,requestedAnimations,generationCreditCost,selectedAnimationIndices,mapFrame,mapInterval,mapInk,type VideoCustomization,type VideoDuration,type VideoAspectRatio} from '@bienvu/contracts';
+import {CustomNarration,videoStyles,frenchVoices,requestedAnimations,generationCreditCost,selectedAnimationIndices,mapFrame,mapInterval,mapInk,videoMapFromDefaults,type VideoCustomization,type VideoDuration,type VideoAspectRatio} from '@bienvu/contracts';
 import {suggestedNarration,narrationWordLimit,wordCount} from '@bienvu/narration/suggestion';
 import type {ManualDraftFields} from '../lib/listing-draft';
 import {HomeIcon} from './home-icons';
 import {VoicePreview} from './voice-preview';
 import {useAccount} from './account';
-import {MapScenePreview,VideoMapControls} from './video-map';
+import {MapScenePreview,VideoMapControls,useVideoMapDefaults,useAutomaticMapLocation} from './video-map';
 import {PhotoPreviewImage} from './photo-preview-image';
 
 export type CustomizerPhoto={id:string;preview:string;slot:number;state:string;file?:File|null;error?:string;removing?:boolean};
@@ -17,6 +17,9 @@ type Props={settings:VideoCustomization;onChange(value:VideoCustomization):void;
   busy:boolean;ready:boolean;onEdit():void;saved:boolean;sourceUrl?:string;onRetry?(id:string):void;onRemove?(id:string):void};
 export function VideoCustomizer(p:Props){
   const {me,voiceCatalog}=useAccount();
+  const mapDefaults=useVideoMapDefaults(),automaticMap=Boolean(p.settings.mapAutomatic||(!p.settings.map&&!p.settings.mapDisabled&&!p.settings.editor&&mapDefaults?.enabled)),
+    automaticLocation=useAutomaticMapLocation(p.fields.locality,automaticMap),mapSettings=p.settings.map??(automaticMap&&mapDefaults?videoMapFromDefaults(mapDefaults):undefined),
+    previewMap=mapSettings?{...mapSettings,...(automaticMap?{location:automaticLocation}:{})}:undefined;
   const duration=p.durationSeconds??20;
   const [tab,setTab]=useState<'photos'|'style'|'voice'|'map'>('photos'),[drag,setDrag]=useState<number|null>(null),
     [playing,setPlaying]=useState(false),[time,setTime]=useState(0);
@@ -34,7 +37,7 @@ export function VideoCustomizer(p:Props){
   function move(slot:number,target:number){trackProductEvent('editor_action',{action:'photo_reordered'});const next=order.filter(s=>s!==slot);next.splice(Math.max(0,Math.min(next.length,target)),0,slot);patch({photoOrder:next});}
   useEffect(()=>{setPlaying(false);setTime(0);},[duration]);
   useEffect(()=>{if(!playing)return;const timer=setInterval(()=>setTime(t=>{if(t>=duration-.2){setPlaying(false);return duration;}return t+.1;}),100);return()=>clearInterval(timer);},[playing,duration]);
-  const interval=mapInterval(p.settings.map,duration*30),mapAt=mapFrame(p.settings.map,duration*30,Math.min(duration*30-1,Math.round(time*30))),
+  const interval=mapInterval(previewMap,duration*30),mapAt=mapFrame(previewMap,duration*30,Math.min(duration*30-1,Math.round(time*30))),
     photo=chosen[Math.max(0,Math.min(chosen.length-1,Math.floor((time*30-interval.photoStartFrame)/interval.photoFrames*chosen.length)))],line=Math.min(narration.length-1,Math.floor(time/duration*narration.length));
   const money=Number(p.fields.priceCents.replace(/\s/g,'').replace(',','.'));
   const price=money>0?`${new Intl.NumberFormat('fr-FR').format(money)} €${p.fields.transaction==='rent'?' / mois':''}`:'';
@@ -91,7 +94,7 @@ export function VideoCustomizer(p:Props){
         <p className={validNarration.success||p.sourceUrl&&!p.settings.narration?'customizer-hint':'customizer-error'} role="status">{p.sourceUrl&&!p.settings.narration?`Rédaction automatique · ${duration} secondes.`:validNarration.success?`${wordCount(narration.join(' '))} mots · ${duration} secondes · ${narrationWordLimit(duration)} mots conseillés maximum${wordCount(narration.join(' '))>narrationWordLimit(duration)?' — raccourcissez le texte ou choisissez une durée supérieure.':''}`:
           validNarration.error.issues[0].message}</p><button type="button" className="customizer-reset" disabled={p.busy} onClick={()=>patch({narration:undefined})}>Reprendre le texte proposé</button>
       </>}
-      {tab==='map'&&<VideoMapControls map={p.settings.map} onChange={map=>patch({map})} onPreview={endpoint=>{setPlaying(false);setTime((interval.startFrame+(endpoint==='end'?interval.durationFrames-1:0))/30);}} locality={p.fields.locality} aspectRatio={p.aspectRatio??'9:16'} busy={p.busy} color={mapInk(p.settings.primaryColor,p.settings.secondaryColor)} duration={duration}/>}
+      {tab==='map'&&<VideoMapControls map={mapSettings} automatic={automaticMap} defaults={mapDefaults} onChange={(map,automatic=automaticMap)=>patch({map,mapDisabled:map?undefined:true,mapAutomatic:map&&automatic?true:undefined})} onPreview={endpoint=>{setPlaying(false);setTime((interval.startFrame+(endpoint==='end'?interval.durationFrames-1:0))/30);}} locality={p.fields.locality} aspectRatio={p.aspectRatio??'9:16'} busy={p.busy} color={mapInk(p.settings.primaryColor,p.settings.secondaryColor)} duration={duration}/>}
       </div>
       <details className="customizer-advanced"><summary><HomeIcon name="settings" size={21}/>Réglages avancés<HomeIcon name="chevron" size={17}/></summary><div>
         <label className="customizer-checkbox"><input type="checkbox" checked={p.settings.photoMotion} onChange={event=>patch({photoMotion:event.target.checked})} disabled={p.busy}/>Zooms et translations des photos</label>
@@ -104,7 +107,7 @@ export function VideoCustomizer(p:Props){
         {p.subtitlesEnabled&&!p.sourceUrl&&<div className="customizer-preview-subtitle">{narration[line]}</div>}
         <div className="customizer-poster-copy"><h2>{p.settings.style==='cinematic'?p.fields.title||'Une nouvelle adresse':time>=duration*.8?p.agencyName||'Découvrez le bien':p.fields.title||'Une nouvelle adresse'}</h2><p>{[p.fields.area?`${p.fields.area} m²`:'',p.fields.rooms?`${p.fields.rooms} pièces`:''].filter(Boolean).join(' · ')}</p><strong>{price}</strong></div>
         <div className="customizer-poster-agency">{p.agencyName||'BienVu'}</div>
-        {p.settings.map&&mapAt!==null&&<MapScenePreview map={p.settings.map} aspectRatio={p.aspectRatio??'9:16'} frame={mapAt} primaryColor={p.settings.primaryColor} secondaryColor={p.settings.secondaryColor} agencyName={p.agencyName}/>}
+        {previewMap&&mapAt!==null&&<MapScenePreview map={previewMap} automatic={automaticMap} aspectRatio={p.aspectRatio??'9:16'} frame={mapAt} primaryColor={p.settings.primaryColor} secondaryColor={p.settings.secondaryColor} agencyName={p.agencyName}/>}
       </div><div className="customizer-player-controls"><button type="button" aria-label={playing?'Pause':'Lecture'} disabled={!chosen.length} onClick={()=>{if(time>=duration)setTime(0);setPlaying(!playing);}}>{playing?'Ⅱ':'▶'}</button><span>0:{String(Math.floor(time)).padStart(2,'0')} / 0:{duration}</span>
         <input type="range" min="0" max={duration} step=".1" value={time} aria-label="Position de l’aperçu" onChange={event=>{setPlaying(false);setTime(Number(event.target.value));}}/>
         <button type="button" aria-label="Aperçu en plein écran" onClick={()=>void preview.current?.requestFullscreen?.()}>⛶</button></div>

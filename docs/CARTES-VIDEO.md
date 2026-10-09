@@ -1,6 +1,24 @@
-# Séquence de carte optionnelle
+# Séquence de carte
 
-Dans **Personnaliser → Carte**, activer la séquence, choisir son emplacement (début ou fin) et sa durée (3 à 5 secondes, 4 par défaut). Rechercher la ville ou une adresse, choisir le résultat, puis confirmer la localisation. Le rendu standard reste sans carte et ne fait aucun appel au service cartographique.
+## Carte par défaut — 9 octobre 2026
+
+Les nouvelles générations par URL, saisie manuelle ou essai sans compte ajoutent une carte **satellite**, de **4 secondes au début**, avec un zoom **12 → 14,5**. La carte est incluse dans la durée totale, sans crédit supplémentaire. Le superadmin règle l’activation, la vue (satellite, plan ou bâtiments 3D), l’emplacement, la durée et les deux zooms dans **Vidéos → Map par défaut**. Les modifications sont journalisées et soumises à une révision pour éviter qu’une sauvegarde écrase une autre modification.
+
+La ville vérifiée de l’annonce est recherchée dans les communes du géocodeur IGN, sans supposer une adresse. Seul un résultat dont le nom correspond et dont la commune est unique est retenu ; une ville introuvable, ambiguë ou une panne cartographique omet la carte automatique et laisse la génération continuer. Les coordonnées restent arrondies pour cette localisation par ville. La carte personnalisée conserve son obligation de confirmation.
+
+La réponse intermittente IGN `LayerNotDefined` sur la couche prévue bénéficie de deux reprises espacées. Les autres erreurs, redirections ou réponses excessives restent refusées ; aucune autre source n’est utilisée silencieusement.
+
+Les réglages sont figés à l’admission, séparément du corps et du hash d’idempotence. La décision de localisation et les fonds sont préparés avant la narration et les animations payantes, puis conservés pour toutes les reprises du job. Un changement de réglages n’ajoute pas de carte aux vidéos historiques ou aux générations déjà admises. Les projets de l’éditeur conservent leur timeline ; une vidéo générée avec une carte la récupère lorsqu’on l’ouvre dans l’éditeur.
+
+**Personnaliser → Carte** affiche la sélection automatique et permet de la désactiver (`mapDisabled` explicite), de modifier vue/zoom/durée/emplacement, ou de passer à un repère à confirmer. Les réglages automatiques particuliers (`mapAutomatic`) restent valides sans confirmation manuelle. Le calendrier de photos et les durées demandées à Runway utilisent la durée réellement réservée à la carte, y compris après son omission éventuelle.
+
+Migration `0056_default_video_map.sql` : réglages globaux, journal immuable, paramétrage figé du job et résolution privée par agence. API publique `/api/video-defaults` pour le formulaire, API `/api/admin/video-map` réservée au superadmin avec contrôle d’origine et révision à la sauvegarde. Aucune nouvelle clé fournisseur ni modification du modèle Runway.
+
+Tests `tests/default-video-map.test.ts`, `tests/video-maps.test.ts` et workflow local. `pnpm exec tsx scripts/probe-video-maps.ts --default-map --render` vérifie les deux formats avec des photographies aériennes IGN et des médias synthétiques, sans appel IA ni génération client. Le renderer existant supporte déjà ces vues et ces niveaux ; aucune modification de sa composition n’est nécessaire.
+
+## Personnalisation manuelle et fonctionnement initial
+
+Dans **Personnaliser → Carte**, choisir l’emplacement de la séquence (début ou fin) et sa durée (3 à 5 secondes, 4 par défaut). Pour un repère personnalisé, rechercher la ville ou une adresse, choisir le résultat, puis confirmer la localisation. Avant l’ajout de la carte automatique, le rendu standard restait sans carte.
 
 Le style **Plan · sans satellite** est proposé par défaut. **Bâtiments en 3D** utilise les emprises et hauteurs connues de la BD TOPO pour créer des volumes sur une carte inclinée. La caméra avance de façon déterministe ; les bâtiments ne sont pas inventés. Une zone sans hauteur connue est signalée dans les réglages. Le troisième style, **Satellite · vue aérienne**, affiche des photographies aériennes BD ORTHO. Les niveaux de zoom au départ et à l’arrivée sont réglables ; les bâtiments 3D restent réservés au style en volume.
 
@@ -21,7 +39,7 @@ Une ville ou une rue est proposée comme zone approximative. Les coordonnées so
 
 Migrations `0049_video_maps.sql` et `0050_map_buildings.sql`. D1 conserve les références, le type, les hashes et la date ; R2 garde le fond et, en 3D, la géométrie publique. Les caches Plan, 3D et Satellite sont séparés, sans repère, texte ou identité client. Le manifeste figé possède sa propre copie sous le préfixe privé du job. Les anciens JSON et hashes ne reçoivent aucun champ par défaut.
 
-Les POST sont de même origine. Les limites sont atomiques dans D1 et indépendantes des imports et des crédits : 12 recherches/préparations par minute et IP pseudonymisée, 50 requêtes par minute et 1 000 par jour globalement, 300 nouveaux fonds par jour. Une réservation avec bail évite les téléchargements concurrents d’un même fond. Aucun texte de recherche ou IP brute n’est conservé dans ces compteurs. Les erreurs ne remplacent jamais silencieusement une carte demandée par un plan photo.
+Les POST sont de même origine. Les limites sont atomiques dans D1 et indépendantes des imports et des crédits : 12 recherches/préparations par minute et IP pseudonymisée, 50 requêtes par minute et 1 000 par jour globalement, 300 nouveaux fonds par jour. Une réservation avec bail évite les téléchargements concurrents d’un même fond. Aucun texte de recherche ou IP brute n’est conservé dans ces compteurs. Les erreurs ne remplacent jamais silencieusement une carte personnalisée confirmée par un plan photo ; seule la carte automatique peut être omise avec un motif conservé.
 
 ## Vérification
 

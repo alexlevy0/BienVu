@@ -101,6 +101,20 @@ test('géocodage : endpoint IGN fixe, résultats validés, pas de redirection ni
   await assert.rejects(geocodeMap('Lyon',async()=>Response.json({not:'GeoJSON'})),MapFailure);
   await assert.rejects(geocodeMap('Lyon',async()=>new Response(null,{status:302,headers:{Location:'https://attacker.invalid/'}})),MapFailure);
 });
+test('satellite IGN : reprise bornée de la couche temporairement absente, sans changement de source',async()=>{
+  const bytes=await png(),unavailable=()=>new Response('<ServiceException code="LayerNotDefined">Layer ORTHOIMAGERY.ORTHOPHOTOS unknown</ServiceException>',{status:400,headers:{'Content-Type':'text/xml; charset=UTF-8'}});
+  let attempts=0,firstUrl='';
+  const plate=await fetchMapPlate(location,'9:16',async(url,init)=>{
+    const value=String(url);if(!firstUrl)firstUrl=value;assert.equal(value,firstUrl);assert.equal(init?.redirect,'manual');
+    return ++attempts<3?unavailable():new Response(bytes,{headers:{'Content-Type':'image/png'}});
+  },'satellite',13);
+  assert.equal(attempts,3);assert.equal(plate.mime,'image/png');
+  attempts=0;await assert.rejects(fetchMapPlate(location,'9:16',async()=>{attempts++;return unavailable();},'satellite',13),MapFailure);assert.equal(attempts,3);
+  for(const response of [new Response('<ServiceException code="InvalidParameterValue">Invalid dimensions</ServiceException>',{status:400,headers:{'Content-Type':'text/xml'}}),
+    new Response('redirect',{status:302,headers:{Location:'https://attacker.invalid'}}),new Response('x'.repeat(2049),{status:400,headers:{'Content-Type':'text/xml'}})]){
+    attempts=0;await assert.rejects(fetchMapPlate(location,'9:16',async()=>{attempts++;return response;},'satellite',13),MapFailure);assert.equal(attempts,1);
+  }
+});
 test('fond raster : bonnes dimensions, URL serveur fixe et rejet des faux PNG ou des réponses excessives',async()=>{
   const bytes=await png();let calls=0;
   const result=await fetchMapPlate(location,'9:16',async(url,init)=>{calls++;const u=new URL(String(url));assert.equal(u.host,'data.geopf.fr');assert.equal(u.searchParams.get('WIDTH'),'2160');

@@ -12,9 +12,19 @@ export const MapZoom=z.number().finite().min(12).max(18);
 const zoomFields={zoomStart:MapZoom.optional(),zoomEnd:MapZoom.optional()};
 export const VideoMap=z.object({position:z.enum(['start','end']),durationSeconds:z.number().int().min(3).max(5),location:MapLocation.nullable(),view:MapView.optional(),...zoomFields}).strict();
 export type VideoMap=z.infer<typeof VideoMap>;
+export const VideoMapDefaults=z.object({enabled:z.boolean(),position:VideoMap.shape.position,durationSeconds:VideoMap.shape.durationSeconds,
+  view:MapView,zoomStart:MapZoom,zoomEnd:MapZoom}).strict();
+export type VideoMapDefaults=z.infer<typeof VideoMapDefaults>;
+export const DEFAULT_VIDEO_MAP:VideoMapDefaults={enabled:true,position:'start',durationSeconds:4,view:'satellite',zoomStart:12,zoomEnd:14.5};
+export function videoMapFromDefaults(settings:VideoMapDefaults):VideoMap {
+  const {enabled:_enabled,...map}=VideoMapDefaults.parse(settings);return {...map,location:null};
+}
+export const AdminVideoMapSettings=z.object({settings:VideoMapDefaults,revision:z.number().int().positive(),updatedAt:z.iso.datetime().nullable()}).strict();
+export type AdminVideoMapSettings=z.infer<typeof AdminVideoMapSettings>;
+export const UpdateVideoMapSettings=z.object({settings:VideoMapDefaults,revision:z.number().int().positive()}).strict();
 export const ConfirmedVideoMap=VideoMap.extend({location:MapLocation});
 export type ConfirmedVideoMap=z.infer<typeof ConfirmedVideoMap>;
-export const MapSearch=z.object({query:label}).strict();
+export const MapSearch=z.object({query:label,municipalityOnly:z.boolean().optional()}).strict();
 export const MapPreviewRequest=z.object({location:MapLocation,aspectRatio:z.enum(['9:16','16:9']),view:MapView.optional(),...zoomFields}).strict();
 const MapRasterInfo=z.object({id:z.string().regex(/^[a-f0-9]{64}$/),url:z.string().regex(/^\/api\/maps\/images\/[a-f0-9]{64}$/),
   width:z.number().int().positive(),height:z.number().int().positive(),capturedAt:z.iso.datetime(),
@@ -34,6 +44,15 @@ export function mapPublicLocation(input:MapLocation):MapLocation {
   if(location.precision==='exact')return location;
   const label=['housenumber','manual'].includes(location.sourceType)?location.label.replace(/^\d+(?:\s*[-/]\s*\d+)?(?:\s*(?:bis|ter|quater|[a-z]))?\s+/i,''):location.label;
   return {...location,label,latitude:Math.round(location.latitude*1000)/1000,longitude:Math.round(location.longitude*1000)/1000};
+}
+// Never infer a street address or choose between homonymous municipalities.
+export function automaticMapLocation(query:string,locations:MapLocation[]):MapLocation|null {
+  const normalize=(text:string)=>text.normalize('NFD').replace(/\p{M}/gu,'').toLowerCase().replace(/\b\d{5}\b/g,'')
+    .replace(/\b(arrondissement|france)\b/g,'').replace(/\b(\d+)(?:eme|ieme|er|e)\b/g,'$1').replace(/[^a-z0-9]+/g,' ').trim();
+  const key=normalize(query);if(!key)return null;
+  const matches=locations.filter(l=>l.sourceType==='municipality'&&normalize(l.label)===key);
+  const unique=[...new Map(matches.map(l=>[`${l.latitude.toFixed(3)}:${l.longitude.toFixed(3)}`,l])).values()];
+  return unique.length===1?mapPublicLocation({...unique[0],precision:'approximate'}):null;
 }
 export function mapInterval(map:VideoMap|undefined,total:number){
   const durationFrames=map?map.durationSeconds*30:0,startFrame=map?.position==='end'?total-durationFrames:0;

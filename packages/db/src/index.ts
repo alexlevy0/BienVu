@@ -12,6 +12,7 @@ export * from './homepage';
 export * from './mailbox';
 export * from './partners';
 export * from './voices';
+export * from './video-map-settings';
 
 // Port structurel minimal compatible D1 ; pas de transaction interactive.
 export interface SqlStatement {

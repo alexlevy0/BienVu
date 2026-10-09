@@ -21,9 +21,10 @@ async function bounded(response:Response,limit:number){
   finally{reader.releaseLock();}
   const bytes=new Uint8Array(size);let offset=0;for(const part of parts){bytes.set(part,offset);offset+=part.length;}return bytes;
 }
-export async function geocodeMap(query:string,transport:typeof fetch=fetch):Promise<MapLocation[]>{
+export async function geocodeMap(query:string,transport:typeof fetch=fetch,municipalityOnly=false):Promise<MapLocation[]>{
   const {query:q}=MapSearch.parse({query}),url=new URL('https://data.geopf.fr/geocodage/search');
   url.search=new URLSearchParams({q,limit:'5',index:'address'}).toString();
+  if(municipalityOnly)url.searchParams.set('type','municipality');
   try{
     const response=await transport(url,{redirect:'manual',signal:AbortSignal.timeout(10000)});
     const json=JSON.parse(new TextDecoder().decode(await bounded(response,100_000))) as {features?:unknown[]};
@@ -45,12 +46,23 @@ export async function fetchMapPlate(location:MapLocation,aspectRatio:'9:16'|'16:
   url.search=new URLSearchParams({SERVICE:'WMS',VERSION:'1.3.0',REQUEST:'GetMap',LAYERS:view==='satellite'?'ORTHOIMAGERY.ORTHOPHOTOS':'GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2',
     STYLES:'normal',CRS:'EPSG:3857',BBOX:geometry.box.join(','),WIDTH:String(geometry.width),HEIGHT:String(geometry.height),FORMAT:'image/jpeg'}).toString();
   try{
-    const response=await transport(url,{redirect:'manual',signal:AbortSignal.timeout(20000)});
-    const mime=response.headers.get('content-type')?.split(';')[0];
-    if(mime!=='image/jpeg'&&mime!=='image/png')throw new MapFailure('MAP_UNAVAILABLE');
-    const bytes=await bounded(response,8*1024*1024),size=imageSize(bytes);
-    if(size.width!==geometry.width||size.height!==geometry.height||(mime==='image/jpeg'?size.type!=='jpg':size.type!=='png'))throw new MapFailure('MAP_UNAVAILABLE');
-    return {bytes,geometry,mime};
+    for(let attempt=0;attempt<3;attempt++){
+      const response=await transport(url,{redirect:'manual',signal:AbortSignal.timeout(20000)});
+      const mime=response.headers.get('content-type')?.split(';')[0];
+      // The fixed, documented layer can intermittently be absent on an IGN WMS
+      // backend. Retry only that bounded XML error, never another layer or host.
+      if(attempt<2&&response.status===400&&mime?.includes('xml')){
+        const message=new TextDecoder().decode(await bounded(new Response(response.body,{headers:response.headers}),2048));
+        if(/code=["']LayerNotDefined["']/.test(message)&&message.includes(url.searchParams.get('LAYERS')!)){
+          await new Promise(resolve=>setTimeout(resolve,300*(attempt+1)));continue;
+        }
+      }
+      if(mime!=='image/jpeg'&&mime!=='image/png')throw new MapFailure('MAP_UNAVAILABLE');
+      const bytes=await bounded(response,8*1024*1024),size=imageSize(bytes);
+      if(size.width!==geometry.width||size.height!==geometry.height||(mime==='image/jpeg'?size.type!=='jpg':size.type!=='png'))throw new MapFailure('MAP_UNAVAILABLE');
+      return {bytes,geometry,mime};
+    }
+    throw new MapFailure('MAP_UNAVAILABLE');
   }catch(error){if(error instanceof MapFailure)throw error;throw new MapFailure('MAP_UNAVAILABLE');}
 }
 export async function fetchMapBuildings(input:MapLocation,transport:typeof fetch=fetch){

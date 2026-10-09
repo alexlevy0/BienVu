@@ -10,8 +10,12 @@ test('purge R2 réelle locale : aucun fichier récupéré supprimé, reprise ide
   await DB.exec('UPDATE trial_policy SET enabled=1,free_enabled=1; UPDATE generation_control SET enabled=1');
   await DB.prepare('INSERT INTO hosted_import_budget VALUES(?,0,2500,0)').bind(new Date().toISOString().slice(0,7)).run();
   const {session}=await createAnonymousSession(DB),input={url:'https://www.century21.fr/trouver_logement/detail/123456/'},proof={ipHmac:'a'.repeat(64),turnstileHash:'b'.repeat(64)};
-  const old=await admitAnonymous(DB,session,'purge-abandoned-key',input,proof,'true');await failGeneration(DB,old,'GENERATION_FAILED');
+  const old=await admitAnonymous(DB,session,'purge-abandoned-key',input,proof,'true');
+  const map=JSON.stringify({position:'start',durationSeconds:4,view:'satellite',zoomStart:12,zoomEnd:14.5,location:{latitude:45.772,longitude:4.856,label:'Lyon 6e',precision:'approximate',sourceType:'municipality'}});
+  await DB.prepare('INSERT INTO generation_map_resolutions(job_id,agency_id,map_json,created_at) VALUES(?,?,?,?)').bind(old.jobId,old.agencyId,map,new Date().toISOString()).run();
+  await failGeneration(DB,old,'GENERATION_FAILED');
   const current=await admitAnonymous(DB,session,'purge-claimed-key-123',input,{...proof,turnstileHash:'c'.repeat(64)},'true');
+  await DB.prepare('INSERT INTO generation_map_resolutions(job_id,agency_id,map_json,created_at) VALUES(?,?,?,?)').bind(current.jobId,current.agencyId,map,new Date().toISOString()).run();
   const now=Date.now(),at=new Date(now).toISOString();
   await DB.prepare('INSERT INTO auth_user VALUES(?,?,?,1,NULL,?,?)').bind('purge-owner','Owner','owner@example.com',now-1000,now).run();
   const user=await ensureAgency(DB,{id:'purge-owner',email:'owner@example.com'});await claimTrial(DB,session,user.id,current.jobId);await failGeneration(DB,current,'GENERATION_FAILED');
@@ -35,6 +39,8 @@ test('purge R2 réelle locale : aucun fichier récupéré supprimé, reprise ide
   assert.equal(await DB.prepare("SELECT id FROM listing_imports WHERE id='expired-import'").first(),null);
   assert.ok(await DB.prepare("SELECT id FROM listings WHERE id='kept-import'").first());
   assert.equal((await findGeneration(DB,session.scopeId,old.jobId))!.retention,'expired');assert.equal((await findGeneration(DB,session.scopeId,current.jobId))!.retention,'available');
+  assert.equal(await DB.prepare('SELECT job_id FROM generation_map_resolutions WHERE job_id=?').bind(old.jobId).first(),null);
+  assert.ok(await DB.prepare('SELECT job_id FROM generation_map_resolutions WHERE job_id=?').bind(current.jobId).first());
   await cleanupAnonymousTrials(env,now);assert.ok(await env.MEDIA.head(kept));
   await cleanupAnonymousTrials(env,now+31*86400_000);
   assert.deepEqual(await DB.prepare('SELECT proof_hash,claim_job_id FROM anonymous_sessions WHERE id=?').bind(session.id).first(),{proof_hash:null,claim_job_id:null});

@@ -1,5 +1,5 @@
 import {GenerationRequest,PreparedNarration,PhotoAnimation,requestedAnimations,selectedAnimationIndices,type NormalizedListing} from '@bienvu/contracts';
-import {findNarration,findGeneration,type Database} from '@bienvu/db';
+import {findNarration,findGeneration,findDefaultGenerationMap,type Database} from '@bienvu/db';
 import {scriptContext} from '@bienvu/narration';
 import type {NarrationBucket} from './narration';
 import {runwayProvider,runwayError,runwayClipCost,type AnimationProvider} from './runway';
@@ -14,7 +14,8 @@ const select=`SELECT id,photo_id AS photoId,source_sha256 AS sourceSha256,state,
 export function animationIndices(count:number,clips:number){return clips===2?[0,Math.floor(count/2)]:clips===1?[0]:[];}
 export async function prepareJobAnimations(env:AnimationEnv,agencyId:string,jobId:string,provider?:AnimationProvider){
   const job=await findGeneration(env.DB,agencyId,jobId);if(!job||['ready','failed'].includes(job.status)||job.retention!=='available')throw Error('RUNWAY_JOB_INACTIVE');
-  const input=GenerationRequest.parse(JSON.parse(job.input)),settings=input.customization,requested=requestedAnimations(settings);
+  const input=GenerationRequest.parse(JSON.parse(job.input)),defaultMap=await findDefaultGenerationMap(env.DB,agencyId,jobId),
+    settings=input.customization?{...input.customization,...(defaultMap?{map:defaultMap}:input.customization.mapAutomatic?{map:undefined}:{})}:undefined,requested=requestedAnimations(settings);
   const reuseRow=await env.DB.prepare('SELECT animation_reuses_json AS data FROM generation_runs WHERE agency_id=? AND job_id=?').bind(agencyId,jobId).first<{data:string}>();
   const reused=JSON.parse(reuseRow?.data??'[]') as {photoId:string}[];
   if(!requested)return {requested,ready:0};

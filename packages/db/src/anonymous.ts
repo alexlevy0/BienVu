@@ -4,6 +4,7 @@ import {creditGrant} from './credits';
 import {findGeneration,findOwnedGeneration,GenerationFailure,type GenerationRow} from './generation';
 import {generationRetained} from './retention';
 import {voiceSettings} from './voices';
+import {generationMapDefault} from './video-map-settings';
 export const opaqueHash=async(value:string)=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))].map(n=>n.toString(16).padStart(2,'0')).join('');
 export type TrialPolicy={enabled:number;free_enabled:number;free_monthly:number;session_days:number;successes:number;session_daily:number;ip_daily:number;global_daily:number;global_monthly:number;render_concurrency:number;retention_hours:number;active_minutes:number;preview_provision_cents:number;budget_ceiling_cents:number};
 export const trialPolicy=async(db:Database)=>(await db.prepare('SELECT * FROM trial_policy WHERE id=1').first<TrialPolicy>())!;
@@ -72,8 +73,8 @@ export async function admitAnonymous(db:Database,session:AnonymousSession,key:st
   const brand=AgencyBrand.parse({id:session.scopeId,ownerUserId:session.id,name:'BienVu',neutral:true,logoAssetId:null,
     primaryColor:'#E1E8D9',secondaryColor:'#171714',phone:null,email:null,website:null,createdAt:at});
   try {await db.prepare(`INSERT INTO generation_runs(job_id,agency_id,allocation_id,reservation_id,idempotency_key,input_hash,input_json,brand_json,created_at,deadline,expires_at,month,
-    anonymous_session_id,ip_hmac,turnstile_hash,preview_provision_cents,credit_version,financial_mode,selected_voice) VALUES(?,?,'unfunded',?,?,?,?,?,?,?,?,?,?,?,?,?, ?,(SELECT mode FROM credit_payment_policy WHERE id=1),?)`)
-    .bind(id,session.scopeId,crypto.randomUUID(),key,old.hash,old.body,JSON.stringify(brand),at,deadline,deadline,at.slice(0,7),session.id,proof.ipHmac,proof.turnstileHash,policy.preview_provision_cents,CREDIT_PRICING_VERSION,GenerationRequest.parse(input).customization?.voice??(await voiceSettings(db)).voice).run();
+    anonymous_session_id,ip_hmac,turnstile_hash,preview_provision_cents,credit_version,financial_mode,selected_voice,default_map_json) VALUES(?,?,'unfunded',?,?,?,?,?,?,?,?,?,?,?,?,?, ?,(SELECT mode FROM credit_payment_policy WHERE id=1),?,?)`)
+    .bind(id,session.scopeId,crypto.randomUUID(),key,old.hash,old.body,JSON.stringify(brand),at,deadline,deadline,at.slice(0,7),session.id,proof.ipHmac,proof.turnstileHash,policy.preview_provision_cents,CREDIT_PRICING_VERSION,parsed.customization?.voice??(await voiceSettings(db)).voice,await generationMapDefault(db,parsed)).run();
   }catch(error){const winner=await priorTrial(db,session,key,input);if(winner.row)return winner.row;
     const message=error instanceof Error?error.message:'';
     const code=Object.keys(publicErrors).find(code=>message.includes(code)) as PublicErrorCode|undefined;

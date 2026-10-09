@@ -99,7 +99,7 @@ export function ManualListingForm(props: Props) {
       (!customization.photoOrder||customization.photoOrder.every(slot=>photos.some(photo=>photo.slot===slot&&photo.state==='ready')));
     const ready=(completed||hydrated&&fieldsValid&&unresolved().length===0&&(props.saveOnly||photos.filter(photo=>photo.state==='ready').length>=3)&&
       !photos.some(photo=>photo.state!=='ready'||photo.removing)&&(!props.guided.agencyId||Boolean(serverDraft)));
-    const reason=customization?.map&&!customization.map.location?'Confirmez la localisation dans Personnaliser → Carte.':!selectionValid?'Vérifiez la narration et sélectionnez au moins trois photos.':completed?'':!hydrated?'Chargement du brouillon en cours.':
+    const reason=customization?.map&&!customization.map.location&&!customization.mapAutomatic?'Confirmez la localisation dans Personnaliser → Carte.':!selectionValid?'Vérifiez la narration et sélectionnez au moins trois photos.':completed?'':!hydrated?'Chargement du brouillon en cours.':
       unresolved().length?'Confirmez les informations signalées avant la création.':
       photos.some(photo=>photo.removing)?'Retrait des photos en cours.':photos.some(photo=>photo.state==='sending')?'Envoi des photos en cours.':photos.some(photo=>photo.state==='error')?
       'Réessayez ou retirez les photos en erreur.':issue?fieldMessage(String(issue.path[0]),issue.code,issue.message):!props.saveOnly&&photos.length<3?'Ajoutez au moins trois photos.':!serverDraft&&props.guided.agencyId?
@@ -413,7 +413,8 @@ export function ManualListingForm(props: Props) {
     try{await settingsWrite.current;const current=await ensureServerDraft(),raw=draftFields(),number=(value:string)=>value.trim()?Number(value.replace(/\s/g,'').replace(',','.')):null;
       const fields=CreationFields.parse({title:listingTitle(raw.title,raw.locality,propertyType,transaction),locality:raw.locality.trim()||null,propertyType:raw.propertyType||null,transaction:raw.transaction||null,
         description:raw.description.trim()||null,priceCents:number(raw.priceCents)===null?null:Math.round(number(raw.priceCents)!*100),charges:raw.charges||null,area:number(raw.area),rooms:number(raw.rooms)});
-      const settings={...defaultVideoCustomization(props.brand,defaultVoice),...customizationRef.current},order=settings.photoOrder??current.photos.map(p=>p.sourceOrder),
+      const rawSettings={...defaultVideoCustomization(props.brand,defaultVoice),...customizationRef.current},
+        settings={...rawSettings,...(rawSettings.mapAutomatic?{map:undefined,mapAutomatic:undefined}:{})},order=settings.photoOrder??current.photos.map(p=>p.sourceOrder),
         editor=settings.editor??createEditorDocument(order.flatMap(slot=>current.photos.filter(p=>p.sourceOrder===slot)),fields,{agencyName:props.brand?.name,durationSeconds:props.durationSeconds,aspectRatio:props.aspectRatio,
           voiceEnabled:props.voiceEnabled,subtitlesEnabled:props.subtitlesEnabled});
       const response=await fetch(`/api/imports/${current.id}/draft`,{method:'PATCH',headers:{'Content-Type':'application/json'},

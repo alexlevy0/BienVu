@@ -8,6 +8,8 @@ import {fixturePlan,fixtureScriptMetrics} from './narration';
 import {findGeneration,generationView} from '../packages/db/src/index';
 import {productRenderBudget} from '../apps/pipeline/src/product-render-budget';
 export class FixtureGenerationWorkflow extends GenerationWorkflow {
+  // The workflow fixture must never contact the real map service.
+  protected override async defaultMap(){return null;}
   protected override diagnostic(error:unknown){console.error(error);}
   protected override async providers(voiceName?:string,voiceEnabled=true){
     const config=frenchVoiceConfig(voiceName??'fish-manon','bienvu-fixture');
