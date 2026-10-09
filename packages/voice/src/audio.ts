@@ -33,16 +33,17 @@ export function measureVoiceWav(input: Uint8Array,maximumDurationMs:35000|40000|
   if (!format || !pcm || pcm.bytes === 0 || pcm.bytes % format.blockAlign !== 0) throw new VoiceFailure('VOICE_AUDIO_INVALID');
   const durationMs = Math.ceil(pcm.bytes / format.blockAlign / format.sampleRate * 1000);
   if (durationMs > maximumDurationMs) throw new VoiceFailure('VOICE_DURATION_EXCEEDED');
-  let sum = 0, peak = 0;
+  let sum = 0, peak = 0,clipped=0,quiet=0;
   for (let index = pcm.offset; index < pcm.offset + pcm.bytes; index += 2) {
     const sample = data.getInt16(index, true) / 32768;
     sum += sample * sample; peak = Math.max(peak, Math.abs(sample));
+    if(Math.abs(sample)>=.999)clipped++;if(Math.abs(sample)<.00316)quiet++;
   }
   const rmsDbfs = 10 * Math.log10(sum / (pcm.bytes / 2));
   if (!Number.isFinite(rmsDbfs) || rmsDbfs < -55) throw new VoiceFailure('VOICE_AUDIO_SILENT');
   return {durationMs, durationFrames: Math.ceil(durationMs * 30 / 1000), sampleRate: format.sampleRate,
     channels: format.channels, sampleFrames: pcm.bytes / format.blockAlign, rmsDbfs, peak,
-    pcmOffset:pcm.offset,pcmBytes:pcm.bytes,measurement: 'decoded_pcm16_samples' as const};
+    pcmOffset:pcm.offset,pcmBytes:pcm.bytes,clippedRatio:clipped/(pcm.bytes/2),quietRatio:quiet/(pcm.bytes/2),measurement: 'decoded_pcm16_samples' as const};
 }
 
 export function measureMusicWav(bytes:Uint8Array){

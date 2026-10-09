@@ -30,7 +30,7 @@ export async function describeGuest(request:Request,env:Env,trustedCloudflare:bo
     .bind(session.id,key).first<{id:string}>();
   if(claim?.id!==id)return Response.json({extraction:'unavailable',data:null});
   try{const response=await env.GENERATION_SERVICE.fetch('https://generation.internal/extract',{method:'POST',
-    headers:{Authorization:`Bearer ${env.GENERATION_TOKEN}`,'X-Agency-ID':session.id,'Content-Type':'application/json'},
+    headers:{Authorization:`Bearer ${env.GENERATION_TOKEN}`,'X-Agency-ID':session.id,'X-AI-Extraction-ID':id,'Content-Type':'application/json'},
     body:JSON.stringify({text}),signal:AbortSignal.timeout(22_000)});
     if(!response.ok){await response.body?.cancel();throw new Error('EXTRACTION_UNAVAILABLE');}
     const result=await response.json() as {data:unknown},data=CreationDraftData.parse(result.data);

@@ -87,7 +87,7 @@
 .login-studio-demo-caption>span:last-child {font-size:24px}
 .login-studio-showcase-note {max-width:370px;align-self:center;margin:7px 0 0;color:#667761;font-size:11px;line-height:1.5;text-align:center}
 .login-studio-dialog {position:fixed;max-width:min(92vw,560px);max-height:92svh;padding:20px 20px 13px;border:0;border-radius:15px;background:#fbfaf7;color:#1a2419;box-shadow:0 25px 90px #0008;text-align:center}
-.login-studio-dialog::backdrop {background:#10180edb}
+
 .login-studio-dialog video {display:block;max-width:100%;max-height:calc(92svh - 92px);width:auto;height:auto;margin:auto;border-radius:8px;background:#172017}
 .login-studio-dialog-close {position:absolute;z-index:2;top:9px;right:9px;width:38px;height:38px;border:0;border-radius:50%;background:#fff;color:#111;font-size:26px;line-height:1;box-shadow:0 1px 8px #0005}
 .login-studio-dialog p {margin:9px 0 0;color:#566154;font-size:12px}

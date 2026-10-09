@@ -1,0 +1,947 @@
+{
+  "dashboardId": 1010344,
+  "projectId": 299212,
+  "version": "bienvu-quality/1",
+  "evaluations": [
+    {
+      "key": "price",
+      "label": "Prix annoncé",
+      "id": "01a1209d-53cf-0000-aedb-1453a2df357b"
+    },
+    {
+      "key": "area",
+      "label": "Surface annoncée",
+      "id": "01a1209d-564a-0000-cb6d-38767ea902f3"
+    },
+    {
+      "key": "rooms",
+      "label": "Nombre de pièces",
+      "id": "01a1209d-592b-0000-8aab-5a986dd398ff"
+    },
+    {
+      "key": "transaction",
+      "label": "Vente ou location",
+      "id": "01a1209d-5bce-0000-b0a1-cd195726692d"
+    },
+    {
+      "key": "qualifications",
+      "label": "Conditions explicites",
+      "id": "01a1209d-5e32-0000-b71c-5b5b69cb5941"
+    },
+    {
+      "key": "timing",
+      "label": "Voix complète",
+      "id": "01a1209d-608e-0000-6b14-2f9782a1377e"
+    },
+    {
+      "key": "silence",
+      "label": "Temps sans voix",
+      "id": "01a1209d-631d-0000-7ddb-bf8217b4b766"
+    },
+    {
+      "key": "audio",
+      "label": "Niveau sonore",
+      "id": "01a1209d-652a-0000-a945-af23639dcc1f"
+    },
+    {
+      "key": "repetition",
+      "label": "Paragraphes distincts",
+      "id": "01a1209d-6755-0000-8e24-503b6a248bab"
+    },
+    {
+      "key": "clipping",
+      "label": "Saturation audio",
+      "id": "01a1209d-69e2-0000-1411-e42a46738de7"
+    },
+    {
+      "key": "render",
+      "label": "Fichier vidéo vérifié",
+      "id": "01a1209d-6c6e-0000-58ca-a486a1da1f38"
+    }
+  ],
+  "insights": [
+    {
+      "i": 0,
+      "id": 6448815,
+      "shortId": "GJfe7Zov",
+      "name": "Générations suivies"
+    },
+    {
+      "i": 1,
+      "id": 6448816,
+      "shortId": "bIOfW7H5",
+      "name": "Générations à vérifier"
+    },
+    {
+      "i": 2,
+      "id": 6448821,
+      "shortId": "MUU0gHDB",
+      "name": "Conformité des contrôles (%)"
+    },
+    {
+      "i": 3,
+      "id": 6448822,
+      "shortId": "4pizePVw",
+      "name": "Estimation connue moyenne par vidéo"
+    },
+    {
+      "i": 4,
+      "id": 6448823,
+      "shortId": "wK2Upncp",
+      "name": "Vidéos prêtes et échecs"
+    },
+    {
+      "i": 5,
+      "id": 6448824,
+      "shortId": "s9ikQQJ1",
+      "name": "Couverture et résultats par contrôle"
+    },
+    {
+      "i": 6,
+      "id": 6448825,
+      "shortId": "sQ4nCwAR",
+      "name": "Durée de génération : médiane et 95e percentile"
+    },
+    {
+      "i": 7,
+      "id": 6448834,
+      "shortId": "bB5sJ3Mz",
+      "name": "Temps mesuré par étape"
+    },
+    {
+      "i": 8,
+      "id": 6448835,
+      "shortId": "KREKp13O",
+      "name": "Fiabilité par source d’annonce"
+    },
+    {
+      "i": 9,
+      "id": 6448836,
+      "shortId": "r8TyGWRE",
+      "name": "Voix : qualité et coût connu"
+    },
+    {
+      "i": 10,
+      "id": 6448837,
+      "shortId": "aaOLdD26",
+      "name": "Versions de narration"
+    },
+    {
+      "i": 11,
+      "id": 6448838,
+      "shortId": "GGPkmCFB",
+      "name": "Retours de relecture humaine"
+    },
+    {
+      "i": 12,
+      "id": 6448839,
+      "shortId": "6bMpIFzt",
+      "name": "Réutilisation d’animations"
+    },
+    {
+      "i": 13,
+      "id": 6448848,
+      "shortId": "xv8thsV8",
+      "name": "Économie estimée par réutilisation"
+    },
+    {
+      "i": 14,
+      "id": 6448850,
+      "shortId": "sx4dP4wT",
+      "name": "Imports : résultat par source"
+    },
+    {
+      "i": 15,
+      "id": 6448851,
+      "shortId": "rj8wjZDX",
+      "name": "Publications : résultat confirmé"
+    }
+  ],
+  "tiles": [
+    {
+      "id": 7289670,
+      "layouts": {
+        "sm": {
+          "x": 0,
+          "y": 0,
+          "w": 3,
+          "h": 5
+        }
+      },
+      "show_description": true
+    },
+    {
+      "id": 7289671,
+      "layouts": {
+        "sm": {
+          "x": 3,
+          "y": 0,
+          "w": 3,
+          "h": 5
+        }
+      },
+      "show_description": true
+    },
+    {
+      "id": 7289678,
+      "layouts": {
+        "sm": {
+          "x": 6,
+          "y": 0,
+          "w": 3,
+          "h": 5
+        }
+      },
+      "show_description": true
+    },
+    {
+      "id": 7289679,
+      "layouts": {
+        "sm": {
+          "x": 9,
+          "y": 0,
+          "w": 3,
+          "h": 5
+        }
+      },
+      "show_description": true
+    },
+    {
+      "id": 7289680,
+      "layouts": {
+        "sm": {
+          "x": 0,
+          "y": 5,
+          "w": 5,
+          "h": 10
+        }
+      },
+      "show_description": true
+    },
+    {
+      "id": 7289682,
+      "layouts": {
+        "sm": {
+          "x": 5,
+          "y": 5,
+          "w": 7,
+          "h": 10
+        }
+      },
+      "show_description": true
+    },
+    {
+      "id": 7289683,
+      "layouts": {
+        "sm": {
+          "x": 0,
+          "y": 15,
+          "w": 7,
+          "h": 8
+        }
+      },
+      "show_description": true
+    },
+    {
+      "id": 7289700,
+      "layouts": {
+        "sm": {
+          "x": 7,
+          "y": 15,
+          "w": 5,
+          "h": 8
+        }
+      },
+      "show_description": true
+    },
+    {
+      "id": 7289701,
+      "layouts": {
+        "sm": {
+          "x": 0,
+          "y": 23,
+          "w": 6,
+          "h": 8
+        }
+      },
+      "show_description": true
+    },
+    {
+      "id": 7289702,
+      "layouts": {
+        "sm": {
+          "x": 6,
+          "y": 23,
+          "w": 6,
+          "h": 8
+        }
+      },
+      "show_description": true
+    },
+    {
+      "id": 7289703,
+      "layouts": {
+        "sm": {
+          "x": 0,
+          "y": 31,
+          "w": 6,
+          "h": 8
+        }
+      },
+      "show_description": true
+    },
+    {
+      "id": 7289704,
+      "layouts": {
+        "sm": {
+          "x": 6,
+          "y": 31,
+          "w": 6,
+          "h": 8
+        }
+      },
+      "show_description": true
+    },
+    {
+      "id": 7289705,
+      "layouts": {
+        "sm": {
+          "x": 0,
+          "y": 39,
+          "w": 6,
+          "h": 7
+        }
+      },
+      "show_description": true
+    },
+    {
+      "id": 7289722,
+      "layouts": {
+        "sm": {
+          "x": 6,
+          "y": 39,
+          "w": 6,
+          "h": 7
+        }
+      },
+      "show_description": true
+    },
+    {
+      "id": 7289724,
+      "layouts": {
+        "sm": {
+          "x": 0,
+          "y": 46,
+          "w": 6,
+          "h": 8
+        }
+      },
+      "show_description": true
+    },
+    {
+      "id": 7289725,
+      "layouts": {
+        "sm": {
+          "x": 6,
+          "y": 46,
+          "w": 6,
+          "h": 8
+        }
+      },
+      "show_description": true
+    }
+  ],
+  "definitions": [
+    {
+      "name": "Générations suivies",
+      "description": "Tentatives réelles terminées côté serveur sur 30 jours, y compris l’historique identifié. Les traitements continuent d’être comptés même si le navigateur est fermé.",
+      "query": {
+        "kind": "TrendsQuery",
+        "series": [
+          {
+            "kind": "EventsNode",
+            "event": "ai_quality_run",
+            "custom_name": "Générations",
+            "math": "total",
+            "properties": []
+          }
+        ],
+        "dateRange": {
+          "date_from": "-30d"
+        },
+        "interval": "day",
+        "filterTestAccounts": false,
+        "properties": [
+          {
+            "key": "bv_app",
+            "type": "event",
+            "operator": "exact",
+            "value": "bienvu"
+          },
+          {
+            "key": "bv_test",
+            "type": "event",
+            "operator": "is_not",
+            "value": "true"
+          }
+        ],
+        "trendsFilter": {
+          "display": "Metric",
+          "showLegend": true,
+          "metricSummary": "total"
+        },
+        "compareFilter": {
+          "compare": true
+        }
+      }
+    },
+    {
+      "name": "Générations à vérifier",
+      "description": "Générations avec au moins une alerte déterministe. Une alerte ne prouve pas une erreur du contenu ; la relecture confirme le verdict.",
+      "query": {
+        "kind": "TrendsQuery",
+        "series": [
+          {
+            "kind": "EventsNode",
+            "event": "ai_quality_run",
+            "custom_name": "À vérifier",
+            "math": "total",
+            "properties": [
+              {
+                "key": "bv_flagged",
+                "type": "event",
+                "operator": "exact",
+                "value": "true"
+              }
+            ]
+          }
+        ],
+        "dateRange": {
+          "date_from": "-30d"
+        },
+        "interval": "day",
+        "filterTestAccounts": false,
+        "properties": [
+          {
+            "key": "bv_app",
+            "type": "event",
+            "operator": "exact",
+            "value": "bienvu"
+          },
+          {
+            "key": "bv_test",
+            "type": "event",
+            "operator": "is_not",
+            "value": "true"
+          }
+        ],
+        "trendsFilter": {
+          "display": "Metric",
+          "showLegend": true,
+          "metricSummary": "total",
+          "metricChangeIncreaseColor": "#bf583e",
+          "metricChangeDecreaseColor": "#5a7f46"
+        },
+        "compareFilter": {
+          "compare": true
+        }
+      }
+    },
+    {
+      "name": "Conformité des contrôles (%)",
+      "description": "Conformes / (conformes + alertes). N/A et erreurs techniques exclus du dénominateur. Mesure des règles disponibles, pas de toute la qualité d’une vidéo.",
+      "sql": "SELECT round(100 * countIf(properties.bv_check_status = 'pass') / nullIf(countIf(properties.bv_check_status IN ('pass','fail')),0),1) AS conformite_pct FROM events WHERE timestamp > now() - INTERVAL 30 DAY AND properties.bv_app = 'bienvu' AND properties.bv_test != true AND event = 'ai_quality_check'",
+      "display": "BoldNumber",
+      "savedSql": "SELECT round(100 * countIf(properties.bv_check_status = 'pass') / nullIf(countIf(properties.bv_check_status IN ('pass','fail')),0),1) AS conformite_pct FROM events WHERE {filters} AND properties.bv_app = 'bienvu' AND properties.bv_test != true AND event = 'ai_quality_check'"
+    },
+    {
+      "name": "Estimation connue moyenne par vidéo",
+      "description": "Moyenne USD des composantes connues. Estimation partielle, sans confondre absence de mesure et coût nul. Les factures et couvertures fournisseur restent dans Rentabilité.",
+      "query": {
+        "kind": "TrendsQuery",
+        "series": [
+          {
+            "kind": "EventsNode",
+            "event": "ai_quality_run",
+            "custom_name": "Estimation partielle USD",
+            "math": "avg",
+            "math_property": "bv_cost_estimated_usd",
+            "properties": []
+          }
+        ],
+        "dateRange": {
+          "date_from": "-30d"
+        },
+        "interval": "day",
+        "filterTestAccounts": false,
+        "properties": [
+          {
+            "key": "bv_app",
+            "type": "event",
+            "operator": "exact",
+            "value": "bienvu"
+          },
+          {
+            "key": "bv_test",
+            "type": "event",
+            "operator": "is_not",
+            "value": "true"
+          }
+        ],
+        "trendsFilter": {
+          "display": "Metric",
+          "showLegend": true,
+          "aggregationAxisFormat": "currency",
+          "decimalPlaces": 4,
+          "metricSummary": "average",
+          "metricChangeIncreaseColor": "#bf583e",
+          "metricChangeDecreaseColor": "#5a7f46"
+        },
+        "compareFilter": {
+          "compare": true
+        }
+      }
+    },
+    {
+      "name": "Vidéos prêtes et échecs",
+      "description": "Résultat serveur par jour. Une tentative terminée apparaît une seule fois ; le statut prêt ne constitue pas un verdict de qualité humaine.",
+      "query": {
+        "kind": "TrendsQuery",
+        "series": [
+          {
+            "kind": "EventsNode",
+            "event": "ai_quality_run",
+            "custom_name": "Prêtes",
+            "math": "total",
+            "properties": [
+              {
+                "key": "bv_status",
+                "type": "event",
+                "operator": "exact",
+                "value": "ready"
+              }
+            ]
+          },
+          {
+            "kind": "EventsNode",
+            "event": "ai_quality_run",
+            "custom_name": "Échouées",
+            "math": "total",
+            "properties": [
+              {
+                "key": "bv_status",
+                "type": "event",
+                "operator": "exact",
+                "value": "failed"
+              }
+            ]
+          }
+        ],
+        "dateRange": {
+          "date_from": "-30d"
+        },
+        "interval": "day",
+        "filterTestAccounts": false,
+        "properties": [
+          {
+            "key": "bv_app",
+            "type": "event",
+            "operator": "exact",
+            "value": "bienvu"
+          },
+          {
+            "key": "bv_test",
+            "type": "event",
+            "operator": "is_not",
+            "value": "true"
+          }
+        ],
+        "trendsFilter": {
+          "display": "ActionsBar",
+          "showLegend": true
+        }
+      }
+    },
+    {
+      "name": "Couverture et résultats par contrôle",
+      "description": "Chaque critère affiche ses conformes, alertes, N/A et erreurs. Les N/A ne sont jamais assimilés à des échecs. Les règles ne couvrent pas les nuances ni la prononciation.",
+      "sql": "SELECT properties.bv_check AS controle,countIf(properties.bv_check_status='pass') AS conformes,countIf(properties.bv_check_status='fail') AS alertes,countIf(properties.bv_check_status='na') AS non_applicables,countIf(properties.bv_check_status='error') AS erreurs,round(100*countIf(properties.bv_check_status='pass')/nullIf(countIf(properties.bv_check_status IN ('pass','fail')),0),1) AS conformite_pct FROM events WHERE timestamp > now() - INTERVAL 30 DAY AND properties.bv_app = 'bienvu' AND properties.bv_test != true AND event='ai_quality_check' GROUP BY controle ORDER BY alertes DESC,controle",
+      "display": "ActionsTable",
+      "savedSql": "SELECT properties.bv_check AS controle,countIf(properties.bv_check_status='pass') AS conformes,countIf(properties.bv_check_status='fail') AS alertes,countIf(properties.bv_check_status='na') AS non_applicables,countIf(properties.bv_check_status='error') AS erreurs,round(100*countIf(properties.bv_check_status='pass')/nullIf(countIf(properties.bv_check_status IN ('pass','fail')),0),1) AS conformite_pct FROM events WHERE {filters} AND properties.bv_app = 'bienvu' AND properties.bv_test != true AND event='ai_quality_check' GROUP BY controle ORDER BY alertes DESC,controle"
+    },
+    {
+      "name": "Durée de génération : médiane et 95e percentile",
+      "description": "Temps entre création du job et fin du traitement, en ms. Vidéos prêtes uniquement. Le 95e percentile aide à repérer les cas les plus lents.",
+      "query": {
+        "kind": "TrendsQuery",
+        "series": [
+          {
+            "kind": "EventsNode",
+            "event": "ai_quality_run",
+            "custom_name": "Médiane",
+            "math": "median",
+            "math_property": "bv_total_ms",
+            "properties": [
+              {
+                "key": "bv_status",
+                "type": "event",
+                "operator": "exact",
+                "value": "ready"
+              }
+            ]
+          },
+          {
+            "kind": "EventsNode",
+            "event": "ai_quality_run",
+            "custom_name": "95e percentile",
+            "math": "p95",
+            "math_property": "bv_total_ms",
+            "properties": [
+              {
+                "key": "bv_status",
+                "type": "event",
+                "operator": "exact",
+                "value": "ready"
+              }
+            ]
+          }
+        ],
+        "dateRange": {
+          "date_from": "-30d"
+        },
+        "interval": "day",
+        "filterTestAccounts": false,
+        "properties": [
+          {
+            "key": "bv_app",
+            "type": "event",
+            "operator": "exact",
+            "value": "bienvu"
+          },
+          {
+            "key": "bv_test",
+            "type": "event",
+            "operator": "is_not",
+            "value": "true"
+          }
+        ],
+        "trendsFilter": {
+          "display": "ActionsLineGraph",
+          "showLegend": true,
+          "aggregationAxisFormat": "duration_ms"
+        }
+      }
+    },
+    {
+      "name": "Temps mesuré par étape",
+      "description": "Médiane des étapes voix, script et rendu quand leur durée est disponible. La durée totale et les étapes ne se somment pas forcément (cache, attente, parallélisme).",
+      "query": {
+        "kind": "TrendsQuery",
+        "series": [
+          {
+            "kind": "EventsNode",
+            "event": "ai_stage_completed",
+            "custom_name": "Temps médian",
+            "math": "median",
+            "math_property": "bv_elapsed_ms",
+            "properties": []
+          }
+        ],
+        "dateRange": {
+          "date_from": "-30d"
+        },
+        "interval": "day",
+        "filterTestAccounts": false,
+        "properties": [
+          {
+            "key": "bv_app",
+            "type": "event",
+            "operator": "exact",
+            "value": "bienvu"
+          },
+          {
+            "key": "bv_test",
+            "type": "event",
+            "operator": "is_not",
+            "value": "true"
+          }
+        ],
+        "trendsFilter": {
+          "display": "ActionsBarValue",
+          "showLegend": true,
+          "aggregationAxisFormat": "duration_ms"
+        },
+        "breakdownFilter": {
+          "breakdowns": [
+            {
+              "property": "bv_stage",
+              "type": "event"
+            }
+          ],
+          "breakdown_limit": 10
+        }
+      }
+    },
+    {
+      "name": "Fiabilité par source d’annonce",
+      "description": "Nombre de générations, vidéos prêtes, échecs et alertes par source. Les cas de saisie manuelle sont suivis sous manual ; comparer aussi la durée et les options.",
+      "sql": "SELECT properties.bv_source AS source,count() AS generations,countIf(properties.bv_status='ready') AS pretes,countIf(properties.bv_status='failed') AS echecs,countIf(properties.bv_flagged=true) AS a_verifier FROM events WHERE timestamp > now() - INTERVAL 30 DAY AND properties.bv_app = 'bienvu' AND properties.bv_test != true AND event='ai_quality_run' GROUP BY source ORDER BY generations DESC",
+      "display": "ActionsTable",
+      "savedSql": "SELECT properties.bv_source AS source,count() AS generations,countIf(properties.bv_status='ready') AS pretes,countIf(properties.bv_status='failed') AS echecs,countIf(properties.bv_flagged=true) AS a_verifier FROM events WHERE {filters} AND properties.bv_app = 'bienvu' AND properties.bv_test != true AND event='ai_quality_run' GROUP BY source ORDER BY generations DESC"
+    },
+    {
+      "name": "Voix : qualité et coût connu",
+      "description": "Comparaison opérationnelle par voix, avec volumes et durées pour interpréter les écarts. Les coûts sont partiels ; la bonne prononciation exige une écoute humaine.",
+      "sql": "SELECT coalesce(properties.bv_voice,'non_renseignee') AS voix,count() AS generations,countIf(properties.bv_flagged=true) AS a_verifier,round(avg(toFloat(properties.bv_duration_seconds)),1) AS duree_moyenne_s,round(avg(toFloat(properties.bv_cost_estimated_usd)),5) AS estimation_partielle_usd FROM events WHERE timestamp > now() - INTERVAL 30 DAY AND properties.bv_app = 'bienvu' AND properties.bv_test != true AND event='ai_quality_run' GROUP BY voix ORDER BY generations DESC",
+      "display": "ActionsTable",
+      "savedSql": "SELECT coalesce(properties.bv_voice,'non_renseignee') AS voix,count() AS generations,countIf(properties.bv_flagged=true) AS a_verifier,round(avg(toFloat(properties.bv_duration_seconds)),1) AS duree_moyenne_s,round(avg(toFloat(properties.bv_cost_estimated_usd)),5) AS estimation_partielle_usd FROM events WHERE {filters} AND properties.bv_app = 'bienvu' AND properties.bv_test != true AND event='ai_quality_run' GROUP BY voix ORDER BY generations DESC"
+    },
+    {
+      "name": "Versions de narration",
+      "description": "Volumes, alertes et durées par version de prompt. Comparaison descriptive : les biens, voix et options diffèrent ; ce graphique ne démontre pas un effet causal.",
+      "sql": "SELECT coalesce(properties.bv_prompt_version,'non_renseignee') AS version,count() AS generations,countIf(properties.bv_flagged=true) AS a_verifier,round(avg(toFloat(properties.bv_total_ms))/1000,1) AS temps_moyen_s FROM events WHERE timestamp > now() - INTERVAL 30 DAY AND properties.bv_app = 'bienvu' AND properties.bv_test != true AND event='ai_quality_run' GROUP BY version ORDER BY generations DESC",
+      "display": "ActionsTable",
+      "savedSql": "SELECT coalesce(properties.bv_prompt_version,'non_renseignee') AS version,count() AS generations,countIf(properties.bv_flagged=true) AS a_verifier,round(avg(toFloat(properties.bv_total_ms))/1000,1) AS temps_moyen_s FROM events WHERE {filters} AND properties.bv_app = 'bienvu' AND properties.bv_test != true AND event='ai_quality_run' GROUP BY version ORDER BY generations DESC"
+    },
+    {
+      "name": "Retours de relecture humaine",
+      "description": "Dernier verdict par génération revue : problème, faux positif, choix volontaire ou contenu validé. Aucune relecture n’est fabriquée pour remplir le graphique.",
+      "sql": "SELECT verdict,count() AS generations FROM (SELECT properties.bv_run_id AS run,argMax(properties.bv_verdict,timestamp) AS verdict FROM events WHERE timestamp > now() - INTERVAL 30 DAY AND properties.bv_app = 'bienvu' AND properties.bv_test != true AND event='ai_quality_review' GROUP BY run) GROUP BY verdict ORDER BY generations DESC",
+      "display": "ActionsBarValue",
+      "savedSql": "SELECT verdict,count() AS generations FROM (SELECT properties.bv_run_id AS run,argMax(properties.bv_verdict,timestamp) AS verdict FROM events WHERE {filters} AND properties.bv_app = 'bienvu' AND properties.bv_test != true AND event='ai_quality_review' GROUP BY run) GROUP BY verdict ORDER BY generations DESC"
+    },
+    {
+      "name": "Réutilisation d’animations",
+      "description": "Nombre d’animations réutilisées et économie estimée USD au tarif du clip. Une économie estimée ne constitue pas une différence de facture mesurée.",
+      "query": {
+        "kind": "TrendsQuery",
+        "series": [
+          {
+            "kind": "EventsNode",
+            "event": "ai_quality_run",
+            "custom_name": "Clips réutilisés",
+            "math": "sum",
+            "math_property": "bv_animations_reused",
+            "properties": []
+          }
+        ],
+        "dateRange": {
+          "date_from": "-30d"
+        },
+        "interval": "day",
+        "filterTestAccounts": false,
+        "properties": [
+          {
+            "key": "bv_app",
+            "type": "event",
+            "operator": "exact",
+            "value": "bienvu"
+          },
+          {
+            "key": "bv_test",
+            "type": "event",
+            "operator": "is_not",
+            "value": "true"
+          }
+        ],
+        "trendsFilter": {
+          "display": "ActionsLineGraph",
+          "showLegend": true
+        }
+      }
+    },
+    {
+      "name": "Économie estimée par réutilisation",
+      "description": "Somme USD théorique des durées de clips réutilisés au tarif Runway. À rapprocher des dépenses fournisseur ; la mesure n’inclut pas le rendu et le stockage.",
+      "query": {
+        "kind": "TrendsQuery",
+        "series": [
+          {
+            "kind": "EventsNode",
+            "event": "ai_quality_run",
+            "custom_name": "Économie estimée USD",
+            "math": "sum",
+            "math_property": "bv_reuse_saving_usd",
+            "properties": []
+          }
+        ],
+        "dateRange": {
+          "date_from": "-30d"
+        },
+        "interval": "day",
+        "filterTestAccounts": false,
+        "properties": [
+          {
+            "key": "bv_app",
+            "type": "event",
+            "operator": "exact",
+            "value": "bienvu"
+          },
+          {
+            "key": "bv_test",
+            "type": "event",
+            "operator": "is_not",
+            "value": "true"
+          }
+        ],
+        "trendsFilter": {
+          "display": "ActionsLineGraph",
+          "showLegend": true,
+          "aggregationAxisFormat": "currency"
+        }
+      }
+    },
+    {
+      "name": "Imports : résultat par source",
+      "description": "Résultats serveur ready/failed des imports finalisés. Le domaine est conservé, sans URL privée. La collecte indépendante continue après fermeture du navigateur.",
+      "query": {
+        "kind": "TrendsQuery",
+        "series": [
+          {
+            "kind": "EventsNode",
+            "event": "ai_import_completed",
+            "custom_name": "Réussis",
+            "math": "total",
+            "properties": [
+              {
+                "key": "bv_status",
+                "type": "event",
+                "operator": "exact",
+                "value": "ready"
+              }
+            ]
+          },
+          {
+            "kind": "EventsNode",
+            "event": "ai_import_completed",
+            "custom_name": "Échoués",
+            "math": "total",
+            "properties": [
+              {
+                "key": "bv_status",
+                "type": "event",
+                "operator": "exact",
+                "value": "failed"
+              }
+            ]
+          }
+        ],
+        "dateRange": {
+          "date_from": "-30d"
+        },
+        "interval": "day",
+        "filterTestAccounts": false,
+        "properties": [
+          {
+            "key": "bv_app",
+            "type": "event",
+            "operator": "exact",
+            "value": "bienvu"
+          },
+          {
+            "key": "bv_test",
+            "type": "event",
+            "operator": "is_not",
+            "value": "true"
+          }
+        ],
+        "trendsFilter": {
+          "display": "ActionsBarValue",
+          "showLegend": true
+        },
+        "breakdownFilter": {
+          "breakdowns": [
+            {
+              "property": "bv_source",
+              "type": "event"
+            }
+          ],
+          "breakdown_limit": 25
+        }
+      }
+    },
+    {
+      "name": "Publications : résultat confirmé",
+      "description": "Un événement par destination et résultat terminal. published confirme la diffusion serveur ; uncertain demande une vérification. Le délai comprend l’attente d’une programmation.",
+      "query": {
+        "kind": "TrendsQuery",
+        "series": [
+          {
+            "kind": "EventsNode",
+            "event": "ai_publication_completed",
+            "custom_name": "Publiées",
+            "math": "total",
+            "properties": [
+              {
+                "key": "bv_status",
+                "type": "event",
+                "operator": "exact",
+                "value": "published"
+              }
+            ]
+          },
+          {
+            "kind": "EventsNode",
+            "event": "ai_publication_completed",
+            "custom_name": "Échouées",
+            "math": "total",
+            "properties": [
+              {
+                "key": "bv_status",
+                "type": "event",
+                "operator": "exact",
+                "value": "failed"
+              }
+            ]
+          },
+          {
+            "kind": "EventsNode",
+            "event": "ai_publication_completed",
+            "custom_name": "Incertaines",
+            "math": "total",
+            "properties": [
+              {
+                "key": "bv_status",
+                "type": "event",
+                "operator": "exact",
+                "value": "uncertain"
+              }
+            ]
+          }
+        ],
+        "dateRange": {
+          "date_from": "-30d"
+        },
+        "interval": "day",
+        "filterTestAccounts": false,
+        "properties": [
+          {
+            "key": "bv_app",
+            "type": "event",
+            "operator": "exact",
+            "value": "bienvu"
+          },
+          {
+            "key": "bv_test",
+            "type": "event",
+            "operator": "is_not",
+            "value": "true"
+          }
+        ],
+        "trendsFilter": {
+          "display": "ActionsBarValue",
+          "showLegend": true
+        },
+        "breakdownFilter": {
+          "breakdowns": [
+            {
+              "property": "bv_platform",
+              "type": "event"
+            }
+          ],
+          "breakdown_limit": 4
+        }
+      }
+    }
+  ]
+}

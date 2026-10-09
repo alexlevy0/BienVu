@@ -90,6 +90,9 @@ importers:
       '@bienvu/narration':
         specifier: workspace:*
         version: link:../../packages/narration
+      '@bienvu/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
       '@bienvu/voice':
         specifier: workspace:*
         version: link:../../packages/voice
@@ -252,6 +255,9 @@ importers:
       '@bienvu/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@bienvu/db':
+        specifier: workspace:*
+        version: link:../db
 
   packages/video:
     dependencies:

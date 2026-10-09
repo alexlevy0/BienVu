@@ -174,8 +174,11 @@ export async function analyticsFetch(input:RequestInfo|URL,init?:RequestInit,pro
   properties={...requestAnalyticsProperties(init?.body),...properties};
   const started=performance.now(),atRevision=revision;
   const headers=new Headers(init?.headers),key=headers.get('Idempotency-Key')??undefined;
+  // Correlate operational traces with a consented replay only. This metadata
+  // never grants access and is ignored by authentication/agency selection.
+  if(mayRecord()&&sdk){headers.set('X-Analytics-Consent','2');headers.set('X-PostHog-Session-ID',sdk.get_session_id());headers.set('X-PostHog-Distinct-ID',sdk.get_distinct_id());}
   trackProductEvent(op+'_requested',properties,key);
-  try {const response=await fetch(input,init);
+  try {const response=await fetch(input,{...init,headers});
     if(atRevision!==revision||!mayCapture())return response;
     try {const body=await response.clone().json() as {id?:string;status?:string;authenticated?:boolean;sourceKind?:string;durationSeconds?:number;aspectRatio?:string;errorCode?:string;error?:{code?:string};received?:boolean};
       const failed=!response.ok||body.status==='failed'||op==='partner_application'&&body.received!==true,name=failed?(op==='generation'?'generation_request_failed':op+'_failed'):

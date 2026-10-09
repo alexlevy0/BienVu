@@ -1,0 +1,55 @@
+:root {
+  --dialog-blur:1px;
+  --dialog-motion-duration:220ms;
+  --dialog-motion-easing:cubic-bezier(.22,1,.36,1);
+}
+
+dialog::backdrop {
+  background:#1b231c60;
+  -webkit-backdrop-filter:blur(var(--dialog-blur,1px));
+  backdrop-filter:blur(var(--dialog-blur,1px));
+}
+
+@supports selector(body:has(dialog:modal)) {
+  /* This layer survives React unmounting a dialog, so its blur can fade out.
+     Native dialogs stay above it in the top layer and retain their focus trap. */
+  body::after {
+    content:'';
+    position:fixed;
+    inset:0;
+    z-index:2000;
+    pointer-events:none;
+    visibility:hidden;
+    opacity:0;
+    background:#1b231c60;
+    -webkit-backdrop-filter:blur(0);
+    backdrop-filter:blur(0);
+    transition:opacity var(--dialog-motion-duration) var(--dialog-motion-easing),
+      backdrop-filter var(--dialog-motion-duration) var(--dialog-motion-easing),
+      -webkit-backdrop-filter var(--dialog-motion-duration) var(--dialog-motion-easing),
+      visibility 0s linear var(--dialog-motion-duration);
+  }
+  body:has(dialog:modal:not([data-closing]))::after {
+    visibility:visible;
+    opacity:1;
+    -webkit-backdrop-filter:blur(var(--dialog-blur));
+    backdrop-filter:blur(var(--dialog-blur));
+    transition-delay:0s;
+  }
+  dialog::backdrop {
+    background:transparent;
+    -webkit-backdrop-filter:none;
+    backdrop-filter:none;
+  }
+  @starting-style {
+    body:has(dialog:modal:not([data-closing]))::after {
+      opacity:0;
+      -webkit-backdrop-filter:blur(0);
+      backdrop-filter:blur(0);
+    }
+  }
+}
+
+@media(prefers-reduced-motion:reduce) {
+  :root {--dialog-motion-duration:0ms}
+}

@@ -73,7 +73,7 @@
 .video-library-empty p {font-size:15px;color:#626760}
 .video-library-empty .video-library-create {margin-top:15px}
 .video-library-dialog {position:fixed;inset:0;margin:auto;max-width:510px;width:calc(100% - 32px);max-height:calc(100svh - 32px);overflow:auto;padding:27px;border:1px solid #d9ddcf;border-radius:16px;background:#fbfaf7;box-shadow:0 20px 80px #0004;color:#10120f}
-.video-library-dialog::backdrop {background:#1b261d78;backdrop-filter:blur(5px)}
+
 .video-library-dialog h2 {font-family:'Times New Roman',Times,serif;font-size:34px;font-weight:500;margin:4px 38px 12px 0;line-height:1.1}
 .video-library-dialog video {display:block;height:min(65svh,630px);max-width:100%;margin:auto;border-radius:10px;background:#10150e}
 .video-library-dialog p {font-size:13px;color:#646b62;margin:15px 0 0;line-height:1.55}

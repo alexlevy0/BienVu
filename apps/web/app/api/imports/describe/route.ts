@@ -34,7 +34,7 @@ export async function POST(request:Request){return respond(async()=>{
   }
   try{
     const response=await serviceEnv.GENERATION_SERVICE.fetch('https://generation.internal/extract',{method:'POST',
-      headers:{Authorization:`Bearer ${serviceEnv.GENERATION_TOKEN}`,'X-Agency-ID':agency.id,'Content-Type':'application/json'},
+      headers:{Authorization:`Bearer ${serviceEnv.GENERATION_TOKEN}`,'X-Agency-ID':agency.id,'X-AI-Extraction-ID':id,'X-AI-Listing-ID':draft.id,'Content-Type':'application/json'},
       body:JSON.stringify({text}),signal:AbortSignal.timeout(22_000)});
     if(!response.ok){await response.body?.cancel();throw new Error('EXTRACTION_UNAVAILABLE');}
     const value=await response.json() as {data:unknown;usage:unknown},data=CreationDraftData.parse(value.data);

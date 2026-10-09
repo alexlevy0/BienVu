@@ -1,5 +1,6 @@
 import './style.css';
 import './privacy-choice.css';
+import './dialog-backdrop.css';
 import {Suspense} from 'react';
 import {ProductAnalytics} from '../components/product-analytics';
 import {AccountProvider} from '../components/account';

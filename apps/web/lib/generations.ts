@@ -1,12 +1,13 @@
 import {EntityId,VideoReport,publicErrors,type PublicErrorCode} from '@bienvu/contracts';
-import {findOwnedGeneration,generationEvent,generationMasterUnlocked,generationRetained,GenerationFailure,listGenerations,type GenerationRow,type Database} from '@bienvu/db';
+import {findOwnedGeneration,generationEvent,generationMasterUnlocked,generationRetained,GenerationFailure,listGenerations,rememberAiContext,type GenerationRow,type Database} from '@bienvu/db';
 import {RequestFailure} from './http';
-export async function callGeneration(env:CloudflareEnv&{GENERATION_SERVICE?:Fetcher;GENERATION_TOKEN?:string},agencyId:string,path:string,body:unknown,key=''){
+export async function callGeneration(env:CloudflareEnv&{GENERATION_SERVICE?:Fetcher;GENERATION_TOKEN?:string},agencyId:string,path:string,body:unknown,key='',request?:Request){
   if(!env.GENERATION_SERVICE||!env.GENERATION_TOKEN)throw new RequestFailure('GENERATIONS_PAUSED');
   const response=await env.GENERATION_SERVICE.fetch(`https://generation.internal${path}`,{method:'POST',
     headers:{'Content-Type':'application/json','X-Agency-ID':agencyId,'Idempotency-Key':key,Authorization:`Bearer ${env.GENERATION_TOKEN}`},body:JSON.stringify(body)});
-  const value=await response.json() as {error?:string};
+  const value=await response.json() as {error?:string;id?:string};
   if(!response.ok)throw new RequestFailure(value.error&&value.error in publicErrors?value.error as PublicErrorCode:'INTERNAL_ERROR');
+  if(request&&value.id&&EntityId.safeParse(value.id).success)try{await rememberAiContext(env.DB,value.id,request);}catch{/* Analytics cannot change admission. */}
   return Response.json(value,{status:response.status});
 }
 export async function ownGeneration(env:{DB:Database},agencyId:string,id:string){

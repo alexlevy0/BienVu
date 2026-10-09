@@ -13,6 +13,7 @@ import {videoFixture,videoReport} from '../fixtures/video';
 import {RequestFailure} from '../apps/web/lib/http';
 import {importResult} from '../apps/web/lib/imports';
 import {adminVideoMapRequest} from '../apps/web/lib/video-map-settings';
+import {adminAiQualityRequest} from '../apps/web/lib/ai-quality';
 
 test('Super admin : accès fermé par défaut, adresse exacte et vérification obligatoires',()=>{
   const user={id:'admin',email:'Owner@Example.com',emailVerified:true};
@@ -43,7 +44,7 @@ test('Admin avec Better Auth/D1/R2 locaux : isolation, pagination globale, actio
   const req=(path:string,cookie=cookies[0],options:RequestInit={})=>new Request(env.BETTER_AUTH_URL+path,{...options,headers:{cookie,...options.headers}});
   await t.test('toutes les routes privées refusent anonyme, autre compte et adresse non vérifiée',async()=>{
     for(const [cookie,expected] of [['',401],[cookies[1],403],[cookies[2],401]] as const){
-      for(const response of [await financeRequest(req('/api/admin/finance?mode=test',cookie),env),await financeRequest(req('/api/admin/finance',cookie,{method:'POST',headers:{origin:env.BETTER_AUTH_URL,'Content-Type':'application/json'},body:JSON.stringify({action:'stripe_sync'})}),env),await adminRequest(req('/api/admin?section=overview',cookie),env),await adminRequest(req('/api/admin?section=traffic',cookie),env),await adminRequest(req('/api/admin',cookie,{method:'POST',headers:{origin:env.BETTER_AUTH_URL,'Content-Type':'application/json'},body:JSON.stringify({action:'generation_gate',expected:true,enabled:false,reason:'Fixture'})}),env),await adminJobRequest(req('/api/admin/jobs/missing',cookie),env,'missing'),await adminJobRequest(req('/api/admin/jobs/missing/video',cookie),env,'missing',true),await adminVideoMapRequest(req('/api/admin/video-map',cookie),env),await adminVideoMapRequest(req('/api/admin/video-map',cookie,{method:'PATCH',headers:{origin:env.BETTER_AUTH_URL,'Content-Type':'application/json'},body:'{}'}),env)]){
+      for(const response of [await financeRequest(req('/api/admin/finance?mode=test',cookie),env),await financeRequest(req('/api/admin/finance',cookie,{method:'POST',headers:{origin:env.BETTER_AUTH_URL,'Content-Type':'application/json'},body:JSON.stringify({action:'stripe_sync'})}),env),await adminRequest(req('/api/admin?section=overview',cookie),env),await adminRequest(req('/api/admin?section=traffic',cookie),env),await adminRequest(req('/api/admin',cookie,{method:'POST',headers:{origin:env.BETTER_AUTH_URL,'Content-Type':'application/json'},body:JSON.stringify({action:'generation_gate',expected:true,enabled:false,reason:'Fixture'})}),env),await adminJobRequest(req('/api/admin/jobs/missing',cookie),env,'missing'),await adminJobRequest(req('/api/admin/jobs/missing/video',cookie),env,'missing',true),await adminAiQualityRequest(req('/api/admin/ai-quality',cookie),env),await adminAiQualityRequest(req('/api/admin/ai-quality?id=private',cookie),env),await adminAiQualityRequest(req('/api/admin/ai-quality?export=dataset',cookie),env),await adminAiQualityRequest(req('/api/admin/ai-quality',cookie,{method:'POST',headers:{origin:env.BETTER_AUTH_URL},body:'{"action":"scan"}'}),env),await adminVideoMapRequest(req('/api/admin/video-map',cookie),env),await adminVideoMapRequest(req('/api/admin/video-map',cookie,{method:'PATCH',headers:{origin:env.BETTER_AUTH_URL,'Content-Type':'application/json'},body:'{}'}),env)]){
         assert.equal(response.status,expected);assert.equal(response.headers.get('cache-control'),'private, no-store');}
     }
     await assert.rejects(requireAdmin(req('/api/admin'),{...env,SUPER_ADMIN_EMAIL:''}),e=>e instanceof RequestFailure&&e.code==='FORBIDDEN');
@@ -63,6 +64,19 @@ test('Admin avec Better Auth/D1/R2 locaux : isolation, pagination globale, actio
     assert.equal((await patch(update)).status,409);
     assert.equal((await db.prepare('SELECT actor_id FROM video_map_setting_events').first<{actor_id:string}>())?.actor_id,users[0].id);
     assert.equal((await patch({settings:DEFAULT_VIDEO_MAP,revision:state.revision})).status,200);
+  });
+  await t.test('qualité IA : réglages privés, origine vérifiée, aucun juge payant et audit',async()=>{
+    const response=await adminAiQualityRequest(req('/api/admin/ai-quality'),env);assert.equal(response.status,200);
+    const current=await response.json() as {revision:number;settings:{enabled:boolean;retentionDays:number;reviewSamplePercent:number}};
+    const patch=(body:unknown,origin=env.BETTER_AUTH_URL)=>adminAiQualityRequest(req('/api/admin/ai-quality',cookies[0],{method:'PATCH',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify(body)}),env);
+    const change={settings:{...current.settings,reviewSamplePercent:20},revision:current.revision};
+    assert.equal((await patch(change,'https://evil.example')).status,403);
+    assert.equal((await patch(null)).status,422);
+    assert.equal((await patch({...change,settings:{...change.settings,judgeEnabled:true}})).status,422);
+    assert.equal((await patch(change)).status,200);assert.equal((await patch(change)).status,409);
+    assert.equal((await db.prepare("SELECT actor_id FROM ai_quality_audit WHERE action='settings'").first<{actor_id:string}>())?.actor_id,users[0].id);
+    assert.equal((await adminAiQualityRequest(req('/api/admin/ai-quality?export=dataset'),env)).status,200);
+    assert.equal((await adminAiQualityRequest(req('/api/admin/ai-quality?days=365'),env)).status,422);
   });
   await t.test('toutes les sections se lisent sans secrets et les mauvais paramètres sont refusés',async()=>{
     for(const section of ['traffic','overview','videos','agencies','users','subscriptions','quotas','imports','reports','audit']){

@@ -1,4 +1,5 @@
 import {EntityId, JobStage, publicErrors, type PublicErrorCode} from '@bienvu/contracts';
+export * from './ai';
 
 export function requestContext() {
   // Ne pas faire confiance à un identifiant fourni par le navigateur.

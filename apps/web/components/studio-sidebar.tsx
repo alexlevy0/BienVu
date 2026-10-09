@@ -49,7 +49,7 @@ export function StudioSidebar({active}: {active: 'create' | 'videos' | 'explore'
     </Link>;
   return <>
     <header className="home-mobile-header"><Link href="/" aria-label="BienVu, accueil"><HomeWordmark/></Link><button ref={menuButton} type="button" aria-expanded={menuOpen} aria-controls="home-sidebar" aria-label={menuOpen ? 'Fermer la navigation' : 'Ouvrir la navigation'} onClick={() => setMenuOpen(value => !value)}><HomeIcon name={menuOpen ? 'close' : 'menu'}/></button></header>
-    {menuOpen && <button type="button" className="home-menu-backdrop" aria-label="Fermer la navigation" onClick={closeMenu} tabIndex={-1}/>}
+    <button type="button" className={`home-menu-backdrop${menuOpen?' home-menu-backdrop-open':''}`} aria-label="Fermer la navigation" aria-hidden={!menuOpen} onClick={closeMenu} tabIndex={-1}/>
     <aside id="home-sidebar" ref={sidebar} className={`home-sidebar${menuOpen ? ' home-sidebar-open' : ''}`} aria-label="Votre studio BienVu">
       <Link className="home-brand-link" href="/" aria-label="BienVu, accueil" onClick={closeMenu}><HomeWordmark/></Link>
       <nav className="home-navigation" aria-label="Navigation principale" data-analytics-public>

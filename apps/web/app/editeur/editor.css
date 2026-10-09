@@ -171,7 +171,7 @@
 .editor-feedback button{border:0;background:none;text-decoration:underline;white-space:nowrap}
 .editor-error{color:#ab4f38!important;font-size:13px!important}
 .editor-export-dialog{border:1px solid #d5ddcd;border-radius:14px;max-width:470px;width:calc(100% - 32px);padding:30px;color:#172112;background:#fffef9;box-shadow:0 25px 90px #101a1250}
-.editor-export-dialog::backdrop{background:#17201177;backdrop-filter:blur(4px)}
+
 .editor-export-dialog h2{font-family:'Instrument Serif',Georgia,serif;font-size:36px;margin:0 0 12px;font-weight:400}
 .editor-export-dialog p{color:#717969;font-size:14px;line-height:1.6}
 .editor-export-dialog .editor-check{margin:22px 0;font-size:13px}
@@ -239,7 +239,14 @@
 .editor-guest-banner button{display:inline-flex;align-items:center;gap:6px;border:0;background:none;font:inherit;padding:4px 0;text-decoration:underline;text-underline-offset:3px;color:#405e38}
 .editor-guest-loading{padding:14px 20px;margin:0;font-size:14px;color:#536849;background:#edf3e8}
 .editor-welcome{border:1px solid #d6dece;border-radius:20px;background:#fffefa;box-shadow:0 20px 100px #17231026;padding:34px;width:min(700px,calc(100vw - 32px));max-height:calc(100svh - 40px);overflow:auto;color:#20251f;box-sizing:border-box;font-family:'Inter Tight',Arial,sans-serif}
-.editor-welcome::backdrop{background:#1b231c60;backdrop-filter:blur(4px)}
+.editor-welcome:modal{animation:editor-welcome-in var(--dialog-motion-duration) var(--dialog-motion-easing) both}
+.editor-welcome[data-closing]{animation:editor-welcome-out var(--dialog-motion-duration) var(--dialog-motion-easing) both;pointer-events:none}
+.editor-welcome-close{position:absolute;top:12px;right:12px;display:grid;place-items:center;width:40px;height:40px;border:1px solid transparent;border-radius:50%;background:transparent;color:#65745c;transition:background .15s,color .15s}
+.editor-welcome-close:hover:not(:disabled){background:#edf3e6;color:#20251f}
+.editor-welcome-close:focus-visible{outline:3px solid #718b62;outline-offset:2px}
+.editor-welcome>.editor-eyebrow{display:block;padding-right:30px}
+@keyframes editor-welcome-in{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes editor-welcome-out{from{opacity:1;transform:translateY(0) scale(1)}to{opacity:0;transform:translateY(6px) scale(.99)}}
 .editor-welcome h2{font-family:'Instrument Serif',Georgia,serif;font-size:52px;font-weight:400;letter-spacing:-1.3px;margin:9px 0 10px;line-height:1}
 .editor-welcome>p{color:#71776d;line-height:1.55;font-size:15px;margin:0 0 24px}
 .editor-welcome-options{display:grid;grid-template-columns:1.2fr 1fr;gap:14px}

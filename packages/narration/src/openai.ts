@@ -9,7 +9,7 @@ export type ScriptMetrics = {provider: 'openai'; model: string; promptVersion: s
   providerRequestId: string | null; responseId: string | null; requestDurationMs: number;
   usage: {inputTokens: number; outputTokens: number; cachedInputTokens: number | null} | null;
   cost: {currency: 'USD'; priceDate: string; estimatedMicrosBeforeCacheDiscount: number | null; actualBilledMicros: null}};
-export type ScriptReply = {plan: unknown; metrics: ScriptMetrics};
+export type ScriptReply = {plan: unknown; metrics: ScriptMetrics;telemetry?:{input:unknown;output:unknown}};
 export type ScriptProvider = {model: string; plan(context: ScriptContext, correction: boolean): Promise<ScriptReply>};
 
 export function scriptRequest(context: ScriptContext, model: string, correction: boolean) {
@@ -103,7 +103,7 @@ export function openaiScripts(apiKey: string, model: string = DEFAULT_SCRIPT_MOD
       if (data.model !== model && data.model !== DEFAULT_SCRIPT_MODEL) throw new NarrationFailure('SCRIPT_RESPONSE_INVALID');
       let plan: unknown;
       try {plan = descriptionPlan(context,JSON.parse(text));} catch {plan = null;}
-      return {plan, metrics: {provider: 'openai', model: String(data.model), promptVersion: scriptPromptVersion(context),
+      return {plan,telemetry:{input:scriptRequest(context,model,correction).input,output:[{role:'assistant',content:text}]}, metrics: {provider: 'openai', model: String(data.model), promptVersion: scriptPromptVersion(context),
         requestId: localId, providerRequestId: requestId(response.headers.get('x-request-id')), responseId: requestId(typeof data.id === 'string' ? data.id : null),
         requestDurationMs: Date.now() - started, usage: counts,
         cost: {currency: 'USD', priceDate: '2026-09-28', estimatedMicrosBeforeCacheDiscount: counts ? Math.ceil(counts.inputTokens * 0.75 + counts.outputTokens * 4.5) : null, actualBilledMicros: null}}};

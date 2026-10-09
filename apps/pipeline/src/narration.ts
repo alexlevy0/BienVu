@@ -183,7 +183,7 @@ async function voiceScenes(env: {DB: Database; MEDIA: NarrationBucket}, lease: N
       await assertNarrationLease(env.DB, lease, now());
       await env.MEDIA.put(asset.objectKey, bytes, {httpMetadata: {contentType: 'audio/wav'}, customMetadata: {sha256, cacheKey}});
       await readNarrationAudio(env.MEDIA, lease, asset);
-      await finishNarrationCall(env.DB, lease, call.row.id, {asset, metrics, measurement: measured, providerMock: providers.mode === 'mock'}, now());
+      await finishNarrationCall(env.DB, lease, call.row.id, {asset, metrics, measurement: measured,spokenText:text,voice:providers.voice.config, providerMock: providers.mode === 'mock'}, now());
       result.push(asset);
     } catch (error) {await failNarrationCall(env.DB, lease, call.row.id, codeOf(error)); throw error;}
   }

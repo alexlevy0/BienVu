@@ -1,4 +1,4 @@
-import {admitAnonymous,anonymousManualPermit,anonymousSession,createAnonymousSession,generationEvent,generationView,generationRetained,GenerationFailure,listAnonymousGenerationPage,priorTrial,trialForSession,trialPolicy,type AnonymousSession} from '@bienvu/db';
+import {admitAnonymous,anonymousManualPermit,anonymousSession,createAnonymousSession,generationEvent,generationView,generationRetained,GenerationFailure,listAnonymousGenerationPage,priorTrial,trialForSession,trialPolicy,rememberAiContext,type AnonymousSession} from '@bienvu/db';
 import {authOrigin} from './auth';
 import {assertSameOrigin,boundedJson,RequestFailure} from './http';
 import {callGeneration,streamGenerationMedia} from './generations';
@@ -66,6 +66,7 @@ export async function startTrial(request:Request,env:TrialEnv,trustedCloudflare:
   if(row.status==='queued'&&row.launchStatus==='pending'){
     try{await callGeneration(env,row.agencyId,`/generations/${row.jobId}/retry`,{});}catch{/* The durable outbox remains authoritative; cron retries launch. */}
   }
+  try{await rememberAiContext(env.DB,row.jobId,request);}catch{}
   return Response.json(generationView(row,Date.now(),'anonymous'),{status:202});
 }
 export async function ownAnonymousJob(request:Request,env:TrialEnv,id:string){

@@ -12,6 +12,7 @@ import {extractDescription,EXTRACTION_TEXT_MAX} from '@bienvu/narration';
 import {loadGenerationListing} from './generation-import';
 import {prepareJobAnimations} from './photo-animations';
 import {prepareDefaultGenerationMap} from './default-video-map';
+import {safeAiEvent} from '@bienvu/observability';
 export {VideoRenderer};
 export type GenerationEnv=VideoEnv&Pick<NarrationEnv,'GOOGLE_SERVICE_ACCOUNT_JSON'|'GOOGLE_CLOUD_PROJECT'|'GOOGLE_TTS_VOICE'|'OPENAI_API_KEY'|'SCRIPT_MODEL'>&FishVoiceEnv&{
   GENERATIONS_ENABLED:string;GENERATION_TOKEN:string;IMPORT_TOKEN:string;IMPORT_SERVICE:Fetcher;GENERATION_WORKFLOW:Workflow<{agencyId:string;jobId:string}>;
@@ -164,8 +165,17 @@ export default {
         const input=JSON.parse(body) as {text?:unknown};
         if(!input||typeof input.text!=='string'||input.text.length<15||input.text.length>EXTRACTION_TEXT_MAX)
           return json({error:'VALIDATION_ERROR'},422);
-        try{return json(await extractDescription(input.text,env.OPENAI_API_KEY,env.SCRIPT_MODEL));}
-        catch{return json({error:'SOURCE_UNAVAILABLE'},502);}
+        const extractionId=request.headers.get('X-AI-Extraction-ID'),trace=extractionId&&EntityId.safeParse(extractionId).success?'bv-extract-'+extractionId:null,started=Date.now();
+        try{const result=await extractDescription(input.text,env.OPENAI_API_KEY,env.SCRIPT_MODEL);
+          if(trace)await safeAiEvent(env.DB,trace,'$ai_generation',trace,{distinct_id:'bv-agency-'+agencyId,bv_app:'bienvu',bv_stage:'extraction',bv_extraction_id:extractionId,
+            bv_listing_id:request.headers.get('X-AI-Listing-ID'),$ai_span_id:extractionId,$ai_span_name:'Extraction annonce',$ai_provider:'openai',$ai_model:env.SCRIPT_MODEL,
+            $ai_input:result.telemetry.input,$ai_output_choices:result.telemetry.output,
+            $ai_input_tokens:result.usage?.inputTokens,$ai_output_tokens:result.usage?.outputTokens,$ai_latency:(Date.now()-started)/1000,
+            bv_cost_estimated_usd:result.usage?(result.usage.inputTokens*.75+result.usage.outputTokens*4.5)/1e6:null,bv_cost_actual_usd:null});
+          return json({data:result.data,usage:result.usage});}
+        catch{if(trace)await safeAiEvent(env.DB,trace,'$ai_generation',trace,{distinct_id:'bv-agency-'+agencyId,bv_app:'bienvu',bv_stage:'extraction',bv_extraction_id:extractionId,
+          $ai_span_id:extractionId,$ai_provider:'openai',$ai_model:env.SCRIPT_MODEL,$ai_input:[{role:'user',content:input.text}],$ai_is_error:true,$ai_error:'EXTRACTION_UNAVAILABLE',$ai_latency:(Date.now()-started)/1000});
+          return json({error:'SOURCE_UNAVAILABLE'},502);}
       }
       if(path==='/generations'&&request.method==='POST'){
         const body=await request.text();if(body.length>32_000)return json({error:'VALIDATION_ERROR'},422);

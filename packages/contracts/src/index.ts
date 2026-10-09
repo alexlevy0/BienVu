@@ -23,6 +23,7 @@ export * from './source-coverage';
 export * from './voice';
 export * from './voice-catalog';
 export * from './narration';
+export * from './ai-quality';
 export * from './video';
 export * from './generation';
 export * from './homepage';

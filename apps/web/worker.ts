@@ -7,7 +7,8 @@ import {runSocialBatch} from './lib/social-publisher';
 import {cleanupSocial} from './lib/social';
 import {cleanupHomepageAssets} from './lib/homepage-media';
 import {sendMailboxOutbox,cleanupMailUploads} from './lib/mailbox';
-import {cleanupPartnerApplications} from '@bienvu/db';
+import {cleanupPartnerApplications,purgeAiQuality} from '@bienvu/db';
+import {runAiQualityBatch} from './lib/ai-quality';
 
 export default {
   async fetch(request, env, ctx) {
@@ -17,8 +18,8 @@ export default {
     return response;
   },
   async scheduled(controller,env){
-    if(controller.cron==='23 3 * * *'){await purgeTraffic(env.DB);await purgeSeo(env.DB);await cleanupSocial(env);await cleanupHomepageAssets(env);await cleanupMailUploads(env);await cleanupPartnerApplications(env.DB);}
-    else await Promise.all([runSocialBatch(env),sendMailboxOutbox(env)]);
+    if(controller.cron==='23 3 * * *'){await purgeTraffic(env.DB);await purgeSeo(env.DB);await cleanupSocial(env);await cleanupHomepageAssets(env);await cleanupMailUploads(env);await cleanupPartnerApplications(env.DB);await purgeAiQuality(env.DB);}
+    else await Promise.all([runSocialBatch(env),sendMailboxOutbox(env),runAiQualityBatch(env)]);
   },
 } satisfies ExportedHandler<CloudflareEnv>;
 

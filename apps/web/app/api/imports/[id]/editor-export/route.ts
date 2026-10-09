@@ -15,7 +15,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
   if(previous&&previous.status!=='failed'&&generationRetained(previous))return Response.json(generationView(previous));
   const key=await contentHash(new TextEncoder().encode(`${agency.id}:${id}:${version}:${previous?.jobId??'initial'}`));
   const input=await snapshotEditorExport(env,agency.id,id,version,key,request.signal);
-  const response=await callGeneration(env,agency.id,'/generations',input,key),value=await response.json() as {id:string};
+  const response=await callGeneration(env,agency.id,'/generations',input,key,request),value=await response.json() as {id:string};
   await env.DB.prepare('INSERT INTO editor_exports VALUES(?,?,?,?,?) ON CONFLICT(agency_id,import_id,version) DO UPDATE SET job_id=excluded.job_id,created_at=excluded.created_at')
     .bind(agency.id,id,version,value.id,new Date().toISOString()).run();
   return Response.json(value,{status:response.status});

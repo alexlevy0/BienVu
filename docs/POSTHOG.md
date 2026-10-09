@@ -72,3 +72,9 @@ Ces indicateurs sont opérationnels : les fins de traitement dépendent de leur 
 La livraison du 9 octobre 2026 est documentée dans `evidence/remote/posthog-2026-10-09/`. Les 21 graphiques ont été exécutés avec les filtres du dashboard ; leur disposition stockée ne contient aucun chevauchement.
 
 Documentation : [SDK Next.js](https://posthog.com/docs/libraries/next-js), [contrôles des replays](https://posthog.com/docs/session-replay/privacy), [capture des canvas](https://posthog.com/docs/session-replay/canvas-recording), [collecte et consentement](https://posthog.com/docs/privacy/data-collection).
+
+## Qualité des générations IA
+
+Le suivi serveur et les évaluations Hog sont décrits dans [QUALITE-IA.md](QUALITE-IA.md). Le [dashboard Qualité IA BienVu](https://eu.posthog.com/project/299212/dashboard/1010344) contient 16 graphiques : contrôles, couverture, sources, voix, versions de narration, délais, coûts partiels, réutilisation, imports, publications et verdicts humains. Les requêtes SQL utilisent les filtres de dates du dashboard.
+
+L'onglet **Qualité IA** du superadmin permet la relecture et l'export de références figées. Onze évaluations natives sont actives, exclusivement de type Hog, sans clé fournisseur et sans requête supplémentaire à OpenAI ou aux fournisseurs de média. Le suivi lit les journaux existants ; il ne régénère aucun contenu. Les coûts réels incomplets et les critères non applicables restent explicitement distincts de zéro et des échecs. [Définitions et identifiants](posthog-quality-dashboard.json).
