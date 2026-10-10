@@ -1,5 +1,13 @@
 # BienVu — suivi des sprints
 
+### 10/10/2026 — Chat d’assistance Tawk.to
+
+Widget fourni par Alex intégré au layout principal : chargement `lazyOnload` unique, visiteurs et comptes connectés, conversations dans Tawk.to. Connexion suspendue sur le superadmin, les validations privées et les URLs contenant des jetons ; reprise après retour au studio. Initialisation explicite via le premier état de disponibilité du SDK, y compris si le téléchargement se termine après une navigation. Z-index 40, aucun nom/e-mail de compte injecté et préférences PostHog indépendantes. Page Confidentialité et [réglages Tawk.to](TAWK.md) actualisés ; langue, horaires et formulaire de consentement natif se règlent dans le dashboard du fournisseur.
+
+**3/3 tests ciblés**, types web/tests, frontières **486 fichiers**, build OpenNext et dry-run Wrangler réussis. Vrai layout Next.js vérifié à **1536/390 px** avec fixture du widget : chargement unique à la navigation, arrêt sur lien privé, absence de chargement initial avec un jeton. Vrai widget vérifié dans Chrome avec fenêtre sur la home locale et publiée, sans message envoyé ni événement PostHog de recette. Tawk.to refuse le navigateur headless avec une réponse 403 ; test repris dans un Chrome avec fenêtre, sans falsifier son User-Agent.
+
+Web publié à 100 % : **`836f6df7-32b8-4851-8661-e7e368d230ab`**, **56 bindings conservés à l’identique**, accueil/confidentialité en 200 et `/api/me` anonyme en 401. Vrai widget en ligne, visible et sans débordement sur les deux largeurs. Aucun changement de migration, secret, offre ou traitement vidéo. Preuves et captures ignorées : `evidence/local/tawk-2026-10-10/`. Aucun commit/push à cette étape.
+
 ### 10/10/2026 — Imports par lien : 40 tentatives par jour
 
 Quota quotidien partagé augmenté de **20 à 40/jour UTC**, quota mensuel **300 inchangé**. Migration additive **0065**, contrat `URL_IMPORT_QUOTAS`, droits d’admission et affichage superadmin alignés. Compteurs, budgets et historiques conservés ; échecs toujours comptés, rejeux idempotents et formulaires manuels hors compteur. Verrou individuel d’import toujours appliqué.
