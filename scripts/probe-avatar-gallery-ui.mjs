@@ -5,14 +5,14 @@ import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright-core';
-const out=resolve('evidence/local/public-avatars');await mkdir(out,{recursive:true});
+const out=resolve('evidence/local/public-avatars-scroll');await mkdir(out,{recursive:true});
 const require=createRequire(import.meta.url),esbuild=createRequire(require.resolve('tsx'))('esbuild');
 const looks=Array.from({length:1257},(_,i)=>({id:'look-'+i,name:'Avatar '+String(i).padStart(4,'0'),gender:i%2?'male':'female',type:'studio_avatar',engines:['avatar_iii'],enabled:true,thumbnail:'/portrait/'+i,preview:'/excerpt/'+i,transparentVerified:false,ownership:'public',updatedAt:'2026-10-10'}));
 const initial={looks:looks.slice(0,32),offset:0,total:looks.length,hasMore:true};
-const bundle=await esbuild.build({stdin:{contents:`import React from'react';import{createRoot}from'react-dom/client';import{AvatarGallery}from'./components/avatar-gallery';createRoot(document.getElementById('gallery')).render(<AvatarGallery initial={${JSON.stringify(initial)}}/>);`,loader:'tsx',resolveDir:resolve('apps/web')},bundle:true,platform:'browser',format:'iife',jsx:'automatic',minify:true,write:false,define:{'process.env.NODE_ENV':'"production"'}});
+const bundle=await esbuild.build({stdin:{contents:`import React from'react';import{createRoot}from'react-dom/client';import{AvatarGallery}from'./components/avatar-gallery';createRoot(document.getElementById('gallery')).render(<AvatarGallery initial={${JSON.stringify(initial)}}/>);`,loader:'tsx',resolveDir:resolve('apps/web')},bundle:true,platform:'browser',format:'iife',jsx:'automatic',minify:true,write:false,define:{'process.env':'{}','process.env.NODE_ENV':'"production"'}});
 const css=(await Promise.all(['landing.css','avatars.css','avatar/avatar.css'].map(path=>readFile('apps/web/app/'+path,'utf8')))).join('\n');
 const portrait=await readFile('apps/web/public/images/studio-home/avatar-circle.webp'),video=await readFile('apps/web/public/videos/studio-home/avatar-circle.mp4');
-let failNext=false;
+let failNext=false,delayNextMs=0;
 const server=createServer((req,res)=>{
  const url=new URL(req.url,'http://localhost');
  if(url.pathname==='/bundle.js'){res.setHeader('Content-Type','text/javascript');res.end(bundle.outputFiles[0].contents);return;}
@@ -20,7 +20,8 @@ const server=createServer((req,res)=>{
  if(url.pathname==='/api/avatars/gallery'){
   if(failNext){failNext=false;res.statusCode=503;res.end();return;}
   const query=url.searchParams.get('query')??'',gender=url.searchParams.get('gender')??'all',offset=Number(url.searchParams.get('offset')??0),filtered=looks.filter(l=>l.name.toLowerCase().includes(query.toLowerCase())&&(gender==='all'||l.gender===gender));
-  res.setHeader('Content-Type','application/json');res.end(JSON.stringify({looks:filtered.slice(offset,offset+32),total:filtered.length,offset,hasMore:offset+32<filtered.length}));return;
+  const payload=JSON.stringify({looks:filtered.slice(offset,offset+32),total:filtered.length,offset,hasMore:offset+32<filtered.length}),delay=delayNextMs;delayNextMs=0;
+  res.setHeader('Content-Type','application/json');if(delay)setTimeout(()=>res.end(payload),delay);else res.end(payload);return;
  }
  if(url.pathname.startsWith('/portrait/')){res.setHeader('Content-Type','image/webp');res.end(portrait);return;}
  if(url.pathname.startsWith('/excerpt/')){const match=/bytes=(\d+)-(\d*)/.exec(req.headers.range??''),start=Number(match?.[1]??0),end=match?.[2]?Math.min(Number(match[2]),video.length-1):video.length-1;
@@ -54,8 +55,24 @@ try{for(const width of live?[1536,390]:[1536,1100,900,768,390,320]){
   if(!live)assert.equal(await page.locator('.avatar-gallery-card').count(),1);
   await page.getByLabel('Rechercher un avatar').fill('does-not-exist-at-all');await page.getByRole('heading',{name:'Aucun avatar ne correspond à votre recherche.'}).waitFor();await page.getByRole('button',{name:'Voir tous les avatars'}).click();await page.waitForFunction(()=>document.querySelectorAll('.avatar-gallery-card').length===32);
   await page.getByLabel('Genre du présentateur').selectOption('female');await page.waitForTimeout(600);await page.waitForFunction(()=>document.querySelector('.avatar-gallery-grid').getAttribute('aria-busy')==='false');assert.ok(await page.locator('.avatar-gallery-card-info>span').evaluateAll(nodes=>nodes.every(n=>n.textContent==='Présentatrice')));
-  await page.getByRole('button',{name:'Afficher plus d’avatars'}).click();await page.waitForFunction(()=>document.querySelectorAll('.avatar-gallery-card').length===64);
-  if(!live){failNext=true;await page.getByLabel('Rechercher un avatar').fill('failure-test');await page.getByRole('alert').waitFor();await page.getByRole('button',{name:'Réessayer',exact:true}).click();await page.getByRole('heading',{name:'Aucun avatar ne correspond à votre recherche.'}).waitFor();}
+  assert.equal(await page.getByRole('button',{name:'Afficher plus d’avatars'}).count(),0);
+  await page.locator('.avatar-gallery-more').scrollIntoViewIfNeeded();await page.waitForFunction(()=>document.querySelectorAll('.avatar-gallery-card').length===64);
+  await page.waitForTimeout(400);assert.equal(requests.filter(url=>url.includes('/api/avatars/gallery')&&new URL(url).searchParams.get('gender')==='female'&&new URL(url).searchParams.get('offset')==='32').length,1);
+  await page.screenshot({path:resolve(out,(live?'published-':'local-')+'scroll-'+width+'.png')});
+  if(!live){
+   const ids=await page.locator('.avatar-gallery-card').evaluateAll(cards=>cards.map(card=>card.dataset.avatarId));
+   failNext=true;await page.locator('.avatar-gallery-more').scrollIntoViewIfNeeded();await page.getByRole('alert').waitFor();assert.equal(await page.locator('.avatar-gallery-card').count(),64);
+   await page.waitForTimeout(400);assert.equal(requests.filter(url=>url.includes('/api/avatars/gallery')&&new URL(url).searchParams.get('gender')==='female'&&new URL(url).searchParams.get('offset')==='64').length,1);
+   await page.getByRole('button',{name:'Réessayer',exact:true}).click();await page.waitForFunction(()=>document.querySelectorAll('.avatar-gallery-card').length===96);
+   const after=await page.locator('.avatar-gallery-card').evaluateAll(cards=>cards.map(card=>card.dataset.avatarId));assert.deepEqual(after.slice(0,64),ids);assert.equal(new Set(after).size,96);
+   delayNextMs=700;const slow=page.waitForRequest(request=>request.url().includes('/api/avatars/gallery')&&new URL(request.url()).searchParams.get('offset')==='96');
+   await page.locator('.avatar-gallery-more').scrollIntoViewIfNeeded();await slow;await page.getByLabel('Rechercher un avatar').fill('Avatar 1256');
+   await page.waitForFunction(()=>document.querySelectorAll('.avatar-gallery-card').length===1);await page.waitForTimeout(800);assert.equal(await page.locator('.avatar-gallery-card').count(),1);
+   failNext=true;await page.getByLabel('Rechercher un avatar').fill('failure-test');await page.getByRole('alert').waitFor();await page.getByRole('button',{name:'Réessayer',exact:true}).click();await page.getByRole('heading',{name:'Aucun avatar ne correspond à votre recherche.'}).waitFor();
+   await page.getByLabel('Genre du présentateur').selectOption('all');await page.getByLabel('Rechercher un avatar').fill('Avatar 12');await page.waitForFunction(()=>document.querySelectorAll('.avatar-gallery-card').length===32);
+   await page.locator('.avatar-gallery-more').scrollIntoViewIfNeeded();await page.waitForFunction(()=>document.querySelectorAll('.avatar-gallery-card').length===57);await page.getByText('Tous les résultats sont affichés.',{exact:true}).waitFor();
+   const count=requests.filter(url=>url.includes('/api/avatars/gallery')).length;await page.waitForTimeout(500);assert.equal(requests.filter(url=>url.includes('/api/avatars/gallery')).length,count);
+  }
   await page.getByLabel('Rechercher un avatar').fill('');await page.getByLabel('Genre du présentateur').selectOption('all');await page.waitForTimeout(600);
  }
  await page.waitForFunction(()=>document.querySelector('.avatar-gallery-grid').getAttribute('aria-busy')==='false');

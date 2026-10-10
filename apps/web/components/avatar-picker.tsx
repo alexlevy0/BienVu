@@ -2,6 +2,8 @@
 import {useCallback,useEffect,useRef,useState,type RefObject} from 'react';
 import type {AvatarLook} from '@bienvu/contracts';
 import {HomeIcon} from './home-icons';
+import {useAvatarFavorites} from './avatar-favorites';
+import {prioritizeAvatarFavorites} from '@bienvu/contracts';
 
 // Portraits load near the visible strip, not several screens ahead. Videos are
 // mounted only after deliberate interest; leaving also cancels a pending hover.
@@ -28,6 +30,7 @@ export function AvatarPortrait({look,playing,root,onUnavailable,priority=false}:
 }
 
 export function AvatarPicker({looks,selected,busy,onSelect}:{looks:AvatarLook[];selected:string;busy?:boolean;onSelect(look:AvatarLook):void}){
+  const favorites=useAvatarFavorites();
   const strip=useRef<HTMLDivElement>(null),timer=useRef<ReturnType<typeof setTimeout>|null>(null);
   const [query,setQuery]=useState(''),[gender,setGender]=useState('all'),[preview,setPreview]=useState<{id:string;pinned:boolean}|null>(null);
   const clearTimer=()=>{if(timer.current!==null){clearTimeout(timer.current);timer.current=null;}};
@@ -35,7 +38,7 @@ export function AvatarPicker({looks,selected,busy,onSelect}:{looks:AvatarLook[];
   useEffect(()=>{clearTimer();setPreview(null);if(strip.current)strip.current.scrollLeft=0;},[query,gender,busy]);
   const stop=useCallback(()=>setPreview(null),[]);
   const normalized=query.trim().toLocaleLowerCase('fr');
-  const filtered=looks.filter(look=>(gender==='all'||look.gender===gender)&&look.name.toLocaleLowerCase('fr').includes(normalized));
+  const filtered=prioritizeAvatarFavorites(looks,favorites.ids).filter(look=>(gender==='all'||look.gender===gender)&&look.name.toLocaleLowerCase('fr').includes(normalized));
   function hover(look:AvatarLook,pointer:string){
     clearTimer();if(busy||!look.preview||pointer!=='mouse'||!matchMedia('(hover: hover) and (pointer: fine)').matches)return;
     timer.current=setTimeout(()=>{setPreview({id:look.id,pinned:false});timer.current=null;},800);
@@ -44,6 +47,8 @@ export function AvatarPicker({looks,selected,busy,onSelect}:{looks:AvatarLook[];
   function scroll(direction:number){strip.current?.scrollBy({left:direction*strip.current.clientWidth*.8,
     behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});}
   return <div className="avatar-picker">
+    {favorites.authenticated&&favorites.loading&&<p className="avatar-picker-hint" role="status">Chargement de vos favoris…</p>}
+    {favorites.error&&<p className="avatar-favorites-error" role="alert">{favorites.error} <button type="button" onClick={favorites.refresh}>Actualiser les favoris</button></p>}
     <div className="avatar-picker-toolbar">
       <input type="search" aria-label="Rechercher un avatar" placeholder="Rechercher un présentateur…" value={query} onChange={e=>setQuery(e.target.value)}/>
       <select aria-label="Genre du présentateur" value={gender} onChange={e=>setGender(e.target.value)}><option value="all">Tous les avatars</option><option value="female">Présentatrices</option><option value="male">Présentateurs</option><option value="unknown">Genre non renseigné</option></select>
@@ -51,11 +56,12 @@ export function AvatarPicker({looks,selected,busy,onSelect}:{looks:AvatarLook[];
       <div className="avatar-picker-arrows"><button type="button" aria-label="Avatars précédents" onClick={()=>scroll(-1)}>←</button><button type="button" aria-label="Avatars suivants" onClick={()=>scroll(1)}>→</button></div>
     </div>
     <div className="avatar-look-strip" ref={strip} tabIndex={0} role="region" aria-label="Choisir un présentateur" onScroll={()=>{clearTimer();setPreview(current=>current?.pinned?current:null);}}>
-      {filtered.map(look=><div className={`avatar-look${look.id===selected?' is-selected':''}`} key={look.id}
+      {filtered.map(look=><div className={`avatar-look${look.id===selected?' is-selected':''}`} key={look.id} data-avatar-id={look.id}
         onPointerEnter={e=>hover(look,e.pointerType)} onPointerLeave={()=>leave(look.id)}>
         <button type="button" aria-pressed={look.id===selected} disabled={busy} onClick={()=>{clearTimer();setPreview(null);onSelect(look);}}>
           <AvatarPortrait look={look} root={strip} playing={preview?.id===look.id} onUnavailable={stop}/>
           <strong>{look.name}</strong><small>{look.gender==='female'?'Présentatrice':look.gender==='male'?'Présentateur':'Présentation'}</small>
+          {favorites.ids.includes(look.id)&&<span className="avatar-picker-favorite"><HomeIcon name="heart" size={12} filled/>Favori</span>}
         </button>
         {look.preview&&<button type="button" className="avatar-look-preview" disabled={busy} onClick={()=>{clearTimer();setPreview(current=>current?.id===look.id?null:{id:look.id,pinned:true});}}>
           {preview?.id===look.id?'Fermer l’extrait':'Voir un extrait'}

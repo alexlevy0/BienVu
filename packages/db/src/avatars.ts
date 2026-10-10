@@ -1,4 +1,4 @@
-import {AvatarSettings,AvatarLook,AvatarAdmission,AvatarCatalog,AvatarGallery,AvatarGalleryQuery,DEFAULT_AVATAR_SETTINGS,avatarCreditCost,type AvatarCustomization} from '@bienvu/contracts';
+import {AvatarSettings,AvatarLook,AvatarAdmission,AvatarCatalog,AvatarGallery,AvatarGalleryQuery,AvatarFavorites,AvatarFavoriteUpdate,DEFAULT_AVATAR_SETTINGS,avatarCreditCost,type AvatarCustomization} from '@bienvu/contracts';
 import type {Database} from './index';
 
 export async function avatarSettings(db:Database){
@@ -34,6 +34,26 @@ export async function avatarCatalog(db:Database){const {settings}=await avatarSe
 export async function findAvatarLook(db:Database,id:string){
   const row=await db.prepare('SELECT look_json AS look,source_json AS source FROM avatar_looks WHERE id=?').bind(id).first<{look:string;source:string}>();
   return row?{look:AvatarLook.parse(JSON.parse(row.look)),source:JSON.parse(row.source) as {image:string|null;video:string|null}}:null;
+}
+export async function avatarFavorites(db:Database,userId:string){
+  const {settings}=await avatarSettings(db);
+  const row=await db.prepare(`SELECT json_group_array(look_id) AS ids FROM (
+    SELECT f.look_id FROM avatar_favorites f JOIN avatar_looks a ON a.id=f.look_id
+    WHERE f.user_id=? AND a.enabled=1 AND json_extract(a.look_json,'$.ownership')='public'
+      AND EXISTS(SELECT 1 FROM json_each(a.look_json,'$.engines') WHERE value='avatar_iii' OR (?=1 AND value='avatar_iv'))
+    ORDER BY f.look_id LIMIT 5000)`).bind(userId,settings.allowPremium?1:0).first<{ids:string}>();
+  return AvatarFavorites.parse({ids:JSON.parse(row?.ids??'[]')});
+}
+export async function setAvatarFavorite(db:Database,userId:string,input:AvatarFavoriteUpdate){
+  const {lookId,favorite}=AvatarFavoriteUpdate.parse(input);
+  if(!favorite){await db.prepare('DELETE FROM avatar_favorites WHERE user_id=? AND look_id=?').bind(userId,lookId).run();return;}
+  // Check visibility inside the write, including concurrent catalogue changes.
+  await db.prepare(`INSERT INTO avatar_favorites(user_id,look_id,created_at)
+    SELECT ?,a.id,? FROM avatar_looks a WHERE a.id=? AND a.enabled=1 AND json_extract(a.look_json,'$.ownership')='public'
+      AND EXISTS(SELECT 1 FROM json_each(a.look_json,'$.engines') WHERE value='avatar_iii' OR (
+        coalesce((SELECT json_extract(settings_json,'$.allowPremium') FROM avatar_settings WHERE id=1),0)=1 AND value='avatar_iv'))
+    ON CONFLICT(user_id,look_id) DO NOTHING`).bind(userId,new Date().toISOString(),lookId).run();
+  if(!(await avatarFavorites(db,userId)).ids.includes(lookId))throw Error('AVATAR_UNAVAILABLE');
 }
 export async function saveAvatarLook(db:Database,actor:string,look:AvatarLook,source:{image:string|null;video:string|null}){
   const selected=AvatarLook.parse(look),at=new Date().toISOString();

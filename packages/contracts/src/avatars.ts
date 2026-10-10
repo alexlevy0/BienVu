@@ -2,6 +2,15 @@ import {z} from 'zod';
 import {cartesiaParisianVoices} from './cartesia-voices';
 
 export const AvatarId=z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/);
+export const AvatarFavorites=z.object({ids:z.array(AvatarId).max(5000)}).strict();
+export const AvatarFavoriteUpdate=z.object({lookId:AvatarId,favorite:z.boolean()}).strict();
+export type AvatarFavoriteUpdate=z.infer<typeof AvatarFavoriteUpdate>;
+// Stable partition: favourites move first without changing the selected avatar
+// or the catalogue's ordering within either group.
+export function prioritizeAvatarFavorites<T extends {id:string}>(looks:readonly T[],ids:readonly string[]):T[]{
+  const favorites=new Set(ids);
+  return [...looks.filter(look=>favorites.has(look.id)),...looks.filter(look=>!favorites.has(look.id))];
+}
 export const AvatarGender=z.enum(['female','male','unknown']);
 export const AvatarEngine=z.enum(['avatar_iii','avatar_iv']);
 export type AvatarMoment='intro'|'outro'|'full';
