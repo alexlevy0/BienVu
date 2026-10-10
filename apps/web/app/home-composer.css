@@ -10,7 +10,22 @@
 .home-studio .home-composer-modern .home-url-row input {height:40px;font-size:18px;min-width:0;letter-spacing:-.2px}
 .home-studio .home-composer-modern .home-composer-actions {display:flex;flex-direction:column;align-items:stretch;gap:8px;width:auto;min-width:0;padding:0;margin:0;border:0}
 .home-studio .home-composer-modern .home-primary-button {grid-area:auto;min-width:205px;min-height:58px;padding:13px 20px;border-radius:10px;font-size:16px;gap:17px}
-.home-studio .home-composer-modern .home-credit-cost {grid-area:auto;align-self:center;justify-self:auto;min-height:18px;width:auto;white-space:nowrap;text-align:center;color:#697665;font-size:12px;line-height:1.5}
+.home-studio .home-composer-modern .home-credit-cost {grid-area:auto;align-self:center;justify-self:auto;min-height:18px;width:auto;white-space:normal;text-align:center;color:#697665;font-size:12px;line-height:1.5}
+.home-credit-estimate-detail {display:block;margin-top:2px;font-size:10px;font-weight:400;color:#727b6c}
+.photo-duration-advice {display:flex;align-items:center;gap:10px;min-width:0;padding:11px 13px;margin:0;border:1px solid #dce5d6;border-radius:9px;background:#f2f6ed;color:#53664b;font-size:12px;line-height:1.5}
+.photo-duration-advice>svg {flex:none}
+.photo-duration-advice>span {flex:1;min-width:0}
+.photo-duration-advice strong {font-weight:600}
+.photo-duration-advice>button {display:inline-flex;align-items:center;justify-content:center;gap:7px;flex:none;min-height:38px;padding:6px 10px;border:1px solid #aabb9e;border-radius:7px;background:#fffefa;color:#34512d;font:inherit;font-weight:600;cursor:pointer}
+.photo-duration-advice>button:hover {background:#e6efde}
+.photo-duration-advice>button:disabled {opacity:.55;cursor:default}
+.photo-duration-advice>button:focus-visible {outline:2px solid #76936c;outline-offset:3px}
+.customizer-panel .photo-duration-advice {margin-bottom:16px}
+@media(max-width:600px) {
+ .photo-duration-advice {flex-wrap:wrap;align-items:flex-start}
+ .photo-duration-advice>span {flex-basis:calc(100% - 28px)}
+ .photo-duration-advice>button {margin-left:28px}
+}
 .home-studio .home-composer-modern .home-composer-bottom {display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:15px;min-width:0}
 .home-studio .home-composer-modern .home-format-tags {display:flex;flex:1;align-items:center;flex-wrap:nowrap;gap:0;padding:0;min-width:0}
 .home-studio .home-composer-modern .home-format-tags>label,.home-studio .home-composer-modern .home-format-tags>button {flex:1 1 auto;min-width:0;justify-content:center;margin:0;padding:0 10px}

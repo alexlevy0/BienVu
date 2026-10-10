@@ -8,9 +8,9 @@ import {RequestFailure} from './http';
 type ImportBucket = Pick<R2Bucket, 'put' | 'get' | 'delete'>;
 export async function createPrivateImport(env: {DB: Database; MEDIA: ImportBucket}, agencyId: string, url: string, key: string,
   transport: ImportTransport, signal?: AbortSignal, options: {mode?: 'local' | 'cloudflare'; beforeStart?: (id: string) => Promise<void>;
-    browserHtml?: (url: string, signal: AbortSignal) => Promise<string>} = {}) {
+    browserHtml?: (url: string, signal: AbortSignal) => Promise<string>;estimate?:boolean} = {}) {
   try {
-    const {row, fresh} = await beginImport(env.DB, agencyId, publicUrl(url).href, key);
+    const {row, fresh} = await beginImport(env.DB, agencyId, publicUrl(url).href, key,Date.now(),options.estimate);
     if (!fresh) return row;
     let failureStage = 'admission';
     try {

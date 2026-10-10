@@ -3,10 +3,11 @@ import {analyticsFetch as fetch,trackProductEvent} from '../lib/product-analytic
 
 import Link from 'next/link';
 import {useEffect, useLayoutEffect, useRef, useState, type DragEvent, type FormEvent} from 'react';
-import {VideoDuration,ImportUrl, GenerationView, defaultVideoCustomization,GenerationCustomization,publicErrors,generationCreditCost, type VideoCustomization, type CreationDraftData, type CreationDraftView, type GenerationRequest} from '@bienvu/contracts';
+import {VideoDuration,ImportUrl, GenerationView, defaultVideoCustomization,GenerationCustomization,generationCreditCost, type VideoCustomization, type CreationDraftData, type CreationDraftView, type GenerationRequest} from '@bienvu/contracts';
 import {useAnonymousTrial, TrialChallenge} from './anonymous-trial';
 import {useAccount} from './account';
 import {HomeIcon} from './home-icons';
+import {PhotoDurationAdvice} from './photo-duration-advice';
 import {ManualListingForm, type ManualListingFormHandle,type PreparedManualListing} from './manual-listing-form';
 import {generationActive, useGenerationProgress} from './generation-progress';
 import {ConversationGeneration} from './conversation-generation';
@@ -15,6 +16,7 @@ import {clearListingDraft, readListingDraft, saveListingDraft} from '../lib/list
 import {inspectManualPhotos} from '../lib/manual-photos';
 import {useSubtitlePreference} from './video-settings';
 import {VideoCustomizer} from './video-customizer';
+import {useUrlImportEstimate,urlImportPhotoSlots,type PreparedUrlImport} from './url-import-estimate';
 
 type RequestMessage = {kind: 'url' | 'manual'; text: string};
 type ComposerPhoto={id:string;file:File;preview:string};
@@ -56,7 +58,6 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     scrollRegion = useRef<HTMLDivElement>(null),composerDock=useRef<HTMLDivElement>(null),
     composerAnimation=useRef<Animation|null>(null),previousComposer=useRef<DOMRect|null>(null),previousLayout=useRef(false);
   const manualForm=useRef<ManualListingFormHandle>(null),composerInput=useRef<HTMLInputElement>(null),autoFocusHandled=useRef(false);
-  const pendingImport=useRef<{url:string;key:string}|null>(null);
   const guestPending=useRef<{text:string;key:string}|null>(null);
   const lastOwner=useRef<string|null>(null);
   const currentOwner=useRef<string|undefined>(me?.agency.id);currentOwner.current=me?.agency.id;
@@ -69,10 +70,19 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   const guestManualBusy=trial.preparingManual||Boolean(trial.pendingManual);
   const busy = screen.kind === 'sending' || screen.kind==='extracting' || manualBusy||guestManualBusy;
   const canGenerate = Boolean(me?.rights.generationEnabled);
-  const creditCost=screen.kind==='manual'?manualCredits:generationCreditCost(guestSettings,durationSeconds);
-  const noCredits = !editingProperty && canGenerate && (me?.rights.developmentRemaining??0)<creditCost;
   const importPaused = Boolean(me?.rights.importRetryAt);
   const manual = screen.kind === 'manual';
+  const estimate=useUrlImportEstimate(url,me?.agency.id,!loading&&!busy&&!manual&&!composerPhotos.length&&
+    screen.kind!=='guest-customizing'&&!importPaused&&!(screen.kind==='job'&&generationActive(selectedJob)));
+  function settingsForImport(imported:PreparedUrlImport):VideoCustomization{
+    const slots=urlImportPhotoSlots(imported);
+    return {...guestSettings??defaultVideoCustomization(me?.agency,defaultVoice),photoOrder:slots,runwayPhotos:slots,runwayClips:undefined};
+  }
+  const estimatedSettings=me&&estimate.value?settingsForImport(estimate.value):guestSettings;
+  const creditCost=manual?manualCredits:generationCreditCost(estimatedSettings,durationSeconds);
+  const noCredits = !editingProperty && canGenerate && (me?.rights.developmentRemaining??0)<creditCost;
+  const estimatePending=Boolean(me&&estimate.source&&!manual&&!composerPhotos.length&&estimate.phase==='loading');
+  const estimateFailed=Boolean(me&&estimate.source&&!manual&&!composerPhotos.length&&estimate.phase==='error');
   const inConversation = screen.kind !== 'landing' && screen.kind !== 'error';
   const canDropPhotos=!loading&&!busy&&!incomingPhotos&&!photoChecking&&
     !(screen.kind==='job'&&generationActive(selectedJob));
@@ -248,7 +258,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   }, [screen.kind,trial.preparingManual]);
 
   async function create(input: GenerationRequest, request: RequestMessage) {
-    const customization=manualForm.current?.customization();
+    const customization=manualForm.current?.customization()??input.customization??guestSettings;
     const owner=me!.agency.id,version=interactionVersion.current,next = await requestGeneration(owner, {...input,subtitlesEnabled,voiceEnabled,durationSeconds,aspectRatio,...(customization?{customization}:{})});
     if(currentOwner.current!==owner||interactionVersion.current!==version)return;
     setJob(next); setScreen({kind: 'job', id: next.id, request}); remember(next.id, request);
@@ -325,19 +335,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     const owner=me.agency.id,version=interactionVersion.current;
     lock.current=true;setFeedback('');startFresh.current=true;forget();setScreen({kind:'extracting',text:parsed.data});
     try{
-      if(pendingImport.current?.url!==parsed.data){pendingImport.current={url:parsed.data,key:crypto.randomUUID()};
-        sessionStorage.setItem('bienvu:url-import-request',JSON.stringify(pendingImport.current));}
-      const response=await fetch('/api/imports',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':pendingImport.current.key},body:JSON.stringify({url:parsed.data})});
-      const imported=await response.json() as {id?:string;status?:string;draft?:CreationDraftView;errorCode?:string;error?:{code?:string;message?:string}};
-      if(!response.ok){
-        if(imported.error?.code==='IMPORT_BUDGET_LIMIT'){pendingImport.current=null;sessionStorage.removeItem('bienvu:url-import-request');}
-        throw new Error(imported.error?.message??'La lecture de l’annonce a été interrompue.');
-      }
-      if(imported.status==='failed'){
-        pendingImport.current=null;sessionStorage.removeItem('bienvu:url-import-request');
-        throw new Error(imported.errorCode&&Object.hasOwn(publicErrors,imported.errorCode)
-          ?publicErrors[imported.errorCode as keyof typeof publicErrors][1]:'La lecture de l’annonce a échoué. Vous pouvez réessayer ou continuer manuellement.');
-      }
+      const imported=await estimate.prepare(parsed.data,true);
       let draft=imported.draft;
       if(imported.status==='ready'&&imported.id){
         if(pendingCustomization.current?.id!==imported.id){
@@ -351,7 +349,8 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
       }
       if(!draft)throw new Error('Ce site ne permet pas de préparer cette annonce. Vous pouvez saisir ses informations et ajouter vos photos manuellement.');
       if(interactionVersion.current!==version||currentOwner.current!==owner)return;
-      setImportDraft(draft);setGuestExtraction(null);setDescription(draft.data.fields.description??'');setScreen({kind:'manual'});setCustomizing(true);
+      setImportDraft({...draft,data:{...draft.data,videoCustomization:draft.data.videoCustomization??settingsForImport(imported)}});
+      setGuestExtraction(null);setDescription(draft.data.fields.description??'');setScreen({kind:'manual'});setCustomizing(true);
       void refreshDrafts();
     }catch(error){if(interactionVersion.current===version&&currentOwner.current===owner)
       setScreen({kind:'error',request:{kind:'url',text:parsed.data},message:error instanceof Error?error.message:'Préparation interrompue.'});}
@@ -366,7 +365,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
         (document.getElementById('manual-guided-form') as HTMLFormElement | null)?.requestSubmit();
       return;
     }
-    if (loading || busy || lock.current || noCredits || activeOtherJob || screen.kind === 'job' && generationActive(selectedJob)) return;
+    if (loading || busy || lock.current || estimatePending || estimateFailed || noCredits || activeOtherJob || screen.kind === 'job' && generationActive(selectedJob)) return;
     previousComposer.current=composerDock.current?.getBoundingClientRect()??null;
     const value = url.trim();
     const parsed = ImportUrl.safeParse(value);
@@ -398,7 +397,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
       }
       setFeedback('Collez un lien HTTPS public valide, ou décrivez votre bien pour la saisie manuelle.'); return;
     }
-    if(importPaused){setFeedback('La limite des imports par lien est atteinte. Vous pouvez ajouter vos informations et photos manuellement.');return;}
+    if(importPaused&&!estimate.value){setFeedback('La limite des imports par lien est atteinte. Vous pouvez ajouter vos informations et photos manuellement.');return;}
     const request: RequestMessage = {kind: 'url', text: parsed.data};
     const version=++interactionVersion.current,owner=me?.agency.id;
     forget();saveListingDraft({kind:'url',url:parsed.data});
@@ -411,35 +410,19 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     }
     setScreen({kind: 'sending', request});
     try {
-      if(pendingImport.current?.url!==parsed.data){
-        const stored=sessionStorage.getItem('bienvu:url-import-request'),prior=stored?JSON.parse(stored) as {url:string;key:string}:null;
-        pendingImport.current=prior?.url===parsed.data?prior:{url:parsed.data,key:crypto.randomUUID()};
-        sessionStorage.setItem('bienvu:url-import-request',JSON.stringify(pendingImport.current));
-      }
-      const response=await fetch('/api/imports',{method:'POST',headers:{'Content-Type':'application/json',
-        'Idempotency-Key':pendingImport.current.key},body:JSON.stringify({url:parsed.data})});
-      const imported=await response.json() as {id?:string;status?:string;errorCode?:string|null;draft?:CreationDraftView|null;error?:{code?:string;message?:string}};
+      const imported=await estimate.prepare(parsed.data,true);
       if(interactionVersion.current!==version||currentOwner.current!==owner)return;
-      if(!response.ok){
-        if(imported.error?.code==='IMPORT_BUDGET_LIMIT'){pendingImport.current=null;sessionStorage.removeItem('bienvu:url-import-request');}
-        throw new Error(imported.error?.message??'L’import a été interrompu. Réessayez.');
-      }
-      if(imported.status==='failed'){pendingImport.current=null;sessionStorage.removeItem('bienvu:url-import-request');}
       if(imported.status==='needs_input'&&imported.draft){
-        startFresh.current=true;forget();setImportDraft(imported.draft);setDescription(imported.draft.data.fields.description??'');
+        startFresh.current=true;forget();setImportDraft({...imported.draft,data:{...imported.draft.data,videoCustomization:imported.draft.data.videoCustomization??settingsForImport(imported)}});setDescription(imported.draft.data.fields.description??'');
         setScreen({kind:'manual'});
         void refreshDrafts();
         setFeedback(imported.draft.photos.length<3?'Les informations du bien ont été récupérées. Ajoutez vos photos pour continuer.':
           'Certaines informations du bien sont à compléter avant de créer la vidéo.');
         return;
       }
-      if(imported.status!=='ready'||!imported.id)throw new Error(imported.errorCode==='SOURCE_BLOCKED'
-        ?'Ce site refuse actuellement la lecture automatique de cette annonce. Vous pouvez copier ses informations et ajouter vos photos en saisie manuelle.'
-        :imported.errorCode==='IMPORT_TIMEOUT'?'La lecture de cette annonce a pris trop de temps. Vous pouvez continuer en saisie manuelle.'
-        :'Cette annonce ne contient pas encore assez d’informations. Vous pouvez continuer manuellement.');
-      pendingImport.current=null;sessionStorage.removeItem('bienvu:url-import-request');
+      if(imported.status!=='ready')throw new Error('Complétez les informations de cette annonce avant de créer la vidéo.');
       if(!canGenerate){setFeedback('Votre annonce est enregistrée. La création vidéo sera disponible dans votre espace.');setScreen({kind:'landing'});return;}
-      await create({listingId:imported.id},request);
+      await create({listingId:imported.id,customization:settingsForImport(imported)},request);
     }
     catch (error) {if(interactionVersion.current===version&&currentOwner.current===owner)
       setScreen({kind: 'error', request, message: error instanceof Error ? error.message : 'La connexion a été interrompue. Réessayez pour retrouver votre demande.'});}
@@ -447,22 +430,22 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   }
   const statusRequest = screen.kind === 'sending' || screen.kind === 'job' ? screen.request : null;
   const resultReady = screen.kind === 'job' && selectedJob?.status === 'ready';
-  const composerDisabled = screen.kind==='guest-customizing'&&guestSettings&&!GenerationCustomization.safeParse(guestSettings).success || loading || busy || photoChecking || Boolean(incomingPhotos) || (composerPhotos.length
+  const composerDisabled = screen.kind==='guest-customizing'&&guestSettings&&!GenerationCustomization.safeParse(guestSettings).success || loading || busy || estimatePending || estimateFailed || photoChecking || Boolean(incomingPhotos) || (composerPhotos.length
     ? screen.kind==='job'&&generationActive(selectedJob) : manual
     ? !manualReady||Boolean(noCredits)||!editingProperty&&activeOtherJob
-    : Boolean(noCredits)||Boolean(importPaused&&ImportUrl.safeParse(url.trim()).success)||activeOtherJob||screen.kind==='job'&&
+    : Boolean(noCredits)||Boolean(importPaused&&!estimate.value&&ImportUrl.safeParse(url.trim()).success)||activeOtherJob||screen.kind==='job'&&
       (generationActive(selectedJob)||resultReady&&!url.trim()));
-  const contextNote = !me ? 'Essayez gratuitement.' : canGenerate
+  const contextNote = !me ? estimate.source?'Essai classique gratuit. Connectez-vous pour animer les photos par IA et estimer leur coût en crédits.':'Essayez gratuitement.' : canGenerate
     ? (noCredits?'Crédits insuffisants pour ce montage. Réduisez les animations ou consultez vos crédits.':'')
     : 'Accès anticipé · Préparez votre annonce';
   return <div className={`home-create${inConversation ? ' home-create-conversation' : ''}${customizing||screen.kind==='guest-customizing'?' home-create-customizing':''}`}>
     <div ref={scrollRegion} className="home-conversation-scroll">
-    {screen.kind==='guest-customizing'&&<VideoCustomizer sourceUrl={screen.url} settings={guestSettings??defaultVideoCustomization(undefined,defaultVoice)} onChange={value=>{const {photoOrder,runwayPhotos,...settings}=value;setGuestSettings(settings);}} photos={[]} fields={{title:'Votre annonce',propertyType:'',transaction:'',locality:'',description:'',priceCents:'',charges:'',area:'',rooms:''}} agencyName="" subtitlesEnabled={subtitlesEnabled} onSubtitles={setSubtitlesEnabled} voiceEnabled={voiceEnabled} onVoice={setVoiceEnabled} durationSeconds={durationSeconds} aspectRatio={aspectRatio} onBack={closeCustomization} onAdd={files=>{if(files){setIncomingPhotos({id:crypto.randomUUID(),files:Array.from(files)});openManual();setCustomizing(true);}}} busy={busy} ready onEdit={()=>{openManual();}} saved={false}/> }
+    {screen.kind==='guest-customizing'&&<VideoCustomizer sourceUrl={screen.url} settings={guestSettings??defaultVideoCustomization(undefined,defaultVoice)} onChange={value=>{const {photoOrder,runwayPhotos,...settings}=value;setGuestSettings(settings);}} photos={[]} fields={{title:'Votre annonce',propertyType:'',transaction:'',locality:'',description:'',priceCents:'',charges:'',area:'',rooms:''}} agencyName="" subtitlesEnabled={subtitlesEnabled} onSubtitles={setSubtitlesEnabled} voiceEnabled={voiceEnabled} onVoice={setVoiceEnabled} durationSeconds={durationSeconds} onDuration={setDurationSeconds} aspectRatio={aspectRatio} onBack={closeCustomization} onAdd={files=>{if(files){setIncomingPhotos({id:crypto.randomUUID(),files:Array.from(files)});openManual();setCustomizing(true);}}} busy={busy} ready onEdit={()=>{openManual();}} saved={false}/> }
     {manual && <div className="home-conversation-manual home-manual-sheet-view">
       <div className="home-manual-panel">
-        {!me ? <ManualListingForm onCreditCost={setManualCredits} ref={manualForm} key="guest" initialCustomization={guestSettings} customizing={customizing} onCloseCustomizer={closeCustomization} subtitlesEnabled={subtitlesEnabled} onSubtitles={setSubtitlesEnabled} voiceEnabled={voiceEnabled} onVoice={setVoiceEnabled} durationSeconds={durationSeconds} aspectRatio={aspectRatio} prepareGuest incomingPhotos={incomingPhotos} onPhotosReceived={receivePhotos} guided={{description,setDescription,initialData:guestExtraction,onCancel:()=>{previousComposer.current=composerDock.current?.getBoundingClientRect()??null;setCustomizing(false);setScreen({kind:'landing'});},
+        {!me ? <ManualListingForm onCreditCost={setManualCredits} ref={manualForm} key="guest" initialCustomization={guestSettings} customizing={customizing} onCloseCustomizer={closeCustomization} subtitlesEnabled={subtitlesEnabled} onSubtitles={setSubtitlesEnabled} voiceEnabled={voiceEnabled} onVoice={setVoiceEnabled} durationSeconds={durationSeconds} onDuration={setDurationSeconds} aspectRatio={aspectRatio} prepareGuest incomingPhotos={incomingPhotos} onPhotosReceived={receivePhotos} guided={{description,setDescription,initialData:guestExtraction,onCancel:()=>{previousComposer.current=composerDock.current?.getBoundingClientRect()??null;setCustomizing(false);setScreen({kind:'landing'});},
           onReadyChange:(ready,reason)=>{setManualReady(ready);setManualReason(reason);}}} busy={manualBusy||guestManualBusy} setBusy={setManualBusy} onPrepared={prepareManualTrial}/>
-          : <ManualListingForm saveOnly={editingProperty} onSaved={draft=>{clearListingDraft();void refreshDrafts();window.location.assign(`/biens/${encodeURIComponent(`listing:${draft.id}`)}`);}} onCreditCost={setManualCredits} ref={manualForm} customizing={customizing} onCloseCustomizer={closeCustomization} brand={me.agency} subtitlesEnabled={subtitlesEnabled} onSubtitles={setSubtitlesEnabled} voiceEnabled={voiceEnabled} onVoice={setVoiceEnabled} durationSeconds={durationSeconds} aspectRatio={aspectRatio} key={`agency:${me.agency.id}:${importDraft?.id??'manual'}`} incomingPhotos={incomingPhotos} onPhotosReceived={receivePhotos} generate={canGenerate} guided={{description,setDescription,agencyId:me.agency.id,initialDraft:importDraft,
+          : <ManualListingForm initialCustomization={guestSettings} saveOnly={editingProperty} onSaved={draft=>{clearListingDraft();void refreshDrafts();window.location.assign(`/biens/${encodeURIComponent(`listing:${draft.id}`)}`);}} onCreditCost={setManualCredits} ref={manualForm} customizing={customizing} onCloseCustomizer={closeCustomization} brand={me.agency} subtitlesEnabled={subtitlesEnabled} onSubtitles={setSubtitlesEnabled} voiceEnabled={voiceEnabled} onVoice={setVoiceEnabled} durationSeconds={durationSeconds} onDuration={setDurationSeconds} aspectRatio={aspectRatio} key={`agency:${me.agency.id}:${importDraft?.id??'manual'}`} incomingPhotos={incomingPhotos} onPhotosReceived={receivePhotos} generate={canGenerate} guided={{description,setDescription,agencyId:me.agency.id,initialDraft:importDraft,
             onReadyChange:(ready,reason)=>{setManualReady(ready);setManualReason(reason);},onDraftChange:()=>void refreshDrafts(),
             onCancel:()=>{previousComposer.current=composerDock.current?.getBoundingClientRect()??null;setCustomizing(false);setScreen({kind:'landing'});}}} busy={manualBusy} setBusy={setManualBusy} onCreated={async value => {
             void refreshDrafts();
@@ -504,8 +487,11 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
             setFeedback('');}} disabled={screen.kind==='sending'} aria-invalid={Boolean(feedback || screen.kind==='error')} aria-describedby="home-url-error home-create-note"/></div>
         <div className="home-composer-actions"><button type="submit" className="home-primary-button" disabled={composerDisabled} aria-describedby={manual&&!manualReady?'home-manual-action-note':undefined}>
           {incomingPhotos?'Ajout des photos…':composerPhotos.length?'Compléter mon annonce':screen.kind==='sending'||manualBusy?'Envoi en cours':screen.kind==='job'&&generationActive(selectedJob)?'Génération en cours':manual&&me&&!canGenerate?'Enregistrer mon annonce':'Créer ma vidéo'}<HomeIcon name="arrow" size={20}/></button>
-          <span className="home-credit-cost" aria-live="polite">{creditCost} crédit{creditCost>1?'s':''}</span></div>
+          <span className="home-credit-cost" aria-live="polite">{estimatePending?'Estimation en cours…':estimateFailed?'Estimation indisponible':`${creditCost} crédit${creditCost>1?'s':''}${me&&estimate.value?' estimés':''}`}
+            {me&&estimate.value&&<small className="home-credit-estimate-detail">{urlImportPhotoSlots(estimate.value).length} photos · Animations IA activées</small>}
+          </span></div>
       </div>
+      {me&&estimate.phase==='ready'&&estimate.value&&!busy&&<PhotoDurationAdvice photoCount={urlImportPhotoSlots(estimate.value).length} durationSeconds={durationSeconds} onDuration={setDurationSeconds} disabled={loading||activeOtherJob}/>}
       {composerPhotos.length>0&&<div className="home-composer-attachments"><ol aria-label="Photos à ajouter à votre annonce">{composerPhotos.map((photo,index)=><li key={photo.id}>
         <img src={photo.preview} alt={`Photo ${index+1} : ${photo.file.name}`}/><button type="button" disabled={photoChecking||Boolean(incomingPhotos)} aria-label={`Retirer ${photo.file.name}`} onClick={()=>removeComposerPhoto(photo.id)}><HomeIcon name="close" size={14}/></button>
       </li>)}</ol><p role="status">{composerPhotos.length} photo{composerPhotos.length>1?'s':''} · Appuyez sur Entrée pour compléter votre annonce.</p></div>}
@@ -528,6 +514,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     </>}
     {manual&&!manualReady&&<p id="home-manual-action-note" className="home-form-note" role="status">{manualReason}</p>}
     {screen.kind==='error'&&<p className="home-form-feedback" role="alert">{screen.message} Votre saisie est conservée pour réessayer.</p>}
+    {estimateFailed&&<p className="home-form-feedback" role="alert">{estimate.message} <button type="button" className="text-button" onClick={estimate.retry}>Réessayer l’estimation</button></p>}
     {feedback && <p className="home-form-feedback" id="home-url-error" role="alert">{feedback}</p>}
     {!me && trial.challenge && trial.siteKey && <TrialChallenge siteKey={trial.siteKey} version={trial.widgetVersion}
       purpose={guestPending.current?'description':'trial'} onToken={token=>{trial.setToken(token);if(!token)return;

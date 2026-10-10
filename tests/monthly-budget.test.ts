@@ -27,6 +27,9 @@ test('budget mensuel D1 : migration sans effacement, ouverture explicite, audit 
   // Application queries use the current credit schema; budget upgrades below
   // remain separate so their historical ceilings can still be verified.
   await migrate('0061_full_length_avatars.sql');
+  await migrate('0062_generation_preparation_steps.sql');
+  await migrate('0063_offers_and_credit_rollover.sql');
+  await migrate('0064_automatic_import_estimates.sql');
   const open={action:'monthly_budget' as const,month,envelopeCents:10000,ceilingCents:9000,openingCents:800,paused:false,expected:null,reason:'Ouverture du mois pour la recette'};
   assert.equal(AdminAction.safeParse({...open,envelopeCents:MAX_MONTHLY_BUDGET_CENTS+1}).success,false);
   assert.equal(AdminAction.safeParse({...open,ceilingCents:9600}).success,false);

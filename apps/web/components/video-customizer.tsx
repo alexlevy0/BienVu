@@ -5,6 +5,7 @@ import {CustomNarration,videoStyles,frenchVoices,requestedAnimations,generationC
 import {suggestedNarration,narrationWordLimit,wordCount} from '@bienvu/narration/suggestion';
 import type {ManualDraftFields} from '../lib/listing-draft';
 import {HomeIcon} from './home-icons';
+import {PhotoDurationAdvice} from './photo-duration-advice';
 import {VoicePreview} from './voice-preview';
 import {useAccount} from './account';
 import {MapScenePreview,VideoMapControls,useVideoMapDefaults,useAutomaticMapLocation} from './video-map';
@@ -14,7 +15,7 @@ import {PhotoPreviewImage} from './photo-preview-image';
 export type CustomizerPhoto={id:string;preview:string;slot:number;state:string;file?:File|null;error?:string;removing?:boolean};
 export {suggestedNarration};
 type Props={settings:VideoCustomization;onChange(value:VideoCustomization):void;photos:CustomizerPhoto[];fields:ManualDraftFields;
-  agencyName:string;durationSeconds?:VideoDuration;aspectRatio?:VideoAspectRatio;voiceEnabled?:boolean;onVoice?(value:boolean):void;subtitlesEnabled:boolean;onSubtitles(value:boolean):void;onBack():void;onAdd(files:FileList|null):void;
+  agencyName:string;durationSeconds?:VideoDuration;onDuration?(value:VideoDuration):void;aspectRatio?:VideoAspectRatio;voiceEnabled?:boolean;onVoice?(value:boolean):void;subtitlesEnabled:boolean;onSubtitles(value:boolean):void;onBack():void;onAdd(files:FileList|null):void;
   busy:boolean;ready:boolean;onEdit():void;saved:boolean;sourceUrl?:string;onRetry?(id:string):void;onRemove?(id:string):void};
 export function VideoCustomizer(p:Props){
   const {me,voiceCatalog}=useAccount(),{catalog:avatarCatalog}=useAvatarCatalog();
@@ -57,6 +58,7 @@ export function VideoCustomizer(p:Props){
       <AvatarWarning avatar={p.settings.avatar} voice={p.settings.voice??voiceCatalog?.defaultVoice??frenchVoices[0].id} catalog={avatarCatalog}/>
       <div role="tabpanel" id={`customizer-panel-${tab}`} aria-labelledby={`customizer-tab-${tab}`}>
       {tab==='photos'&&<><div className="customizer-section-title"><strong>{p.sourceUrl?'Photos de votre annonce':`${chosen.length} photo${chosen.length>1?'s':''} sélectionnée${chosen.length>1?'s':''}`}</strong><p>{p.sourceUrl?'Les photos seront récupérées avec l’annonce à la génération. Connectez-vous pour les choisir et les réordonner avant génération.':'Glissez les photos pour changer leur ordre. Gardez au moins 3 photos.'}</p></div>
+        <PhotoDurationAdvice photoCount={chosen.length} durationSeconds={duration} onDuration={p.onDuration} disabled={p.busy}/>
         {p.photos.length?<div className="customizer-photos">{ordered.map((photo,index)=>{const at=order.indexOf(photo.slot),selected=at>=0;return <div key={photo.id} className={`customizer-photo${selected?' is-selected':''}${drag===photo.slot?' is-dragging':''}`}
           draggable={selected&&!p.busy&&!photo.removing&&photo.state==='ready'} onDragStart={event=>{event.dataTransfer.setData('text/plain',String(photo.slot));event.dataTransfer.effectAllowed='move';setDrag(photo.slot);}}
           onDragEnd={()=>setDrag(null)} onDragOver={event=>{if(drag!==null&&selected){event.preventDefault();event.dataTransfer.dropEffect='move';}}}

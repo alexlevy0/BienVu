@@ -18,9 +18,16 @@ test('projets éditeur : migration sans perte, plus de 30 projets, indépendance
   const now=Date.now(),at=new Date(now).toISOString(),day=at.slice(0,10),month=at.slice(0,7);
   await DB.prepare('INSERT INTO agencies(id,owner_user_id,name,created_at,updated_at) VALUES(?,?,?,?,?)').bind('projects','owner','Projects',at,at).run();
   const history=[];
-  for(let i=0;i<30;i++)history.push((await beginManualImport(DB,'projects',`historical-project-${i}`,'{}',hash,now-86400_000)).row.id);
+  // Seed the historical columns before exercising the current import API.
+  for(let i=0;i<30;i++){
+    const id=crypto.randomUUID(),created=new Date(now-86400_000).toISOString();history.push(id);
+    await DB.prepare(`INSERT INTO listing_imports(id,agency_id,idempotency_key,source_url,source_kind,input_json,input_hash,status,created_at,lease_until,expires_at)
+      VALUES(?,'projects',?,'','manual','{}',?,'importing',?,?,?)`)
+      .bind(id,`historical-project-${i}`,hash,created,new Date(now).toISOString(),new Date(now+30*86400_000).toISOString()).run();
+  }
   await DB.prepare('INSERT INTO hosted_import_budget(month,baseline_cents,ceiling_cents,paused) VALUES(?,9000,9000,1)').bind(month).run();
   for(const file of files.filter(f=>f>='0047'))await migrate(file);
+  assert.equal((await DB.prepare('SELECT count(*) n FROM listing_imports WHERE estimate_only=0').first<{n:number}>())?.n,30);
   assert.equal((await DB.prepare('SELECT sum(attempts) n FROM project_creation_usage').first<{n:number}>())?.n,30,'Existing creation history survives migration');
   const linked=await beginImport(DB,'projects','https://fixtures.bienvu.example/vente','linked-after-thirty-projects',now);
   assert.equal(linked.fresh,true,'Existing project count must not block an otherwise permitted link');

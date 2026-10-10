@@ -1,5 +1,19 @@
 # BienVu — suivi des sprints
 
+### 10/10/2026 — Conseil de durée et réparation de la CI
+
+Conseil facultatif de **30 s pour 7–9 photos**, **40 s dès 10 photos**, sur l’estimation d’import, la fiche manuelle et la personnalisation. Bouton appliquant la préférence existante ; choix initial conservé, coût partagé recalculé (y compris avatar), aucune nouvelle lecture de source. Conseil retiré si la durée suffit. Mise en page mobile inspectée et corrigée.
+
+Cause GitHub vérifiée : le run **38044555006** échouait dans `pnpm check`, quatre fixtures historiques privées de la table `credit_rollover_links` ajoutée en 0063. Dépendances appliquées dans ces fixtures sans supprimer leurs contrôles historiques ; adaptation 0064 des fixtures d’import et de projets conservée. **622/622 tests**, frontières **484 fichiers**, types complets, build OpenNext, sondes voix/narration workerd et toute l’étape Worker local réussis (fondations, SEO 41 pages, comptes/e-mails, imports manuels/portails simulés). Chrome **1536/390 px**, 8/12 photos, changement volontaire, coûts et réutilisation vérifiés. Aucun appel fournisseur payant. Web **`f50df238-9d4c-4d42-bcb3-8a1b8e7b3e00`** publié, bindings conservés, génération inchangée. [Preuves et diagnostic](preuves/maintenance/DUREE-CI-10-10.md).
+
+### 10/10/2026 — Estimation automatique des crédits d’un lien
+
+La home connectée prépare l’import après une pause de 800 ms, compte ses photos utilisables et propose toutes leurs animations IA : **8 photos → 9 crédits** sans présentateur. L’estimation est affichée sous le bouton et utilise le calcul produit partagé ; Personnaliser reprend les photos et permet de réduire le coût. Une réponse d’un ancien lien est ignorée. Même import/clé réutilisé lors de l’action, aucun appel Runway/TTS/HeyGen ni crédit vidéo réservé pendant la préparation. Les quotas et budgets normaux de lecture restent appliqués. L’essai invité reste classique, avec filigrane et Turnstile.
+
+Migration additive **0064** : les préparations restent hors de Mes biens/récents, conservation d’un jour pour les abandons, promotion lors d’une action explicite ou de l’admission. Migration distante appliquée : les **60 imports existants** restent visibles et les nombres de lignes des historiques, crédits, jobs et objets sont inchangés. Dépendances des schémas des tests historiques mises à jour sans changer leurs plafonds historiques.
+
+Validation : **`pnpm check` — 621 tests/621 réussis, frontières et types complets** ; `pnpm build:web` ; migration locale rejouée ; `pnpm probe:foundations` — pages publiques 200, API privées 401 ; `wrangler deploy --dry-run`. Navigateur sur composants réels/fixtures à 1536 et 390 px, coût, préparation unique, animation désactivable, lien modifié, création cohérente, erreur/reprise, crédit insuffisant et parcours invité. Captures inspectées. Déployé sur **bienvu.online**, Worker web **`1a33c44e-1f83-4093-8ed8-a11a7ac4f58b`** : 56 bindings conservés, service de génération inchangé, home et nouveau bundle 200, lectures privées et estimation sans session 401. Aucun import de portail ni génération fournisseur payante pour ces tests. [Détails](preuves/maintenance/ESTIMATION-IMPORT-10-10.md).
+
 ### 09–10/10/2026 — Nouvelle page Offres, tarifs validés et report plafonné
 
 Maquette Offres appliquée avec simulateur photos/présentateur, quatre mensualités **Solo 50/50, Agence 100/100, Équipe 200/200, Réseau 500/500** (€ HT / crédits), recharges **20/50/100 à 1 € HT/crédit**, comparaison, solde et historique. Tarifs serveur partagés, consentements conservés, anciennes factures/souscriptions/commandes inchangées. Report d’un mois des crédits payés inutilisés, plafonné à une mensualité après renouvellement payé, consommation du lot d’origine en premier ; pas de report des crédits gratuits, des bonus administratifs ou du report précédent. Conditions, aide, article Budget, données SEO et `llms.txt` actualisés.

@@ -1,5 +1,7 @@
 # Imports d’annonces — sprints 03 et 04
 
+**Maintenance du 10/10 :** estimation automatique sur la home connectée : lecture des photos, proposition de toutes les animations IA et calcul des crédits avant génération. La préparation cachée utilise les quotas habituels et est réutilisée lors de l’action explicite. L’essai anonyme reste classique. [Comportement et recette](preuves/maintenance/ESTIMATION-IMPORT-10-10.md).
+
 Le parcours local ou Cloudflare transforme un lien en annonce privée et galerie persistante. Depuis la demande d’Alex du 28/09/2026, un bouton sous l’import ouvre aussi une [saisie manuelle avec photos](SAISIE-MANUELLE.md). Les deux modes utilisent la session et l’agence du sprint 02, sans job vidéo, crédit ou essai consommé. Aucun éditeur vidéo n’est ajouté.
 
 **État au 28/09 :** imports URL et saisie manuelle actifs sur bienvu.online, avec Container privé à IP épinglée/Sharp, fallback Browser Run et D1/R2 existants. Trois agences réelles importées avec 12/11/7 photos ; recette séparée pour la page JavaScript et la saisie synthétiques. [Rapport Cloudflare](preuves/sprint-03/CLOUDFLARE.md).

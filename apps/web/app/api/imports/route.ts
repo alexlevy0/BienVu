@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     const key = request.headers.get('Idempotency-Key') ?? '';
     if (!/^[a-zA-Z0-9_-]{16,128}$/.test(key)) throw new RequestFailure('VALIDATION_ERROR');
     const ports = importPorts(request, env, agency.id);
-    const row = await createPrivateImport(env, agency.id, input.data.url, key, ports.transport, request.signal, ports);
+    const row = await createPrivateImport(env, agency.id, input.data.url, key, ports.transport, request.signal, {...ports,estimate:input.data.estimate});
     return Response.json(importResult(row), {status: row.status === 'importing' ? 202 : 200});
   });
 }

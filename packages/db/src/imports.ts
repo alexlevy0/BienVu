@@ -2,7 +2,7 @@ import {EntityId, Timestamp, GeneratableListing, type NormalizedListing, type Im
 import type {Database} from './index';
 export type ImportRow = {id: string; agencyId: string; sourceKind: 'url' | 'manual'; sourceUrl: string | null; input: string | null; inputHash: string | null; status: 'importing' | 'ready' | 'failed' | 'deleting';
   draftPending:number; draftData:string|null; draftVersion:number|null; draftPhotos:string;
-  errorCode: ImportErrorCode | null; result: string | null; createdAt: string; expiresAt: string; leaseUntil: string};
+  errorCode: ImportErrorCode | null; result: string | null; createdAt: string; expiresAt: string; leaseUntil: string;estimateOnly?:number};
 export type ImportSummary={id:string;sourceKind:'url'|'manual';sourceUrl:string|null;status:'importing'|'needs_input'|'ready'|'failed';
   errorCode:ImportErrorCode|null;createdAt:string;expiresAt:string;title:string|null;locality:string|null;
   transaction:'sale'|'rent'|null;previewPhotoId:string|null};
@@ -10,34 +10,37 @@ const columns = `id,agency_id AS agencyId,source_kind AS sourceKind,nullif(sourc
   draft_pending AS draftPending,(SELECT data_json FROM creation_drafts WHERE id=listing_imports.id) AS draftData,
   (SELECT version FROM creation_drafts WHERE id=listing_imports.id) AS draftVersion,
   (SELECT json_group_array(json(photo_json)) FROM import_objects WHERE import_id=listing_imports.id AND agency_id=listing_imports.agency_id) AS draftPhotos,
-  created_at AS createdAt,expires_at AS expiresAt,lease_until AS leaseUntil`;
+  created_at AS createdAt,expires_at AS expiresAt,lease_until AS leaseUntil,estimate_only AS estimateOnly`;
 export class ImportStateFailure extends Error {constructor(readonly code: 'CONFLICT' | 'IMPORT_LIMIT' | 'IMPORT_BUDGET_LIMIT' | 'IMPORT_RESOURCE_LIMIT' | 'PROJECT_RATE_LIMIT' | 'NOT_FOUND' | 'VALIDATION_ERROR') {super(code);}}
 export async function findImport(db: Database, agencyId: string, id: string) {
   if (!EntityId.safeParse(id).success) return null;
   return db.prepare(`SELECT ${columns} FROM listing_imports WHERE agency_id=? AND id=?`).bind(agencyId, id).first<ImportRow>();
 }
-export async function beginImport(db: Database, agencyId: string, url: string, key: string, now = Date.now()) {
-  return startImport(db, agencyId, url, key, null, null, now);
+export async function beginImport(db: Database, agencyId: string, url: string, key: string, now = Date.now(),estimateOnly=false) {
+  return startImport(db, agencyId, url, key, null, null, now,estimateOnly);
 }
 export async function beginManualImport(db: Database, agencyId: string, key: string, input: string, inputHash: string, now = Date.now()) {
   return startImport(db, agencyId, null, key, input, inputHash, now);
 }
-async function startImport(db: Database, agencyId: string, url: string | null, key: string, input: string | null, inputHash: string | null, now: number) {
+async function startImport(db: Database, agencyId: string, url: string | null, key: string, input: string | null, inputHash: string | null, now: number,estimateOnly=false) {
   EntityId.parse(agencyId);
   if (!/^[a-zA-Z0-9_-]{16,128}$/.test(key)) throw new ImportStateFailure('CONFLICT');
   const previous = () => db.prepare(`SELECT ${columns} FROM listing_imports WHERE agency_id=? AND idempotency_key=?`).bind(agencyId, key).first<ImportRow>();
   const existing = await previous();
   const matches = (row: ImportRow) => row.sourceUrl === url && row.inputHash === inputHash && row.sourceKind === (url === null ? 'manual' : 'url');
-  if (existing) {if (!matches(existing)) throw new ImportStateFailure('CONFLICT'); return {row: existing, fresh: false};}
+  if (existing) {if (!matches(existing)) throw new ImportStateFailure('CONFLICT');
+    if(existing.estimateOnly&&!estimateOnly){await db.prepare('UPDATE listing_imports SET estimate_only=0,expires_at=max(expires_at,?) WHERE agency_id=? AND id=?')
+      .bind(new Date(now+30*86400_000).toISOString(),agencyId,existing.id).run();return {row:(await previous())!,fresh:false};}
+    return {row: existing, fresh: false};}
   const id = crypto.randomUUID(), created = new Date(now).toISOString();
   try {
     // Les triggers limitent les imports par lien et les créations rapprochées.
     // Le nombre total de projets conservés ne bloque plus un nouveau brouillon.
-    await db.prepare(`INSERT INTO listing_imports(id,agency_id,idempotency_key,source_url,source_kind,input_json,input_hash,status,created_at,lease_until,expires_at)
-      VALUES(?,?,?,?,?,?,?,'importing',?,?,?)
+    await db.prepare(`INSERT INTO listing_imports(id,agency_id,idempotency_key,source_url,source_kind,input_json,input_hash,status,created_at,lease_until,expires_at,estimate_only)
+      VALUES(?,?,?,?,?,?,?,'importing',?,?,?,?)
       ON CONFLICT(agency_id,idempotency_key) DO NOTHING`)
       .bind(id, agencyId, key, url ?? '', url === null ? 'manual' : 'url', input, inputHash, created,
-        new Date(now + (url === null ? 900_000 : 90_000)).toISOString(), new Date(now + 30 * 86400_000).toISOString()).run();
+        new Date(now + (url === null ? 900_000 : 90_000)).toISOString(), new Date(now + (estimateOnly?1:30) * 86400_000).toISOString(),estimateOnly?1:0).run();
   } catch (error) {const message=String(error);throw new ImportStateFailure(message.includes('PROJECT_RATE_LIMIT') ? 'PROJECT_RATE_LIMIT'
     : message.includes('IMPORT_LIMIT') ? 'IMPORT_LIMIT' : 'CONFLICT');}
   const row = await previous();
@@ -80,7 +83,7 @@ export async function listImportPage(db:Database,agencyId:string,cursor?:string,
     'transaction',coalesce(json_extract(i.result_json,'$.transaction'),json_extract((SELECT data_json FROM creation_drafts WHERE id=i.id),'$.fields.transaction')),
     'previewPhotoId',(SELECT o.id FROM import_objects o WHERE o.import_id=i.id AND o.agency_id=i.agency_id
       ORDER BY json_extract(o.photo_json,'$.sourceOrder') LIMIT 1))) AS items
-    FROM (SELECT * FROM listing_imports WHERE agency_id=? AND status!='deleting' AND expires_at>?${draftFilter}
+    FROM (SELECT * FROM listing_imports WHERE agency_id=? AND estimate_only=0 AND status!='deleting' AND expires_at>?${draftFilter}
       AND (created_at<? OR (created_at=? AND id<?)) ORDER BY created_at DESC,id DESC LIMIT 31) AS i`)
     .bind(agencyId,new Date().toISOString(),time,time,id).first<{items:string}>();
   const rows=JSON.parse(row?.items??'[]') as ImportSummary[],imports=rows.slice(0,30),last=imports.at(-1);

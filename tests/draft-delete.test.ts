@@ -20,6 +20,8 @@ test('suppression de brouillon : isolation, upload tardif, reprise R2 et limites
   const files=(await readdir(new URL('../packages/db/migrations/',import.meta.url))).filter(file=>file.endsWith('.sql')).sort();
   const migrate=async(file:string)=>DB.exec((await readFile(new URL('../packages/db/migrations/'+file,import.meta.url),'utf8')).replace(/^--.*$/gm,'').replace(/\n/g,' '));
   for(const file of files.filter(file=>file<'0022'))await migrate(file);
+  // Current draft access needs the import column without upgrading extraction counters.
+  await migrate('0064_automatic_import_estimates.sql');
   const at=new Date().toISOString(),month=at.slice(0,7),day=at.slice(0,10);
   for(const id of ['delete-a','delete-b'])await DB.prepare('INSERT INTO agencies(id,owner_user_id,name,created_at,updated_at) VALUES(?,?,?,?,?)')
     .bind(id,'owner-'+id,'Fixture '+id,at,at).run();

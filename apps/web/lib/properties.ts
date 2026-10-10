@@ -38,7 +38,7 @@ export async function readPropertyGroups(env:Env,agencyId:string):Promise<Proper
       i.status,i.expires_at AS expiresAt,i.created_at AS createdAt,coalesce(d.updated_at,i.created_at) AS updatedAt,
       p.project_id AS projectId FROM listing_imports i LEFT JOIN creation_drafts d ON d.id=i.id AND d.agency_id=i.agency_id
       LEFT JOIN project_items p ON p.agency_id=i.agency_id AND p.kind='draft' AND p.entity_id=i.id
-      WHERE i.agency_id=? AND (i.status='ready' OR i.draft_pending=1) AND i.status!='deleting'`).bind(agencyId).all<ImportSource>(),
+      WHERE i.agency_id=? AND i.estimate_only=0 AND (i.status='ready' OR i.draft_pending=1) AND i.status!='deleting'`).bind(agencyId).all<ImportSource>(),
     env.DB.prepare(`SELECT j.id,j.agency_id AS agencyId,coalesce(j.listing_id,json_extract(g.input_json,'$.listingId')) AS listingId,
       g.input_json AS input,j.created_at AS createdAt,j.updated_at AS updatedAt,j.status,i.result_json AS result,
       json_extract(m.manifest_json,'$.presentation') AS presentation,json_extract(m.manifest_json,'$.photos') AS photos,p.project_id AS projectId

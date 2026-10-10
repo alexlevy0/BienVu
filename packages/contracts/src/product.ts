@@ -35,7 +35,7 @@ export const ImportUrl = z.string().trim().max(2048).transform(value => {
   } catch { /* ListingUrl fournit le message de validation. */ }
   return value;
 }).pipe(ListingUrl);
-export const ImportInput = z.object({url: ImportUrl}).strict();
+export const ImportInput = z.object({url: ImportUrl,estimate:z.boolean().optional()}).strict();
 
 export const ObjectKey = z.string().max(512)
   .regex(/^agencies\/[a-zA-Z0-9_-]+\/(?:jobs|brand|imports)\/[a-zA-Z0-9_./-]+$/)

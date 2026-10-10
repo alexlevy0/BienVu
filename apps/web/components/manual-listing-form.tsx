@@ -4,6 +4,7 @@ import {useEffect, useImperativeHandle, useRef, useState, type ChangeEvent, type
 import {generationCreditCost,selectedAnimationIndices,defaultVideoCustomization,createEditorDocument,CreationFields,VideoCustomization,GenerationCustomization,DESCRIPTION_MAX_CHARACTERS, ManualListingInput, PropertyListingInput,MANUAL_PHOTO_LIMITS, publicErrors, type PublicErrorCode,
   type CreationDraftData, type CreationDraftView, type NormalizedListing,type VideoDuration,type VideoAspectRatio} from '@bienvu/contracts';
 import {HomeIcon} from './home-icons';
+import {PhotoDurationAdvice} from './photo-duration-advice';
 import type {ImportView} from './generation-form';
 import {manualDraftFields, readManualListingDraft, saveManualListingDraft, type ManualDraftFields} from '../lib/listing-draft';
 import {inspectManualPhotos} from '../lib/manual-photos';
@@ -45,7 +46,7 @@ type Props = {busy: boolean; generate?: boolean; setBusy(value: boolean): void;g
   customizing?:boolean;onCloseCustomizer?():void;brand?:{name:string;primaryColor:string;secondaryColor:string};
   initialCustomization?:VideoCustomization;
   subtitlesEnabled?:boolean;onSubtitles?(value:boolean):void;voiceEnabled?:boolean;onVoice?(value:boolean):void;
-  durationSeconds?:VideoDuration;aspectRatio?:VideoAspectRatio;
+  durationSeconds?:VideoDuration;onDuration?(value:VideoDuration):void;aspectRatio?:VideoAspectRatio;
   incomingPhotos?:{id:string;files:File[]}|null;onPhotosReceived?(id:string,result:{accepted:File[];issues:string[]}):void} & (
   {prepareGuest: true; onPrepared(value:PreparedManualListing):Promise<void>|void; onCreated?: never} |
   {prepareGuest?: false; onCreated(value: ImportView): Promise<void>; onPrepared?: never}
@@ -462,7 +463,7 @@ export function ManualListingForm(props: Props) {
   const pendingConfirmation=unresolved();
   return <>{props.customizing&&hydrated&&<VideoCustomizer settings={customization??defaultVideoCustomization(props.brand,defaultVoice)}
     onChange={value=>{settingsVersion.current++;setSettingsSaved(false);setCustomization(value);}} photos={photos} fields={draftFields()}
-    agencyName={props.brand?.name??''} durationSeconds={props.durationSeconds} aspectRatio={props.aspectRatio} voiceEnabled={props.voiceEnabled} onVoice={props.onVoice} subtitlesEnabled={props.subtitlesEnabled!==false} onSubtitles={value=>props.onSubtitles?.(value)}
+    agencyName={props.brand?.name??''} durationSeconds={props.durationSeconds} onDuration={props.onDuration} aspectRatio={props.aspectRatio} voiceEnabled={props.voiceEnabled} onVoice={props.onVoice} subtitlesEnabled={props.subtitlesEnabled!==false} onSubtitles={value=>props.onSubtitles?.(value)}
     onBack={()=>props.onCloseCustomizer?.()} onAdd={files=>void addPhotos(files)}
     onRetry={id=>{const photo=selected.current.find(p=>p.id===id);if(photo)void uploadSelected(photo);}}
     onRemove={id=>{const photo=selected.current.find(p=>p.id===id);if(photo)void removePhoto(photo);}} busy={busy||photoChecking}
@@ -526,6 +527,7 @@ export function ManualListingForm(props: Props) {
                 {!photos.length&&<small>ou glissez-les ici</small>}<input id="manual-photos" type="file" multiple disabled={!canAdd} accept="image/jpeg,image/png,image/webp" aria-invalid={Boolean(errors.photos||photoIssues.length)} aria-describedby="manual-photos-help manual-photo-feedback"
                   onChange={event=>{void addPhotos(event.target.files);event.target.value='';}}/></label></li>}
             </ol>
+            {!props.saveOnly&&<PhotoDurationAdvice photoCount={orderedPhotos.filter(p=>!p.removing&&(!customization?.photoOrder||customization.photoOrder.includes(p.slot))).length} durationSeconds={props.durationSeconds} onDuration={props.onDuration} disabled={busy||photoChecking}/>}
             <p className="manual-sheet-gallery-help" id="manual-photos-help"><HomeIcon name="settings" size={14}/>{photos.length?'Glissez pour changer l’ordre.':'3 à 12 photos · JPEG, PNG ou WebP · 10 Mo par photo.'}</p>
             {photos.length>0&&<p className="manual-sheet-gallery-help"><HomeIcon name="sparkle" size={14}/>{me?'Cliquez sur l’étoile pour animer une photo avec l’IA · 1 crédit par photo.':'Connectez-vous pour animer vos photos avec l’IA.'}</p>}
             {photoChecking&&<p role="status" className="field-help">Vérification des images…</p>}
