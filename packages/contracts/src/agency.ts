@@ -20,6 +20,7 @@ export const AgencyProfile = AgencyBrand.safeExtend({city: z.string().trim().min
 export type AgencyProfile = z.infer<typeof AgencyProfile>;
 export const Me = z.object({
   isSuperAdmin: z.boolean().default(false),
+  isAdmin: z.boolean().default(false),
   role:z.enum(['owner','admin','editor','viewer']).optional(),
   memberships:z.array(z.object({id:EntityId,name:z.string(),role:z.enum(['owner','admin','editor','viewer'])}).strict()).max(20).optional(),
   user: z.object({id: EntityId, name: z.string(), email: z.email()}).strict(),

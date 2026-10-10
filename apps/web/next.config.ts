@@ -9,7 +9,7 @@ const config: NextConfig = {
       {key: 'Referrer-Policy', value: 'no-referrer'},
       {key: 'X-Frame-Options', value: 'DENY'},
       {key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()'},
-    ]}];
+    ]},{source:'/api/admin/mailbox/messages/:messageId/html',headers:[{key:'X-Frame-Options',value:'SAMEORIGIN'}]}];
   },
 };
 export default config;

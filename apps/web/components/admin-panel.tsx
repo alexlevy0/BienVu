@@ -60,17 +60,18 @@ function csv(rows:AdminRow[]){
 }
 function Facts({row,keys}:{row:AdminRow;keys:{key:string;label:string}[]}){return <dl className="admin-facts">{keys.map(({key,label})=><div key={key}><dt>{label}</dt><dd>{/At$|^sortKey$|^start$|^end$/.test(key)?date(row[key]):text(row[key])}</dd></div>)}</dl>;}
 
-export function AdminPanel(){
+export function AdminPanel({restricted=false}:{restricted?:boolean}){
+  const visibleTabs=restricted?tabs.filter(t=>['mailbox','users','agencies','videos'].includes(t.id)):tabs;
   const {me,loading,refreshRights}=useAccount();
-  const [view,setView]=useState<View>('overview'),[overview,setOverview]=useState<AdminOverview|null>(null),[page,setPage]=useState<AdminPage|null>(null);
+  const [view,setView]=useState<View>(restricted?'mailbox':'overview'),[overview,setOverview]=useState<AdminOverview|null>(null),[page,setPage]=useState<AdminPage|null>(null);
   const [traffic,setTraffic]=useState<AdminTraffic|null>(null),[trafficDays,setTrafficDays]=useState<7|30>(30);
   const [query,setQuery]=useState(''),[search,setSearch]=useState(''),[status,setStatus]=useState(''),[from,setFrom]=useState(''),[to,setTo]=useState(''),[agency,setAgency]=useState('');
   const [busy,setBusy]=useState(true),[more,setMore]=useState(false),[failure,setFailure]=useState(''),[message,setMessage]=useState(''),[revision,setRevision]=useState(0);
   const [selected,setSelected]=useState<AdminRow|null>(null),[detail,setDetail]=useState<AdminVideoDetail|null>(null),[detailBusy,setDetailBusy]=useState(false),[detailError,setDetailError]=useState('');
   const [pending,setPending]=useState<AdminAction|null>(null),[reason,setReason]=useState(''),[saving,setSaving]=useState(false),[actionError,setActionError]=useState('');
   const loadVersion=useRef(0),morePending=useRef(false),dialog=useRef<HTMLDialogElement>(null),actionDialog=useRef<HTMLDialogElement>(null);
-  const accountId=me?.isSuperAdmin?me.user.id:null;
-  useEffect(()=>{const params=new URLSearchParams(location.search),tab=params.get('view');if(tabs.some(t=>t.id===tab))setView(tab as View);const target=params.get('agency');if(target&&/^[a-zA-Z0-9_-]{1,64}$/.test(target))setAgency(target);},[]);
+  const accountId=me?.isSuperAdmin||me?.isAdmin?me.user.id:null;
+  useEffect(()=>{const params=new URLSearchParams(location.search),tab=params.get('view');if(visibleTabs.some(t=>t.id===tab))setView(tab as View);const target=params.get('agency');if(target&&/^[a-zA-Z0-9_-]{1,64}$/.test(target))setAgency(target);},[]);
   useEffect(()=>{const timer=setTimeout(()=>setSearch(query.trim()),300);return()=>clearTimeout(timer);},[query]);
   const endpoint=()=>{const p=new URLSearchParams({section:view,q:search,status});if(from)p.set('from',from);if(to)p.set('to',to);if(agency)p.set('agency',agency);return '/api/admin?'+p;};
   useEffect(()=>{
@@ -95,7 +96,7 @@ export function AdminPanel(){
     return()=>controller.abort();
   },[selected,view]);
   useEffect(()=>{if(pending)actionDialog.current?.showModal();},[pending]);
-  function choose(next:View){setView(next);setQuery('');setSearch('');setStatus('');setFrom('');setTo('');setAgency('');setMessage('');history.replaceState(null,'','/admin'+(next==='overview'?'':'?view='+next));}
+  function choose(next:View){if(!visibleTabs.some(t=>t.id===next))return;setView(next);setQuery('');setSearch('');setStatus('');setFrom('');setTo('');setAgency('');setMessage('');history.replaceState(null,'','/admin'+(next==='overview'?'':'?view='+next));}
   function focus(target:AdminTarget){choose(target.view);setStatus(target.status??'');setFrom(target.from??'');}
   async function loadMore(){
     if(!page?.nextCursor||morePending.current)return;const version=loadVersion.current;morePending.current=true;setMore(true);setFailure('');
@@ -113,10 +114,10 @@ export function AdminPanel(){
   }
   if(!loading&&!accountId)return <div className="admin-shell"><h1>Accès réservé</h1><p>Connectez-vous avec votre compte administrateur.</p></div>;
   const recordView=!['overview','system','traffic','performance','costs','commercial','finance','pricing','voices','avatars','music','homepage','mailbox','seo','ai-quality'].includes(view)?view as AdminSection:null;
-  const selectedColumns=recordView?columns[recordView]:[];
+  const selectedColumns=recordView?columns[recordView].filter(c=>!restricted||!['providers','sessions','status'].includes(c.key)||recordView==='videos'||recordView==='users'&&c.key==='status'):[];
   return <div className="admin-shell">
-    <header className="admin-heading"><div><span className="admin-eyebrow">PILOTAGE DE BIENVU</span><h1>Super admin<span>.</span></h1><p>Votre activité, vos agences et votre service, au même endroit.</p></div><span className="admin-access"><span/>Accès privé</span></header>
-    <nav className="admin-tabs" aria-label="Rubriques d’administration">{tabs.map(tab=><button key={tab.id} type="button" aria-current={view===tab.id?'page':undefined} onClick={()=>choose(tab.id)}>{tab.label}</button>)}</nav>
+    <header className="admin-heading"><div><span className="admin-eyebrow">PILOTAGE DE BIENVU</span><h1>{restricted?'Admin':'Super admin'}<span>.</span></h1><p>{restricted?'Votre messagerie et le suivi des clients et des vidéos.':'Votre activité, vos agences et votre service, au même endroit.'}</p></div><span className="admin-access"><span/>Accès privé</span></header>
+    <nav className="admin-tabs" aria-label="Rubriques d’administration">{visibleTabs.map(tab=><button key={tab.id} type="button" aria-current={view===tab.id?'page':undefined} onClick={()=>choose(tab.id)}>{tab.label}</button>)}</nav>
     <div className="admin-section-heading"><div><h2>{tabs.find(tab=>tab.id===view)?.label}</h2><p>{view==='videos'?'Toutes les générations enregistrées, y compris les échecs, essais anonymes et tests internes.':view==='subscriptions'?'Abonnements synchronisés par Stripe. Les recettes de test sont séparées des recettes réelles dans Conversion & recettes.':view==='quotas'?'Périodes de crédits des agences. Un crédit « Payant » ne constitue pas une preuve de paiement.':view==='imports'?'Annonces et brouillons encore conservés ; les imports purgés restent comptés dans l’usage.':view==='audit'?'Modifications administratives horodatées, avec leur auteur et leur motif.':view==='reports'?'Retours des utilisateurs et suivi de leur traitement.':overview?'Données relues le '+date(overview.at):'Données de l’application.'}</p></div><button className="admin-button" type="button" disabled={busy||loading} onClick={()=>setRevision(n=>n+1)}><HomeIcon name="refresh" size={17}/>Actualiser</button></div>
     {message&&<p role="status" className="admin-notice">{message}</p>}
     {view==='traffic'&&<div className="admin-period" aria-label="Période de fréquentation">{([7,30] as const).map(days=><button type="button" key={days} aria-pressed={trafficDays===days} onClick={()=>setTrafficDays(days)}>{days} jours</button>)}<span>Dates UTC · chargements HTML</span></div>}
@@ -135,7 +136,7 @@ export function AdminPanel(){
     {view==='homepage'&&accountId&&<AdminHomepage key={revision}/>}
     {view==='mailbox'&&accountId&&<AdminMailbox revision={revision}/>}
     {view==='ai-quality'&&accountId&&<AdminAiQuality revision={revision}/>}
-    {view==='videos'&&accountId&&<AdminVideoMapDefaults key={accountId+':'+revision}/>}
+    {!restricted&&view==='videos'&&accountId&&<AdminVideoMapDefaults key={accountId+':'+revision}/>}
     {failure&&<p role="alert" className="admin-error">{failure}</p>}
     {busy||loading?<div className="admin-loading" role="status"><span className="admin-spinner"/>Lecture des données…</div>:<>
       {overview&&view==='overview'&&<><AdminAttention data={overview} onFocus={focus}/><Overview data={overview} choose={choose}/></>}
@@ -151,11 +152,11 @@ export function AdminPanel(){
     <dialog ref={dialog} className="admin-dialog" onClose={()=>setSelected(null)}><div className="admin-dialog-top"><span className="admin-eyebrow">{tabs.find(tab=>tab.id===view)?.label}</span><button className="admin-close" type="button" aria-label="Fermer les détails" onClick={()=>dialog.current?.close()}><HomeIcon name="close"/></button></div>
       {selected&&<><h2>{text(selected.title??selected.agency??selected.name??'Détails')}</h2>{detailBusy?<p role="status">Chargement du détail…</p>:detailError?<p role="alert" className="admin-error">{detailError}</p>:<>
         {view==='videos'&&detail&&<><div className="admin-video-detail">{Number(detail.video.master)||Number(detail.video.preview)?<video controls playsInline preload="metadata" src={'/api/admin/jobs/'+encodeURIComponent(String(selected.id))+'/video?variant='+(Number(detail.video.master)?'master':'preview')}/>:<div className="admin-video-unavailable">Fichier indisponible ou expiré.<br/>L’historique de génération reste conservé.</div>}
-          <div><Badge value={detail.video.status}/><Facts row={detail.video} keys={[{key:'id',label:'ID'},{key:'email',label:'Compte'},{key:'audience',label:'Origine'},{key:'stage',label:'Étape'},{key:'error',label:'Erreur'},{key:'attempt',label:'Tentative'},{key:'credit',label:'Réservation'},{key:'creditsReserved',label:'Crédits BienVu réservés'},{key:'creditsUsed',label:'Crédits BienVu utilisés'},{key:'creditsRefunded',label:'Crédits restitués'},{key:'creditGift',label:'Essai offert'},{key:'animationsRequested',label:'Animations demandées'},{key:'createdAt',label:'Création'},{key:'sourceUrl',label:'Source'}]}/></div></div>
+          <div><Badge value={detail.video.status}/><Facts row={detail.video} keys={[{key:'id',label:'ID'},{key:'email',label:'Compte'},{key:'audience',label:'Origine'},{key:'stage',label:'Étape'},{key:'error',label:'Erreur'},{key:'attempt',label:'Tentative'},{key:'credit',label:'Réservation'},{key:'creditsReserved',label:'Crédits BienVu réservés'},{key:'creditsUsed',label:'Crédits BienVu utilisés'},{key:'creditsRefunded',label:'Crédits restitués'},{key:'creditGift',label:'Essai offert'},{key:'animationsRequested',label:'Animations demandées'},{key:'createdAt',label:'Création'},{key:'sourceUrl',label:'Source'}].filter(f=>!restricted||!['credit','creditsReserved','creditsUsed','creditsRefunded','creditGift','animationsRequested'].includes(f.key))}/></div></div>
           <h3>Événements enregistrés</h3>{detail.events.length?<ol className="admin-timeline">{detail.events.map((e,i)=><li key={i}><strong>{text(e.event)}</strong><time>{date(e.at)}</time></li>)}</ol>:<p className="admin-muted">Aucun événement détaillé pour cette ancienne génération.</p>}
-          <AdminVideoProfit jobId={String(selected.id)}/>
-          <NarrationCosts calls={detail.calls}/>
-          {!!detail.animations?.length&&<><h3>Animation des photos · Runway</h3><p className="admin-muted">25 crédits / clip de 5 secondes, soit 0,25 USD estimé avant taxes. Les provisions sont consommées dans les crédits prépayés, déjà comptés au budget du service. Les échecs et résultats incertains restent provisionnés.</p>
+          {!restricted&&<AdminVideoProfit jobId={String(selected.id)}/>}
+          {!restricted&&<NarrationCosts calls={detail.calls}/>}
+          {!restricted&&!!detail.animations?.length&&<><h3>Animation des photos · Runway</h3><p className="admin-muted">25 crédits / clip de 5 secondes, soit 0,25 USD estimé avant taxes. Les provisions sont consommées dans les crédits prépayés, déjà comptés au budget du service. Les échecs et résultats incertains restent provisionnés.</p>
             <div className="admin-table-scroll"><table className="admin-table"><thead><tr><th>Photo</th><th>Modèle</th><th>État</th><th>Crédits API Runway</th><th>Provision</th><th>Tâche API</th><th>Erreur</th></tr></thead><tbody>{detail.animations.map(a=><tr key={String(a.id)}><td>{text(a.photoId)}</td><td>{text(a.model)} · {a.mode==='mock'?'Fixture':'Réel'}</td><td>{text(a.state)}</td><td>{a.mode==='mock'?'Simulé':num(a.credits)}</td><td>{euro(Number(a.reservedCents))}</td><td>{text(a.taskId)}</td><td>{text(a.error)}</td></tr>)}</tbody></table></div></>}
           {detail.reports.length>0&&<><h3>Signalements</h3>{detail.reports.map(r=><p key={String(r.id)}><Badge value={r.status}/> {text(r.comment)}</p>)}</>}
         </>}

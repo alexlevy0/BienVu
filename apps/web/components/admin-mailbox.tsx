@@ -23,19 +23,35 @@ function deliveryError(message:MailMessage){
 const fileURL=(messageId:string,fileId:string)=>`/api/admin/mailbox/messages/${encodeURIComponent(messageId)}/files/${encodeURIComponent(fileId)}`;
 
 export function AdminMailbox({revision=0}:{revision?:number}){
+  const [mailboxes,setMailboxes]=useState<string[]>([]),[selected,setSelected]=useState(''),[error,setError]=useState(''),[locked,setLocked]=useState(false);
+  const stores=useRef(new Map<string,Map<string,Draft>>());
+  useEffect(()=>{const controller=new AbortController();setError('');void fetch('/api/admin/mailbox',{cache:'no-store',signal:controller.signal}).then(r=>editorResponse(r)).then(value=>{
+    if(controller.signal.aborted)return;
+    const page=MailboxPage.parse(value),available=page.mailboxes.length?page.mailboxes:[page.address];setMailboxes(available);setSelected(current=>available.includes(current)?current:page.address);
+  }).catch(cause=>{if(!controller.signal.aborted)setError(cause.message);});return()=>controller.abort();},[revision]);
+  if(error)return <p className="admin-error" role="alert">{error}</p>;
+  if(!selected)return <p role="status">Chargement des messageries…</p>;
+  if(!stores.current.has(selected))stores.current.set(selected,new Map());
+  return <><label className="mailbox-selector">Messagerie<select aria-label="Choisir la messagerie" value={selected} disabled={locked} onChange={event=>setSelected(event.target.value)}>{mailboxes.map(a=><option key={a} value={a}>{a}</option>)}</select></label>
+    <MailboxInbox key={selected} revision={revision} mailbox={selected} draftStore={stores.current.get(selected)!} onBusy={setLocked}/></>;
+}
+function MailboxInbox({revision,mailbox,draftStore,onBusy}:{revision:number;mailbox:string;draftStore:Map<string,Draft>;onBusy:(value:boolean)=>void}){
+  const mailFetch=(url:string,init?:RequestInit)=>fetch(url+(url.includes('?')?'&':'?')+new URLSearchParams({mailbox}),init);
   const [page,setPage]=useState<MailboxPage|null>(null),[detail,setDetail]=useState<MailThreadDetail|null>(null),[selected,setSelected]=useState<string|null>(null),
     [compose,setCompose]=useState(false),[folder,setFolder]=useState<Folder>('inbox'),[query,setQuery]=useState(''),[search,setSearch]=useState(''),
     [loading,setLoading]=useState(true),[detailLoading,setDetailLoading]=useState(false),[more,setMore]=useState(false),[older,setOlder]=useState(false),
     [error,setError]=useState(''),[notice,setNotice]=useState(''),[tick,setTick]=useState(0),[draft,setDraft]=useState<Draft>(initial),
     [sending,setSending]=useState(false),[uploading,setUploading]=useState(false),[acting,setActing]=useState(false);
-  const drafts=useRef(new Map<string,Draft>()),active=useRef<string|null>(null),fileInput=useRef<HTMLInputElement>(null),draftRef=useRef(draft),listVersion=useRef(0),historyLoaded=useRef(false);
+  const drafts=useRef(draftStore),active=useRef<string|null>(null),fileInput=useRef<HTMLInputElement>(null),draftRef=useRef(draft),listVersion=useRef(0),historyLoaded=useRef(false);
   draftRef.current=draft;
+  useEffect(()=>{onBusy(sending||uploading);},[sending,uploading,onBusy]);
+  useEffect(()=>()=>{drafts.current.set(active.current??'new',draftRef.current);},[]);
   useEffect(()=>{const timer=setTimeout(()=>setSearch(query.trim()),250);return()=>clearTimeout(timer);},[query]);
   useEffect(()=>{const timer=setInterval(()=>{if(document.visibilityState==='visible')setTick(n=>n+1);},15000);return()=>clearInterval(timer);},[]);
   const params=(cursor?:string)=>new URLSearchParams({folder,q:search,...(cursor?{cursor}:{})});
   useEffect(()=>{
     const controller=new AbortController(),version=++listVersion.current;
-    void fetch('/api/admin/mailbox?'+new URLSearchParams({folder,q:search}),{cache:'no-store',signal:controller.signal}).then(r=>editorResponse(r)).then(value=>{
+    void mailFetch('/api/admin/mailbox?'+new URLSearchParams({folder,q:search}),{cache:'no-store',signal:controller.signal}).then(r=>editorResponse(r)).then(value=>{
       if(version===listVersion.current)setPage(MailboxPage.parse(value));
     }).catch(cause=>{if(!controller.signal.aborted)setError(cause.message);}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});
     return()=>controller.abort();
@@ -43,13 +59,13 @@ export function AdminMailbox({revision=0}:{revision?:number}){
   useEffect(()=>{
     if(!selected||compose)return;
     const controller=new AbortController(),current=selected;
-    void fetch('/api/admin/mailbox/'+encodeURIComponent(current),{cache:'no-store',signal:controller.signal}).then(r=>editorResponse(r)).then(async value=>{
+    void mailFetch('/api/admin/mailbox/'+encodeURIComponent(current),{cache:'no-store',signal:controller.signal}).then(r=>editorResponse(r)).then(async value=>{
       if(controller.signal.aborted||active.current!==current)return;
       const next=MailThreadDetail.parse(value);
       setDetail(before=>before?.thread.id===current?{...next,messages:[...before.messages.filter(m=>!next.messages.some(n=>n.id===m.id)),...next.messages],
         olderCursor:historyLoaded.current?before.olderCursor:next.olderCursor}:next);
       if(next.thread.unread>0&&next.readThrough&&document.visibilityState==='visible'){
-        const updated=MailThread.parse(await editorResponse(await fetch('/api/admin/mailbox/'+encodeURIComponent(current),{method:'PATCH',headers:{'Content-Type':'application/json'},
+        const updated=MailThread.parse(await editorResponse(await mailFetch('/api/admin/mailbox/'+encodeURIComponent(current),{method:'PATCH',headers:{'Content-Type':'application/json'},
           body:JSON.stringify({action:'read',through:next.readThrough}),signal:controller.signal})));
         if(!controller.signal.aborted&&active.current===current){
           setDetail(before=>before?.thread.id===current?{...before,thread:updated}:before);
@@ -69,19 +85,19 @@ export function AdminMailbox({revision=0}:{revision?:number}){
   function changeDraft(value:Partial<Draft>){setDraft(before=>({...before,...value,key:crypto.randomUUID()}));}
   async function loadMore(){
     if(!page?.nextCursor||more)return;setMore(true);const version=listVersion.current;
-    try{const next=MailboxPage.parse(await editorResponse(await fetch('/api/admin/mailbox?'+params(page.nextCursor),{cache:'no-store'})));
+    try{const next=MailboxPage.parse(await editorResponse(await mailFetch('/api/admin/mailbox?'+params(page.nextCursor),{cache:'no-store'})));
       if(version===listVersion.current)setPage(before=>before?{...next,items:[...before.items,...next.items.filter(n=>!before.items.some(p=>p.id===n.id))]}:next);
     }catch(cause){setError(cause instanceof Error?cause.message:'Chargement interrompu.');}finally{setMore(false);}
   }
   async function loadOlder(){
     if(!detail?.olderCursor||older)return;setOlder(true);const current=detail.thread.id;
-    try{const next=MailThreadDetail.parse(await editorResponse(await fetch('/api/admin/mailbox/'+current+'?cursor='+encodeURIComponent(detail.olderCursor),{cache:'no-store'})));
+    try{const next=MailThreadDetail.parse(await editorResponse(await mailFetch('/api/admin/mailbox/'+current+'?cursor='+encodeURIComponent(detail.olderCursor),{cache:'no-store'})));
       if(active.current===current){historyLoaded.current=true;setDetail(before=>before?{...before,olderCursor:next.olderCursor,messages:[...next.messages.filter(n=>!before.messages.some(p=>p.id===n.id)),...before.messages]}:before);}
     }catch(cause){setError(cause instanceof Error?cause.message:'Chargement interrompu.');}finally{setOlder(false);}
   }
   async function action(value:MailThreadAction){
     if(!selected||acting)return;setActing(true);setError('');
-    try{await editorResponse(await fetch('/api/admin/mailbox/'+selected,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(value)}));
+    try{await editorResponse(await mailFetch('/api/admin/mailbox/'+selected,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(value)}));
       if(value.action==='unread')choose(null);
       setTick(n=>n+1);setNotice(value.action==='archive'?'Conversation archivée.':value.action==='spam'?'Conversation déplacée dans les indésirables.':value.action==='restore'?'Conversation replacée dans la boîte de réception.':'Conversation marquée comme non lue.');
     }catch(cause){setError(cause instanceof Error?cause.message:'La modification a échoué.');}finally{setActing(false);}
@@ -91,7 +107,7 @@ export function AdminMailbox({revision=0}:{revision?:number}){
     if(chosen.length+draft.files.length>MAILBOX_LIMITS.attachments||chosen.reduce((sum,f)=>sum+f.size,0)+draft.files.reduce((sum,f)=>sum+f.size,0)>MAILBOX_LIMITS.attachmentBytes){
       setError('Choisissez jusqu’à 8 pièces jointes, pour un total de 3 Mo maximum.');return;}
     setUploading(true);
-    try{for(const file of chosen){const result=MailAttachment.parse(await editorResponse(await fetch('/api/admin/mailbox/uploads/'+crypto.randomUUID(),{method:'PUT',
+    try{for(const file of chosen){const result=MailAttachment.parse(await editorResponse(await mailFetch('/api/admin/mailbox/uploads/'+crypto.randomUUID(),{method:'PUT',
       headers:{'Content-Type':file.type||'application/octet-stream','X-File-Name':encodeURIComponent(file.name)},body:file})));
       setDraft(before=>({...before,files:[...before.files,result],key:crypto.randomUUID()}));}
     }catch(cause){setError(cause instanceof Error?cause.message:'L’ajout a échoué.');}finally{setUploading(false);if(fileInput.current)fileInput.current.value='';}
@@ -101,14 +117,14 @@ export function AdminMailbox({revision=0}:{revision?:number}){
   async function send(event:FormEvent){
     event.preventDefault();if(sending||uploading||!page?.enabled)return;setSending(true);setError('');setNotice('');
     const payload={id:draft.key,text:draft.text,attachments:draft.files.map(f=>f.id),...(compose?{to:draft.to,subject:draft.subject}:{threadId:selected,replyMessageId:parent?.id})};
-    try{const message=MailMessage.parse(await editorResponse(await fetch('/api/admin/mailbox',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})));
+    try{const message=MailMessage.parse(await editorResponse(await mailFetch('/api/admin/mailbox',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})));
       drafts.current.delete(compose?'new':selected??'none');setDraft(initial());setCompose(false);setSelected(message.threadId);active.current=message.threadId;
       setNotice('Message enregistré et placé dans la file d’envoi. Son état se met à jour automatiquement.');setTick(n=>n+1);
     }catch(cause){setError(cause instanceof Error?cause.message:'L’envoi a échoué. Votre texte est conservé.');}finally{setSending(false);}
   }
   async function retry(message:MailMessage){
     if(sending)return;setSending(true);setError('');
-    try{await editorResponse(await fetch(`/api/admin/mailbox/messages/${message.id}/retry`,{method:'POST'}));setTick(n=>n+1);}
+    try{await editorResponse(await mailFetch(`/api/admin/mailbox/messages/${message.id}/retry`,{method:'POST'}));setTick(n=>n+1);}
     catch(cause){setError(cause instanceof Error?cause.message:'La relance a échoué.');}finally{setSending(false);}
   }
   function folderCount(value:Folder){if(value==='all')return null;return page?.counts[value]??0;}
@@ -147,10 +163,10 @@ export function AdminMailbox({revision=0}:{revision?:number}){
               {detail.messages.map(message=><article key={message.id} className={`mailbox-message mailbox-message-${message.direction}`}>
                 <header><div><strong>{message.direction==='out'?'Vous · BienVu':message.fromName||message.fromEmail}</strong><span>{message.direction==='out'?'À : '+message.toEmail:message.fromEmail}</span></div><time dateTime={message.at}>{date(message.at)}</time></header>
                 {message.replyTo&&message.direction==='in'&&message.replyTo!==message.fromEmail&&<p className="mailbox-reply-address">Réponse demandée à : {message.replyTo}</p>}
-                <pre>{message.text||'(Message sans texte)'}</pre>{message.truncated&&<p className="admin-muted">Message long : téléchargez l’original pour le lire intégralement.</p>}
-                {message.attachments.length>0&&<div className="mailbox-attachments">{message.attachments.map(file=><a key={file.id} href={fileURL(message.id,file.id)} download><HomeIcon name="paperclip" size={16}/><span>{file.name}<small>{size(file.size)}</small></span><HomeIcon name="download" size={15}/></a>)}</div>}
+                <MailBody message={message} mailbox={mailbox}/>{message.truncated&&<p className="admin-muted">Message long : téléchargez l’original pour le lire intégralement.</p>}
+                {message.attachments.length>0&&<div className="mailbox-attachments">{message.attachments.map(file=><a key={file.id} href={fileURL(message.id,file.id)+'?'+new URLSearchParams({mailbox})} download><HomeIcon name="paperclip" size={16}/><span>{file.name}<small>{size(file.size)}</small></span><HomeIcon name="download" size={15}/></a>)}</div>}
                 <footer><span className={`mailbox-delivery mailbox-delivery-${message.delivery}`}>{message.delivery==='sent'&&<HomeIcon name="check" size={13}/>} {deliveries[message.delivery]}</span>
-                  {message.hasOriginal&&<a href={fileURL(message.id,'original')} download>Télécharger l’original</a>}</footer>
+                  {message.hasOriginal&&<a href={fileURL(message.id,'original')+'?'+new URLSearchParams({mailbox})} download>Télécharger l’original</a>}</footer>
                 {['failed','uncertain'].includes(message.delivery)&&<div className="mailbox-send-error" role="status"><p>{deliveryError(message)}</p>{message.delivery==='failed'&&message.attempts<3&&<button type="button" className="admin-button" disabled={sending||!page?.enabled} onClick={()=>void retry(message)}>Réessayer l’envoi</button>}</div>}
               </article>)}
             </div>
@@ -168,5 +184,13 @@ export function AdminMailbox({revision=0}:{revision?:number}){
         </>}
       </section>
     </div>
+  </div>;
+}
+
+function MailBody({message,mailbox}:{message:MailMessage;mailbox:string}){
+  const [html,setHtml]=useState(message.hasOriginal);
+  const parts=message.text.split(/(https?:\/\/[^\s<>]+|mailto:[^\s<>]+)/gi);
+  return <div className="mailbox-body">{message.hasOriginal&&<div className="mailbox-body-tabs"><button type="button" aria-pressed={html} onClick={()=>setHtml(true)}>Mise en page</button><button type="button" aria-pressed={!html} onClick={()=>setHtml(false)}>Texte</button></div>}
+    {html?<iframe className="mailbox-html" title={'E-mail : '+message.subject} loading="lazy" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerPolicy="no-referrer" src={'/api/admin/mailbox/messages/'+encodeURIComponent(message.id)+'/html?'+new URLSearchParams({mailbox})}/>:<pre>{message.text?parts.map((part,i)=>i%2?<a key={i} href={part} target="_blank" rel="noopener noreferrer">{part}</a>:part):'(Message sans texte)'}</pre>}
   </div>;
 }

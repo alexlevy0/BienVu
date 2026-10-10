@@ -3,6 +3,11 @@ import {EntityId} from './product';
 
 export const MAILBOX_LIMITS={rawBytes:25*1024*1024,uploadBytes:3*1024*1024,attachmentBytes:3*1024*1024,
   attachments:8,incomingAttachments:64,bodyCharacters:100000,replyCharacters:20000,pageSize:20} as const;
+export const PERSONAL_MAILBOXES={admin:'greg@bienvu.online',superadmin:'alex@bienvu.online'} as const;
+export function configuredMailboxes(env:{MAILBOX_ADDRESS?:string;MAILBOX_ADDRESSES?:string}){
+  try{return z.array(z.email().max(254)).min(1).max(10).parse(env.MAILBOX_ADDRESSES?JSON.parse(env.MAILBOX_ADDRESSES):[env.MAILBOX_ADDRESS??'contact@bienvu.online']).map(a=>a.toLowerCase());}
+  catch{return [];}
+}
 export const MailFolder=z.enum(['inbox','archived','spam']);
 export const MailDelivery=z.enum(['received','queued','sending','sent','failed','uncertain']);
 export const MailAttachment=z.object({id:EntityId,name:z.string().max(200),mime:z.string().max(150),size:z.number().int().nonnegative()});
@@ -12,6 +17,7 @@ export const MailThread=z.object({id:EntityId,subject:z.string().max(998),peerEm
   attachmentCount:z.number().int().nonnegative(),lastAt:z.string(),lastDirection:z.enum(['in','out'])});
 export type MailThread=z.infer<typeof MailThread>;
 export const MailboxPage=z.object({address:z.email(),enabled:z.boolean(),items:z.array(MailThread),nextCursor:EntityId.nullable(),
+  mailboxes:z.array(z.email()).default([]),
   counts:z.object({inbox:z.number(),unread:z.number(),archived:z.number(),spam:z.number(),sent:z.number()})});
 export type MailboxPage=z.infer<typeof MailboxPage>;
 export const MailMessage=z.object({id:EntityId,threadId:EntityId,direction:z.enum(['in','out']),fromEmail:z.email(),fromName:z.string(),

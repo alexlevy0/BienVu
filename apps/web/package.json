@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@bienvu/avatars": "workspace:*",
     "@bienvu/contracts": "workspace:*",
     "@bienvu/db": "workspace:*",
     "@bienvu/importers": "workspace:*",
@@ -24,12 +25,16 @@
     "jpeg-js": "0.4.4",
     "maplibre-gl": "6.12.0",
     "next": "16.3.6",
+    "postal-mime": "4.0.4",
     "posthog-js": "1.438.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",
+    "sanitize-html": "2.18.0",
     "stripe": "23.0.0",
     "web-vitals": "6.2.3",
-    "zod": "4.6.5",
-    "@bienvu/avatars": "workspace:*"
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/sanitize-html": "2.16.2"
   }
 }
