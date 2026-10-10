@@ -11,6 +11,7 @@ import './homepage.css';
 import './mailbox.css';
 import './voices.css';
 import './pricing.css';
+import './promotions.css';
 export const dynamic='force-dynamic';
 export const metadata={title:'Administration — BienVu',robots:{index:false,follow:false}};
 export default async function Page(){

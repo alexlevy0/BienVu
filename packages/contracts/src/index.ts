@@ -82,3 +82,4 @@ export * from './agency-template';
 export * from './access';
 export * from './social';
 export * from './partners';
+export * from './promotions';

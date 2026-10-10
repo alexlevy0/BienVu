@@ -21,21 +21,23 @@ export async function creditBalance(db:Database,agencyId:string,now=Date.now()){
   EntityId.parse(agencyId);const grant=await monthlyCreditGrant(db,agencyId,now),at=new Date(now).toISOString();
   const usage=grant?await db.prepare('SELECT quota_limit AS total,reserved,consumed FROM allocations WHERE id=? AND agency_id=?')
     .bind(grant.id,agencyId).first<{total:number;reserved:number;consumed:number}>():null;
-  const sources=await db.prepare(`SELECT coalesce(sum(IIF(purchased=1 AND rollover=0,available,0)),0) purchased,
+  const sources=await db.prepare(`SELECT coalesce(sum(IIF(purchased=1 AND rollover=0 AND NOT EXISTS(SELECT 1 FROM credit_promotion_redemptions p WHERE p.allocation_id=id),available,0)),0) purchased,
+    coalesce(sum(IIF(EXISTS(SELECT 1 FROM credit_promotion_redemptions p WHERE p.allocation_id=id),available,0)),0) bonus,
     coalesce(sum(IIF(purchased=0 OR rollover=1,available,0)),0) monthly,
     coalesce(sum(IIF(rollover=1,available,0)),0) carried,
     coalesce(sum(IIF(rollover=1,quota_limit,0)),0) carryTotal,
     coalesce(sum(IIF(rollover=1,reserved,0)),0) carryReserved,
     coalesce(sum(IIF(rollover=1,consumed,0)),0) carryConsumed FROM spendable_credit_sources
     WHERE agency_id=? AND enabled=1 AND valid_from<=? AND valid_until>? AND (purchased=1 OR id=?)`)
-    .bind(agencyId,at,at,grant?.id??'none').first<{purchased:number;monthly:number;carried:number;carryTotal:number;carryReserved:number;carryConsumed:number}>();
+    .bind(agencyId,at,at,grant?.id??'none').first<{purchased:number;bonus:number;monthly:number;carried:number;carryTotal:number;carryReserved:number;carryConsumed:number}>();
   const wallet=await db.prepare(`SELECT coalesce(sum(a.quota_limit),0) total,coalesce(sum(a.reserved),0) reserved,coalesce(sum(a.consumed),0) consumed
-    FROM allocations a JOIN credit_topups t ON t.allocation_id=a.id AND t.agency_id=a.agency_id
-    WHERE a.agency_id=? AND t.mode=(SELECT mode FROM credit_payment_policy WHERE id=1) AND a.valid_from<=? AND a.valid_until>?`)
+    FROM allocations a LEFT JOIN credit_topups t ON t.allocation_id=a.id AND t.agency_id=a.agency_id
+    LEFT JOIN credit_promotion_redemptions p ON p.allocation_id=a.id
+    WHERE a.agency_id=? AND coalesce(t.mode,p.mode)=(SELECT mode FROM credit_payment_policy WHERE id=1) AND a.valid_from<=? AND a.valid_until>?`)
     .bind(agencyId,at,at).first<{total:number;reserved:number;consumed:number}>();
-  return {available:(sources?.monthly??0)+(sources?.purchased??0),reserved:(usage?.reserved??0)+(wallet?.reserved??0)+(sources?.carryReserved??0),
+  return {available:(sources?.monthly??0)+(sources?.purchased??0)+(sources?.bonus??0),reserved:(usage?.reserved??0)+(wallet?.reserved??0)+(sources?.carryReserved??0),
     consumed:(usage?.consumed??0)+(wallet?.consumed??0)+(sources?.carryConsumed??0),total:(usage?.total??0)+(wallet?.total??0)+(sources?.carryTotal??0),
-    renewalAt:grant?.renewalAt??null,kind:grant?.kind??(wallet?.total?'paid':null),purchasedAvailable:sources?.purchased??0,monthlyAvailable:sources?.monthly??0,...(sources?.carried?{rolloverAvailable:sources.carried}:{})};
+    renewalAt:grant?.renewalAt??null,kind:grant?.kind??(wallet?.total?'paid':null),purchasedAvailable:sources?.purchased??0,monthlyAvailable:sources?.monthly??0,...(sources?.bonus?{bonusAvailable:sources.bonus}:{}),...(sources?.carried?{rolloverAvailable:sources.carried}:{})};
 }
 export async function creditHistory(db:Database,agencyId:string,cursor?:string,now=Date.now()){
   EntityId.parse(agencyId);let time='9999',id='~';
@@ -54,7 +56,10 @@ export async function creditHistory(db:Database,agencyId:string,cursor?:string,n
   // SQLite IIF strips JSON's subtype; normalize the explicit gift scalar here.
   const data=(JSON.parse(result?.data??'[]') as Record<string,unknown>[]).map(row=>CreditEntry.parse({...row,gift:row.gift===true||row.gift==='true'||row.gift===1}));
   const page=data.slice(0,20),last=page.at(-1);
-  return CreditHistory.parse({balance:await creditBalance(db,agencyId,now),entries:page,nextCursor:data.length>20&&last?btoa(JSON.stringify([last.at,last.id])):null});
+  const bonuses=await db.prepare(`SELECT json_group_array(json(record)) data FROM (SELECT json_object('id',p.intent_id,'code',i.code,'credits',a.quota_limit,'at',p.created_at,'expiresAt',a.valid_until,'used',a.consumed,'reserved',a.reserved,'reversed',coalesce(v.reversed,0),'disputed',r.disputed) record
+    FROM credit_promotion_redemptions p JOIN billing_promotion_intents i ON i.id=p.intent_id JOIN allocations a ON a.id=p.allocation_id JOIN financial_receipts r ON r.id=p.receipt_id
+    LEFT JOIN promotion_reversed_credits v ON v.allocation_id=a.id WHERE p.agency_id=? AND p.mode=(SELECT mode FROM credit_payment_policy WHERE id=1) ORDER BY p.created_at DESC LIMIT 20)`).bind(agencyId).first<{data:string}>();
+  return CreditHistory.parse({balance:await creditBalance(db,agencyId,now),entries:page,bonuses:(JSON.parse(bonuses?.data??'[]') as Record<string,unknown>[]).map(row=>({...row,disputed:Boolean(row.disputed)})),nextCursor:data.length>20&&last?btoa(JSON.stringify([last.at,last.id])):null});
 }
 export type CreditGrant={id:string;kind:'trial'|'paid'|'free';remaining:number;renewalAt:string|null;enabled:number};
 export async function creditGrant(db:Database,agencyId:string,now=Date.now()):Promise<CreditGrant|null> {

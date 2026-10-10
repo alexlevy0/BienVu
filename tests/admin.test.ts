@@ -14,6 +14,7 @@ import {RequestFailure} from '../apps/web/lib/http';
 import {importResult} from '../apps/web/lib/imports';
 import {adminVideoMapRequest} from '../apps/web/lib/video-map-settings';
 import {adminAiQualityRequest} from '../apps/web/lib/ai-quality';
+import {promotionsRequest} from '../apps/web/lib/subscription-promotions';
 
 test('Super admin : accès fermé par défaut, adresse exacte et vérification obligatoires',()=>{
   const user={id:'admin',email:'Owner@Example.com',emailVerified:true};
@@ -42,6 +43,24 @@ test('Admin avec Better Auth/D1/R2 locaux : isolation, pagination globale, actio
     assert.ok(session);cookies.push(context.authCookies.sessionToken.name+'='+encodeURIComponent(session.token+'.'+createHmac('sha256',env.BETTER_AUTH_SECRET).update(session.token).digest('base64')));}
   const agency=await ensureAgency(db,users[0]),otherAgency=await ensureAgency(db,users[1]);
   const req=(path:string,cookie=cookies[0],options:RequestInit={})=>new Request(env.BETTER_AUTH_URL+path,{...options,headers:{cookie,...options.headers}});
+  await t.test('codes bonus : accès superadmin seul, CSRF, campagnes et journal',async()=>{
+    const e={...env,ADMIN_EMAIL:users[1].email,BILLING_MODE:'test',STRIPE_SECRET_KEY:'sk_test_fixture',STRIPE_WEBHOOK_SECRET:'whsec_fixture'};
+    const post=(body:unknown,cookie=cookies[0],origin=env.BETTER_AUTH_URL)=>promotionsRequest(req('/api/admin/promotions',cookie,{method:'POST',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify(body)}),e);
+    for(const [cookie,expected] of [['',401],[cookies[1],403],[cookies[2],401]] as const){
+      for(const r of [await promotionsRequest(req('/api/admin/promotions',cookie),e),await post({action:'reconcile'},cookie)]){assert.equal(r.status,expected);assert.equal(r.headers.get('cache-control'),'private, no-store');}
+    }
+    assert.equal((await post({action:'reconcile'},cookies[0],'https://other.example')).status,403);
+    const body={action:'save',reason:'Lancement de la campagne locale',settings:{code:'LANCEMENT20',name:'Campagne agences',active:true,startsAt:null,endsAt:null,maxRedemptions:25,plans:['solo','agence']}};
+    const created=await post(body);assert.equal(created.status,200);const {id}=await created.json() as {id:string};
+    const report=await promotionsRequest(req('/api/admin/promotions?mode=test&id='+id),e);assert.equal(report.status,200);const data=await report.json() as {codes:{code:string}[];audit:unknown[]};assert.equal(data.codes[0].code,'LANCEMENT20');assert.equal(data.audit.length,1);
+    assert.equal((await post(body)).status,409,'Un code ne peut pas être créé deux fois');
+    assert.equal((await post({...body,id,version:1,settings:{...body.settings,active:false}})).status,200);
+    assert.equal((await post({...body,id,version:1})).status,409,'Une écriture obsolète est rejetée');
+    assert.equal((await post({...body,id,version:2,settings:{...body.settings,code:'RENAMED20'}})).status,409,'Les codes utilisés comme identifiants restent stables');
+    assert.equal((await post({...body,settings:{...body.settings,plans:[]}})).status,422);
+    assert.equal((await promotionsRequest(req('/api/admin/promotions?mode=invalid'),e)).status,422);
+    await assert.rejects(db.prepare('DELETE FROM promotion_audit WHERE promotion_id=?').bind(id).run(),/PROMOTION_IMMUTABLE/);
+  });
   await t.test('toutes les routes privées refusent anonyme, autre compte et adresse non vérifiée',async()=>{
     for(const [cookie,expected] of [['',401],[cookies[1],403],[cookies[2],401]] as const){
       for(const response of [await financeRequest(req('/api/admin/finance?mode=test',cookie),env),await financeRequest(req('/api/admin/finance',cookie,{method:'POST',headers:{origin:env.BETTER_AUTH_URL,'Content-Type':'application/json'},body:JSON.stringify({action:'stripe_sync'})}),env),await adminRequest(req('/api/admin?section=overview',cookie),env),await adminRequest(req('/api/admin?section=traffic',cookie),env),await adminRequest(req('/api/admin',cookie,{method:'POST',headers:{origin:env.BETTER_AUTH_URL,'Content-Type':'application/json'},body:JSON.stringify({action:'generation_gate',expected:true,enabled:false,reason:'Fixture'})}),env),await adminJobRequest(req('/api/admin/jobs/missing',cookie),env,'missing'),await adminJobRequest(req('/api/admin/jobs/missing/video',cookie),env,'missing',true),await adminAiQualityRequest(req('/api/admin/ai-quality',cookie),env),await adminAiQualityRequest(req('/api/admin/ai-quality?id=private',cookie),env),await adminAiQualityRequest(req('/api/admin/ai-quality?export=dataset',cookie),env),await adminAiQualityRequest(req('/api/admin/ai-quality',cookie,{method:'POST',headers:{origin:env.BETTER_AUTH_URL},body:'{"action":"scan"}'}),env),await adminVideoMapRequest(req('/api/admin/video-map',cookie),env),await adminVideoMapRequest(req('/api/admin/video-map',cookie,{method:'PATCH',headers:{origin:env.BETTER_AUTH_URL,'Content-Type':'application/json'},body:'{}'}),env)]){

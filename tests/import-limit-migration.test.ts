@@ -78,7 +78,7 @@ test('migration historique 0029 : compteurs conservés, 20/jour et 60/mois, reno
   // The current rights API also reads the billing ledger. Upgrade the remaining
   // schema before calling it, while proving both upgrades preserve old usage.
   for (const file of (await readdir(directory)).filter(f => f.endsWith('.sql') && f > '0029_double_import_limits.sql' && f < '0053').sort()) await migrate(file);
-  for(const file of ['0058_heygen_avatars.sql','0061_full_length_avatars.sql','0063_offers_and_credit_rollover.sql'])await migrate(file);
+  for(const file of ['0058_heygen_avatars.sql','0061_full_length_avatars.sql','0063_offers_and_credit_rollover.sql','0067_subscription_promotions.sql'])await migrate(file);
   assert.deepEqual(await usage(), before);
   assert.equal((await generationRights(DB, 'double-quota', 'true', now)).importRetryAt, null);
   // Attempts 11–20 are usable immediately; failures and idempotent replays
@@ -121,7 +121,7 @@ test('migration 0053 : 55 essais conservés, ancien plafond de 60 débloqué, 20
   const migrate = async (file: string) => DB.exec((await readFile(new URL(file, directory), 'utf8'))
     .replace(/^--.*$/gm, '').replace(/\n/g, ' '));
   for (const file of (await readdir(directory)).filter(f => f.endsWith('.sql') && f < '0053').sort()) await migrate(file);
-  for(const file of ['0058_heygen_avatars.sql','0061_full_length_avatars.sql','0063_offers_and_credit_rollover.sql'])await migrate(file);
+  for(const file of ['0058_heygen_avatars.sql','0061_full_length_avatars.sql','0063_offers_and_credit_rollover.sql','0067_subscription_promotions.sql'])await migrate(file);
   await migrate('0064_automatic_import_estimates.sql');
   const now = Date.parse('2026-10-08T12:00:00Z'), source = 'https://fixtures.bienvu.example/vente';
   const at = new Date(now).toISOString();

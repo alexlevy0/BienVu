@@ -44,11 +44,12 @@ export function selectedAnimationIndices(sourceSlots:number[],settings?:VideoCus
 }
 export const CreditBalance=z.object({available:z.number().int().nonnegative(),reserved:z.number().int().nonnegative(),
   consumed:z.number().int().nonnegative(),total:z.number().int().nonnegative(),renewalAt:z.string().nullable(),kind:z.string().nullable(),
-  purchasedAvailable:z.number().int().nonnegative().optional(),monthlyAvailable:z.number().int().nonnegative().optional(),rolloverAvailable:z.number().int().nonnegative().optional()});
+  purchasedAvailable:z.number().int().nonnegative().optional(),monthlyAvailable:z.number().int().nonnegative().optional(),rolloverAvailable:z.number().int().nonnegative().optional(),bonusAvailable:z.number().int().nonnegative().optional()});
 export const CreditEntry=z.object({id:z.string(),title:z.string(),at:z.string(),status:z.string(),
   reserved:z.number().int().nonnegative(),used:z.number().int().nonnegative(),refunded:z.number().int().nonnegative(),
   animations:z.number().int().nonnegative(),gift:z.boolean()});
-export const CreditHistory=z.object({balance:CreditBalance,entries:z.array(CreditEntry),nextCursor:z.string().nullable()});
+export const CreditBonus=z.object({id:z.string(),code:z.string(),credits:z.number().int().positive(),at:z.string(),expiresAt:z.string(),used:z.number().int().nonnegative(),reserved:z.number().int().nonnegative(),reversed:z.number().int().nonnegative(),disputed:z.boolean()});
+export const CreditHistory=z.object({balance:CreditBalance,entries:z.array(CreditEntry),bonuses:z.array(CreditBonus).optional(),nextCursor:z.string().nullable()});
 
 export type CreditBalance=z.infer<typeof CreditBalance>;
 export type CreditEntry=z.infer<typeof CreditEntry>;
