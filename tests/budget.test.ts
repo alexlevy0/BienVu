@@ -21,6 +21,12 @@ test('coût brut inclut RAM/disque provisionnés pendant tout le temps actif',()
   assert.ok(Math.abs(containerGrossUsd(120,120)-0.0043008)<1e-10);
   assert.throws(()=>containerGrossUsd(-1,120));
 });
+test('rendu à deux cœurs : CPU cumulé, 8 GiB et 16 GB, sans réévaluer les anciennes sondes',()=>{
+  assert.ok(Math.abs(containerGrossUsd(240,120,'standard-3')-0.0073344)<1e-10);
+  assert.ok(Math.abs(containerGrossUsd(156.88,100,'standard-3')-0.0052496)<1e-10);
+  assert.equal(containerGrossUsd(120,120),containerGrossUsd(120,120,'standard-2'));
+  assert.throws(()=>containerGrossUsd(240,NaN,'standard-3'),/INVALID_MEASUREMENT/);
+});
 test('hausse explicite à 40 € : historique préservé, coupure 35 € et marge de 5 €',()=>{
   const old={...fresh(),fixedAndOtherCents:2425,committedCents:50,attempts:1,days:{'2026-09-27':1}};
   assert.throws(()=>reserve(old,now),/BUDGET_LIMIT/);

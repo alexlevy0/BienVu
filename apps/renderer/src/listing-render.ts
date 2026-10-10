@@ -175,7 +175,8 @@ export async function renderListingVideo(input: unknown, directory: string): Pro
     await withVideoAssets(manifest,directory,async props=>{
       const composition=await selectComposition({serveUrl:bundleDir,id:'BienVuListing',inputProps:props,...browser(manifest)});
       await renderMedia({serveUrl:bundleDir,composition,inputProps:props,...browser(manifest),codec:'h264',audioCodec:'aac',muted:!editorHasAudio(manifest),
-        pixelFormat:'yuv420p',outputLocation:raw,concurrency:1,timeoutInMilliseconds:120_000,
+        // Deux frames en parallèle sur le conteneur de production à 2 vCPU.
+        pixelFormat:'yuv420p',outputLocation:raw,concurrency:2,timeoutInMilliseconds:120_000,
         audioBitrate:'192k',crf:21,logLevel:'error',onProgress:state=>progress(state.progress*85)});
     });
     progress(85);

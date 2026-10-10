@@ -2,6 +2,12 @@
 
 Le modèle `BienVuListing` assemble les photos, la voix mesurée au sprint 05, les sous-titres par phrase et la marque enregistrée. Il exporte un MP4 vertical 1080 × 1920 ou horizontal 1920 × 1080, 30 fps, H.264/AAC lorsque la voix est activée, de 20 à 40 secondes. Le parcours public de génération, le Workflow et la consommation finale du quota ont été intégrés aux sprints 07/08.
 
+## Assemblage sur deux cœurs — 10 octobre 2026
+
+Les nouveaux rendus `BienVuListing` utilisent un conteneur Cloudflare `standard-3` : **2 vCPU, 8 GiB de RAM et 16 GB de disque**, avec **deux frames calculées en parallèle** dans Remotion. Un seul rendu de vidéo reste actif à la fois ; les formats, la voix, le filigrane, les crédits et les budgets de génération sont conservés. Les MP4 déjà terminés ne sont pas recalculés.
+
+L’estimation brute de fin de session utilise ces nouvelles ressources et majore le CPU à deux cœurs occupés pendant toute la session. Elle ne représente pas une facture : Cloudflare mesure le CPU réellement actif et applique les allocations mensuelles partagées. Les anciennes sondes de recette `standard-2` conservent leur calcul à un cœur. [Comparaison réelle, coûts et qualité](preuves/maintenance/RENDER-CPU-10-10.md) · [Mise en production et contrôles](preuves/maintenance/RENDER-PARALLELE-10-10.md).
+
 ## Format vertical ou horizontal — 2 octobre 2026
 
 Le bouton **Vertical 9:16** bascule vers **Horizontal 16:9**, puis revient en vertical au clic suivant. Le vertical reste sélectionné par défaut. La préférence est conservée dans l’onglet et transmise aux générations URL, manuelles et anonymes ; le bouton est bloqué pendant une génération. Les aperçus de Personnaliser, la conversation, les lecteurs de Mes vidéos et les pages publiques respectent le format choisi.
@@ -100,7 +106,7 @@ Les tests automatiques ne dépendent pas de ces preuves ignorées : `fixtures/vi
 
 ## Recette Cloudflare bornée
 
-Configuration générique désactivée : `apps/pipeline/wrangler.video.jsonc`. Configuration opérateur ignorée : `wrangler.staging.video.jsonc`. Variables `VIDEO_ENABLED`, `VIDEO_AGENCY_ID`, `VIDEO_JOB_ID`, `VIDEO_BUDGET_MONTH`, `VIDEO_OTHER_CENTS`, `VIDEO_MAX_ATTEMPTS`, `VIDEO_CEILING_CENTS`, `VIDEO_ENVELOPE_CENTS`, `VIDEO_RETRY_FAILED_AT`. Instance `standard-2`, maximum une instance. Les types du binding sont générés par `pnpm --filter @bienvu/pipeline typegen`.
+Configuration générique désactivée : `apps/pipeline/wrangler.video.jsonc`. Configuration opérateur ignorée : `wrangler.staging.video.jsonc`. Variables `VIDEO_ENABLED`, `VIDEO_AGENCY_ID`, `VIDEO_JOB_ID`, `VIDEO_BUDGET_MONTH`, `VIDEO_OTHER_CENTS`, `VIDEO_MAX_ATTEMPTS`, `VIDEO_CEILING_CENTS`, `VIDEO_ENVELOPE_CENTS`, `VIDEO_RETRY_FAILED_AT`. Instance `standard-3` pour les nouvelles recettes du moteur de listing, maximum une instance. Les types du binding sont générés par `pnpm --filter @bienvu/pipeline typegen`.
 
 La commande `pnpm probe:video:cloudflare` expose les étapes `configure`, `reserve`, `seed`, `secrets`, `enable`, `run`, `status`, `collect`, `pause`, `verify`, ainsi que `fund-resume`, `prepare-retry`, `retry` et `diagnostic`. Elle crée une fixture sur la base **isolée** `bienvu-narration-probe-staging`, emploie les anciens WAV approuvés et refuse de relancer un calcul par un simple rejeu de campagne. Avant tout nouveau test, rapprocher son journal, le budget global et la facture ; **ne pas effacer l'état ni changer l'identité du contrôleur pour contourner le plafond**.
 

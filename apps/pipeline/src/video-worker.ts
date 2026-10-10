@@ -9,7 +9,7 @@ export class VideoRenderer extends Container<Env> {
   defaultPort=8080;
   sleepAfter='30s';
   enableInternet=false;
-  envVars={RENDER_TOKEN:this.env.RENDER_TOKEN??'',RENDER_ENV:'cloudflare-container',INSTANCE_TYPE:'standard-2'};
+  envVars={RENDER_TOKEN:this.env.RENDER_TOKEN??'',RENDER_ENV:'cloudflare-container',INSTANCE_TYPE:'standard-3'};
   private engine=new VideoCoordinator({storage:this.ctx.storage,bucket:this.env.MEDIA,
     call:async(path,init={})=>{const headers=new Headers(init.headers);headers.set('Authorization',`Bearer ${this.env.RENDER_TOKEN}`);
       if((await this.getState()).status!=='healthy') {
@@ -67,10 +67,10 @@ export class VideoRenderer extends Container<Env> {
   }
   override async onActivityExpired(){await this.engine.advance();if((await this.engine.state()).active)this.renewActivityTimeout();else await this.stop();}
   override async onStart(){const life=await this.ctx.storage.get<{startedAt:number}>('lifecycle');
-    await this.ctx.storage.put('lifecycle',{startedAt:life?.startedAt??Date.now(),serviceReadyAt:Date.now()});}
+    await this.ctx.storage.put('lifecycle',{startedAt:life?.startedAt??Date.now(),serviceReadyAt:Date.now(),instanceType:'standard-3'});}
   override async onStop(){const life=await this.ctx.storage.get<{startedAt:number}>('lifecycle');if(life){const stoppedAt=Date.now();
     await this.ctx.storage.put('lifecycle',{...life,stoppedAt,uptimeSeconds:(stoppedAt-life.startedAt)/1000,
-      grossComputeUsdUpperEstimate:containerGrossUsd((stoppedAt-life.startedAt)/1000,(stoppedAt-life.startedAt)/1000),actualBilledEur:null});}}
+      grossComputeUsdUpperEstimate:containerGrossUsd(2*(stoppedAt-life.startedAt)/1000,(stoppedAt-life.startedAt)/1000,'standard-3'),actualBilledEur:null});}}
 }
 function publicJob(job:Awaited<ReturnType<VideoCoordinator['accept']>>) {
   const {manifest,...rest}=job;return {...rest,rights:manifest.rights};
