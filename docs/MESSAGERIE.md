@@ -4,6 +4,12 @@
 
 Les listes, compteurs, recherches, conversations, pièces jointes, originaux, aperçus HTML, uploads, relances et réponses sont filtrés côté serveur par boîte. Une référence RFC ne peut regrouper des messages de deux boîtes ; les fichiers préparés pour une boîte ne peuvent être envoyés depuis une autre. Les brouillons de rédaction restent conservés lors d’un changement de boîte dans la session d’interface. Les messages historiques restent dans `contact`.
 
+## Classement automatique des e-mails HeyGen
+
+La messagerie **Contact** possède un onglet **HeyGen**. Les conversations contenant un e-mail reçu de `heygen.com` ou de l’un de ses sous-domaines, notamment `email.heygen.com`, y sont regroupées automatiquement. Elles sont exclues de **Boîte de réception** et de **Non lus**, avec des compteurs distincts, et restent visibles dans **Tous les messages**. Le nom affiché de l’expéditeur, l’objet ou le texte ne suffisent pas à classer un e-mail : les demandes des clients et les e-mails de Stripe conservent leur place habituelle.
+
+Ce classement est calculé à la lecture, pour les messages historiques comme les prochaines réceptions. Aucun original, état de lecture ou pièce jointe n’est réécrit ou supprimé ; aucune migration ni modification d’Email Routing n’est nécessaire. Un message archivé ou indésirable apparaît dans son dossier habituel ; le restaurer le replace dans HeyGen. Recherche, pagination, lecture, réponse et téléchargement restent disponibles. Les boîtes Alex et Greg conservent leur fonctionnement et leurs contrôles d’accès ; elles n’affichent pas cet onglet.
+
 ## Réception
 
 Le Worker `apps/mail` exporte un gestionnaire `email()` et utilise les mêmes bindings D1 `DB` et R2 privé `MEDIA` que le site. Trois règles Email Routing distinctes associent `contact@bienvu.online`, `alex@bienvu.online` et `greg@bienvu.online` à ce Worker. Définir `MAILBOX_ADDRESSES` comme tableau JSON de ces adresses dans les Workers mail et web. Le domaine doit avoir Email Routing activé et ses enregistrements MX configurés. Le Worker n’expose aucune route HTTP de réception publique.

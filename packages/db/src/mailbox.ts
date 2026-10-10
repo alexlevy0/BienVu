@@ -1,4 +1,4 @@
-import {MailThread,MailMessage,MailThreadDetail,MAILBOX_LIMITS,mailSubjectKey,type MailAttachment,type MailThreadAction} from '@bienvu/contracts';
+import {MailThread,MailMessage,MailThreadDetail,MAILBOX_LIMITS,CONTACT_MAILBOX,mailSubjectKey,type MailAttachment,type MailThreadAction,type MailFolderView} from '@bienvu/contracts';
 import type {Database,SqlStatement} from './index';
 
 export type StoredMailAttachment=MailAttachment&{objectKey:string};
@@ -6,34 +6,44 @@ export type MailMessageRow={id:string;thread_id:string;dedupe_key:string;directi
   reply_to:string|null;subject:string;body_text:string;truncated:number;raw_key:string|null;rfc_message_id:string|null;in_reply_to:string|null;
   references_json:string;attachments_json:string;is_read:number;delivery:MailMessage['delivery'];provider_id:string|null;error_code:string|null;
   attempts:number;actor_id:string|null;created_at:string;updated_at:string};
-type ThreadRow={id:string;peer_email:string;peer_name:string;subject:string;snippet:string;folder:MailThread['folder'];unread:number;
+type ThreadRow={id:string;peer_email:string;peer_name:string;subject:string;snippet:string;folder:MailThread['folder'];category:MailThread['category'];unread:number;
   message_count:number;attachment_count:number;last_direction:'in'|'out';last_at:string};
 const threadView=(r:ThreadRow)=>MailThread.parse({id:r.id,subject:r.subject,peerEmail:r.peer_email,peerName:r.peer_name,snippet:r.snippet,
-  folder:r.folder,unread:r.unread,messageCount:r.message_count,attachmentCount:r.attachment_count,lastAt:r.last_at,lastDirection:r.last_direction});
+  folder:r.folder,category:r.category,unread:r.unread,messageCount:r.message_count,attachmentCount:r.attachment_count,lastAt:r.last_at,lastDirection:r.last_direction});
+// A derived category covers existing and future mail without rewriting originals
+// or changing the archive/spam state. Display names and message text are ignored.
+const mailCategory=`CASE WHEN t.mailbox_address='${CONTACT_MAILBOX}' COLLATE NOCASE AND EXISTS(
+  SELECT 1 FROM mailbox_messages h WHERE h.thread_id=t.id AND h.direction='in'
+  AND (lower(h.from_email) LIKE '%@heygen.com' OR lower(h.from_email) LIKE '%@%.heygen.com')) THEN 'heygen' ELSE 'general' END`;
 export function mailAttachments(row:MailMessageRow){return JSON.parse(row.attachments_json) as StoredMailAttachment[];}
 export function mailMessageView(r:MailMessageRow){return MailMessage.parse({id:r.id,threadId:r.thread_id,direction:r.direction,
   fromEmail:r.from_email,fromName:r.from_name,toEmail:r.to_email,replyTo:r.reply_to,subject:r.subject,text:r.body_text,
   truncated:r.truncated===1,at:r.created_at,delivery:r.delivery,error:r.error_code,attempts:r.attempts,
   attachments:mailAttachments(r),hasOriginal:Boolean(r.raw_key)});}
 export async function findMailMessage(db:Database,id:string,address?:string){return db.prepare('SELECT m.* FROM mailbox_messages m JOIN mailbox_threads t ON t.id=m.thread_id WHERE m.id=? AND (? IS NULL OR t.mailbox_address=? COLLATE NOCASE)').bind(id,address??null,address??null).first<MailMessageRow>();}
-export async function findMailThread(db:Database,id:string,address='contact@bienvu.online'){const row=await db.prepare('SELECT * FROM mailbox_threads WHERE id=? AND mailbox_address=? COLLATE NOCASE').bind(id,address).first<ThreadRow>();return row?threadView(row):null;}
-export async function listMailThreads(db:Database,input:{q:string;folder:'inbox'|'unread'|'archived'|'spam'|'sent'|'all';cursor?:string;address?:string}){
+export async function findMailThread(db:Database,id:string,address='contact@bienvu.online'){const row=await db.prepare(`SELECT t.*,${mailCategory} category FROM mailbox_threads t WHERE id=? AND mailbox_address=? COLLATE NOCASE`).bind(id,address).first<ThreadRow>();return row?threadView(row):null;}
+export async function listMailThreads(db:Database,input:{q:string;folder:MailFolderView;cursor?:string;address?:string}){
   const address=input.address??'contact@bienvu.online';
-  const filter=input.folder==='unread'?"folder='inbox' AND unread>0":input.folder==='sent'?"EXISTS(SELECT 1 FROM mailbox_messages m WHERE m.thread_id=t.id AND m.direction='out')":
+  const filter=input.folder==='unread'?"folder='inbox' AND category='general' AND unread>0":input.folder==='inbox'?"folder='inbox' AND category='general'":
+    input.folder==='heygen'?"folder='inbox' AND category='heygen'":input.folder==='sent'?"EXISTS(SELECT 1 FROM mailbox_messages m WHERE m.thread_id=t.id AND m.direction='out')":
     input.folder==='all'?'1=1':'folder=?';
-  const bindings:(string|null)[]=!['unread','sent','all'].includes(input.folder)?[input.folder]:[];
+  const bindings:(string|null)[]=input.folder==='archived'||input.folder==='spam'?[input.folder]:[];
   const found=await db.prepare(`SELECT json_group_array(json_object('id',id,'peer_email',peer_email,'peer_name',peer_name,'subject',subject,
-    'snippet',snippet,'folder',folder,'unread',unread,'message_count',message_count,'attachment_count',attachment_count,
-    'last_direction',last_direction,'last_at',last_at)) AS items FROM (SELECT * FROM mailbox_threads t WHERE mailbox_address=? COLLATE NOCASE AND message_count>0 AND ${filter}
+    'snippet',snippet,'folder',folder,'category',category,'unread',unread,'message_count',message_count,'attachment_count',attachment_count,
+    'last_direction',last_direction,'last_at',last_at)) AS items FROM (SELECT t.*,${mailCategory} category FROM mailbox_threads t WHERE mailbox_address=? COLLATE NOCASE AND message_count>0 AND ${filter}
     AND (instr(lower(subject),lower(?))>0 OR instr(lower(peer_email),lower(?))>0 OR instr(lower(peer_name),lower(?))>0
       OR EXISTS(SELECT 1 FROM mailbox_messages m WHERE m.thread_id=t.id AND instr(lower(m.body_text),lower(?))>0))
     AND (? IS NULL OR (last_at,id)<(SELECT last_at,id FROM mailbox_threads WHERE id=? AND mailbox_address=? COLLATE NOCASE)) ORDER BY last_at DESC,id DESC LIMIT ?)`)
     .bind(address,...bindings,input.q,input.q,input.q,input.q,input.cursor??null,input.cursor??null,address,MAILBOX_LIMITS.pageSize+1).first<{items:string}>();
   const rows=JSON.parse(found?.items??'[]') as ThreadRow[],items=rows.slice(0,MAILBOX_LIMITS.pageSize).map(threadView);
-  const counts=await db.prepare(`SELECT count(CASE WHEN folder='inbox' THEN 1 END) inbox,
-    count(CASE WHEN folder='inbox' AND unread>0 THEN 1 END) unread,count(CASE WHEN folder='archived' THEN 1 END) archived,
-    count(CASE WHEN folder='spam' THEN 1 END) spam,(SELECT count(DISTINCT m.thread_id) FROM mailbox_messages m JOIN mailbox_threads t ON t.id=m.thread_id WHERE m.direction='out' AND t.mailbox_address=? COLLATE NOCASE) sent FROM mailbox_threads WHERE mailbox_address=? COLLATE NOCASE AND message_count>0`)
-    .bind(address,address).first<{inbox:number;unread:number;archived:number;spam:number;sent:number}>();
+  const counts=await db.prepare(`WITH scoped AS MATERIALIZED(SELECT t.folder,t.unread,${mailCategory} category FROM mailbox_threads t WHERE mailbox_address=? COLLATE NOCASE AND message_count>0)
+    SELECT count(CASE WHEN folder='inbox' AND category='general' THEN 1 END) inbox,
+    count(CASE WHEN folder='inbox' AND category='general' AND unread>0 THEN 1 END) unread,
+    count(CASE WHEN folder='inbox' AND category='heygen' THEN 1 END) heygen,
+    count(CASE WHEN folder='inbox' AND category='heygen' AND unread>0 THEN 1 END) heygenUnread,
+    count(CASE WHEN folder='archived' THEN 1 END) archived,count(CASE WHEN folder='spam' THEN 1 END) spam,
+    (SELECT count(DISTINCT m.thread_id) FROM mailbox_messages m JOIN mailbox_threads t ON t.id=m.thread_id WHERE m.direction='out' AND t.mailbox_address=? COLLATE NOCASE) sent FROM scoped`)
+    .bind(address,address).first<{inbox:number;unread:number;heygen:number;heygenUnread:number;archived:number;spam:number;sent:number}>();
   return {items,nextCursor:rows.length>MAILBOX_LIMITS.pageSize?items.at(-1)!.id:null,counts:counts!};
 }
 export async function mailThreadDetail(db:Database,id:string,cursor?:string,address='contact@bienvu.online'){

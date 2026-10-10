@@ -234,3 +234,55 @@ test('HTML des emails : boutons et liens actifs, scripts, formulaires et traçag
   const text=await deliver(plain('text-link','Consulter https://example.com/annonce'));assert.ok(text.result);
   const textPreview=await adminMailboxRequest(request('GET'),env,{messageId:text.result.id,html:true});assert.match(await textPreview.text(),/<a href="https:\/\/example.com\/annonce"/);
 });
+
+test('HeyGen : tri des messages anciens et nouveaux de Contact, compteurs, lecture et archivage',async t=>{
+  const {env,deliver,request,users,calls}=await fixture(t,true);
+  const received=async(key:string,sender:string,box='contact@bienvu.online',headers:string[]=[])=>{
+    const raw=plain(key,'Votre avatar est prêt · '+key,headers).replace('Client <client@example.com>',`HeyGen <${sender}>`).replace('Subject: Mon annonce','Subject: Avatar '+key);
+    const result=(await deliver(raw,sender,box)).result!;assert.ok(result);return {...result,raw};
+  };
+  // These messages already exist when the new view is first opened.
+  const root=await received('heygen-root','notifications@heygen.com'),sub=await received('heygen-sub','NoReply@EMAIL.HEYGEN.COM');
+  const ordinary=(await deliver(plain('ordinary','Une question sur mon avatar HeyGen'))).result!;
+  for(const [i,sender]of['notice@notheygen.com','notice@heygen.com.evil','receipt@stripe.com'].entries())await received('unrelated-'+i,sender);
+  const incoming=await listMailThreads(env.DB,{q:'',folder:'inbox'});
+  assert.equal(incoming.items.length,4);assert.ok(incoming.items.every(r=>r.category==='general'));
+  assert.ok(incoming.items.some(r=>r.id===ordinary.threadId));assert.equal(incoming.counts.inbox,4);assert.equal(incoming.counts.unread,4);
+  assert.equal(incoming.counts.heygen,2);assert.equal(incoming.counts.heygenUnread,2);
+  const view=await adminMailboxRequest(request('GET','?folder=heygen'),env);assert.equal(view.status,200);assert.equal(view.headers.get('cache-control'),'private, no-store');
+  const page=await view.json() as {items:{id:string;category:string}[]};assert.deepEqual(new Set(page.items.map(r=>r.id)),new Set([root.threadId,sub.threadId]));assert.ok(page.items.every(r=>r.category==='heygen'));
+  assert.equal((await listMailThreads(env.DB,{q:'ordinary',folder:'heygen'})).items.length,0);
+  assert.equal((await listMailThreads(env.DB,{q:'heygen-sub',folder:'heygen'})).items.length,1);
+  const detail=(await mailThreadDetail(env.DB,root.threadId))!;assert.equal(detail.thread.category,'heygen');
+  await changeMailThread(env.DB,root.threadId,users[0].id,{action:'read',through:detail.readThrough!});
+  const read=await listMailThreads(env.DB,{q:'',folder:'heygen'});assert.equal(read.counts.heygenUnread,1);assert.equal(read.counts.unread,4);
+  await changeMailThread(env.DB,root.threadId,users[0].id,{action:'archive'});
+  assert.equal((await listMailThreads(env.DB,{q:'',folder:'heygen'})).items.length,1);
+  assert.equal((await listMailThreads(env.DB,{q:'',folder:'archived'})).items[0].category,'heygen');
+  await received('heygen-reply','notifications@heygen.com','contact@bienvu.online',['In-Reply-To: <heygen-root@example.com>']);
+  assert.equal((await findMailThread(env.DB,root.threadId))?.folder,'inbox');assert.equal((await listMailThreads(env.DB,{q:'',folder:'heygen'})).items.length,2);
+  await changeMailThread(env.DB,sub.threadId,users[0].id,{action:'spam'});
+  await received('heygen-spam-reply','noreply@email.heygen.com','contact@bienvu.online',['References: <heygen-sub@example.com>']);
+  assert.equal((await findMailThread(env.DB,sub.threadId))?.folder,'spam');assert.equal((await listMailThreads(env.DB,{q:'',folder:'heygen'})).items.length,1);
+  await changeMailThread(env.DB,sub.threadId,users[0].id,{action:'restore'});
+  const latest=await received('heygen-future','notifications@email.heygen.com');
+  assert.ok((await listMailThreads(env.DB,{q:'',folder:'heygen'})).items.some(r=>r.id===latest.threadId));
+  assert.equal((await listMailThreads(env.DB,{q:'',folder:'all'})).items.length,7,'Le tri ne supprime aucune conversation');
+  const original=await adminMailboxRequest(request('GET'),env,{messageId:root.id,fileId:'original'});assert.equal(await original.text(),root.raw);
+  assert.equal(calls.length,0,'Le tri n’envoie aucun e-mail');
+  assert.equal((await adminMailboxRequest(request('GET','?folder=heygen',undefined,''),env)).status,401);
+});
+
+test('HeyGen : pagination, recherche et isolation de Contact par rapport aux boîtes Alex et Greg',async t=>{
+  const {env,deliver,request,cookies}=await fixture(t,true);
+  for(let i=0;i<23;i++)await deliver(plain('provider-'+i,'Notification '+i).replace('client@example.com','no-reply@email.heygen.com'),'no-reply@email.heygen.com');
+  for(const box of['alex@bienvu.online','greg@bienvu.online'])await deliver(plain('provider-private-'+box).replace('client@example.com','no-reply@email.heygen.com'),'no-reply@email.heygen.com',box);
+  const first=await listMailThreads(env.DB,{q:'',folder:'heygen'}),next=await listMailThreads(env.DB,{q:'',folder:'heygen',cursor:first.nextCursor!});
+  assert.equal(first.items.length,20);assert.equal(next.items.length,3);assert.equal(next.nextCursor,null);assert.equal(new Set([...first.items,...next.items].map(r=>r.id)).size,23);
+  assert.equal(first.counts.heygen,23);assert.equal(first.counts.inbox,0);assert.equal(first.counts.unread,0);
+  assert.equal((await listMailThreads(env.DB,{q:'Notification 22',folder:'heygen'})).items.length,1);
+  for(const box of['alex@bienvu.online','greg@bienvu.online']){const own=await listMailThreads(env.DB,{q:'',folder:'inbox',address:box});assert.equal(own.items.length,1);assert.equal(own.items[0].category,'general');assert.equal(own.counts.heygen,0);assert.equal((await listMailThreads(env.DB,{q:'',folder:'heygen',address:box})).items.length,0);}
+  assert.equal((await adminMailboxRequest(request('GET','?folder=heygen&mailbox=contact%40bienvu.online',undefined,cookies[3]),env)).status,403);
+  const greg=await adminMailboxRequest(request('GET','?folder=heygen',undefined,cookies[3]),env);assert.equal(greg.status,200);assert.equal((await greg.json() as {items:unknown[]}).items.length,0);
+  assert.equal((await listMailThreads(env.DB,{q:'',folder:'heygen',cursor:first.items[0].id,address:'greg@bienvu.online'})).items.length,0);
+});

@@ -1,13 +1,13 @@
 'use client';
 import {useEffect,useRef,useState,type FormEvent} from 'react';
-import {MailboxPage,MailThreadDetail,MailMessage,MailAttachment,MailThread,MAILBOX_LIMITS,type MailThreadAction} from '@bienvu/contracts';
+import {MailboxPage,MailThreadDetail,MailMessage,MailAttachment,MailThread,MAILBOX_LIMITS,CONTACT_MAILBOX,type MailThreadAction,type MailFolderView} from '@bienvu/contracts';
 import {editorResponse} from '../lib/editor-client';
 import {HomeIcon} from './home-icons';
 
-type Folder='inbox'|'unread'|'sent'|'archived'|'spam'|'all';
+type Folder=MailFolderView;
 type Draft={to:string;subject:string;text:string;files:MailAttachment[];key:string};
-const folders:{id:Folder;label:string;icon:'mail'|'eye'|'send'|'archive'|'trash'}[]=[{id:'inbox',label:'Boîte de réception',icon:'mail'},
-  {id:'unread',label:'Non lus',icon:'eye'},{id:'sent',label:'Envoyés',icon:'send'},{id:'archived',label:'Archives',icon:'archive'},
+const folders:{id:Folder;label:string;icon:'mail'|'eye'|'send'|'archive'|'trash'|'user'}[]=[{id:'inbox',label:'Boîte de réception',icon:'mail'},
+  {id:'unread',label:'Non lus',icon:'eye'},{id:'heygen',label:'HeyGen',icon:'user'},{id:'sent',label:'Envoyés',icon:'send'},{id:'archived',label:'Archives',icon:'archive'},
   {id:'spam',label:'Indésirables',icon:'trash'},{id:'all',label:'Tous les messages',icon:'mail'}];
 const deliveries:Record<MailMessage['delivery'],string>={received:'Reçu',queued:'En attente d’envoi',sending:'Envoi en cours',sent:'Envoyé',failed:'Envoi refusé',uncertain:'Envoi à vérifier'};
 const date=(value:string)=>new Date(value).toLocaleString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
@@ -37,6 +37,7 @@ export function AdminMailbox({revision=0}:{revision?:number}){
 }
 function MailboxInbox({revision,mailbox,draftStore,onBusy}:{revision:number;mailbox:string;draftStore:Map<string,Draft>;onBusy:(value:boolean)=>void}){
   const mailFetch=(url:string,init?:RequestInit)=>fetch(url+(url.includes('?')?'&':'?')+new URLSearchParams({mailbox}),init);
+  const visibleFolders=folders.filter(f=>f.id!=='heygen'||mailbox.toLowerCase()===CONTACT_MAILBOX);
   const [page,setPage]=useState<MailboxPage|null>(null),[detail,setDetail]=useState<MailThreadDetail|null>(null),[selected,setSelected]=useState<string|null>(null),
     [compose,setCompose]=useState(false),[folder,setFolder]=useState<Folder>('inbox'),[query,setQuery]=useState(''),[search,setSearch]=useState(''),
     [loading,setLoading]=useState(true),[detailLoading,setDetailLoading]=useState(false),[more,setMore]=useState(false),[older,setOlder]=useState(false),
@@ -69,8 +70,9 @@ function MailboxInbox({revision,mailbox,draftStore,onBusy}:{revision:number;mail
           body:JSON.stringify({action:'read',through:next.readThrough}),signal:controller.signal})));
         if(!controller.signal.aborted&&active.current===current){
           setDetail(before=>before?.thread.id===current?{...before,thread:updated}:before);
+          const unreadCounter=updated.category==='heygen'?'heygenUnread':'unread';
           setPage(before=>before?{...before,items:before.items.map(t=>t.id===current?updated:t),
-            counts:{...before.counts,unread:Math.max(0,before.counts.unread-(before.items.some(t=>t.id===current&&t.folder==='inbox'&&t.unread>0)&&updated.unread===0?1:0))}}:before);
+            counts:{...before.counts,[unreadCounter]:Math.max(0,before.counts[unreadCounter]-(before.items.some(t=>t.id===current&&t.folder==='inbox'&&t.unread>0)&&updated.unread===0?1:0))}}:before);
         }
       }
     }).catch(cause=>{if(!controller.signal.aborted)setError(cause.message);}).finally(()=>{if(!controller.signal.aborted)setDetailLoading(false);});
@@ -99,7 +101,7 @@ function MailboxInbox({revision,mailbox,draftStore,onBusy}:{revision:number;mail
     if(!selected||acting)return;setActing(true);setError('');
     try{await editorResponse(await mailFetch('/api/admin/mailbox/'+selected,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(value)}));
       if(value.action==='unread')choose(null);
-      setTick(n=>n+1);setNotice(value.action==='archive'?'Conversation archivée.':value.action==='spam'?'Conversation déplacée dans les indésirables.':value.action==='restore'?'Conversation replacée dans la boîte de réception.':'Conversation marquée comme non lue.');
+      setTick(n=>n+1);setNotice(value.action==='archive'?'Conversation archivée.':value.action==='spam'?'Conversation déplacée dans les indésirables.':value.action==='restore'?'Conversation restaurée.':'Conversation marquée comme non lue.');
     }catch(cause){setError(cause instanceof Error?cause.message:'La modification a échoué.');}finally{setActing(false);}
   }
   async function upload(files:FileList|null){
@@ -128,18 +130,20 @@ function MailboxInbox({revision,mailbox,draftStore,onBusy}:{revision:number;mail
     catch(cause){setError(cause instanceof Error?cause.message:'La relance a échoué.');}finally{setSending(false);}
   }
   function folderCount(value:Folder){if(value==='all')return null;return page?.counts[value]??0;}
+  const restoreLabel=detail?.thread.category==='heygen'?'Remettre dans HeyGen':'Remettre dans la boîte de réception';
   return <div className="admin-mailbox">
     <div className="mailbox-bar"><div><HomeIcon name="mail" size={24}/><div><strong>{page?.address??'contact@bienvu.online'}</strong><span>Vos échanges avec les clients de BienVu</span></div></div>
       <button className="admin-button admin-button-dark" type="button" disabled={!page?.enabled||sending||uploading} onClick={()=>choose(null,true)}><HomeIcon name="pencil" size={17}/>Nouveau message</button></div>
     {page&&!page.enabled&&<p className="admin-notice">La réception et l’envoi sont en cours de configuration. Les messages déjà enregistrés restent consultables.</p>}
     {error&&<p className="admin-error" role="alert">{error}</p>}{notice&&<p className="admin-notice" role="status">{notice}</p>}
     <div className={`mailbox-workspace${selected||compose?' has-selection':''}`}>
-      <aside className="mailbox-folders" aria-label="Dossiers de messagerie">{folders.map(f=><button key={f.id} type="button" aria-pressed={folder===f.id}
+      <aside className="mailbox-folders" aria-label="Dossiers de messagerie">{visibleFolders.map(f=><button key={f.id} type="button" aria-pressed={folder===f.id}
         disabled={sending||uploading} onClick={()=>{setFolder(f.id);setLoading(true);choose(null);}}><HomeIcon name={f.icon} size={18}/><span>{f.label}</span>{folderCount(f.id)!==null&&<small>{folderCount(f.id)}</small>}</button>)}</aside>
       <section className="mailbox-list" aria-label="Conversations"><label className="mailbox-search"><HomeIcon name="search" size={18}/><input type="search" maxLength={100}
         aria-label="Rechercher dans les messages" placeholder="Rechercher un message…" value={query} onChange={e=>setQuery(e.target.value)}/></label>
         <div className="mailbox-list-heading"><strong>{folders.find(f=>f.id===folder)?.label}</strong><button type="button" aria-label="Actualiser les messages" onClick={()=>setTick(n=>n+1)}><HomeIcon name="refresh" size={16}/></button></div>
-        {loading?<p className="mailbox-empty" role="status">Chargement des messages…</p>:!page?.items.length?<div className="mailbox-empty"><HomeIcon name="mail" size={30}/><strong>Aucun message</strong><span>{search?'Aucune conversation ne correspond à votre recherche.':'Vos messages apparaîtront ici dès leur réception.'}</span></div>:
+        {folder==='heygen'&&<p className="mailbox-provider-note">Les e-mails de HeyGen sont regroupés ici automatiquement.{Boolean(page?.counts.heygenUnread)&&<> {page!.counts.heygenUnread} conversation{page!.counts.heygenUnread>1?'s':''} non lue{page!.counts.heygenUnread>1?'s':''}.</>}</p>}
+        {loading?<p className="mailbox-empty" role="status">Chargement des messages…</p>:!page?.items.length?<div className="mailbox-empty"><HomeIcon name="mail" size={30}/><strong>Aucun message</strong><span>{search?'Aucune conversation ne correspond à votre recherche.':folder==='heygen'?'Les prochains e-mails de HeyGen apparaîtront ici dès leur réception.':'Vos messages apparaîtront ici dès leur réception.'}</span></div>:
           page.items.map(thread=><button type="button" key={thread.id} className={`mailbox-thread${thread.unread?' is-unread':''}${selected===thread.id?' is-selected':''}`} disabled={sending||uploading}
             aria-pressed={selected===thread.id} onClick={()=>choose(thread.id)}><span className="mailbox-thread-top"><strong>{thread.peerName||thread.peerEmail}</strong><time dateTime={thread.lastAt}>{date(thread.lastAt)}</time></span>
             <span className="mailbox-thread-subject">{thread.unread>0&&<i aria-label="Non lu"/>}{thread.subject}</span><span className="mailbox-snippet">{thread.lastDirection==='out'?'Vous : ':''}{thread.snippet||'Pièce jointe'}</span>
@@ -151,7 +155,7 @@ function MailboxInbox({revision,mailbox,draftStore,onBusy}:{revision:number;mail
           <><div className="mailbox-conversation-heading"><button type="button" className="mailbox-back" onClick={()=>choose(null)} disabled={sending||uploading} aria-label="Retour aux conversations">←</button>
             <div><h3>{compose?'Nouveau message':detail?.thread.subject??'Chargement…'}</h3><span>{compose?'Depuis '+(page?.address??'contact@bienvu.online'):detail?.thread.peerEmail}</span></div>
             {!compose&&detail&&<div className="mailbox-actions"><button type="button" title="Marquer comme non lu" aria-label="Marquer comme non lu" disabled={acting||sending||uploading} onClick={()=>void action({action:'unread'})}><HomeIcon name="mail" size={18}/></button>
-              <button type="button" title={detail.thread.folder==='inbox'?'Archiver':'Remettre dans la boîte de réception'} aria-label={detail.thread.folder==='inbox'?'Archiver':'Remettre dans la boîte de réception'} disabled={acting||sending||uploading}
+              <button type="button" title={detail.thread.folder==='inbox'?'Archiver':restoreLabel} aria-label={detail.thread.folder==='inbox'?'Archiver':restoreLabel} disabled={acting||sending||uploading}
                 onClick={()=>void action({action:detail.thread.folder==='inbox'?'archive':'restore'})}><HomeIcon name="archive" size={18}/></button>
               {detail.thread.folder!=='spam'&&<button type="button" title="Déplacer dans les indésirables" aria-label="Déplacer dans les indésirables" disabled={acting||sending||uploading} onClick={()=>void action({action:'spam'})}><HomeIcon name="trash" size={18}/></button>}</div>}
           </div>
@@ -180,7 +184,7 @@ function MailboxInbox({revision,mailbox,draftStore,onBusy}:{revision:number;mail
               <button type="submit" className="admin-button admin-button-dark" disabled={sending||uploading||!page?.enabled||!draft.text.trim()}>{sending?'Enregistrement…':'Envoyer'}<HomeIcon name="send" size={17}/></button></div>
             <input ref={fileInput} type="file" multiple hidden onChange={e=>void upload(e.target.files)}/>
           </form>}
-          {detail?.thread.folder==='spam'&&<p className="mailbox-empty">Replacez cette conversation dans la boîte de réception pour y répondre.</p>}
+          {detail?.thread.folder==='spam'&&<p className="mailbox-empty">Replacez cette conversation dans {detail.thread.category==='heygen'?'HeyGen':'la boîte de réception'} pour y répondre.</p>}
         </>}
       </section>
     </div>

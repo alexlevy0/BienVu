@@ -1,5 +1,5 @@
 import {z} from 'zod';
-import {configuredMailboxes,PERSONAL_MAILBOXES,EntityId,MailSendRequest,MailThreadAction,MailboxPage,MAILBOX_LIMITS,mailFileName,mailMessageIds,type MailAttachment} from '@bienvu/contracts';
+import {configuredMailboxes,PERSONAL_MAILBOXES,EntityId,MailSendRequest,MailThreadAction,MailboxPage,MailFolderView,MAILBOX_LIMITS,mailFileName,mailMessageIds,type MailAttachment} from '@bienvu/contracts';
 import {listMailThreads,mailThreadDetail,findMailThread,findMailMessage,insertMailThread,insertMailMessage,changeMailThread,
   mailAttachments,mailMessageView,type MailMessageRow,type StoredMailAttachment} from '@bienvu/db';
 import type {AuthEnvironment} from './auth';
@@ -154,7 +154,7 @@ export async function adminMailboxRequest(request:Request,env:MailboxEnv,target?
         if(!query.success)throw new RequestFailure('VALIDATION_ERROR');
         const detail=await mailThreadDetail(env.DB,id(target.threadId),query.data.cursor,mailbox);if(!detail)throw new RequestFailure('NOT_FOUND');return Response.json(detail);
       }
-      const query=z.object({q:z.string().max(100).default(''),folder:z.enum(['inbox','unread','archived','spam','sent','all']).default('inbox'),cursor:EntityId.optional()})
+      const query=z.object({q:z.string().max(100).default(''),folder:MailFolderView.default('inbox'),cursor:EntityId.optional()})
         .strict().safeParse(Object.fromEntries(params));if(!query.success)throw new RequestFailure('VALIDATION_ERROR');
       return Response.json(MailboxPage.parse({address:mailbox,mailboxes,enabled:mailboxEnabled(env),...await listMailThreads(env.DB,{...query.data,address:mailbox})}));
     }
