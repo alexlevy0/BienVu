@@ -1,5 +1,15 @@
 # BienVu — suivi des sprints
 
+### 10/10/2026 — Recharges : accès direct à Stripe
+
+Les achats ponctuels de **20 / 50 / 100 crédits** suivent le parcours simplifié des abonnements : bouton d’achat actif sans case intermédiaire, ouverture de Stripe après connexion et liens conditions/confidentialité conservés près du bouton. Verrou immédiat contre les doubles clics, choix du pack bloqué pendant l’ouverture et même clé à la reprise après erreur, y compris avec un stockage navigateur malformé ou indisponible. Le retour de confirmation ne déverrouille pas un achat en cours.
+
+L’API accepte `{pack}` ; `accepted:true` reste toléré pour les anciens onglets sans être considéré comme une preuve de consentement. Prix serveur, droits de facturation, paramètres Stripe, journal de paiement et attribution des crédits uniquement après paiement vérifié restent inchangés. Aucun changement de tarif, d’abonnement, de mode de paiement ou de migration.
+
+**24/24 tests ciblés** (recharges, Stripe, report et droits d’agence), types web/tests, frontières **488 fichiers**, build OpenNext et dry-run Wrangler réussis. Composants réels dans Chrome à **1536/900/390/320 px** : trois packs redirigés vers un Checkout simulé, connexion des visiteurs, accès membre refusé, doubles clics et reprises vérifiés. Captures inspectées, aucun débordement. Tests de paiement sur fixtures, aucun achat ni appel Stripe réel pour cette recette. Preuves ignorées : `evidence/local/topups-direct-checkout-2026-10-10/` et `evidence/topups-direct-checkout/`.
+
+Web publié à **100 %**, version **`aae46d8f-68cd-472f-aacd-3e08b6780600`**, **58 bindings conservés à l’identique**. `/abonnement` en 200 sans case de recharge, POST recharge anonyme en 401, JavaScript/CSS distants identiques au build par SHA-256. Aucun commit ou push à cette étape.
+
 ### 10/10/2026 — Checkout : reprendre et changer d’offre sans blocage
 
 Diagnostic réel : une session **Solo** ouverte et non payée retenait le verrou d’achat pendant 45 minutes ; choisir Agence renvoyait un conflit que l’actualisation ne résolvait pas. Pas d’abonnement existant sur ce compte. Le serveur relit désormais la session Stripe et contrôle son agence, son client et son mode avant toute reprise. Pour la même offre, il reprend le lien existant ; pour une autre, il expire le lien Stripe précédent avant de libérer son journal et de préparer le nouveau Checkout. Une création incertaine peut être reprise depuis un autre onglet avec sa clé Stripe d’origine.

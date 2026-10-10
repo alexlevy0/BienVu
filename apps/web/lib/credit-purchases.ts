@@ -6,7 +6,8 @@ import {RequestFailure} from './http';
 import {readChargeAccounting,accountingMutations} from './stripe-accounting';
 
 export const stripeId=(value:string|{id:string}|null|undefined)=>typeof value==='string'?value:value?.id??null;
-const packet=z.object({pack:z.enum(['pack20v2','pack50v2','pack100v2']),accepted:z.literal(true)}).strict();
+// Tolerate older open tabs without treating this legacy field as a consent record.
+const packet=z.object({pack:z.enum(['pack20v2','pack50v2','pack100v2']),accepted:z.literal(true).optional()}).strict();
 export async function createTopupCheckout(env:BillingEnv,agencyId:string,email:string,origin:string,input:unknown,key:string,client=stripeClient(env)){
  const parsed=packet.safeParse(input),mode=billingMode(env);
  if(!parsed.success||!EntityId.safeParse(agencyId).success||!/^[-a-zA-Z0-9_]{16,128}$/.test(key))throw new RequestFailure('VALIDATION_ERROR');

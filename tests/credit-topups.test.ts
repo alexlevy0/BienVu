@@ -46,14 +46,19 @@ async function fixture(t:{after(fn:()=>Promise<void>):void},label:string,modern=
 test('Nouvelles recharges : 20, 50 et 100 crédits à 1 € HT ; commandes antérieures inchangées',async t=>{
  const f=await fixture(t,'topup-new-prices',true),amounts:number[]=[];
  f.client.checkout.sessions.create=async params=>{amounts.push(params!.line_items![0].price_data!.unit_amount!);return {id:'cs_new_price_'+amounts.length,url:'https://checkout.stripe.com/c/pay/new-price'} as Stripe.Response<Stripe.Checkout.Session>;};
- for(const pack of creditPacks){await f.DB.exec('DELETE FROM billing_topup_checkouts');await createTopupCheckout(f.env,f.agencyId,'test@example.com','https://bienvu.online',{pack:pack.code,accepted:true},'new-pack-price-'+pack.code,f.client);
+ for(const pack of creditPacks){await f.DB.exec('DELETE FROM billing_topup_checkouts');await createTopupCheckout(f.env,f.agencyId,'test@example.com','https://bienvu.online',{pack:pack.code},'new-pack-price-'+pack.code,f.client);
   assert.deepEqual(await f.DB.prepare('SELECT pack,credits,price_cents AS cents FROM billing_topup_checkouts').first(),{pack:pack.code,credits:pack.credits,cents:pack.priceCents});}
  assert.deepEqual(amounts,[2000,5000,10000]);await assert.rejects(createTopupCheckout(f.env,f.agencyId,'test@example.com','https://bienvu.online',{pack:'pack100',accepted:true},'legacy-new-purchase',f.client));
  assert.equal((await f.DB.prepare('SELECT count(*) n FROM credit_topups').first<{n:number}>())!.n,0,'Checkout alone never creates credits');
 });
-test('Recharge : consentement, prix serveur, paiement vérifié, événements concurrents et plan inchangé',async t=>{
- const f=await fixture(t,'topup-payment',true);await assert.rejects(createTopupCheckout(f.env,f.agencyId,'test@example.com','https://bienvu.online',{pack:'pack20v2',accepted:false},'wallet-invalid-key',f.client));
- await createTopupCheckout(f.env,f.agencyId,'test@example.com','https://bienvu.online',{pack:'pack20v2',accepted:true},'wallet-checkout-key01',f.client);
+test('Recharge : achat direct, prix serveur, paiement vérifié, événements concurrents et plan inchangé',async t=>{
+ const f=await fixture(t,'topup-payment',true),create=f.client.checkout.sessions.create;let creations=0;
+ f.client.checkout.sessions.create=async(params,options)=>{creations++;assert.equal(options?.idempotencyKey,`bienvu:test:topup:${f.agencyId}:wallet-checkout-key01`);return create(params,options);};
+ for(const input of [{pack:'pack20v2',accepted:false},{pack:'pack20v2',priceCents:1},{pack:'pack20v2',credits:999}])await assert.rejects(createTopupCheckout(f.env,f.agencyId,'test@example.com','https://bienvu.online',input,'wallet-invalid-key',f.client));
+ await assert.rejects(createTopupCheckout(f.env,f.agencyId,'test@example.com','https://bienvu.online',{pack:'pack20v2'},'bad-key',f.client));assert.equal(creations,0);
+ const checkout=await createTopupCheckout(f.env,f.agencyId,'test@example.com','https://bienvu.online',{pack:'pack20v2'},'wallet-checkout-key01',f.client);
+ assert.deepEqual(await createTopupCheckout(f.env,f.agencyId,'test@example.com','https://bienvu.online',{pack:'pack20v2',accepted:true},'wallet-checkout-key01',f.client),checkout,'Un ancien onglet reprend le même paiement');assert.equal(creations,1);
+ assert.equal((await creditBalance(f.DB,f.agencyId)).available,2,'Ouvrir Stripe ne crédite pas le portefeuille');
  f.session.payment_status='unpaid';await processStripeEvent(f.env,f.event('evt_unpaid'),'1'.repeat(64),f.client);assert.equal((await creditBalance(f.DB,f.agencyId)).available,2);
  f.session.payment_status='paid';f.session.amount_subtotal=1999;await assert.rejects(processStripeEvent(f.env,f.event('evt_bad_amount'),'2'.repeat(64),f.client));f.session.amount_subtotal=2000;
  f.session.metadata.agencyId='foreign';await assert.rejects(processStripeEvent(f.env,f.event('evt_foreign'),'3'.repeat(64),f.client));f.session.metadata.agencyId=f.agencyId;
