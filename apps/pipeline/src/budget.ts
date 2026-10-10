@@ -27,10 +27,11 @@ export function summary(b:Budget) {
   return {...b,...budgetLimits(b),engagedCents:engaged,remainingEnvelopeCents:Math.max(0,budgetLimits(b).envelopeCents-engaged),alert:engaged>=2000,
     note:'Réservations conservatrices, échecs inclus. Aucun plafond fournisseur garanti. Les allocations partagées ne sont pas soustraites.'};
 }
-export function containerGrossUsd(cpuSeconds:number,uptimeSeconds:number,instanceType:'standard-2'|'standard-3'='standard-2') {
+export function containerGrossUsd(cpuSeconds:number,uptimeSeconds:number,instanceType:'standard-2'|'standard-3'|'standard-4'='standard-2') {
   // cpuSeconds cumule l'utilisation active de tous les vCPU. La RAM et le
   // disque provisionnés sont facturés pendant toute la durée de fonctionnement.
   if(!Number.isFinite(cpuSeconds)||!Number.isFinite(uptimeSeconds)||cpuSeconds<0||uptimeSeconds<0)throw new Error('INVALID_MEASUREMENT');
-  const ramGiB=instanceType==='standard-3'?8:6,diskGB=instanceType==='standard-3'?16:12;
+  const ramGiB=instanceType==='standard-4'?12:instanceType==='standard-3'?8:6,
+    diskGB=instanceType==='standard-4'?20:instanceType==='standard-3'?16:12;
   return cpuSeconds*0.000020+uptimeSeconds*ramGiB*0.0000025+uptimeSeconds*diskGB*0.00000007;
 }

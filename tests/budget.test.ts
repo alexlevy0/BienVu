@@ -27,6 +27,13 @@ test('rendu à deux cœurs : CPU cumulé, 8 GiB et 16 GB, sans réévaluer les a
   assert.equal(containerGrossUsd(120,120),containerGrossUsd(120,120,'standard-2'));
   assert.throws(()=>containerGrossUsd(240,NaN,'standard-3'),/INVALID_MEASUREMENT/);
 });
+test('rendu à quatre cœurs : CPU actif cumulé, 12 GiB et 20 GB, anciens calculs préservés',()=>{
+  assert.ok(Math.abs(containerGrossUsd(480,120,'standard-4')-0.013368)<1e-10);
+  assert.ok(Math.abs(containerGrossUsd(190.77,70.634294185,'standard-4')-0.006033316837409)<1e-10);
+  assert.ok(Math.abs(containerGrossUsd(0,120,'standard-4')-0.003768)<1e-10);
+  assert.equal(containerGrossUsd(120,120),containerGrossUsd(120,120,'standard-2'));
+  assert.throws(()=>containerGrossUsd(Infinity,120,'standard-4'),/INVALID_MEASUREMENT/);
+});
 test('hausse explicite à 40 € : historique préservé, coupure 35 € et marge de 5 €',()=>{
   const old={...fresh(),fixedAndOtherCents:2425,committedCents:50,attempts:1,days:{'2026-09-27':1}};
   assert.throws(()=>reserve(old,now),/BUDGET_LIMIT/);
