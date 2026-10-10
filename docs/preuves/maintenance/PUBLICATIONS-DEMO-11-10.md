@@ -1,0 +1,23 @@
+# Calendrier public illustré — 11 octobre 2026
+
+L’aperçu déconnecté de `/publications` contient désormais **24 publications d’exemple**, réparties sur **23 dates** de chaque mois, contre trois auparavant. Appartement parisien, villa avec piscine, loft lyonnais et maison avec jardin à Bordeaux : les exemples déclinent les quatre vidéos publiques de démonstration en visites, coups de cœur, détails et inspirations. Les publications concernent Instagram, Facebook ou les deux. Les dates restent valides en février ; les états « Publiée » et « Programmée » suivent la date de consultation. Deux exemples partagent une date pour montrer le regroupement de plusieurs publications.
+
+Les cases occupées affichent en fond la photo de leur première publication. Le dégradé, le numéro de date et les titres préservent la lisibilité ; des repères de réseau, le format et le nombre de publications complètent les cartes. Sur mobile, le numéro et le compteur restent visibles et les titres détaillés sont accessibles dans la liste après sélection d’une date. Une légende annonce le volume d’exemples et explique l’interaction. Le clic conserve le filtrage par jour, les boutons parcourent les mois, les filtres et la prévisualisation vidéo restent utilisables.
+
+Les fonds et miniatures utilisent les variantes WebP **320 px** existantes, avec chargement différé et décodage asynchrone. Plusieurs cases réutilisent les mêmes quatre fichiers, servis depuis les assets publics. Aucune vidéo n’est chargée avant une prévisualisation volontaire. Aucune collecte de données privées, création de publication, connexion Meta ou génération IA n’est ajoutée. Le calendrier connecté conserve ses données et son affichage compact ; les illustrations sont limitées au mode démo.
+
+## Vérifications
+
+Deux tests existants `tests/auth-navigation.test.ts` passent après actualisation du volume d’exemples : reprise de connexion sûre, contrat des publications, dates dans le mois choisi, identifiants distincts, médias publics et aucune connexion réelle ni URL de publication. La sonde studio invité existante tient compte des 24 exemples.
+
+`node scripts/probe-publications-demo-ui.mjs` exerce les vrais composants sur cinq largeurs (320, 390, 768, 1 100 et 1 536 px), avec un contexte de compte contrôlé et des fichiers médias réels. **24 exemples / 23 cases illustrées**, images décodées, aucun débordement, aucune vidéo initiale, aucune requête sociale ou média de génération privée en mode invité. Navigation des mois, filtres, état vide, date avec deux publications, retour à tout le mois, lecture vidéo et retour de connexion passent. Le passage au compte de recette remplace les exemples par une seule publication privée sans fond de démo. Captures desktop/mobile inspectées.
+
+TypeScript web et tests, frontières sur 508 fichiers et build OpenNext validés. Les essais utilisent les médias publics et des fixtures ; aucune génération, publication sociale, import, dépense fournisseur ou débit de crédit BienVu.
+
+## Publication et contrôle du site
+
+Configuration opérateur réconciliée avec la production avant préparation des sourcemaps privées Next/Worker. Déploiement du Worker préparé avec `--keep-vars --strict` : version **`7bda7be8-e91d-4157-8b6f-bd50308e608f`**, **100 % du trafic**, **60 bindings conservés**, **330 assets sans sourcemap publique**. Chunk du calendrier téléchargé et comparé au bundle local ; page publique 200, API sociale privée 401, quatre posters WebP 320 px disponibles. Budget et configuration du renderer quatre cœurs comparés avant/après, identiques. Aucune migration ni modification du pipeline.
+
+`BIENVU_PUBLICATIONS_URL=https://bienvu.online node scripts/probe-publications-demo-ui.mjs` passe à 1 536 et 390 px : 24 exemples, 23 dates illustrées, fonds décodés, filtres, navigation des mois, date avec deux publications, vidéo publique prévisualisée puis arrêtée et absence de débordement. Aucune requête sociale ou de génération privée par l’invité et aucune vidéo initiale. Les posters de cette page utilisent bien les variantes 320 px ; le contrôle porte sur les éléments du calendrier, pour ne pas confondre ses images avec les médias préchargés par les autres composants du studio. Captures du site inspectées. Le contrôle du calendrier connecté utilise le contexte synthétique local, sans accès à une agence réelle.
+
+Preuves privées ignorées : `evidence/local/publications-demo/`. Configuration opérateur : `apps/web/wrangler.staging.publications-demo.jsonc`. Pas de migration. Retour arrière : rétablir la version précédente du Worker web ; aucune donnée métier modifiée par cette livraison.

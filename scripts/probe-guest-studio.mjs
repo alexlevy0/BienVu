@@ -119,7 +119,7 @@ try {
     }
 
     await page.goto({url:base+'/publications?post=foreign-private-fixture',timeout:60000,options:{waitUntil:'load'}});
-    await wait("document.querySelector('.social-preview-notice')&&document.querySelectorAll('.social-calendar-days>button').length===42&&document.querySelectorAll('.social-publication-card').length===3");
+    await wait("document.querySelector('.social-preview-notice')&&document.querySelectorAll('.social-calendar-days>button').length===42&&document.querySelectorAll('.social-publication-card').length===24");
     await evaluate('document.fonts.ready');
     assert.equal(await evaluate('document.documentElement.scrollWidth>innerWidth'),false);
     assert.equal((await requests()).filter(row=>row.path?.startsWith('/api/social/')).length,0);
@@ -129,7 +129,7 @@ try {
     await evaluate("document.querySelector('[aria-label=\"Mois suivant\"]').click()");
     await wait(`document.querySelector('.social-month-navigation h2').textContent!==${JSON.stringify(currentMonth)}`);
     await evaluate("[...document.querySelectorAll('.social-filters button')].find(b=>b.textContent==='À venir').click()");
-    await wait("document.querySelectorAll('.social-publication-card').length===3");
+    await wait("document.querySelectorAll('.social-publication-card').length===24");
     await evaluate("document.querySelector('.social-month-navigation .social-text-button').click();document.querySelector('.social-filters button').click()");
     await wait(`document.querySelector('.social-month-navigation h2').textContent===${JSON.stringify(currentMonth)}`);
     await evaluate("[...document.querySelectorAll('.social-calendar-days>button')].find(b=>b.querySelector('small')).click()");

@@ -11,7 +11,9 @@ test('la reprise après connexion reste dans le studio et conserve les paramètr
 });
 test('l’aperçu du calendrier utilise seulement les médias publics et des dates du mois choisi', () => {
   const posts = socialCalendarPreview(new Date(2028,1,1), new Date(2028,1,16));
-  assert.equal(posts.length, 3);
+  assert.equal(posts.length, 24);
+  assert.equal(new Set(posts.map(post=>post.id)).size,posts.length);
+  assert.equal(new Set(posts.map(post=>post.thumbnail)).size,4);
   for (const post of posts) {
     SocialPublication.parse(post);
     assert.equal(new Date(post.scheduledAt).getMonth(), 1);
@@ -21,5 +23,5 @@ test('l’aperçu du calendrier utilise seulement les médias publics et des dat
     assert.ok(post.targets.every(target => target.connectionId === null && target.permalink === null));
   }
   assert.equal(posts[0].targets[0].status, 'published');
-  assert.equal(posts[2].targets[0].status, 'scheduled');
+  assert.equal(posts.at(-1)!.targets[0].status, 'scheduled');
 });
