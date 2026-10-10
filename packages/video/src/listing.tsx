@@ -5,6 +5,7 @@ import {contrastInk, displayArea, displayLocation, displayPrice, displayRooms, f
 import {cameraMotion} from './camera-motion';
 import {HorizontalPhotoScene} from './horizontal';
 import {EditorFilm} from './editor';
+import {AvatarOverlay} from './avatar';
 import {MapOverlay} from './map';
 
 // Ces URL sont résolues uniquement par le renderer Node vers son serveur
@@ -235,6 +236,7 @@ export function ListingFilm(props: ListingVideoProps) {
         transformOrigin:'left center',transform:`scaleX(${f / Math.max(1,at-1)})`}}/></>}
     </>}
     <MapOverlay manifest={m} media={props.media} moduleUrl={props.maplibreModuleUrl} workerUrl={props.maplibreWorkerUrl}/>
+    <AvatarOverlay manifest={m} media={props.media}/>
     {m.rights.watermarked && (!horizontal||mapFrame(m.map?.settings,at,f)!==null) && <div style={{position:'absolute',left:editorial?235:262,top:editorial?785:f >= scenes.at(-1)!.from ? 540 : 780,transform:'rotate(-14deg)',
       background:'#132a23d9',border:'2px solid #ffffffa0',borderRadius:12,padding:'18px 30px',color:'#fff',
       fontWeight:750,fontSize:35,letterSpacing:2}}>BIENVU · VIDÉO D’ESSAI</div>}

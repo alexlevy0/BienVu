@@ -21,17 +21,21 @@ export async function creditBalance(db:Database,agencyId:string,now=Date.now()){
   EntityId.parse(agencyId);const grant=await monthlyCreditGrant(db,agencyId,now),at=new Date(now).toISOString();
   const usage=grant?await db.prepare('SELECT quota_limit AS total,reserved,consumed FROM allocations WHERE id=? AND agency_id=?')
     .bind(grant.id,agencyId).first<{total:number;reserved:number;consumed:number}>():null;
-  const sources=await db.prepare(`SELECT coalesce(sum(IIF(purchased=1,available,0)),0) purchased,
-    coalesce(sum(IIF(purchased=0,available,0)),0) monthly FROM spendable_credit_sources
+  const sources=await db.prepare(`SELECT coalesce(sum(IIF(purchased=1 AND rollover=0,available,0)),0) purchased,
+    coalesce(sum(IIF(purchased=0 OR rollover=1,available,0)),0) monthly,
+    coalesce(sum(IIF(rollover=1,available,0)),0) carried,
+    coalesce(sum(IIF(rollover=1,quota_limit,0)),0) carryTotal,
+    coalesce(sum(IIF(rollover=1,reserved,0)),0) carryReserved,
+    coalesce(sum(IIF(rollover=1,consumed,0)),0) carryConsumed FROM spendable_credit_sources
     WHERE agency_id=? AND enabled=1 AND valid_from<=? AND valid_until>? AND (purchased=1 OR id=?)`)
-    .bind(agencyId,at,at,grant?.id??'none').first<{purchased:number;monthly:number}>();
+    .bind(agencyId,at,at,grant?.id??'none').first<{purchased:number;monthly:number;carried:number;carryTotal:number;carryReserved:number;carryConsumed:number}>();
   const wallet=await db.prepare(`SELECT coalesce(sum(a.quota_limit),0) total,coalesce(sum(a.reserved),0) reserved,coalesce(sum(a.consumed),0) consumed
     FROM allocations a JOIN credit_topups t ON t.allocation_id=a.id AND t.agency_id=a.agency_id
     WHERE a.agency_id=? AND t.mode=(SELECT mode FROM credit_payment_policy WHERE id=1) AND a.valid_from<=? AND a.valid_until>?`)
     .bind(agencyId,at,at).first<{total:number;reserved:number;consumed:number}>();
-  return {available:(sources?.monthly??0)+(sources?.purchased??0),reserved:(usage?.reserved??0)+(wallet?.reserved??0),
-    consumed:(usage?.consumed??0)+(wallet?.consumed??0),total:(usage?.total??0)+(wallet?.total??0),
-    renewalAt:grant?.renewalAt??null,kind:grant?.kind??(wallet?.total?'paid':null),purchasedAvailable:sources?.purchased??0,monthlyAvailable:sources?.monthly??0};
+  return {available:(sources?.monthly??0)+(sources?.purchased??0),reserved:(usage?.reserved??0)+(wallet?.reserved??0)+(sources?.carryReserved??0),
+    consumed:(usage?.consumed??0)+(wallet?.consumed??0)+(sources?.carryConsumed??0),total:(usage?.total??0)+(wallet?.total??0)+(sources?.carryTotal??0),
+    renewalAt:grant?.renewalAt??null,kind:grant?.kind??(wallet?.total?'paid':null),purchasedAvailable:sources?.purchased??0,monthlyAvailable:sources?.monthly??0,...(sources?.carried?{rolloverAvailable:sources.carried}:{})};
 }
 export async function creditHistory(db:Database,agencyId:string,cursor?:string,now=Date.now()){
   EntityId.parse(agencyId);let time='9999',id='~';
@@ -39,9 +43,9 @@ export async function creditHistory(db:Database,agencyId:string,cursor?:string,n
     time=Timestamp.parse(parts[0]);id=EntityId.parse(parts[1]);}catch{throw Error('INVALID_CREDIT_CURSOR');}}
   const result=await db.prepare(`SELECT json_group_array(json(record)) AS data FROM
     (SELECT json_object('id',g.job_id,'title',coalesce(json_extract(i.result_json,'$.facts.title.value'),'Votre annonce'),
-      'at',g.created_at,'status',j.status,'reserved',r.credit_amount,
-      'used',IIF(g.credit_version=1 AND g.anonymous_session_id IS NOT NULL,IIF(j.status='ready',1,0),r.credit_used),
-      'refunded',IIF(j.status IN ('ready','failed'),r.credit_amount-IIF(g.credit_version=1 AND g.anonymous_session_id IS NOT NULL,IIF(j.status='ready',1,0),r.credit_used),0),
+      'at',g.created_at,'status',j.status,'reserved',r.credit_amount+g.avatar_credits+g.avatar_extra_credits,
+      'used',IIF(g.credit_version=1 AND g.anonymous_session_id IS NOT NULL,IIF(j.status='ready',1,0),r.credit_used)+(SELECT coalesce(sum(consumed),0) FROM avatar_credit_parts WHERE job_id=g.job_id),
+      'refunded',IIF(j.status IN ('ready','failed'),r.credit_amount+g.avatar_credits+g.avatar_extra_credits-(SELECT coalesce(sum(consumed),0) FROM avatar_credit_parts WHERE job_id=g.job_id)-IIF(g.credit_version=1 AND g.anonymous_session_id IS NOT NULL,IIF(j.status='ready',1,0),r.credit_used),0),
       'animations',IIF(g.reuse_pricing=1 AND j.status='failed',r.credit_used,max(0,r.credit_used-1)),'gift',IIF(g.credit_version=1 AND g.anonymous_session_id IS NOT NULL,json('true'),json('false'))) AS record
       FROM generation_runs g JOIN jobs j ON j.id=g.job_id JOIN reservations r ON r.job_id=g.job_id
       LEFT JOIN listing_imports i ON i.id=j.listing_id AND i.agency_id=g.agency_id
@@ -65,6 +69,19 @@ export async function creditGrant(db:Database,agencyId:string,now=Date.now()):Pr
 }
 async function monthlyCreditGrant(db:Database,agencyId:string,now=Date.now()):Promise<CreditGrant|null> {
   const at=new Date(now).toISOString();
+  // Snapshot only after the paid period has begun. Prepaid future invoices must
+  // not copy credits which the agency can still spend in the previous period.
+  await db.prepare(`INSERT INTO credit_rollover_links(allocation_id,agency_id,previous_allocation_id,base_credits,carried,created_at)
+    SELECT current.id,current.agency_id,previous.id,receipt.credits,
+      IIF(previous.id IS NULL,0,max(0,min(receipt.credits,previous_receipt.credits-previous.reserved-previous.consumed,previous.available))),?
+    FROM allocations current JOIN billing_invoices i ON i.allocation_id=current.id JOIN financial_receipts receipt ON receipt.invoice_id=i.id
+    LEFT JOIN billing_invoices pi ON pi.agency_id=i.agency_id AND pi.subscription_id=i.subscription_id AND pi.mode=i.mode AND pi.period_end=i.period_start
+    LEFT JOIN base_spendable_credit_sources previous ON previous.id=pi.allocation_id AND previous.enabled=1
+    LEFT JOIN financial_receipts previous_receipt ON previous_receipt.invoice_id=pi.id
+    WHERE current.agency_id=? AND current.valid_from<=? AND current.valid_until>?
+      AND i.mode=(SELECT mode FROM credit_payment_policy WHERE id=1) AND i.plan IN ('solo','agence','equipe','reseau')
+      AND receipt.disputed=0 AND receipt.reversed_credits=0 AND NOT EXISTS(SELECT 1 FROM credit_rollover_links l WHERE l.allocation_id=current.id)
+    ON CONFLICT(allocation_id) DO NOTHING`).bind(at,agencyId,at,at).run();
   const paid=await db.prepare(`SELECT a.id,a.kind,max(0,a.quota_limit-a.reserved-a.consumed) AS remaining,a.valid_until AS renewalAt,1 AS enabled FROM allocations a JOIN billing_invoices i ON i.allocation_id=a.id WHERE a.agency_id=? AND a.valid_from<=? AND a.valid_until>? AND i.mode=(SELECT mode FROM credit_payment_policy WHERE id=1) ORDER BY a.valid_from DESC LIMIT 1`).bind(agencyId,at,at).first<CreditGrant>();
   if(paid)return paid;
   const legacy=await db.prepare(`SELECT a.id,a.kind,max(0,a.quota_limit-a.reserved-a.consumed) AS remaining,a.valid_until AS renewalAt,g.enabled

@@ -1218,6 +1218,8 @@ h1{
 .generation-steps {display:flex;flex-wrap:wrap;gap:8px;list-style:none;padding:0;}
 .generation-steps li {border:1px solid #b6cabc;border-radius:24px;padding:8px 14px;}
 .generation-steps [aria-current=step] {background:#214f43;color:white;}
+.generation-steps .step-done {background:#e8eee2;color:#35423a;}
+.generation-steps .step-skipped {border-style:dashed;color:#747b72;}
 .generated-video {display:block;width:min(100%,360px);max-height:70vh;aspect-ratio:9/16;background:#14261e;border-radius:12px;margin:20px 0;}
 .generation-history {max-width:900px;}
 @media(max-width:600px){.generation-progress{padding:16px}.generation-steps li{font-size:.8rem;padding:6px 10px}}

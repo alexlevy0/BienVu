@@ -69,7 +69,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   const guestManualBusy=trial.preparingManual||Boolean(trial.pendingManual);
   const busy = screen.kind === 'sending' || screen.kind==='extracting' || manualBusy||guestManualBusy;
   const canGenerate = Boolean(me?.rights.generationEnabled);
-  const creditCost=screen.kind==='manual'?manualCredits:generationCreditCost(guestSettings);
+  const creditCost=screen.kind==='manual'?manualCredits:generationCreditCost(guestSettings,durationSeconds);
   const noCredits = !editingProperty && canGenerate && (me?.rights.developmentRemaining??0)<creditCost;
   const importPaused = Boolean(me?.rights.importRetryAt);
   const manual = screen.kind === 'manual';
@@ -328,8 +328,11 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
       if(pendingImport.current?.url!==parsed.data){pendingImport.current={url:parsed.data,key:crypto.randomUUID()};
         sessionStorage.setItem('bienvu:url-import-request',JSON.stringify(pendingImport.current));}
       const response=await fetch('/api/imports',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':pendingImport.current.key},body:JSON.stringify({url:parsed.data})});
-      const imported=await response.json() as {id?:string;status?:string;draft?:CreationDraftView;errorCode?:string;error?:{message?:string}};
-      if(!response.ok)throw new Error(imported.error?.message??'La lecture de l’annonce a été interrompue.');
+      const imported=await response.json() as {id?:string;status?:string;draft?:CreationDraftView;errorCode?:string;error?:{code?:string;message?:string}};
+      if(!response.ok){
+        if(imported.error?.code==='IMPORT_BUDGET_LIMIT'){pendingImport.current=null;sessionStorage.removeItem('bienvu:url-import-request');}
+        throw new Error(imported.error?.message??'La lecture de l’annonce a été interrompue.');
+      }
       if(imported.status==='failed'){
         pendingImport.current=null;sessionStorage.removeItem('bienvu:url-import-request');
         throw new Error(imported.errorCode&&Object.hasOwn(publicErrors,imported.errorCode)
@@ -415,9 +418,12 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
       }
       const response=await fetch('/api/imports',{method:'POST',headers:{'Content-Type':'application/json',
         'Idempotency-Key':pendingImport.current.key},body:JSON.stringify({url:parsed.data})});
-      const imported=await response.json() as {id?:string;status?:string;errorCode?:string|null;draft?:CreationDraftView|null;error?:{message?:string}};
+      const imported=await response.json() as {id?:string;status?:string;errorCode?:string|null;draft?:CreationDraftView|null;error?:{code?:string;message?:string}};
       if(interactionVersion.current!==version||currentOwner.current!==owner)return;
-      if(!response.ok)throw new Error(imported.error?.message??'L’import a été interrompu. Réessayez.');
+      if(!response.ok){
+        if(imported.error?.code==='IMPORT_BUDGET_LIMIT'){pendingImport.current=null;sessionStorage.removeItem('bienvu:url-import-request');}
+        throw new Error(imported.error?.message??'L’import a été interrompu. Réessayez.');
+      }
       if(imported.status==='failed'){pendingImport.current=null;sessionStorage.removeItem('bienvu:url-import-request');}
       if(imported.status==='needs_input'&&imported.draft){
         startFresh.current=true;forget();setImportDraft(imported.draft);setDescription(imported.draft.data.fields.description??'');

@@ -1,5 +1,5 @@
-import {publicErrors,rebalanceEditorClips,MUSIC_LIMITS,type EditorDocument,type PublicErrorCode,type VideoCustomization,type PhotoAsset} from '@bienvu/contracts';
-export type EditorResources={version:number;sourceKey:string;cost:number;animations:{slot:number;url:string}[];availableAnimations:{slot:number;url:string}[]};
+import {publicErrors,rebalanceEditorClips,MUSIC_LIMITS,type EditorDocument,type PublicErrorCode,type VideoCustomization,type PhotoAsset,type AvatarPreviewClip} from '@bienvu/contracts';
+export type EditorResources={avatars?:AvatarPreviewClip[];avatarVoiceId?:string;version:number;sourceKey:string;cost:number;animations:{slot:number;url:string}[];availableAnimations:{slot:number;url:string}[]};
 // Visual/text edits must not replace retained videos with stills while saving.
 // A different source photo or format does invalidate the cached files.
 export function editorMediaSourcesKey(settings:VideoCustomization,photos:PhotoAsset[]){

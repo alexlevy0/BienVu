@@ -1,4 +1,4 @@
-import {ImportFailure, importFailureReason, parseImportResourceHeader} from '@bienvu/contracts';
+import {ImportFailure, errorCodes, importFailureReason, parseImportResourceHeader} from '@bienvu/contracts';
 import {IMPORT_LIMITS, readLimited, type ImportTransport} from '@bienvu/importers';
 import {RequestFailure} from './http';
 import type {PhotoNormalizer} from './manual-listings';
@@ -49,7 +49,13 @@ export function importPorts(request: Request, env: HostedEnv, agencyId: string) 
   if (mode === 'local') return {transport: localImportTransport(request, env), mode};
   let id = '';
   const transport: ImportTransport = {async load(url, kind, _hosts, signal, maxBytes) {
-    const response = await hostedCall(env, agencyId, id, '/resource', JSON.stringify({url, kind, maxBytes}), 'application/json', signal);
+    let response: Response;
+    try {response = await hostedCall(env, agencyId, id, '/resource', JSON.stringify({url, kind, maxBytes}), 'application/json', signal);}
+    catch (error) {
+      if (error instanceof RequestFailure && (error.code === 'IMPORT_BUDGET_LIMIT' || error.code === 'IMPORT_RESOURCE_LIMIT'))
+        throw new ImportFailure(error.code, 'Limite du transport hébergé atteinte.');
+      throw error;
+    }
     return {url: response.headers.get('X-Source-Url') ?? url, mime: response.headers.get('Content-Type') ?? '',
       sourceBytes: Number(response.headers.get('X-Source-Bytes')), width: Number(response.headers.get('X-Image-Width')) || undefined,
       height: Number(response.headers.get('X-Image-Height')) || undefined,
@@ -87,8 +93,7 @@ export function localImportTransport(request: Request, env: ImportEnv): ImportTr
     } catch {throw new ImportFailure(signal.aborted ? 'IMPORT_TIMEOUT' : 'SOURCE_UNAVAILABLE', 'Transport local indisponible.');}
     if (!response.ok) {
       const code = response.headers.get('X-Import-Error'); await response.body?.cancel();
-      const failure = new ImportFailure(code === 'UNSAFE_URL' || code === 'SOURCE_BLOCKED' || code === 'IMPORT_TIMEOUT'
-        || code === 'INSUFFICIENT_PHOTOS' || code === 'NOT_A_LISTING' ? code : 'SOURCE_UNAVAILABLE', 'Ressource non importable.', importFailureReason(response.headers.get('X-Import-Reason')),
+      const failure = new ImportFailure(errorCodes.find(value => value === code) ?? 'SOURCE_UNAVAILABLE', 'Ressource non importable.', importFailureReason(response.headers.get('X-Import-Reason')),
         parseImportResourceHeader(response.headers.get('X-Import-Resource')));
       failure.browserUsed = response.headers.get('X-Import-Browser') === '1'; throw failure;
     }

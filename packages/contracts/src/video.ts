@@ -6,18 +6,25 @@ import {VideoStyle} from './customization';
 import {EditorDocument} from './editor';
 import {MUSIC_LIMITS} from './music-library';
 import {ConfirmedVideoMap,MapZoom,mapRasterLevels} from './maps';
+import {AvatarCustomization,AvatarEngine,AvatarId,avatarMoments,AvatarAudioSources,AVATAR_AUDIO_BYTES,AVATAR_VIDEO_BYTES} from './avatars';
 
-export const VideoAsset = z.object({id: EntityId, objectKey: ObjectKey, sha256: Sha256,
+const VideoAssetData = z.object({id: EntityId, objectKey: ObjectKey, sha256: Sha256,
   sizeBytes: z.number().int().positive().max(MUSIC_LIMITS.bytes),
-  mime: z.enum(['image/jpeg', 'image/png', 'image/webp', 'audio/wav', 'video/mp4','application/json']),
+  mime: z.enum(['image/jpeg', 'image/png', 'image/webp', 'audio/wav', 'video/mp4','video/webm','application/json']),
   width: z.number().int().positive().max(12000).optional(), height: z.number().int().positive().max(12000).optional(),
   durationMs: z.number().int().positive().max(MUSIC_LIMITS.durationMs).optional(),
   normalizationGain:z.number().min(.1).max(4).optional(),
-}).strict().superRefine((asset,ctx)=>{
+}).strict();
+export const VideoAsset=VideoAssetData.superRefine((asset,ctx)=>{
   if(asset.mime!=='audio/wav'&&(asset.sizeBytes>10*1024*1024||(asset.durationMs??0)>40000))
     ctx.addIssue({code:'custom',message:'Média trop volumineux ou trop long.'});
 });
 export type VideoAsset = z.infer<typeof VideoAsset>;
+export const AvatarVideoAsset=VideoAssetData.extend({sizeBytes:z.number().int().positive().max(AVATAR_VIDEO_BYTES)}).superRefine((asset,ctx)=>{
+  if(!['video/mp4','video/webm'].includes(asset.mime)||asset.sizeBytes>AVATAR_VIDEO_BYTES||!asset.durationMs
+    ||asset.durationMs>40350||asset.width!==720||asset.height!==1280)
+    ctx.addIssue({code:'custom',message:'Média d’avatar invalide.'});
+});
 export const PhotoAnimation=z.object({photoAssetId:EntityId,sourceSha256:Sha256,
   provider:z.literal('runway'),model:z.literal('gen4_turbo'),asset:VideoAsset}).strict().superRefine((animation,ctx)=>{
     if(![2000,3000,4000,5000].includes(animation.asset.durationMs??0))
@@ -71,6 +78,10 @@ export const VideoManifest = z.object({schemaVersion: z.literal(2), templateVers
   photoAnimations:z.array(PhotoAnimation).max(12).optional(),
   editor:EditorDocument.optional(),
   music:z.object({asset:VideoAsset}).strict().optional(),
+  avatar:z.object({settings:AvatarCustomization,clips:z.array(z.object({id:AvatarId,moment:z.enum(['intro','outro','full']),
+    startFrame:z.number().int().min(0).max(1199),durationFrames:z.number().int().min(1).max(1200),
+    audioAssetId:EntityId,audioSha256:Sha256,lookId:AvatarId,engine:AvatarEngine,transparent:z.boolean(),asset:AvatarVideoAsset,
+    sourceAudio:z.object({asset:VideoAsset,sources:AvatarAudioSources}).strict().optional()}).strict()).max(2)}).strict().optional(),
   map:z.object({settings:ConfirmedVideoMap,asset:VideoAsset,capturedAt:z.iso.datetime(),buildings:VideoAsset.optional(),
     rasterZoom:MapZoom.optional(),details:z.array(z.object({zoom:MapZoom,asset:VideoAsset}).strict()).max(6).optional()}).strict().optional(),
 }).strict().superRefine((m, ctx) => {
@@ -107,6 +118,29 @@ export const VideoManifest = z.object({schemaVersion: z.literal(2), templateVers
   if (new Set(m.scenes.map(s => s.photoAssetId)).size < 3 || new Set(m.scenes.map(s => s.audioAssetId).filter(id=>id!==null)).size !== m.audio.length
     || !m.photoTimeline && m.photos.some(p => !m.scenes.some(s => s.photoAssetId === p.id))) fail('Médias inutilisés ou incomplets.');
   const frames = m.scenes.reduce((n, s) => n + s.durationFrames, 0);
+  if(m.avatar){let at=0;const starts=m.scenes.map(s=>{const from=at;at+=s.durationFrames;return from;});
+    if(m.voiceEnabled===false||m.avatar.settings.hidden||new Set(m.avatar.clips.map(c=>c.moment)).size!==m.avatar.clips.length)fail('Avatar sans narration ou dupliqué.');
+    for(const clip of m.avatar.clips){
+      if(clip.moment==='full'){
+        const source=clip.sourceAudio,asset=source?.asset;
+        if(m.avatar.settings.moments!=='full'||m.avatar.clips.length!==1||clip.startFrame!==0||clip.durationFrames!==frames
+          ||!source||!asset||asset.mime!=='audio/wav'||asset.width||asset.height||asset.sizeBytes>AVATAR_AUDIO_BYTES||asset.durationMs!==frames/30*1000
+          ||clip.audioAssetId!==asset.id||clip.audioSha256!==asset.sha256||Math.abs((clip.asset.durationMs??0)-(asset.durationMs??0))>350
+          ||clip.lookId!==m.avatar.settings.lookId||clip.engine!==m.avatar.settings.engine||clip.asset.mime!==(clip.transparent?'video/webm':'video/mp4')
+          ||source.sources.length!==m.scenes.length||source.sources.some((s,i)=>{
+            const audio=m.audio.find(a=>a.id===m.scenes[i].audioAssetId);
+            return !audio||s.audioAssetId!==audio.id||s.audioSha256!==audio.sha256||s.durationMs!==audio.durationMs||s.startFrame!==starts[i];
+          }))fail('Avatar continu désynchronisé ou incompatible avec sa voix.');
+        continue;
+      }
+      const index=clip.moment==='intro'?0:m.scenes.length-1,audio=m.audio.find(a=>a.id===m.scenes[index].audioAssetId);
+      if(!avatarMoments(m.avatar.settings).includes(clip.moment)||!audio||clip.audioAssetId!==audio.id||clip.audioSha256!==audio.sha256||clip.startFrame!==starts[index]
+        ||clip.durationFrames!==Math.ceil(audio.durationMs!*30/1000)||clip.startFrame+clip.durationFrames>frames
+        ||clip.lookId!==m.avatar.settings.lookId||clip.engine!==m.avatar.settings.engine
+        ||clip.durationFrames>m.avatar.settings.maxSeconds*30||clip.asset.durationMs===undefined
+        ||Math.abs(clip.asset.durationMs-audio.durationMs!)>350||clip.asset.width===undefined||clip.asset.height===undefined
+        ||clip.sourceAudio||clip.asset.mime!==(clip.transparent?'video/webm':'video/mp4'))fail('Avatar désynchronisé ou incompatible avec sa voix.');}
+  }
   if(m.map&&(!['image/png','image/jpeg'].includes(m.map.asset.mime)||m.map.asset.width!==m.width*2||m.map.asset.height!==m.height*2||m.map.asset.durationMs||!m.photoTimeline||m.templateVersion==='bienvu-vertical/1'))fail('Fond de carte invalide.');
   if(m.map&&(Boolean(m.map.buildings)!==(m.map.settings.view==='buildings-3d')||m.map.buildings&&(m.map.buildings.mime!=='application/json'||m.map.buildings.sizeBytes>4*1024*1024||m.map.buildings.width||m.map.buildings.height||m.map.buildings.durationMs)))fail('Données de bâtiments invalides.');
   if(m.map){
@@ -146,11 +180,11 @@ export function videoPhotoTimeline(photos: Pick<VideoAsset, 'id'>[], frames: num
   return photos.map((photo, i) => ({photoAssetId: photo.id,
     durationFrames: Math.floor((i + 1) * frames / photos.length) - Math.floor(i * frames / photos.length)}));
 }
-export function videoAssets(m: {photos: VideoAsset[]; audio: VideoAsset[]; logo: VideoAsset | null;photoAnimations?:PhotoAnimation[];music?:{asset:VideoAsset};map?:{asset:VideoAsset;buildings?:VideoAsset;details?:{asset:VideoAsset}[]}}): VideoAsset[] {
-  return [...m.photos, ...m.audio, ...(m.logo ? [m.logo] : []),...(m.photoAnimations??[]).map(c=>c.asset),...(m.music?[m.music.asset]:[]),...(m.map?[m.map.asset,...(m.map.buildings?[m.map.buildings]:[]),...(m.map.details??[]).map(d=>d.asset)]:[])];
+export function videoAssets(m: {photos: VideoAsset[]; audio: VideoAsset[]; logo: VideoAsset | null;photoAnimations?:PhotoAnimation[];music?:{asset:VideoAsset};avatar?:{clips:{asset:VideoAsset;sourceAudio?:{asset:VideoAsset}}[]};map?:{asset:VideoAsset;buildings?:VideoAsset;details?:{asset:VideoAsset}[]}}): VideoAsset[] {
+  return [...m.photos, ...m.audio, ...(m.logo ? [m.logo] : []),...(m.photoAnimations??[]).map(c=>c.asset),...(m.music?[m.music.asset]:[]),...(m.avatar?.clips??[]).flatMap(c=>[c.asset,...(c.sourceAudio?[c.sourceAudio.asset]:[])]),...(m.map?[m.map.asset,...(m.map.buildings?[m.map.buildings]:[]),...(m.map.details??[]).map(d=>d.asset)]:[])];
 }
 export function videoAssetFile(asset: VideoAsset) {
-  return `${asset.sha256}.${({'image/jpeg':'jpg','image/png':'png','image/webp':'webp','audio/wav':'wav','video/mp4':'mp4','application/json':'json'} as const)[asset.mime]}`;
+  return `${asset.sha256}.${({'image/jpeg':'jpg','image/png':'png','image/webp':'webp','audio/wav':'wav','video/mp4':'mp4','video/webm':'webm','application/json':'json'} as const)[asset.mime]}`;
 }
 export const VideoSubmission = z.object({id: Sha256, manifest: VideoManifest}).strict();
 export type VideoSubmission = z.infer<typeof VideoSubmission>;

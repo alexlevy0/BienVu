@@ -1,6 +1,6 @@
 import {EntityId, GenerationRequest, PreparedNarration, PhotoAnimation, VideoAsset, VideoManifest, VideoFailure, videoAssets, videoManifestHash, videoPresentation, videoPhotoTimeline,videoDimensions,audioNormalizationGain} from '@bienvu/contracts';
 import {measureVoiceWav} from '@bienvu/voice';
-import {findNarration,retainedAnimation,generationStoredPermanently,findDefaultGenerationMap,type AnimationReuse, type Database} from '@bienvu/db';
+import {findNarration,retainedAnimation,generationStoredPermanently,findDefaultGenerationMap,jobAvatarTasks,type AnimationReuse, type Database} from '@bienvu/db';
 import {scriptContext, validateScript, type ScriptContext} from '@bienvu/narration';
 import type {NarrationBucket} from './narration';
 import {prepareMapImage} from '@bienvu/maps';
@@ -132,6 +132,10 @@ export async function prepareJobVideo(env: {DB: Database; MEDIA: NarrationBucket
         if(!original)fail('VIDEO_SCOPE_INVALID');
         animations.push(animation);sources.push({id:animation.asset.id,key:animation.asset.objectKey});}
     }
+    const avatarTasks=customization?.avatar&&!customization.avatar.hidden?await jobAvatarTasks(env.DB,agency,job):[];
+    const avatarClips=avatarTasks.filter(task=>task.state==='ready'&&task.result).map(task=>JSON.parse(task.result!) as NonNullable<VideoManifest['avatar']>['clips'][number]);
+    for(const clip of avatarClips){if(!clip.asset.objectKey.startsWith(`${prefix}avatars/`))fail('VIDEO_SCOPE_INVALID');sources.push({id:clip.asset.id,key:clip.asset.objectKey});
+      if(clip.sourceAudio){if(!clip.sourceAudio.asset.objectKey.startsWith(`${prefix}audio/`))fail('VIDEO_SCOPE_INVALID');sources.push({id:clip.sourceAudio.asset.id,key:clip.sourceAudio.asset.objectKey});}}
     const manifest=VideoManifest.parse({schemaVersion:2,templateVersion:input?.aspectRatio==='16:9'?'bienvu-horizontal/1':'bienvu-vertical/2',agencyId:agency,jobId:job,listingId:context.listing.id,
       brand:context.brand,contact:context.contact,logo,...videoDimensions(input?.aspectRatio),fps:30,disclosure:prepared.script.disclosure,
       rights:entitlement.kind==='anonymous'?{kind:'anonymous',watermarked:false,previewProvisionCents:entitlement.previewProvisionCents}:{kind:entitlement.kind,allocationId:entitlement.allocationId,watermarked:entitlement.kind==='trial'},photos,audio,
@@ -142,7 +146,7 @@ export async function prepareJobVideo(env: {DB: Database; MEDIA: NarrationBucket
       ...(input?.voiceEnabled===false?{voiceEnabled:false}:{}),
       ...(input?.durationSeconds!==undefined?{durationSeconds:input.durationSeconds}:{}),
       ...(customization?{visualStyle:customization.style,photoMotion:customization.photoMotion,photoTransition:customization.transition}:{visualStyle:'cinematic'}),
-      ...(animations.length?{photoAnimations:animations}:{}),...(editor?{editor}:{}),...(music?{music}:{}),...(map?{map}:{})});
+      ...(animations.length?{photoAnimations:animations}:{}),...(editor?{editor}:{}),...(music?{music}:{}),...(map?{map}:{}),...(avatarClips.length?{avatar:{settings:customization!.avatar,clips:avatarClips}}:{})});
     const at=new Date().toISOString(),hash=await videoManifestHash(manifest);
     await env.DB.prepare(`INSERT INTO video_manifests(job_id,agency_id,job_attempt,manifest_hash,manifest_json,sources_json,state,created_at,expires_at)
       SELECT ?,?,?,?,?,?,'preparing',?,? WHERE EXISTS(SELECT 1 FROM jobs j JOIN reservations r ON r.id=j.reservation_id AND r.agency_id=j.agency_id

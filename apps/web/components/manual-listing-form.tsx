@@ -67,7 +67,7 @@ export function ManualListingForm(props: Props) {
   const uploads=useRef(new Set<string>()),removals=useRef(new Set<string>());
   const receivedBatches=useRef(new Set<string>()),photoLock=useRef(false),mounted=useRef(true);
   const [customization,setCustomization]=useState<VideoCustomization|undefined>(),[settingsSaved,setSettingsSaved]=useState(false);
-  useEffect(()=>{props.onCreditCost?.(generationCreditCost(customization));},[customization,props.onCreditCost]);
+  useEffect(()=>{props.onCreditCost?.(generationCreditCost(customization,props.durationSeconds));},[customization,props.durationSeconds,props.onCreditCost]);
   const customizationRef=useRef<VideoCustomization|undefined>(undefined),settingsVersion=useRef(0),customInitialized=useRef(false),settingsWrite=useRef<Promise<void>|null>(null);
   customizationRef.current=customization;
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);

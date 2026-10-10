@@ -7,15 +7,15 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import {migrateNarrationProbe,seedNarrationFixture} from '../scripts/narration-fixtures';
-import {admitGeneration,setGenerationProgress,findGeneration,findNarration,generationView} from '../packages/db/src/index';
+import {admitGeneration,setGenerationProgress,findGeneration,findNarration,generationView,saveAvatarLook,setAvatarSettings} from '../packages/db/src/index';
 import {videoFixture} from '../fixtures/video';
 import {propertyDescription} from '../fixtures/listing-description';
 import {getJobVideo} from '../apps/pipeline/src/video-manifest';
-import {CartesiaVoiceConfig,CARTESIA_DEFAULT_VOICE} from '../packages/contracts/src/index';
+import {CartesiaVoiceConfig,CARTESIA_DEFAULT_VOICE,DEFAULT_AVATAR_SETTINGS,defaultAvatarCustomization,defaultVideoCustomization} from '../packages/contracts/src/index';
 import {hashJson,DEFAULT_SCRIPT_MODEL} from '../packages/narration/src/index';
 import {LOCALITY_SPEECH_VERSION} from '../packages/voice/src/index';
 
-for(const {voiceEnabled,invalidScript} of [{voiceEnabled:true,invalidScript:false},{voiceEnabled:false,invalidScript:false},{voiceEnabled:true,invalidScript:true}])test(`Workflow workerd réel ${invalidScript?'narration invalide et crédit libéré':voiceEnabled?'avec voix':'sans voix ni sous-titres'}, fournisseurs simulés : reprise et erreur publique`,async t=>{
+for(const {voiceEnabled,invalidScript,avatarFallback} of [{voiceEnabled:true,invalidScript:false,avatarFallback:false},{voiceEnabled:false,invalidScript:false,avatarFallback:false},{voiceEnabled:true,invalidScript:true,avatarFallback:false},{voiceEnabled:true,invalidScript:false,avatarFallback:true}])test(`Workflow workerd réel ${avatarFallback?'avatar indisponible et supplément rendu':invalidScript?'narration invalide et crédit libéré':voiceEnabled?'avec voix':'sans voix ni sous-titres'}, fournisseurs simulés : reprise et erreur publique`,async t=>{
   const directory=await mkdtemp(path.join(tmpdir(),'bienvu-generation-'));t.after(()=>rm(directory,{recursive:true,force:true}));
   const require=createRequire(import.meta.url),wrangler=createRequire(require.resolve('wrangler/package.json'));
   const esbuild=await import(pathToFileURL(wrangler.resolve('esbuild')).href) as {build:(o:unknown)=>Promise<unknown>};
@@ -33,9 +33,15 @@ for(const {voiceEnabled,invalidScript} of [{voiceEnabled:true,invalidScript:fals
   await env.DB.prepare('UPDATE listing_imports SET result_json=? WHERE id=?').bind(JSON.stringify(listing),listing.id).run();
   await env.DB.prepare('INSERT INTO generation_access VALUES(?,?,1)').bind(scope.agencyId,'allocation-workflow').run();
   await env.DB.prepare('INSERT INTO hosted_import_budget VALUES(?,0,3500,0)').bind(new Date().toISOString().slice(0,7)).run();await env.DB.exec('UPDATE generation_control SET enabled=1');
+  if(avatarFallback){
+    await env.DB.exec("UPDATE allocations SET kind='paid',quota_limit=3");
+    await saveAvatarLook(env.DB,'fixture-admin',{id:'fixture-avatar',name:'Présentatrice fixture',gender:'female',type:'studio_avatar',engines:['avatar_iii'],enabled:true,thumbnail:null,preview:null,transparentVerified:false,ownership:'public',updatedAt:new Date().toISOString()},{image:null,video:null});
+    await setAvatarSettings(env.DB,'fixture-admin',{...DEFAULT_AVATAR_SETTINGS,enabled:true,defaultLookId:'fixture-avatar'},1);
+  }
   const headers={'Content-Type':'application/json',Authorization:'Bearer fixture-generation-token-1234567890','X-Agency-ID':scope.agencyId,'Idempotency-Key':'fixture-workflow-idempotency'};
   assert.equal((await mf.dispatchFetch('https://test/generations',{method:'POST',body:'{}'})).status,401);
-  const input={listingId:listing.id,durationSeconds:40 as const,subtitlesEnabled:!voiceEnabled,...(!voiceEnabled?{voiceEnabled:false}:{})};
+  const input={listingId:listing.id,durationSeconds:40 as const,subtitlesEnabled:!voiceEnabled,...(!voiceEnabled?{voiceEnabled:false}:{}),
+    ...(avatarFallback?{customization:{...defaultVideoCustomization(),voice:CARTESIA_DEFAULT_VOICE,avatar:defaultAvatarCustomization('fixture-avatar')}}:{})};
   const create=()=>mf.dispatchFetch('https://test/generations',{method:'POST',headers,body:JSON.stringify(input)});
   const missing=listing.photos[0];await env.MEDIA.delete(missing.objectKey);
   assert.equal((await create()).status,422);
@@ -78,6 +84,10 @@ for(const {voiceEnabled,invalidScript} of [{voiceEnabled:true,invalidScript:fals
   assert.equal((await getJobVideo(env.DB,scope.agencyId,job.id))!.manifest.subtitlesEnabled,false);
   assert.equal((await getJobVideo(env.DB,scope.agencyId,job.id))!.manifest.audio.length===0,!voiceEnabled);
   const progressRow=(await findGeneration(env.DB,scope.agencyId,job.id))!;
+  assert.equal(generationView(progressRow).narrationReady,true);
+  assert.equal(generationView(progressRow).preparation?.map,'skipped');
+  if(avatarFallback)assert.equal(generationView(progressRow).preparation?.avatar,'skipped');
+  else assert.equal(generationView(progressRow).preparation?.avatar,undefined);
   await setGenerationProgress(env.DB,progressRow,42);
   await setGenerationProgress(env.DB,progressRow,17);
   assert.equal((await env.DB.prepare('SELECT progress_percent AS percent FROM jobs WHERE id=?').bind(job.id).first<{percent:number}>())!.percent,42);
@@ -89,8 +99,10 @@ for(const {voiceEnabled,invalidScript} of [{voiceEnabled:true,invalidScript:fals
   await mf.dispatchFetch(`https://test/reconcile/${job.id}`,{headers});
   for(let i=0;i<100;i++){row=await env.DB.prepare('SELECT status FROM jobs WHERE id=?').bind(job.id).first();if(['ready','failed'].includes(row!.status))break;await new Promise(r=>setTimeout(r,200));}
   assert.equal(row!.status,'ready');
+  assert.equal(generationView((await findGeneration(env.DB,scope.agencyId,job.id))!).preparation?.map,'skipped');
   assert.equal((await env.DB.prepare('SELECT progress_percent AS percent FROM jobs WHERE id=?').bind(job.id).first<{percent:number}>())!.percent,100);
   assert.deepEqual(await env.DB.prepare('SELECT reserved,consumed FROM allocations WHERE agency_id=?').bind(scope.agencyId).first(),{reserved:0,consumed:1});
+  if(avatarFallback){const view=generationView((await findGeneration(env.DB,scope.agencyId,job.id))!);assert.equal(view.creditsReserved,2);assert.equal(view.creditsUsed,1);assert.equal(view.creditsRefunded,1);assert.equal(view.avatar?.failed,2);assert.equal((await getJobVideo(env.DB,scope.agencyId,job.id))!.manifest.avatar,undefined);}
   assert.equal((await env.DB.prepare('SELECT count(*) AS n FROM generation_artifacts').first<{n:number}>())!.n,1);
   assert.equal((await env.DB.prepare('SELECT count(*) AS n FROM narration_calls').first<{n:number}>())!.n,beforeCalls);
   assert.equal((await env.DB.prepare('SELECT count(*) AS n FROM generation_runs').first<{n:number}>())!.n,1);

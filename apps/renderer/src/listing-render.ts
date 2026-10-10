@@ -50,13 +50,13 @@ export async function withVideoAssets<T>(input: unknown, directory: string, use:
     const bytes = await readFile(file);
     if (sha(bytes) !== asset.sha256) throw new Error('VIDEO_ASSET_HASH_MISMATCH');
     if (asset.mime === 'audio/wav') {
-      if (measureVoiceWav(bytes,asset.id===manifest.music?.asset.id?300000:35000).durationMs !== asset.durationMs) throw new Error('VIDEO_AUDIO_DURATION_MISMATCH');
-    } else if(asset.mime==='video/mp4'){
+      if (measureVoiceWav(bytes,asset.id===manifest.music?.asset.id?300000:manifest.avatar?.clips.some(c=>c.sourceAudio?.asset.id===asset.id)?40000:35000).durationMs !== asset.durationMs) throw new Error('VIDEO_AUDIO_DURATION_MISMATCH');
+    } else if(asset.mime==='video/mp4'||asset.mime==='video/webm'){
       const {stdout}=await exec(binary('ffprobe'),['-v','error','-show_format','-show_streams','-of','json',file],{cwd:cwd(binary('ffprobe')),timeout:20_000,maxBuffer:128_000});
-      const metadata=JSON.parse(stdout) as {format:{duration:string};streams:{codec_type:string;codec_name:string;width:number;height:number}[]};
+      const metadata=JSON.parse(stdout) as {format:{duration:string};streams:{codec_type:string;codec_name:string;width:number;height:number;tags?:{alpha_mode?:string;ALPHA_MODE?:string}}[]};
       const video=metadata.streams.filter(s=>s.codec_type==='video');
       const duration=Number(metadata.format.duration);
-      if(video.length!==1||video[0].codec_name!=='h264'||video[0].width!==asset.width||video[0].height!==asset.height
+      if(video.length!==1||(asset.mime==='video/mp4'?video[0].codec_name!=='h264':!['vp8','vp9'].includes(video[0].codec_name)||String(video[0].tags?.alpha_mode??video[0].tags?.ALPHA_MODE)!=='1')||video[0].width!==asset.width||video[0].height!==asset.height
         ||!Number.isFinite(duration)||Math.abs(duration*1000-asset.durationMs!)>200)throw Error('VIDEO_ANIMATION_INVALID');
     } else if(asset.mime==='application/json'){
       if(bytes.length>4*1024*1024||asset.id!==manifest.map?.buildings?.id)throw new Error('VIDEO_BUILDINGS_INVALID');

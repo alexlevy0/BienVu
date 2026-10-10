@@ -1,5 +1,5 @@
 import {GeneratableListing,GenerationRequest,customizedListing,ImportFailure,errorCodes,importFailureReason,parseImportResourceHeader} from '@bienvu/contracts';
-import {beginImport,completeImport,failImport,findImport,journalImportPhoto,reserveHostedImport,GenerationFailure,type GenerationRow} from '@bienvu/db';
+import {beginImport,completeImport,failImport,findImport,journalImportPhoto,reserveHostedImport,GenerationFailure,ImportStateFailure,type GenerationRow} from '@bienvu/db';
 import {importListing,readLimited,IMPORT_LIMITS,type ImportTransport} from '@bienvu/importers';
 export type GenerationImportEnv={DB:D1Database;MEDIA:R2Bucket;IMPORT_SERVICE:Fetcher;IMPORT_TOKEN:string};
 export async function loadGenerationListing(env:GenerationImportEnv,row:GenerationRow){
@@ -32,8 +32,11 @@ export async function loadGenerationListing(env:GenerationImportEnv,row:Generati
             await env.MEDIA.put(photo.objectKey,bytes,{httpMetadata:{contentType:photo.mime},customMetadata:{agencyId:row.agencyId,importId:id!,sha256:photo.contentHash}});}
         },{mode:'cloudflare',signal:AbortSignal.timeout(75_000)});
         await completeImport(env.DB,listing,diagnostics);
-      }catch(error){await failImport(env.DB,row.agencyId,id,error instanceof ImportFailure?error.code:'SOURCE_UNAVAILABLE',
-        error&&typeof error==='object'&&'diagnostics' in error?error.diagnostics:{stage:'generation'});if(error instanceof ImportFailure)throw new GenerationFailure(error.code);throw error;}
+      }catch(error){
+        const code=error instanceof ImportFailure?error.code:error instanceof ImportStateFailure?errorCodes.find(code=>code===error.code)??'SOURCE_UNAVAILABLE':'SOURCE_UNAVAILABLE';
+        await failImport(env.DB,row.agencyId,id,code,error&&typeof error==='object'&&'diagnostics' in error?error.diagnostics:{stage:'generation'});
+        if(error instanceof ImportFailure||error instanceof ImportStateFailure)throw new GenerationFailure(code);throw error;
+      }
     }
   }
   const imported=await findImport(env.DB,row.agencyId,id);

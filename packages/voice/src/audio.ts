@@ -100,3 +100,25 @@ export function compactVoiceSceneTiming(durationsMs:readonly number[],durationSe
   frames[frames.length-1]+=target-total;
   return frames;
 }
+
+// Deterministic PCM assembly for lip-sync. Preserve each voice's timing and
+// the actual pauses; no text synthesis and no truncation of spoken samples.
+export function assembleNarrationWavs(clips:readonly {bytes:Uint8Array;startFrame:number}[],durationFrames:number){
+  if(clips.length<4||clips.length>6||!Number.isInteger(durationFrames)||durationFrames<600||durationFrames>1200)
+    throw new VoiceFailure('VOICE_AUDIO_INVALID');
+  const sampleRate=24000,sampleFrames=durationFrames*sampleRate/30,bytes=new Uint8Array(44+sampleFrames*2),out=new DataView(bytes.buffer);
+  const tag=(at:number,value:string)=>{for(let i=0;i<value.length;i++)bytes[at+i]=value.charCodeAt(i);};
+  tag(0,'RIFF');out.setUint32(4,bytes.length-8,true);tag(8,'WAVE');tag(12,'fmt ');out.setUint32(16,16,true);
+  out.setUint16(20,1,true);out.setUint16(22,1,true);out.setUint32(24,sampleRate,true);out.setUint32(28,sampleRate*2,true);
+  out.setUint16(32,2,true);out.setUint16(34,16,true);tag(36,'data');out.setUint32(40,sampleFrames*2,true);
+  let previousEnd=0;
+  for(const clip of clips){const measured=measureVoiceWav(clip.bytes),source=new DataView(clip.bytes.buffer,clip.bytes.byteOffset,clip.bytes.byteLength),
+    start=clip.startFrame*sampleRate/30,length=Math.ceil(measured.sampleFrames*sampleRate/measured.sampleRate);
+    if(!Number.isInteger(clip.startFrame)||clip.startFrame<0||start<previousEnd||start+length>sampleFrames)throw new VoiceFailure('VOICE_AUDIO_INVALID');
+    const sample=(i:number)=>{let n=0;for(let c=0;c<measured.channels;c++)n+=source.getInt16(measured.pcmOffset+(Math.min(i,measured.sampleFrames-1)*measured.channels+c)*2,true);return n/measured.channels;};
+    for(let i=0;i<length;i++){const at=i*measured.sampleRate/sampleRate,low=Math.floor(at),fraction=at-low;
+      out.setInt16(44+(start+i)*2,Math.max(-32768,Math.min(32767,Math.round(sample(low)*(1-fraction)+sample(low+1)*fraction))),true);}
+    previousEnd=start+length;
+  }
+  return {bytes,...measureVoiceWav(bytes,40000)};
+}

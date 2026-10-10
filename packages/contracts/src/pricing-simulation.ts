@@ -15,8 +15,8 @@ export const PricingUsageProfile = z.object({
   id: key, name: z.string().trim().min(1).max(80), share: percent,
   photos: z.number().int().min(1).max(12), animations: z.number().int().min(0).max(12),
   durationSeconds: z.number().min(5).max(300), renderSeconds: z.number().min(1).max(3600),
-  voice: z.boolean(), map: z.boolean(),
-}).strict().refine(p => p.animations <= p.photos, {path: ['animations'], message: 'Une animation maximum par photo.'});
+  voice: z.boolean(), map: z.boolean(),avatar:z.object({seconds:z.number().min(1).max(16),engine:z.enum(['avatar_iii','avatar_iv']),coverage:z.enum(['passages','full']).optional()}).strict().optional(),
+}).strict().refine(p => p.animations <= p.photos, {path: ['animations'], message: 'Une animation maximum par photo.'}).refine(p=>!p.avatar||p.voice,{path:['voice'],message:'L’avatar nécessite une voix off.'});
 
 export const PricingSimulationInput = z.object({
   version: z.literal(1), name: z.string().trim().min(1).max(100), notes: z.string().max(1500),
@@ -34,7 +34,7 @@ export const PricingSimulationInput = z.object({
   }).strict().refine(m => m.refundsPercent + m.disputesPercent <= 100, {
     path: ['refundsPercent'], message: 'Remboursements et litiges ne peuvent pas dépasser 100 % des achats.',
   }),
-  production: z.object({
+  production: z.object({avatar:z.object({priceIII:amount,priceIV:amount,reusePercent:percent,mediaMB:amount.max(100)}).strict().optional(),
     runwayCreditsPerSecond: amount, runwaySeconds: z.number().min(1).max(60), runwayUsdPerCredit: amount,
     animationReusePercent: percent, extraAnimationAttemptsPercent: z.number().min(0).max(300),
     extraRenderPercent: z.number().min(0).max(500), textEurPerVideo: amount,
@@ -121,7 +121,7 @@ export function defaultPricingSimulation(): PricingSimulationInput {
       ...creditPacks.map((p, i) => ({id: p.code, name: `Recharge ${p.credits}`, kind: 'pack', credits: p.credits,
         bonusCredits: 0, priceHt: p.priceCents / 100, quantity: i === 1 ? 20 : 10, enabled: true, referenceCode: p.code})),
       ...creditPlans.filter(p => p.price > 0).map(p => ({id: p.code, name: p.name, kind: 'subscription', credits: p.credits,
-        bonusCredits: 0, priceHt: p.price, quantity: p.code === 'plus' ? 20 : 10, enabled: true, referenceCode: p.code})),
+        bonusCredits: 0, priceHt: p.price, quantity: p.code === 'agence' ? 20 : 10, enabled: true, referenceCode: p.code})),
     ],
     profiles: [
       {id: 'classic', name: 'Montage classique', share: 60, photos: 6, animations: 0, durationSeconds: 20, renderSeconds: 120, voice: true, map: false},

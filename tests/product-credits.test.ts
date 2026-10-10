@@ -32,7 +32,7 @@ async function finish(DB:D1Database,id:string,animations:number){const at=new Da
 }
 const settings=(photos:number[])=>({...defaultVideoCustomization(),runwayPhotos:photos});
 test('barème partagé : 1 vidéo + 1/photo, choix exact malgré réordonnancement et contrats stricts',()=>{
-  assert.deepEqual(creditPlans.map(p=>p.credits),[3,40,120]);assert.equal(generationCreditCost(),1);assert.equal(generationCreditCost(settings([2,5,7,1])),5);
+  assert.deepEqual(creditPlans.map(p=>p.credits),[3,50,100,200,500]);assert.equal(generationCreditCost(),1);assert.equal(generationCreditCost(settings([2,5,7,1])),5);
   assert.deepEqual(selectedAnimationIndices([7,2,5,1],settings([2,1])),[1,3]);assert.equal(requestedAnimations(settings([])),0);
   assert.equal(GenerationRequest.safeParse({listingId:'listing-test',customization:{...settings([2]),photoOrder:[0,1,3]}}).success,false);
   assert.equal(GenerationRequest.safeParse({listingId:'listing-test',customization:settings([2,2])}).success,false);

@@ -1,4 +1,4 @@
-import {GeneratableListing, ImportFailure, type NormalizedListing} from '@bienvu/contracts';
+import {GeneratableListing, ImportFailure, errorCodes, type NormalizedListing} from '@bienvu/contracts';
 import {beginImport, completeImport, failImport, findImport, importObjectKeys, ImportStateFailure, draftFromListing,startCreationDraft,viewCreationDraft,
   journalImportPhoto, markImportDeleting, removeImport, type Database} from '@bienvu/db';
 import {importListing, publicUrl, type ImportTransport} from '@bienvu/importers';
@@ -12,8 +12,10 @@ export async function createPrivateImport(env: {DB: Database; MEDIA: ImportBucke
   try {
     const {row, fresh} = await beginImport(env.DB, agencyId, publicUrl(url).href, key);
     if (!fresh) return row;
+    let failureStage = 'admission';
     try {
       await options.beforeStart?.(row.id);
+      failureStage = 'storage';
       const {listing, diagnostics} = await importListing(url, {agencyId, importId: row.id}, {transport, browserHtml: options.browserHtml,
         store: async (photo, bytes, abort) => {
           abort.throwIfAborted();
@@ -25,9 +27,11 @@ export async function createPrivateImport(env: {DB: Database; MEDIA: ImportBucke
       if(GeneratableListing.safeParse(listing).success)await completeImport(env.DB, listing, diagnostics);
       else await startCreationDraft(env.DB,agencyId,row.id,draftFromListing(listing));
     } catch (error) {
-      const code = error instanceof ImportFailure ? error.code : 'SOURCE_UNAVAILABLE';
+      const code = error instanceof ImportFailure ? error.code
+        : error instanceof RequestFailure || error instanceof ImportStateFailure
+          ? errorCodes.find(code => code === error.code) ?? 'SOURCE_UNAVAILABLE' : 'SOURCE_UNAVAILABLE';
       await failImport(env.DB, agencyId, row.id, code,
-        error && typeof error === 'object' && 'diagnostics' in error ? error.diagnostics : {stage: 'storage'});
+        error && typeof error === 'object' && 'diagnostics' in error ? error.diagnostics : {stage: failureStage});
       // Nettoyage immédiat des objets connus ; le journal reste pour réconcilier
       // une requête put dont l'issue serait incertaine. Aucune clé de job n'est touchée.
       try {for (const objectKey of await importObjectKeys(env.DB, agencyId, row.id)) await env.MEDIA.delete(objectKey);} catch { /* reprise par purgeImports */ }

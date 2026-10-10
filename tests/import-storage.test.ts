@@ -57,6 +57,18 @@ test('imports : D1 et R2 réels en local, aucune génération ni consommation de
     assert.equal(await purgeImport(env, 'c', failed.id, now + 600_000), true);
     assert.equal(await findImport(DB, 'c', failed.id), null);
   });
+  await t.test('admission refusée : le budget est conservé dans le diagnostic, sans accuser la source ni appeler le réseau', async () => {
+    let requests=0;
+    await assert.rejects(createPrivateImport(env,'e',source,'fixture-budget-refused',
+      {load:async()=>{requests++;throw Error('NETWORK_MUST_NOT_RUN');}},undefined,
+      {beforeStart:async()=>{throw new RequestFailure('IMPORT_BUDGET_LIMIT');}}),
+      error=>error instanceof RequestFailure&&error.code==='IMPORT_BUDGET_LIMIT');
+    assert.equal(requests,0);
+    const failed=await DB.prepare('SELECT status,error_code,diagnostics_json FROM listing_imports WHERE agency_id=?').bind('e')
+      .first<{status:string;error_code:string;diagnostics_json:string}>();
+    assert.equal(failed!.status,'failed');assert.equal(failed!.error_code,'IMPORT_BUDGET_LIMIT');
+    assert.equal(JSON.parse(failed!.diagnostics_json).stage,'admission');
+  });
   await t.test('abandon et purge rejouable, écriture tardive interdite', async () => {
     const abandoned = (await beginImport(DB, 'd', source, 'fixture-abandoned-001')).row;
     assert.equal(await markImportDeleting(DB, 'd', abandoned.id, now + 600_000), true);

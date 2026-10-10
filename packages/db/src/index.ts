@@ -5,6 +5,7 @@ export * from './creation-drafts';
 export * from './import-budget';
 export * from './narration';
 export * from './generation';
+export * from './generation-preparation';
 export * from './editor-voice';
 export * from './animation-library';
 export * from './retention';
@@ -14,6 +15,7 @@ export * from './partners';
 export * from './voices';
 export * from './video-map-settings';
 export * from './ai-quality';
+export * from './avatars';
 
 // Port structurel minimal compatible D1 ; pas de transaction interactive.
 export interface SqlStatement {

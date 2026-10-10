@@ -6,7 +6,7 @@ import {RequestFailure} from './http';
 import {readChargeAccounting,accountingMutations} from './stripe-accounting';
 
 export const stripeId=(value:string|{id:string}|null|undefined)=>typeof value==='string'?value:value?.id??null;
-const packet=z.object({pack:z.enum(['pack10','pack30','pack100']),accepted:z.literal(true)}).strict();
+const packet=z.object({pack:z.enum(['pack20v2','pack50v2','pack100v2']),accepted:z.literal(true)}).strict();
 export async function createTopupCheckout(env:BillingEnv,agencyId:string,email:string,origin:string,input:unknown,key:string,client=stripeClient(env)){
  const parsed=packet.safeParse(input),mode=billingMode(env);
  if(!parsed.success||!EntityId.safeParse(agencyId).success||!/^[-a-zA-Z0-9_]{16,128}$/.test(key))throw new RequestFailure('VALIDATION_ERROR');
@@ -29,12 +29,11 @@ export async function createTopupCheckout(env:BillingEnv,agencyId:string,email:s
  catch(e){if(e instanceof Error&&e.message.includes('CHECKOUT_IN_PROGRESS'))throw new RequestFailure('CONFLICT');throw e;}
  const journal=await env.DB.prepare('SELECT expires_at AS expires FROM billing_topup_checkouts WHERE agency_id=? AND mode=? AND idempotency_key=?').bind(agencyId,mode,key).first<{expires:string}>();
  const suffix=(await contentHash(new TextEncoder().encode(`${mode}:${agencyId}:${key}`))).slice(0,8).split('').map(c=>String.fromCharCode(97+parseInt(c,16))).join('');
- const price=pack.code==='pack10'?env.STRIPE_TOPUP_PRICE_10:pack.code==='pack30'?env.STRIPE_TOPUP_PRICE_30:env.STRIPE_TOPUP_PRICE_100;
- const metadata={agencyId,pack:pack.code,kind:'credit_topup',creditPolicy:'1'};
+ const metadata={agencyId,pack:pack.code,kind:'credit_topup',creditPolicy:'2'};
  const session=await client.checkout.sessions.create({mode:'payment',managed_payments:{enabled:false},integration_identifier:`bienvu_topup_${suffix}`,customer:customer!.id,client_reference_id:agencyId,locale:'fr',
   success_url:`${origin}/abonnement?recharge=confirmation`,cancel_url:`${origin}/abonnement?recharge=annule`,expires_at:Math.floor(Date.parse(journal!.expires)/1000),
   metadata,payment_intent_data:{metadata},invoice_creation:{enabled:true,invoice_data:{metadata}},
-  line_items:[price?{price,quantity:1}:{price_data:{currency:'eur',unit_amount:pack.priceCents,tax_behavior:'exclusive',product_data:{name:`BienVu · Recharge de ${pack.credits} crédits`}},quantity:1}],
+  line_items:[{price_data:{currency:'eur',unit_amount:pack.priceCents,tax_behavior:'exclusive',product_data:{name:`BienVu · Recharge de ${pack.credits} crédits`,metadata:{creditCatalog:'2'}}},quantity:1}],
   billing_address_collection:'required',customer_update:{name:'auto',address:'auto'},tax_id_collection:{enabled:true},automatic_tax:{enabled:false},
   custom_text:{submit:{message:`Achat unique de ${pack.credits} crédits, ${policy.validDays?'valables 12 mois':'sans expiration'}. Les crédits mensuels sont utilisés en premier. Votre abonnement ne change pas.`}}},
   {idempotencyKey:`bienvu:${mode}:topup:${agencyId}:${key}`});
@@ -59,7 +58,7 @@ export async function topupMutations(env:BillingEnv,sessionId:string,client:Stri
   ||intent.amount_received!==session.amount_total||session.currency!=='eur'||session.amount_subtotal!==order.priceCents||session.amount_total!==order.priceCents+(session.total_details?.amount_tax??0)
   ||session.line_items?.has_more||session.line_items?.data.length!==1||item?.quantity!==1||item.price?.unit_amount!==order.priceCents||item.price.recurring||item.price.currency!=='eur'
   ||item.amount_subtotal!==order.priceCents||session.total_details?.amount_discount)throw new RequestFailure('VALIDATION_ERROR');
- const expected=order.pack==='pack10'?env.STRIPE_TOPUP_PRICE_10:order.pack==='pack30'?env.STRIPE_TOPUP_PRICE_30:env.STRIPE_TOPUP_PRICE_100;
+ const expected=order.pack==='pack10'?env.STRIPE_TOPUP_PRICE_10:order.pack==='pack30'?env.STRIPE_TOPUP_PRICE_30:order.pack==='pack100'?env.STRIPE_TOPUP_PRICE_100:undefined;
  if(expected&&item.price.id!==expected)throw new RequestFailure('VALIDATION_ERROR');
  const policy=await env.DB.prepare('SELECT mode,topup_valid_days AS days FROM credit_payment_policy WHERE id=1').first<{mode:string;days:number}>();
  if(policy?.mode!==mode)throw new RequestFailure('BILLING_UNAVAILABLE');

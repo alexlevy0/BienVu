@@ -21,6 +21,7 @@
     "@runwayml/sdk": "4.20.1",
     "image-size": "2.0.3",
     "@bienvu/maps": "workspace:*",
-    "@bienvu/observability": "workspace:*"
+    "@bienvu/observability": "workspace:*",
+    "@bienvu/avatars": "workspace:*"
   }
 }

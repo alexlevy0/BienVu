@@ -7,7 +7,7 @@ import {DEFAULT_VIDEO_MAP,VideoMapDefaults,GenerationRequest,GenerationCustomiza
 import {videoMapSettings,setVideoMapSettings,generationMapDefault,findDefaultGenerationMap,admitGeneration,admitAnonymous,createAnonymousSession,
   findGeneration,findImport,failGeneration} from '../packages/db/src/index';
 import {migrateNarrationProbe,seedNarrationFixture} from '../scripts/narration-fixtures';
-import {prepareDefaultGenerationMap} from '../apps/pipeline/src/default-video-map';
+import {prepareDefaultGenerationMap,prepareGenerationMap} from '../apps/pipeline/src/default-video-map';
 import {prepareJobNarration} from '../apps/pipeline/src/narration';
 import {prepareJobVideo} from '../apps/pipeline/src/video-manifest';
 import {videoFixture} from '../fixtures/video';
@@ -99,6 +99,11 @@ test('carte par défaut : admission figée, isolation, cache, montage et essais 
   await t.test('URL importée, cache partagé et génération sans réglages clients',async()=>{
     const {job}=await create('default-map-url',{url:'https://www.iadfrance.fr/annonce/appartement-vente-3-pieces-lyon-55m2/r2125326'});
     const before=calls;assert.ok(await prepareDefaultGenerationMap(env,job,transport));assert.equal(calls,before);
+    // Exercise the explicit-location branch with the same prepared plates, without a sixth billed fixture job.
+    const map={position:'end' as const,durationSeconds:3,location:city,view:'satellite' as const,zoomStart:12,zoomEnd:14.5};
+    const explicit={...job,defaultMap:null,input:JSON.stringify({listingId:job.listingId,durationSeconds:20,customization:{...defaultVideoCustomization(),map}})};
+    const searchBefore=searches;assert.deepEqual(await prepareGenerationMap(env,explicit,transport),map);assert.equal(calls,before);assert.equal(searches,searchBefore);
+    assert.deepEqual(await prepareGenerationMap(env,explicit,async()=>{throw Error('MAP_ALREADY_PREPARED');}),map);
     await failGeneration(env.DB,job,'GENERATION_FAILED');
   });
   await t.test('désactivation, carte personnalisée et timeline d’éditeur prioritaires',async()=>{

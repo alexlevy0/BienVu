@@ -1,4 +1,4 @@
-import {CreationDraftData,EditorDocument,GenerationRequest,GeneratableListing,VideoAsset,VideoManifest,defaultVideoCustomization,createEditorDocument,selectedAnimationIndices,audioNormalizationGain,generationCreditCost,
+import {CreationDraftData,EditorDocument,GenerationRequest,GeneratableListing,VideoAsset,VideoManifest,videoManifestHash,defaultVideoCustomization,createEditorDocument,selectedAnimationIndices,audioNormalizationGain,generationCreditCost,
   MUSIC_LIMITS,type CreationDraftView,type VideoCustomization} from '@bienvu/contracts';
 import {findCreationDraft,findImport,draftFromListing,updateCreationDraft,beginManualImport,startCreationDraft,blankCreationDraft,retainedAnimations,generationRetained,retainedAnimationLibrarySql,ImportStateFailure,type Database} from '@bienvu/db';
 import {measureMusicWav} from '../../../packages/voice/src/audio';
@@ -7,6 +7,7 @@ import {startManualCreationDraft,uploadCreationPhoto,finishCreationDraft} from '
 import {ownGeneration} from './generations';
 import {RequestFailure} from './http';
 import {restoreVideoVoice,copyEditorVoice} from './editor-voice';
+import {editorAvatarClips} from './editor-avatars';
 import {editorMediaSourcesKey} from './editor-client';
 
 type Env={DB:Database;MEDIA:Pick<R2Bucket,'put'|'head'|'get'|'delete'>};
@@ -20,7 +21,7 @@ export async function editorResources(db:Database,agencyId:string,id:string){
     {...defaultVideoCustomization(),photoOrder:draft.photos.map(p=>p.sourceOrder),runwayPhotos:draft.photos.map(p=>p.sourceOrder)},settings?.editor?.aspectRatio??'9:16');
   const availableAnimations=available.map(reuse=>({slot:draft.photos[reuse.index].sourceOrder,url:`/api/animations/${reuse.libraryId}`})),
     animations=availableAnimations.filter(a=>selected.has(a.slot));
-  return {version:draft.version,sourceKey:editorMediaSourcesKey(settings??defaultVideoCustomization(),draft.photos),cost:generationCreditCost(settings)-animations.length,animations,availableAnimations};
+  return {version:draft.version,sourceKey:editorMediaSourcesKey(settings??defaultVideoCustomization(),draft.photos),cost:generationCreditCost(settings)-animations.length,animations,availableAnimations,...(settings?.avatar?{avatars:await editorAvatarClips(db,agencyId,id,settings),avatarVoiceId:settings.voiceSourceId}: {})};
 }
 export async function putEditorMusic(env:Env,agencyId:string,importId:string,id:string,bytes:Uint8Array){
   const draft=await findCreationDraft(env.DB,agencyId,importId);
@@ -103,12 +104,15 @@ async function retainOriginalAnimations(env:Env,agencyId:string,m:VideoManifest,
 }
 export async function editExistingVideo(env:Env,agencyId:string,jobId:string,key:string,signal:AbortSignal){
   const job=await ownGeneration(env,agencyId,jobId);
-  if(job.status!=='ready'||!generationRetained(job))throw new RequestFailure('NOT_FOUND');
-  const stored=await env.DB.prepare("SELECT manifest_json AS manifest FROM video_manifests WHERE agency_id=? AND job_id=? AND state='prepared'")
-    .bind(job.agencyId,jobId).first<{manifest:string}>();
+  // A failed render can still have complete, paid voice/animation/avatar assets.
+  // Copy that verified montage into a draft; never reopen the settled job or
+  // repeat provider calls. Failures before preparation remain unavailable.
+  if(!(job.status==='ready'||job.status==='failed'&&job.stage==='rendering')||!generationRetained(job))throw new RequestFailure('NOT_FOUND');
+  const stored=await env.DB.prepare("SELECT manifest_json AS manifest,manifest_hash AS hash FROM video_manifests WHERE agency_id=? AND job_id=? AND state='prepared'")
+    .bind(job.agencyId,jobId).first<{manifest:string;hash:string}>();
   if(!stored)throw new RequestFailure('NOT_FOUND');
   const m=VideoManifest.parse(JSON.parse(stored.manifest)),input=GenerationRequest.parse(JSON.parse(job.input));
-  if(m.jobId!==jobId||m.agencyId!==job.agencyId)throw new RequestFailure('NOT_FOUND');
+  if(m.jobId!==jobId||m.agencyId!==job.agencyId||await videoManifestHash(m)!==stored.hash)throw new RequestFailure('NOT_FOUND');
   await retainOriginalAnimations(env,agencyId,m,signal);
   let draft=await startManualCreationDraft(env.DB,agencyId,key,`Version de la vidéo ${jobId}`);
   const seconds=([20,30,40] as const).find(s=>s*30>=m.scenes.reduce((n,scene)=>n+scene.durationFrames,0))??40;
@@ -133,7 +137,7 @@ export async function editExistingVideo(env:Env,agencyId:string,jobId:string,key
   if(m.music&&old?.editor?.music){const music=await copyMusic(env,agencyId,draft.id,m.music.asset,`agencies/${job.agencyId}/jobs/${jobId}/`);
     editor.music={...old.editor.music,...music};}
   const voiceSourceId=await restoreVideoVoice(env,agencyId,draft.id,m,sourceVoice,seconds,signal);
-  const settings:VideoCustomization={...defaultVideoCustomization(m.brand),...old,map:m.map?.settings,mapAutomatic:undefined,mapDisabled:m.map?undefined:true,editor,voice:sourceVoice,voiceSourceId,
+  const settings:VideoCustomization={...defaultVideoCustomization(m.brand),...old,...(m.avatar?{avatar:m.avatar.settings}:{}),map:m.map?.settings,mapAutomatic:undefined,mapDisabled:m.map?undefined:true,editor,voice:sourceVoice,voiceSourceId,
     ...(voiceSourceId?{narration:m.scenes.map(s=>s.narrationText)}:{}),photoOrder:[...new Set(editor.clips.map(c=>c.photoSlot))],
     runwayClips:undefined,runwayPhotos:m.photoAnimations?.length?m.photos.flatMap((photo,slot)=>
       m.photoAnimations!.some(clip=>clip.photoAssetId===photo.id&&clip.sourceSha256===photo.sha256)?[slot]:[]):

@@ -49,8 +49,9 @@ async function setup(t:{after(fn:()=>Promise<void>):void},label:string,clips:num
   t.after(()=>mf.dispose());const env=await mf.getBindings<{DB:D1Database;MEDIA:R2Bucket}>();
   if(options.legacySchema){for(const file of (await readdir(new URL('../packages/db/migrations/',import.meta.url))).filter(f=>/^\d{4}_.*\.sql$/.test(f)&&f<'0055').sort())
     await env.DB.exec((await readFile(new URL(`../packages/db/migrations/${file}`,import.meta.url),'utf8')).replace(/^--.*$/gm,'').replace(/\n/g,' '));
-    // Only the animation journal is kept legacy; admission uses current map settings.
+    // Only the animation journal is kept legacy; admission uses current map and avatar settings.
     await env.DB.exec((await readFile(new URL('../packages/db/migrations/0056_default_video_map.sql',import.meta.url),'utf8')).replace(/^--.*$/gm,'').replace(/\n/g,' '));
+    await env.DB.exec((await readFile(new URL('../packages/db/migrations/0058_heygen_avatars.sql',import.meta.url),'utf8')).replace(/^--.*$/gm,'').replace(/\n/g,' '));
   }else await migrateNarrationProbe(env.DB);
   const seed=await seedNarrationFixture(env.DB,label,true);await env.DB.prepare("UPDATE jobs SET status='failed',error_code='FIXTURE',lease_until=NULL WHERE id=?").bind(seed.jobId).run();
   const month=new Date().toISOString().slice(0,7),at=new Date().toISOString();

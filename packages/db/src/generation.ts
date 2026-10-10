@@ -1,4 +1,4 @@
-import {AgencyBrand, EntityId, Timestamp, GeneratableListing, GenerationRequest, GenerationView, VideoReport, VideoAsset, publicErrors,customizedListing,generationCreditCost,requestedAnimations,CREDIT_PRICING_VERSION,selectedAnimationIndices,URL_IMPORT_QUOTAS, type PublicErrorCode,type NormalizedListing} from '@bienvu/contracts';
+import {AgencyBrand, EntityId, Timestamp, GeneratableListing, GenerationRequest, GenerationView, GenerationPreparation, VideoReport, VideoAsset, publicErrors,customizedListing,generationCreditCost,avatarCreditCost,requestedAnimations,CREDIT_PRICING_VERSION,selectedAnimationIndices,URL_IMPORT_QUOTAS, type PublicErrorCode,type NormalizedListing} from '@bienvu/contracts';
 import type {Database} from './index';
 import {creditGrant,creditBalance} from './credits';
 import {findImport} from './imports';
@@ -6,20 +6,34 @@ import {findEditorVoiceSource} from './editor-voice';
 import {retainedAnimations} from './animation-library';
 import {generationRetained} from './retention';
 import {voiceSettings} from './voices';
+import {admitAvatar} from './avatars';
 import {generationMapDefault} from './video-map-settings';
 
 export class GenerationFailure extends Error {constructor(public code:PublicErrorCode){super(code);}}
 export type GenerationRow={ownerAgencyId:string|null;anonymousSessionId:string|null;retention:'available'|'expiring'|'expired';creditStatus:'unfunded'|'reserved'|'consumed'|'released';previewKey:string|null;previewReport:string|null;jobId:string;agencyId:string;inputHash:string;input:string;brand:string;deadline:string;expiresAt:string|null;
   status:GenerationView['status'];stage:GenerationView['stage'];progressPercent:number;attempt:number;errorCode:string|null;narrationErrorCode?:string|null;createdAt:string;updatedAt:string;sourceKind:'url'|'manual'|null;
   workflowId:string;listingId:string|null;objectKey:string|null;report:string|null;launchStatus:string;title:string;locality:string|null;
-  creditVersion?:number;creditsReserved?:number;creditsUsed?:number;animationsRequested?:number;selectedVoice?:string;defaultMap?:string|null};
+  preparation?:string|null;narrationState?:string|null;mapResolved?:number;resolvedMap?:string|null;manifestMap?:number|null;animationsReady?:number;animationsActive?:number;animationsReused?:number;
+  creditVersion?:number;creditsReserved?:number;creditsUsed?:number;animationsRequested?:number;selectedVoice?:string;defaultMap?:string|null;avatarConfig?:string|null;avatarCredits?:number;avatarUsed?:number;avatarReady?:number;avatarFailed?:number;avatarActive?:number};
 const columns=`g.owner_agency_id AS ownerAgencyId,g.anonymous_session_id AS anonymousSessionId,g.retention,r.status AS creditStatus,p.object_key AS previewKey,p.report_json AS previewReport,g.job_id AS jobId,g.agency_id AS agencyId,g.input_hash AS inputHash,g.input_json AS input,g.brand_json AS brand,
   g.deadline,CASE WHEN g.storage_permanent=1 THEN NULL ELSE g.expires_at END AS expiresAt,j.status,j.stage,j.progress_percent AS progressPercent,j.attempt,j.error_code AS errorCode,n.error_code AS narrationErrorCode,j.created_at AS createdAt,j.updated_at AS updatedAt,
   j.workflow_id AS workflowId,j.listing_id AS listingId,a.object_key AS objectKey,a.report_json AS report,l.status AS launchStatus,
   coalesce(json_extract(i.result_json,'$.facts.title.value'),'Votre annonce') AS title,
   json_extract(i.result_json,'$.facts.locality.value') AS locality,
   CASE WHEN json_type(g.input_json,'$.url') IS NOT NULL THEN 'url' ELSE i.source_kind END AS sourceKind,
-  g.credit_version AS creditVersion,r.credit_amount AS creditsReserved,r.credit_used AS creditsUsed,g.animations_requested AS animationsRequested,g.selected_voice AS selectedVoice,g.default_map_json AS defaultMap`;
+  g.credit_version AS creditVersion,r.credit_amount AS creditsReserved,r.credit_used AS creditsUsed,g.animations_requested AS animationsRequested,g.selected_voice AS selectedVoice,g.default_map_json AS defaultMap,g.avatar_config_json AS avatarConfig,g.avatar_credits+g.avatar_extra_credits AS avatarCredits,
+  coalesce((SELECT sum(consumed) FROM avatar_credit_parts WHERE job_id=g.job_id),0) AS avatarUsed,
+  (SELECT count(*) FROM avatar_tasks WHERE job_id=g.job_id AND state='ready') AS avatarReady,
+  (SELECT count(*) FROM avatar_tasks WHERE job_id=g.job_id AND state IN ('failed','uncertain')) AS avatarFailed,
+  (SELECT count(*) FROM avatar_tasks WHERE job_id=g.job_id AND (state IN ('claimed','submitting','submitted') OR (state='uncertain' AND provider_id IS NOT NULL))) AS avatarActive,
+  (SELECT json_group_object(step,state) FROM generation_preparation_steps WHERE job_id=g.job_id AND agency_id=g.agency_id) AS preparation,
+  n.state AS narrationState,
+  EXISTS(SELECT 1 FROM generation_map_resolutions WHERE job_id=g.job_id AND agency_id=g.agency_id) AS mapResolved,
+  (SELECT map_json FROM generation_map_resolutions WHERE job_id=g.job_id AND agency_id=g.agency_id) AS resolvedMap,
+  (SELECT json_type(manifest_json,'$.map') IS NOT NULL FROM video_manifests WHERE job_id=g.job_id AND agency_id=g.agency_id) AS manifestMap,
+  (SELECT count(*) FROM photo_animations WHERE job_id=g.job_id AND agency_id=g.agency_id AND state='ready') AS animationsReady,
+  (SELECT count(*) FROM photo_animations WHERE job_id=g.job_id AND agency_id=g.agency_id AND state IN ('submitting','submitted')) AS animationsActive,
+  g.animations_reused AS animationsReused`;
 const joins=`FROM generation_runs g JOIN jobs j ON j.id=g.job_id JOIN job_launch_intents l ON l.job_id=j.id
   JOIN reservations r ON r.job_id=j.id LEFT JOIN narration_runs n ON n.job_id=j.id AND n.agency_id=j.agency_id
   LEFT JOIN generation_previews p ON p.job_id=j.id LEFT JOIN generation_artifacts a ON a.job_id=j.id LEFT JOIN listing_imports i ON i.id=j.listing_id AND i.agency_id=j.agency_id`;
@@ -35,22 +49,45 @@ export function generationMasterUnlocked(row:GenerationRow){
   return Boolean(row.ownerAgencyId)&&(row.creditStatus==='consumed'||row.creditVersion===1&&Boolean(row.anonymousSessionId));
 }
 export function generationView(row:GenerationRow,now=Date.now(),audience:'owner'|'anonymous'='owner'):GenerationView {
+  const input=GenerationRequest.parse(JSON.parse(row.input));
+  const recorded=GenerationPreparation.parse(JSON.parse(row.preparation??'{}'));
+  const preparation:GenerationPreparation={
+    ...(row.defaultMap||input.customization?.map?.location?{map:'pending' as const}:{}),
+    ...(row.avatarCredits?{avatar:'pending' as const}:{}),
+    ...(row.animationsRequested?{animations:'pending' as const}:{}),...recorded,
+  };
+  const afterPreparation=row.stage==='rendering';
+  // Historical/in-flight workflows may have passed a step before these checkpoints existed.
+  if(preparation.map&&!recorded.map){
+    if(row.mapResolved)preparation.map=row.resolvedMap?'ready':'skipped';
+    else if(row.manifestMap!==null&&row.manifestMap!==undefined)preparation.map=row.manifestMap?'ready':'skipped';
+  }
+  if(preparation.avatar&&!recorded.avatar){
+    const expected=input.customization?.avatar?.moments==='both'?2:1;
+    preparation.avatar=row.avatarActive?'working':afterPreparation||(row.avatarReady??0)+(row.avatarFailed??0)>=expected
+      ?row.avatarReady?'ready':'skipped':'pending';
+  }
+  if(preparation.animations&&!recorded.animations){
+    preparation.animations=row.animationsActive?'working':afterPreparation
+      ?(row.animationsReady??0)+(row.animationsReused??0)>0?'ready':'skipped':'pending';
+  }
   const available=generationRetained(row,now)&&row.status==='ready'&&Boolean(row.objectKey);
   const gift=row.creditVersion===1&&Boolean(row.anonymousSessionId);
   const unlocked=audience==='owner'&&generationMasterUnlocked(row);
   const preview=available&&Boolean(row.previewKey);
   const errorCode=row.status==='failed'&&row.errorCode==='GENERATION_FAILED'&&row.narrationErrorCode==='SCRIPT_INVALID'
     ?row.narrationErrorCode:row.errorCode;
-  return GenerationView.parse({ownership:row.ownerAgencyId?'owned':'anonymous',masterAccess:unlocked?'unlocked':row.creditStatus==='reserved'?'reserved':'locked',retention:row.retention,id:row.jobId,status:row.status,stage:row.stage,progressPercent:row.progressPercent,attempt:row.attempt,sourceKind:row.sourceKind,
-    creditsReserved:row.creditsReserved??1,creditsUsed:gift?(row.status==='ready'?1:0):row.creditsUsed??0,
-    creditsRefunded:['ready','failed'].includes(row.status)?Math.max(0,(row.creditsReserved??1)-(gift&&row.status==='ready'?1:row.creditsUsed??0)):0,
+  return GenerationView.parse({preparation,narrationReady:row.narrationState==='prepared'||afterPreparation,ownership:row.ownerAgencyId?'owned':'anonymous',masterAccess:unlocked?'unlocked':row.creditStatus==='reserved'?'reserved':'locked',retention:row.retention,id:row.jobId,status:row.status,stage:row.stage,progressPercent:row.progressPercent,attempt:row.attempt,sourceKind:row.sourceKind,
+    creditsReserved:(row.creditsReserved??1)+(row.avatarCredits??0),creditsUsed:gift?(row.status==='ready'?1:0):(row.creditsUsed??0)+(row.avatarUsed??0),
+    ...(row.avatarCredits?{avatar:{requested:1,ready:row.avatarReady??0,failed:row.avatarFailed??0,active:row.avatarActive??0,creditsUsed:row.avatarUsed??0}}:{}),
+    creditsRefunded:['ready','failed'].includes(row.status)?Math.max(0,((row.creditsReserved??1)+(row.avatarCredits??0))-(gift&&row.status==='ready'?1:(row.creditsUsed??0)+(row.avatarUsed??0))):0,
     animationsRequested:row.animationsRequested??0,animationsUsed:row.status==='ready'&&row.creditVersion===1?Math.max(0,(row.creditsUsed??0)-1):0,
     errorCode:errorCode&&errorCode in publicErrors?errorCode:errorCode?'GENERATION_FAILED':null,
     createdAt:row.createdAt,updatedAt:row.updatedAt,expiresAt:row.expiresAt,title:row.title,locality:row.locality,
     videoUrl:available&&unlocked?`/api/generations/${row.jobId}/video`:preview?audience==='anonymous'?`/api/trial/${row.jobId}/preview`:`/api/generations/${row.jobId}/preview`:null,downloadUrl:available&&unlocked?`/api/generations/${row.jobId}/video?download=1`:null,
     durationSeconds:row.report?VideoReport.parse(JSON.parse(row.report)).durationSeconds:null,
-    aspectRatio:GenerationRequest.parse(JSON.parse(row.input)).aspectRatio??'9:16',
-    syntheticVoice:GenerationRequest.parse(JSON.parse(row.input)).voiceEnabled!==false,retryAllowed:row.status==='queued'&&row.launchStatus==='pending'});
+    aspectRatio:input.aspectRatio??'9:16',
+    syntheticVoice:input.voiceEnabled!==false,retryAllowed:row.status==='queued'&&row.launchStatus==='pending'});
 }
 export async function generationRights(db:Database,agencyId:string,flag:string|undefined,now=Date.now()) {
   const at=new Date(now).toISOString();
@@ -94,22 +131,23 @@ export async function admitGeneration(db:Database,agencyId:string,key:string,inp
   const brand=AgencyBrand.safeParse(brandRow);if(!brand.success)throw new GenerationFailure('VALIDATION_ERROR');
   const grant=await creditGrant(db,agencyId,now);
   const reuses=sourceListing?await retainedAnimations(db,agencyId,sourceListing,parsed.data.customization,parsed.data.aspectRatio??'9:16',now):[];
-  const credits=generationCreditCost(parsed.data.customization)-reuses.length,animations=requestedAnimations(parsed.data.customization);
-  if(!grant||grant.remaining<credits)throw new GenerationFailure('QUOTA_EXHAUSTED');
+  const avatarCredits=avatarCreditCost(parsed.data.customization?.avatar,parsed.data.durationSeconds),credits=generationCreditCost(parsed.data.customization,parsed.data.durationSeconds)-avatarCredits-reuses.length,animations=requestedAnimations(parsed.data.customization);
+  if(!grant||grant.remaining<credits+avatarCredits)throw new GenerationFailure('QUOTA_EXHAUSTED');
   if(saved)try{selectedAnimationIndices((parsed.data.customization?.photoOrder??saved.photos.map(p=>p.sourceOrder)),parsed.data.customization);}catch{throw new GenerationFailure('VALIDATION_ERROR');}
   if(saved&&verifyPhotos)await verifyPhotos(saved);
   const id=crypto.randomUUID(),at=new Date(now).toISOString(),selectedVoice=parsed.data.customization?.voice??(await voiceSettings(db)).voice;
+  let avatarConfig:string|null;try{avatarConfig=await admitAvatar(db,parsed.data.customization?.avatar,selectedVoice,parsed.data.voiceEnabled!==false);}catch{throw new GenerationFailure('AVATAR_UNAVAILABLE');}
   try {await db.prepare(`INSERT INTO generation_runs(job_id,agency_id,allocation_id,reservation_id,idempotency_key,input_hash,input_json,brand_json,
-    created_at,deadline,expires_at,month,credit_version,credits_total,animations_requested,reuse_pricing,animations_reused,animation_reuses_json,funding_version,financial_mode,selected_voice,default_map_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,1,(SELECT mode FROM credit_payment_policy WHERE id=1),?,?)`)
-    .bind(id,agencyId,grant.id,crypto.randomUUID(),key,hash,body,JSON.stringify(brand.data),at,new Date(now+900_000).toISOString(),
-      new Date(now+7*86400_000).toISOString(),at.slice(0,7),CREDIT_PRICING_VERSION,credits,animations,reuses.length,JSON.stringify(reuses),selectedVoice,await generationMapDefault(db,parsed.data)).run();
+    created_at,deadline,expires_at,month,credit_version,credits_total,animations_requested,reuse_pricing,animations_reused,animation_reuses_json,funding_version,financial_mode,selected_voice,default_map_json,avatar_credits,avatar_config_json,avatar_extra_credits) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,1,(SELECT mode FROM credit_payment_policy WHERE id=1),?,?,?,?,?)`)
+    .bind(id,agencyId,grant.id,crypto.randomUUID(),key,hash,body,JSON.stringify(brand.data),at,new Date(now+(avatarCredits?1800_000:900_000)).toISOString(),
+      new Date(now+7*86400_000).toISOString(),at.slice(0,7),CREDIT_PRICING_VERSION,credits,animations,reuses.length,JSON.stringify(reuses),selectedVoice,await generationMapDefault(db,parsed.data),Math.min(1,avatarCredits),avatarConfig,Math.max(0,avatarCredits-1)).run();
   }catch(error){
     // Une course sur la même clé doit converger, même si le trigger voit le slot occupé.
     const winner=await db.prepare('SELECT job_id AS id,input_hash AS hash FROM generation_runs WHERE agency_id=? AND idempotency_key=?')
       .bind(agencyId,key).first<{id:string;hash:string}>();
     if(winner){if(winner.hash!==hash)throw new GenerationFailure('CONFLICT');return (await findGeneration(db,agencyId,winner.id))!;}
     const message=error instanceof Error?error.message:'';
-    const code=(['GENERATIONS_PAUSED','QUOTA_EXHAUSTED','GENERATION_BUSY','GENERATION_BUDGET_LIMIT'] as const).find(c=>message.includes(c));
+    const code=(['GENERATIONS_PAUSED','QUOTA_EXHAUSTED','GENERATION_BUSY','GENERATION_BUDGET_LIMIT','AVATAR_UNAVAILABLE','AVATAR_BUDGET_LIMIT','AVATAR_BUSY','AVATAR_LOGIN_REQUIRED'] as const).find(c=>message.includes(c));
     if(code)throw new GenerationFailure(code);throw error;
   }
   return (await findGeneration(db,agencyId,id))!;

@@ -208,4 +208,6 @@ export const GenerationInput = z.union([
   value.durationSeconds===value.customization.editor.durationSeconds&&value.aspectRatio===value.customization.editor.aspectRatio&&
   (value.voiceEnabled!==false)===value.customization.editor.voiceEnabled&&
   (value.voiceEnabled!==false&&value.subtitlesEnabled!==false)===value.customization.editor.subtitlesEnabled
-),'Les paramètres de génération doivent correspondre à ceux de l’éditeur.');
+),'Les paramètres de génération doivent correspondre à ceux de l’éditeur.')
+ .refine(value=>!value.customization?.avatar||value.customization.avatar.hidden||value.voiceEnabled!==false,'L’avatar nécessite une voix off.')
+ .refine(value=>value.customization?.avatar?.moments!=='full'||value.customization.avatar.hidden||value.durationSeconds!==undefined,'Choisissez la durée de la vidéo pour l’avatar continu.');

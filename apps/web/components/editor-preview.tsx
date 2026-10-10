@@ -1,7 +1,8 @@
 'use client';
 import {useEffect,useRef,useState,type CSSProperties,type PointerEvent} from 'react';
-import {editorActiveClip,editorClipStarts,mapFrame,editorLayerStyle,editorPhotoMotion,editorCaptionStyle,editorVoiceCaption,type EditorVoicePreview,type EditorDocument,type EditorLayer,type PhotoAsset,type VideoMap} from '@bienvu/contracts';
+import {editorActiveClip,editorClipStarts,mapFrame,editorLayerStyle,editorPhotoMotion,editorCaptionStyle,editorVoiceCaption,avatarFrameStyle,avatarMoments,type AvatarCustomization,type AvatarLook,type AvatarPreviewClip,type EditorVoicePreview,type EditorDocument,type EditorLayer,type PhotoAsset,type VideoMap} from '@bienvu/contracts';
 import {HomeIcon} from './home-icons';
+import {AvatarPoster} from './avatar-controls';
 import {MapScenePreview} from './video-map';
 export const editorTime=(frames:number)=>`${Math.floor(frames/30/60).toString().padStart(2,'0')}:${Math.floor(frames/30%60).toString().padStart(2,'0')}`;
 function RetainedClip(p:{url:string;poster?:string;frame:number;playing:boolean;style:CSSProperties}){
@@ -16,7 +17,7 @@ function RetainedClip(p:{url:string;poster?:string;frame:number;playing:boolean;
  },[p.frame,p.playing,p.url]);
  return <>{error&&<span className="editor-media-unavailable" role="alert">Ce clip ne peut pas être lu. Rechargez l’aperçu.</span>}<video ref={ref} src={p.url} poster={p.poster} muted playsInline preload="metadata" style={p.style} onError={()=>setError(true)}/></>;
 }
-export function EditorPreview(p:{doc:EditorDocument;voice?:EditorVoicePreview|null;voiceReusable?:boolean;photos:PhotoAsset[];photoUrls?:Record<string,string>;draftId:string;logoId?:string|null;frame:number;playing:boolean;zoom:number;
+export function EditorPreview(p:{avatar?:AvatarCustomization;avatarLook?:AvatarLook;avatars?:AvatarPreviewClip[];doc:EditorDocument;voice?:EditorVoicePreview|null;voiceReusable?:boolean;photos:PhotoAsset[];photoUrls?:Record<string,string>;draftId:string;logoId?:string|null;frame:number;playing:boolean;zoom:number;
   map?:VideoMap;primaryColor:string;secondaryColor:string;agencyName:string;
   photoMotion:boolean;transition:'fade'|'cut';animations?:{slot:number;url:string}[];
   selected:string|null;onSelect(id:string):void;onSeek(frame:number):void;onPlay():void;onMove(layer:EditorLayer):void;onCheckpoint():void}){
@@ -58,6 +59,10 @@ export function EditorPreview(p:{doc:EditorDocument;voice?:EditorVoicePreview|nu
           {p.selected===layer.id&&!p.playing&&<span className="editor-layer-handles" aria-hidden="true"><i/><i/><i/><i/></span>}
         </button>)}
         {p.map&&mapAt!==null&&<MapScenePreview map={p.map} aspectRatio={p.doc.aspectRatio} frame={mapAt} primaryColor={p.primaryColor} secondaryColor={p.secondaryColor} agencyName={p.agencyName}/>}
+        {p.avatar&&!p.avatar.hidden&&p.doc.voiceEnabled&&(()=>{const clips=p.voiceReusable?p.avatars?.filter(c=>c.lookId===p.avatar!.lookId&&c.engine===p.avatar!.engine&&c.transparent===(p.avatar!.appearance==='cutout')&&avatarMoments(p.avatar).includes(c.moment))??[]:[];
+          const clip=clips.find(c=>p.frame>=c.startFrame&&p.frame<c.startFrame+c.durationFrames);
+          return clip?<div style={avatarFrameStyle(p.avatar,width,height,clip.transparent)}><RetainedClip url={clip.url} frame={p.frame-clip.startFrame} playing={p.playing} style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:'center 30%'}}/></div>:
+            !clips.length?<AvatarPoster avatar={p.avatar} look={p.avatarLook} frame={p.frame} total={total} width={width} height={height}/>:null;})()}
         {p.doc.clips.length>0&&p.doc.textsVisible&&p.doc.voiceEnabled&&p.doc.subtitlesEnabled&&(p.voice?caption&&<div className="editor-caption-placement" style={{...editorCaptionStyle(width),...(mapAt!==null?{top:'27%'}:{})}} aria-label="Sous-titres de la voix d’origine">{caption}</div>:<div className="editor-caption-placement" style={{...editorCaptionStyle(width),...(mapAt!==null?{top:'27%'}:{})}} aria-label="Emplacement des sous-titres">Sous-titres de votre narration<br/><span>Aperçu de leur emplacement</span></div>)}
       </div></div></div>
     <div className="editor-playback"><button type="button" aria-label="Photo précédente" onClick={()=>p.onSeek(mapAt!==null?(p.map?.position==='end'?starts.at(-1)?.startFrame??0:0):Math.max(0,(starts.find(c=>c.id===active?.id)?.startFrame??0)-1))}><HomeIcon name="previous" size={21}/></button>

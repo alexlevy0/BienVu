@@ -75,6 +75,9 @@ importers:
 
   apps/pipeline:
     dependencies:
+      '@bienvu/avatars':
+        specifier: workspace:*
+        version: link:../../packages/avatars
       '@bienvu/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -147,6 +150,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@bienvu/avatars':
+        specifier: workspace:*
+        version: link:../../packages/avatars
       '@bienvu/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -204,6 +210,12 @@ importers:
       zod:
         specifier: 4.6.5
         version: 4.6.5
+
+  packages/avatars:
+    dependencies:
+      '@bienvu/contracts':
+        specifier: workspace:*
+        version: link:../contracts
 
   packages/contracts:
     dependencies:

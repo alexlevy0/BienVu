@@ -13,14 +13,14 @@ type NumericKey<T> = {[K in keyof T]: T[K] extends number ? K : never}[keyof T];
 const money = (value: number | null, decimals = 2) => value === null ? '—' : new Intl.NumberFormat('fr-FR', {style: 'currency', currency: 'EUR', minimumFractionDigits: decimals, maximumFractionDigits: decimals}).format(value);
 const num = (value: number, decimals = 1) => value.toLocaleString('fr-FR', {maximumFractionDigits: decimals});
 const pct = (value: number | null) => value === null ? '—' : num(value) + ' %';
-const providerNames: Record<string, string> = {openai: 'OpenAI · rédaction', google: 'Google · voix', fish: 'Fish Audio · voix', cartesia: 'Cartesia · voix', runway: 'Runway · animations', cloudflare: 'Cloudflare', other: 'Autres'};
+const providerNames: Record<string, string> = {openai: 'OpenAI · rédaction', google: 'Google · voix', fish: 'Fish Audio · voix', cartesia: 'Cartesia · voix', heygen: 'HeyGen · avatars', runway: 'Runway · animations', cloudflare: 'Cloudflare', other: 'Autres'};
 const tabs: {id: Tab; label: string}[] = [
   {id: 'offers', label: 'Packs & abonnements'}, {id: 'usage', label: 'Profils d’usage'},
   {id: 'production', label: 'Coûts de production'}, {id: 'volume', label: 'Volume & frais'},
   {id: 'forecast', label: 'Prévisions & sensibilité'}, {id: 'observations', label: 'Données observées'},
 ];
 const parts: [keyof PricingReport['months'][number]['costs'], string][] = [
-  ['runway', 'Animations IA'], ['text', 'Rédaction'], ['voice', 'Voix off'], ['compute', 'Calcul Cloudflare'],
+  ['runway', 'Animations IA'], ['avatar', 'Avatars IA'], ['text', 'Rédaction'], ['voice', 'Voix off'], ['compute', 'Calcul Cloudflare'],
   ['browser', 'Imports par navigateur'], ['storage', 'Stockage R2'], ['operations', 'Opérations R2'],
   ['workers', 'Requêtes et CPU Workers'], ['support', 'Support'], ['other', 'Autres coûts variables'],
 ];
@@ -229,14 +229,18 @@ export function AdminPricingSimulator({accountId}: {accountId: string}) {
           <div className="pricing-fields">{([['share', 'Part des vidéos (%)'], ['photos', 'Photos'], ['animations', 'Photos animées'], ['durationSeconds', 'Durée vidéo (s)'], ['renderSeconds', 'Calcul du rendu (s)']] as const).map(([key, label]) =>
             <NumberField key={key} label={label} value={profile[key]} step={key === 'share' ? 0.1 : 1} onChange={value => edit(s => ({...s, profiles: s.profiles.map((p, n) => n === i ? {...p, [key]: value} : p)}))}/>)}
           </div><div className="pricing-checks">{([['voice', 'Voix off'], ['map', 'Séquence carte']] as const).map(([key, label]) => <label key={key}><input type="checkbox" checked={profile[key]} onChange={e => edit(s => ({...s, profiles: s.profiles.map((p, n) => n === i ? {...p, [key]: e.target.checked} : p)}))}/>{label}</label>)}</div>
+          {profile.avatar&&<label className="pricing-field"><span>Présence de l’avatar</span><select value={profile.avatar.coverage??'passages'} onChange={e=>edit(s=>({...s,profiles:s.profiles.map((p,n)=>n===i?{...p,avatar:{...p.avatar!,coverage:e.target.value as 'passages'|'full'}}:p)}))}><option value="passages">Début / fin · +1 crédit</option><option value="full">Toute la vidéo · +1 crédit / 10 s</option></select></label>}
+          <label className="pricing-field"><span>Avatar IA · durée totale des passages courts (s)</span><input type="number" min={0} max={16} step={1} disabled={profile.avatar?.coverage==='full'} value={profile.avatar?.seconds??0} onChange={e=>edit(s=>({...s,profiles:s.profiles.map((p,n)=>n===i?{...p,avatar:Number(e.target.value)>0?{seconds:Number(e.target.value),engine:p.avatar?.engine??'avatar_iii'}:undefined}:p)}))}/></label>
+          {profile.avatar&&<label className="pricing-field"><span>Moteur de l’avatar</span><select value={profile.avatar.engine} onChange={e=>edit(s=>({...s,profiles:s.profiles.map((p,n)=>n===i?{...p,avatar:{...p.avatar!,engine:e.target.value as 'avatar_iii'|'avatar_iv'}}:p)}))}><option value="avatar_iii">Avatar III</option><option value="avatar_iv">Avatar IV studio</option></select></label>}
           {report && <p className="pricing-profile-result">{num(report.profiles[i].measures.credits, 2)} crédits par vidéo · {money(report.profiles[i].grossEur, 3)} de coût prudent</p>}
         </article>)}</div>
-        <p className="pricing-help">1 crédit par génération, plus 1 par nouvelle animation IA. Une animation réutilisée réduit à la fois le coût fournisseur et les crédits facturés. Moyenne : {report ? num(report.averageCreditsPerVideo, 2) : '—'} crédits par vidéo.</p>
+        <p className="pricing-help">1 crédit par génération, plus 1 par nouvelle animation IA. Avatar IA : 1 crédit pour un ou deux passages, ou 1 crédit par tranche de 10 secondes sur toute la vidéo. Une animation réutilisée réduit à la fois le coût fournisseur et les crédits facturés. Moyenne : {report ? num(report.averageCreditsPerVideo, 2) : '—'} crédits par vidéo.</p>
       </section>
       {fields('production', [['animationReusePercent', 'Animations réutilisées (%)', 1], ['extraAnimationAttemptsPercent', 'Tentatives IA facturées supplémentaires (%)', 1, 'Échecs facturés ou nouvelles générations. Une reprise sans nouvel appel fournisseur ne compte pas.'], ['extraRenderPercent', 'Rendus supplémentaires (%)', 1, 'Réexports offerts et reprises qui utilisent du calcul sans créer de nouveaux crédits.'], ['voiceExtraPercent', 'Voix régénérées supplémentaires (%)', 1]])}
     </>}
 
     {tab === 'production' && <>
+      <section className="pricing-card"><h3>Avatars IA · HeyGen</h3><div className="pricing-fields">{([['priceIII','Avatar III ($ / minute)',.99],['priceIV','Avatar IV studio ($ / minute)',4.83],['reusePercent','Vidéos avec tous les clips réutilisés (%)',0],['mediaMB','Stockage des clips par vidéo (Mo)',4]] as const).map(([key,label,initial])=><NumberField key={key} label={label} value={input.production.avatar?.[key]??initial} step={key==='reusePercent'?1:.01} onChange={value=>edit(s=>({...s,production:{...s.production,avatar:{priceIII:.99,priceIV:4.83,reusePercent:0,mediaMB:4,...s.production.avatar,[key]:value}}}))}/>)}</div><p className="pricing-help">Renseignez la durée cumulée d’ouverture et de conclusion dans chaque profil. Le coût fournisseur varie avec cette durée ; le supplément BienVu reste de 1 crédit. Les clips réutilisés ne déclenchent pas de nouvel appel HeyGen. Les tarifs sont des hypothèses ajustables, sans licence ou remise supposée pour l’audio externe.</p></section>
       <section className="pricing-card"><h3>Animations et rédaction</h3>{fields('production', [
         ['runwayCreditsPerSecond', 'Crédits API Runway / seconde', 0.1], ['runwaySeconds', 'Durée d’un clip IA (s)', 1],
         ['runwayUsdPerCredit', 'Prix USD / crédit Runway', 0.001], ['textEurPerVideo', 'Rédaction EUR / vidéo', 0.001, 'Hypothèse initiale. Une moyenne de requêtes estimée peut être copiée depuis Données observées.'],

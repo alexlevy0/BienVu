@@ -1,5 +1,6 @@
 import {z} from 'zod';
 import {EntityId, ObjectKey, Sha256, VideoDuration} from './product';
+import {AvatarAudioSources} from './avatars';
 
 export const ScriptFactRef = z.enum(['propertyType', 'locality', 'price', 'area', 'rooms', 'transaction', 'photos', 'agency.name', 'agency.contact','narration','description']);
 export type ScriptFactRef = z.infer<typeof ScriptFactRef>;
@@ -29,6 +30,9 @@ export const NarrationAudio = z.object({id: EntityId, cacheKey: Sha256, objectKe
   sizeBytes: z.number().int().positive().max(7 * 1024 * 1024), durationMs: z.number().int().positive().max(35000),
   sampleRate: z.number().int().positive(), channels: z.number().int().min(1).max(2), rmsDbfs: z.number().finite(),
 }).strict();
+// Full-length avatar audio is a deterministic assembly of the original tracks.
+// It never replaces or lengthens the individual narration WAVs.
+export const AvatarAudio=NarrationAudio.extend({durationMs:z.number().int().positive().max(40000),sources:AvatarAudioSources.optional()});
 export const PreparedNarration = z.object({script: ListingScript, voiceEnabled:z.boolean().optional(),durationSeconds:VideoDuration.optional(),audio: z.array(NarrationAudio).max(6),
   durationFrames: z.array(z.number().int().positive().max(1200)).min(4).max(6),
 }).strict().superRefine((value, ctx) => {

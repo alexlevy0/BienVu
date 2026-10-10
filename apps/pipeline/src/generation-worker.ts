@@ -1,6 +1,6 @@
 import {WorkflowEntrypoint,type WorkflowEvent,type WorkflowStep} from 'cloudflare:workers';
 import {EntityId,GenerationRequest,VideoReport,publicErrors,videoObjectKey,videoPreviewKey,DEFAULT_VIDEO_VOICE} from '@bienvu/contracts';
-import {admitGeneration,findGeneration,generationView,GenerationFailure,failGeneration,setGenerationStage,setGenerationProgress,type GenerationRow} from '@bienvu/db';
+import {admitGeneration,findGeneration,generationView,GenerationFailure,failGeneration,setGenerationStage,setGenerationProgress,setGenerationPreparation,type GenerationRow} from '@bienvu/db';
 import {authorized,json} from './auth';
 import {VideoRenderer} from './video-worker';
 import {getJobVideo,prepareJobVideo} from './video-manifest';
@@ -11,10 +11,12 @@ import {cleanupAnonymousTrials} from './trial-cleanup';
 import {extractDescription,EXTRACTION_TEXT_MAX} from '@bienvu/narration';
 import {loadGenerationListing} from './generation-import';
 import {prepareJobAnimations} from './photo-animations';
-import {prepareDefaultGenerationMap} from './default-video-map';
+import {prepareGenerationMap} from './default-video-map';
 import {safeAiEvent} from '@bienvu/observability';
+import {submitJobAvatars,pollJobAvatars,timeoutJobAvatars,reconcileAvatarTasks} from './avatars';
+import type {HeygenEnvironment} from '@bienvu/avatars';
 export {VideoRenderer};
-export type GenerationEnv=VideoEnv&Pick<NarrationEnv,'GOOGLE_SERVICE_ACCOUNT_JSON'|'GOOGLE_CLOUD_PROJECT'|'GOOGLE_TTS_VOICE'|'OPENAI_API_KEY'|'SCRIPT_MODEL'>&FishVoiceEnv&{
+export type GenerationEnv=VideoEnv&Pick<NarrationEnv,'GOOGLE_SERVICE_ACCOUNT_JSON'|'GOOGLE_CLOUD_PROJECT'|'GOOGLE_TTS_VOICE'|'OPENAI_API_KEY'|'SCRIPT_MODEL'>&FishVoiceEnv&HeygenEnvironment&{
   GENERATIONS_ENABLED:string;GENERATION_TOKEN:string;IMPORT_TOKEN:string;IMPORT_SERVICE:Fetcher;GENERATION_WORKFLOW:Workflow<{agencyId:string;jobId:string}>;
   RUNWAY_ENABLED?:string;RUNWAYML_API_SECRET?:string;RUNWAY_TEST_AGENCY_ID?:string;
 };
@@ -80,7 +82,9 @@ export class GenerationWorkflow extends WorkflowEntrypoint<GenerationEnv,{agency
   protected diagnostic(_error:unknown){}
   protected providers(voiceName?:string,voiceEnabled=true){return realProviders(this.env,voiceName,voiceEnabled);}
   protected animations(agencyId:string,jobId:string){return prepareJobAnimations(this.env,agencyId,jobId);}
-  protected defaultMap(row:GenerationRow){return prepareDefaultGenerationMap(this.env,row);}
+  protected defaultMap(row:GenerationRow){return prepareGenerationMap(this.env,row);}
+  protected avatars(agency:string,job:string){return submitJobAvatars(this.env,agency,job);}
+  protected pollAvatars(agency:string,job:string){return pollJobAvatars(this.env,agency,job);}
   async run(event:WorkflowEvent<{agencyId:string;jobId:string}>,step:WorkflowStep){
     const {agencyId,jobId}=event.payload;
     const once={retries:{limit:0,delay:'1 second' as const},timeout:'10 minutes' as const};
@@ -88,9 +92,14 @@ export class GenerationWorkflow extends WorkflowEntrypoint<GenerationEnv,{agency
       await step.do('import-or-load',once,async()=>{const row=await active(this.env,agencyId,jobId);await setGenerationStage(this.env.DB,row,'importing');
         return loadGenerationListing(this.env,row);});
       await step.do('resolve-default-map',{...once,timeout:'3 minutes'},async()=>{
-        const row=await active(this.env,agencyId,jobId);await this.defaultMap(row);return {prepared:true};
+        const row=await active(this.env,agencyId,jobId),input=GenerationRequest.parse(JSON.parse(row.input));
+        const requested=Boolean(row.defaultMap||input.customization?.map?.location);
+        if(requested)await setGenerationPreparation(this.env.DB,row,'map','working');
+        const map=await this.defaultMap(row);
+        if(requested)await setGenerationPreparation(this.env.DB,row,'map',map?'ready':'skipped');
+        return {prepared:true};
       });
-      await step.do('script-and-voice-checkpoints',once,async()=>{
+      const narration=await step.do('script-and-voice-checkpoints',once,async()=>{
         const row=await active(this.env,agencyId,jobId);await setGenerationStage(this.env.DB,row,'scripting');
         const input=GenerationRequest.parse(JSON.parse(row.input));
         const providers=await this.providers(input.customization?.voice??row.selectedVoice??DEFAULT_VIDEO_VOICE,input.voiceEnabled!==false),guard=()=>active(this.env,agencyId,jobId);
@@ -98,11 +107,29 @@ export class GenerationWorkflow extends WorkflowEntrypoint<GenerationEnv,{agency
         providers.script={...source,plan:async(...args)=>{await guard();return source.plan(...args);}};
         providers.voice={...voice,synthesize:async(text,callId)=>{await guard();return voice.synthesize(text,callId);}};
         await prepareJobNarration(this.env,agencyId,jobId,providers,{brand:JSON.parse(row.brand),onVoicing:()=>setGenerationStage(this.env.DB,row,'voicing')});
-        return {prepared:true};
+        return {prepared:true,avatarRequested:Boolean(row.avatarCredits)};
       });
+      if(narration.avatarRequested){
+        await step.do('prepare-avatar-clips',{...once,timeout:'3 minutes'},async()=>{
+          const row=await active(this.env,agencyId,jobId);await setGenerationPreparation(this.env.DB,row,'avatar','working');return this.avatars(agencyId,jobId);});
+        let done=false;
+        for(let poll=0;poll<60;poll++){
+          const status=await step.do(`avatar-status-${poll}`,{retries:{limit:1,delay:'2 seconds'},timeout:'2 minutes'},async()=>{
+            const row=await active(this.env,agencyId,jobId),status=await this.pollAvatars(agencyId,jobId);
+            if(status.done)await setGenerationPreparation(this.env.DB,row,'avatar',status.ready?'ready':'skipped');
+            return status;});
+          if(status.done){done=true;break;}await step.sleep(`avatar-wait-${poll}`,'10 seconds');
+        }
+        if(!done)await step.do('avatar-timeout',once,async()=>{
+          await timeoutJobAvatars(this.env,agencyId,jobId);
+          const row=await active(this.env,agencyId,jobId);await setGenerationPreparation(this.env.DB,row,'avatar',row.avatarReady?'ready':'skipped');return {done:true};});
+      }
       await step.do('animate-selected-photos',{...once,timeout:'10 minutes'},async()=>{
-        await active(this.env,agencyId,jobId);
-        return this.animations(agencyId,jobId);
+        const row=await active(this.env,agencyId,jobId);
+        if(row.animationsRequested)await setGenerationPreparation(this.env.DB,row,'animations','working');
+        const result=await this.animations(agencyId,jobId);
+        if(row.animationsRequested)await setGenerationPreparation(this.env.DB,row,'animations',result.ready+(row.animationsReused??0)>0?'ready':'skipped');
+        return result;
       });
       const render=await step.do('prepare-and-submit-render',once,async()=>{
         const row=await active(this.env,agencyId,jobId),frozen=await prepareJobVideo(this.env,agencyId,jobId);
@@ -154,6 +181,7 @@ export default {
         await env.DB.prepare("UPDATE generation_control SET enabled=0,updated_at=? WHERE id='generations'").bind(new Date().toISOString()).run();return json({paused:true});
       }
       if(path==='/operator/reconcile'&&request.method==='POST'){await reconcileBatch(env);return json({reconciled:true});}
+      if(path==='/operator/avatars/reconcile'&&request.method==='POST')return json(await reconcileAvatarTasks(env));
       if(path==='/extract'&&request.method==='POST'){
         const limit=EXTRACTION_TEXT_MAX*4+200,reader=request.body?.getReader();
         if(!reader||Number(request.headers.get('content-length'))>limit)return json({error:'VALIDATION_ERROR'},422);
@@ -195,5 +223,5 @@ export default {
       return json({error:'NOT_FOUND'},404);
     }catch(error){const code=error instanceof GenerationFailure?error.code:'INTERNAL_ERROR';return json({error:code},publicErrors[code][0]);}
   },
-  scheduled(_event:ScheduledController,env:GenerationEnv,ctx:ExecutionContext){ctx.waitUntil(reconcileBatch(env).then(()=>cleanupAnonymousTrials(env)).then(()=>cleanupAnimations(env)));},
+  scheduled(_event:ScheduledController,env:GenerationEnv,ctx:ExecutionContext){ctx.waitUntil(reconcileBatch(env).then(()=>reconcileAvatarTasks(env)).then(()=>cleanupAnonymousTrials(env)).then(()=>cleanupAnimations(env)));},
 };

@@ -1,6 +1,10 @@
 import {z} from 'zod';
 
 export const publicErrors = {
+  AVATAR_LOGIN_REQUIRED: [401, 'Connectez-vous pour ajouter un avatar IA à votre vidéo.'],
+  AVATAR_UNAVAILABLE: [503, 'Ce présentateur ou ses réglages sont momentanément indisponibles. Choisissez un autre avatar ou désactivez cette option.'],
+  AVATAR_BUDGET_LIMIT: [429, 'Le budget des avatars IA est atteint. Vous pouvez créer votre vidéo sans avatar.'],
+  AVATAR_BUSY: [429, 'Les présentateurs sont en cours de préparation. Réessayez dans quelques instants.'],
   MAP_UNAVAILABLE: [503, 'La carte est momentanément indisponible. Réessayez ou désactivez la séquence de carte.'],
   MAP_RATE_LIMIT: [429, 'Trop de recherches de carte. Réessayez dans quelques instants.'],
   MAILBOX_UNAVAILABLE: [503, 'La messagerie est momentanément indisponible. Aucun message n’a été envoyé.'],

@@ -74,11 +74,16 @@ async function collectJob(db:Database,job:JobRecord,settings:Awaited<ReturnType<
     if(call.provider==='openai')scriptMs+=metrics?.requestDurationMs??0;else voiceMs+=metrics?.requestDurationMs??0;
     if(call.mode==='real'&&typeof price==='number'&&Number.isFinite(price)&&price>=0&&!(['cartesia','fish'].includes(call.provider)&&price===0)){estimated+=price/1e6;known++;}else if(call.mode==='real')unknown.add(call.provider);
   }
+  const avatarCalls=await aiRows<{id:string;moment:string;engine:string;state:string;mode:string;reused:number;reserved:number;createdAt:string;updatedAt:string}>(db,
+    `SELECT id,moment,engine,state,mode,reused,reserved_micros AS reserved,created_at AS createdAt,updated_at AS updatedAt FROM avatar_tasks WHERE job_id=?`,
+    ['id','moment','engine','state','mode','reused','reserved','createdAt','updatedAt'],[job.id]);
+  for(const c of avatarCalls)if(c.mode==='real'&&!c.reused){estimated+=c.reserved/1e6;known++;if(c.state==='uncertain')unknown.add('heygen');}
   for(const c of clips)if(c.mode==='real'){if(c.state==='ready'){estimated+=c.credits*.01;known++;}else unknown.add('runway');}
   const checks:QualityCheck[]=listing?narrationQualityChecks(listing,narration):[{key:'facts',label:'Informations confirmées',status:'na',reason:'Aucun snapshot de narration ; import interrompu ou génération historique.'}];
   checks.push({key:'render',label:'Fichier vidéo vérifié',status:job.status==='failed'?'error':report?'pass':'fail',reason:job.status==='failed'?(job.errorCode??'Génération interrompue.'):report?'Dimensions, durée, codecs et intégrité vérifiés par le moteur de rendu.':'Rapport de rendu absent.'});
   if(narration?.audio.length){const measurements=calls.map(c=>json(c.result)?.measurement).filter(Boolean);
     checks.push({key:'clipping',label:'Saturation audio',status:measurements.length?(measurements.some(m=>typeof m.clippedRatio==='number'&&m.clippedRatio>.001)?'fail':measurements.every(m=>typeof m.clippedRatio==='number')?'pass':'na'):'na',reason:'Mesure PCM disponible pour les nouvelles synthèses ; les anciennes pistes ne sont pas régénérées.'});}
+  if(avatarCalls.length)checks.push({key:'avatar',label:'Présentateur synchronisé',status:avatarCalls.every(c=>c.state==='ready')?'pass':'error',reason:avatarCalls.every(c=>c.state==='ready')?'Clips liés au WAV exact et durées vérifiées.':'Un passage n’a pas pu être créé ou nécessite une vérification du fournisseur.'});
   const automatic=Boolean(narration&&!snapshot?.customNarration),historical=job.createdAt<activatedAt;
   const selected=qualitySample(trace,settings.reviewSamplePercent);
   const payload:StoredQualityPayload={title:String(listing?.facts.title.value??manifest?.presentation?.title??'Vidéo '+job.id),facts:listing?qualityFacts(listing):{},
@@ -86,7 +91,7 @@ async function collectJob(db:Database,job:JobRecord,settings:Awaited<ReturnType<
     spokenText:calls.filter(c=>c.stepKey.startsWith('voice/')).map(c=>json(c.result)?.spokenText).filter((t):t is string=>typeof t==='string'),checks,
     model:narration?.script.model??null,promptVersion:narration?.script.promptVersion??null,voice:input?.customization?.voice??job.selectedVoice,
     durationSeconds:input?.durationSeconds??report?.durationSeconds??null,voiceEnabled:input?.voiceEnabled!==false,
-    animations:clips.length,animationsReused:job.animationsReused,mapEnabled:Boolean(manifest?.map),
+    animations:clips.length,animationsReused:job.animationsReused,mapEnabled:Boolean(manifest?.map),avatars:avatarCalls.length,avatarsReused:avatarCalls.filter(c=>c.reused).length,
     costs:{estimatedUsd:known?Number(estimated.toFixed(6)):null,actualUsd:null,unknownProviders:[...unknown],reusedSavingUsd:reuse?.amount??0},
     timing:{totalMs:elapsed(job.createdAt,job.completedAt),renderMs:report?Math.round(report.renderAndVerifySeconds*1000):null,voiceMs,scriptMs},
     version:AI_QUALITY_VERSION,automatic,historical,mediaAvailable:Boolean(report),audio:narration?.audio??[],sourceFacts:listing?.facts??{},
@@ -118,6 +123,10 @@ async function collectJob(db:Database,job:JobRecord,settings:Awaited<ReturnType<
   await capture('compiled','$ai_span',{$ai_span_id:trace+'-compiled',$ai_parent_id:trace,$ai_span_name:'Narration compilée finale',$ai_input_state:{facts:payload.facts,source:payload.sourceText},$ai_output_state:{narration:payload.finalNarration},bv_stage:'compiled_narration',bv_checks:checks});
   for(const clip of clips)await capture(clip.id,'$ai_span',{$ai_span_id:clip.id,$ai_parent_id:trace,$ai_span_name:'Animation photo IA',$ai_provider:'runway',$ai_model:clip.model,$ai_latency:elapsed(clip.createdAt,clip.updatedAt)/1000,
     $ai_input:{durationSeconds:clip.durationSeconds},$ai_output:{state:clip.state},$ai_is_error:clip.state!=='ready',bv_stage:'animation',bv_api_credits:clip.credits,bv_cost_estimated_usd:clip.mode==='real'&&clip.state==='ready'?clip.credits*.01:null,bv_cost_actual_usd:null},clip.createdAt);
+  for(const clip of avatarCalls)await capture('avatar-'+clip.id,'$ai_span',{$ai_span_id:clip.id,$ai_parent_id:trace,$ai_span_name:'Avatar '+clip.moment,
+    $ai_provider:'heygen',$ai_model:clip.engine,$ai_latency:elapsed(clip.createdAt,clip.updatedAt)/1000,
+    $ai_input:{moment:clip.moment},$ai_output:{state:clip.state,reused:Boolean(clip.reused)},$ai_is_error:clip.state!=='ready',bv_stage:'avatar',
+    bv_cost_estimated_usd:clip.reserved/1e6,bv_cost_actual_usd:null});
   if(manifest?.map)await capture('map','$ai_span',{$ai_span_id:trace+'-map',$ai_parent_id:trace,$ai_span_name:'Carte animée',$ai_input:{view:manifest.map.settings.view,zoomStart:manifest.map.settings.zoomStart,zoomEnd:manifest.map.settings.zoomEnd,durationSeconds:manifest.map.settings.durationSeconds},$ai_output:{available:true},bv_stage:'map'});
   if(report)await capture('render','$ai_span',{$ai_span_id:trace+'-render',$ai_parent_id:trace,$ai_span_name:'Rendu et vérification',$ai_latency:report.renderAndVerifySeconds,
     $ai_input:{width:report.width,height:report.height,seconds:report.durationSeconds},$ai_output:{codec:report.codec,fastStart:report.fastStart,meanVolumeDb:report.meanVolumeDb},bv_stage:'render'},report.startedAt);

@@ -1,11 +1,11 @@
 'use client';
 import {useEffect,useMemo,useRef,useState,type PointerEvent,type DragEvent} from 'react';
-import {editorClipStarts,resizeEditorVisualClip,editorSourceFrame,mapInterval,splitEditorClip,editorMusicFrames,editorMusicWaveform,MUSIC_DRAG_TYPE,EntityId,type EditorVoicePreview,type EditorDocument,type EditorLayer,type PhotoAsset,type VideoMap} from '@bienvu/contracts';
+import {editorClipStarts,resizeEditorVisualClip,editorSourceFrame,mapInterval,splitEditorClip,editorMusicFrames,editorMusicWaveform,MUSIC_DRAG_TYPE,EntityId,avatarMoments,type AvatarCustomization,type AvatarLook,type AvatarPreviewClip,type EditorVoicePreview,type EditorDocument,type EditorLayer,type PhotoAsset,type VideoMap} from '@bienvu/contracts';
 import {HomeIcon} from './home-icons';
 import {editorTime} from './editor-preview';
 import {MusicWaveform} from './music-waveform';
 type Selection={kind:'text'|'photo'|'music';id:string}|null;
-export function EditorTimeline(p:{doc:EditorDocument;map?:VideoMap;voice?:EditorVoicePreview|null;voiceLoading?:boolean;voiceError?:boolean;animatedSlots?:number[];photos:PhotoAsset[];photoUrls?:Record<string,string>;draftId:string;frame:number;selected:Selection;
+export function EditorTimeline(p:{avatar?:AvatarCustomization;avatarLook?:AvatarLook;avatars?:AvatarPreviewClip[];onAvatarChange?(avatar:AvatarCustomization):void;onAvatarSettings?():void;doc:EditorDocument;map?:VideoMap;voice?:EditorVoicePreview|null;voiceLoading?:boolean;voiceError?:boolean;animatedSlots?:number[];photos:PhotoAsset[];photoUrls?:Record<string,string>;draftId:string;frame:number;selected:Selection;
   musicBusy?:boolean;onAddMusic(id:string,startFrame:number):Promise<void>;onSelect(selection:Selection):void;onSeek(frame:number):void;onChange(doc:EditorDocument,remember?:boolean):void;onCheckpoint():void;onAddPhoto(slot:number,index?:number):void}){
   const [snap,setSnap]=useState(true),[zoom,setZoom]=useState(100),[musicDrag,setMusicDrag]=useState(false),track=useRef<HTMLDivElement>(null),musicTrack=useRef<HTMLDivElement>(null),total=p.doc.durationSeconds*30,starts=editorClipStarts(p.doc,p.map),mapWindow=mapInterval(p.map,p.doc.durationSeconds*30),
     musicPeaks=useMemo(()=>editorMusicWaveform(p.doc),[p.doc.music,p.doc.durationSeconds]);
@@ -99,6 +99,13 @@ export function EditorTimeline(p:{doc:EditorDocument;map?:VideoMap;voice?:Editor
           <svg viewBox="0 0 192 26" preserveAspectRatio="none" aria-hidden="true">{clip.waveform.map((peak,j)=><line key={j} x1={j*3+1} x2={j*3+1} y1={13-peak*12} y2={13+peak*12}/>)}</svg>
           <span>{i===0?'Ouverture':i===p.voice!.clips.length-1?'Conclusion':`Passage ${i+1}`}</span></button>):<div className="editor-voice-clip"><HomeIcon name="microphone" size={16}/><span>{!p.doc.voiceEnabled?'Voix off désactivée':p.voiceLoading?'Chargement de la voix d’origine…':p.voiceError?'Voix indisponible · Réessayez dans Audio':'Voix off · créée à l’export'}</span></div>}
         <i className="editor-playhead" style={{left:`${p.frame/total*100}%`}}/></div>
+      {p.avatar&&<><div className="editor-track-label"><button type="button" aria-label={p.avatar.hidden?'Afficher l’avatar':'Masquer l’avatar'} aria-pressed={!p.avatar.hidden} onClick={()=>p.onAvatarChange?.({...p.avatar!,hidden:!p.avatar!.hidden})}><HomeIcon name="user" size={17}/></button><span>Avatar IA</span></div>
+        <div className={`editor-track editor-avatar-lane${p.avatar.hidden?' is-muted':''}`} style={{height:60}}>{avatarMoments({...p.avatar,hidden:false}).map(moment=>{
+          const retained=p.doc.voiceEnabled?p.avatars?.find(c=>c.moment===moment&&c.lookId===p.avatar!.lookId&&c.engine===p.avatar!.engine&&c.transparent===(p.avatar!.appearance==='cutout')):null,
+            voice=p.voice?.clips[moment==='intro'?0:p.voice.clips.length-1],frames=moment==='full'?total:Math.min(voice?Math.ceil(voice.durationMs*30/1000):p.avatar!.maxSeconds*30,p.avatar!.maxSeconds*30),start=moment==='full'?0:retained?.startFrame??voice?.startFrame??(moment==='intro'?0:total-frames);
+          return <button type="button" key={moment} className={`editor-avatar-clip${retained?'':' is-pending'}`} style={{left:`${start/total*100}%`,width:`${(retained?.durationFrames??frames)/total*100}%`}} onClick={()=>{p.onSeek(start);p.onAvatarSettings?.();}}>
+            {p.avatarLook?.thumbnail&&<img src={p.avatarLook.thumbnail} alt=""/>}<span>{moment==='full'?'Toute la vidéo':moment==='intro'?'Ouverture':'Conclusion'} · {retained?'Avatar IA':'À générer'}</span></button>;
+        })}<i className="editor-playhead" style={{left:`${p.frame/total*100}%`}}/></div></>}
       <div className="editor-track-label"><button type="button" disabled={!p.doc.music} aria-label={p.doc.music?.volume?'Couper la musique':'Activer la musique'} aria-pressed={Boolean(p.doc.music?.volume)}
         onClick={()=>p.doc.music&&p.onChange({...p.doc,music:{...p.doc.music,volume:p.doc.music.volume?0:.15}})}><HomeIcon name="music" size={17}/></button><span>Musique</span></div>
       <div ref={musicTrack} data-music-track className={`editor-track editor-audio-track editor-music-track${p.doc.music&&p.doc.music.volume===0?' is-muted':''}${musicDrag?' is-drop-target':''}`}

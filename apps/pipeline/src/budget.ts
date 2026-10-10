@@ -1,11 +1,14 @@
+import {MAX_MONTHLY_BUDGET_CENTS,MIN_BUDGET_SAFETY_MARGIN_CENTS} from '@bienvu/contracts';
+
 export type Budget={month:string;paused:boolean;fixedAndOtherCents:number;committedCents:number;attempts:number;days:Record<string,number>;
   ceilingCents?:number;envelopeCents?:number};
 export function budgetLimits(b:Pick<Budget,'ceilingCents'|'envelopeCents'>) {
   // Les anciens journaux gardent leur enveloppe. Une hausse exige une
-  // configuration explicite ; Alex autorise 100 € depuis le 01/10/2026.
+  // configuration explicite, dans l'enveloppe autorisée commune au produit.
   const ceilingCents=b.ceilingCents??2500,envelopeCents=b.envelopeCents??3000;
   if(!Number.isSafeInteger(ceilingCents)||!Number.isSafeInteger(envelopeCents)||ceilingCents<0
-    ||ceilingCents>9500||envelopeCents>10000||envelopeCents-ceilingCents<500)throw new Error('BUDGET_CONFIG_INVALID');
+    ||ceilingCents>MAX_MONTHLY_BUDGET_CENTS-MIN_BUDGET_SAFETY_MARGIN_CENTS||envelopeCents>MAX_MONTHLY_BUDGET_CENTS
+    ||envelopeCents-ceilingCents<MIN_BUDGET_SAFETY_MARGIN_CENTS)throw new Error('BUDGET_CONFIG_INVALID');
   return {ceilingCents,envelopeCents};
 }
 export function reserve(b:Budget,now=new Date(),provisionCents=50):Budget {

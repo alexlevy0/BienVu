@@ -87,6 +87,7 @@ export function PropertyDetail({id}:{id:string}){
               {job.videoUrl?<button type="button" aria-label={`Lire ${label}`} onClick={()=>setPreview(job)}><HomeIcon name="play" size={24}/></button>:<span className="property-video-unavailable">{statusLabel(job)}</span>}
               {job.durationSeconds&&<small>{`${Math.floor(job.durationSeconds/60)}:${String(Math.round(job.durationSeconds%60)).padStart(2,'0')}`}</small>}</div>
             {canEdit&&ready&&job.videoUrl&&<Link className="property-content-edit" href={`/editeur?video=${job.id}`}><HomeIcon name="clapper" size={19}/>Modifier dans l’Éditeur</Link>}
+            {canEdit&&job.status==='failed'&&job.stage==='rendering'&&job.retention==='available'&&<Link className="property-content-edit" href={`/editeur?video=${job.id}`}><HomeIcon name="clapper" size={19}/>Reprendre dans l’Éditeur</Link>}
             {canEdit&&job.downloadUrl&&!shared&&<button type="button" className="property-content-share" disabled={Boolean(busy)} onClick={()=>setConfirm(job)}><HomeIcon name="compass" size={19}/>Publier dans Explorer</button>}
             {shared&&<Link className="property-content-share" href={`/explorer/${shared.id}`}><HomeIcon name="compass" size={19}/>Voir dans Explorer</Link>}
             {!ready&&<Link className="property-content-share" href={`/historique/${job.id}`}>Voir le suivi <HomeIcon name="arrow" size={17}/></Link>}

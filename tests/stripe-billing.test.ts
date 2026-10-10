@@ -55,10 +55,10 @@ test('Stripe : renouvellement sans report, annulation et événements désordonn
 test('Stripe Checkout : consentement, doublons, prix serveur et paramètres stables',async t=>{
  const f=await fixture(t,'bill-checkout'),sessions=new Map<string,unknown>();let calls=0;
  f.client.checkout.sessions.create=async(params,options)=>{calls++;const key=options!.idempotencyKey!,previous=sessions.get(key);if(previous)assert.deepEqual(params,previous);else sessions.set(key,params);return {id:'cs_fixture',url:'https://checkout.stripe.com/c/pay/cs_fixture'} as Stripe.Response<Stripe.Checkout.Session>;};
- await assert.rejects(createCheckout(f.env,f.agencyId,'fixture@example.com','https://bienvu.online',{plan:'plus',accepted:false},'checkout-fixture-key',f.client));
- const result=await Promise.all([1,2].map(()=>createCheckout(f.env,f.agencyId,'fixture@example.com','https://bienvu.online',{plan:'plus',accepted:true},'checkout-fixture-key',f.client)));assert.equal(result[0].url,result[1].url);
- const params=[...sessions.values()][0] as Stripe.Checkout.SessionCreateParams;assert.equal(params.line_items![0].price_data!.unit_amount,1900);assert.equal('payment_method_types' in params,false);assert.equal(params.automatic_tax!.enabled,false);assert.equal(params.managed_payments!.enabled,false);
- await createCheckout(f.env,f.agencyId,'fixture@example.com','https://bienvu.online',{plan:'plus',accepted:true},'checkout-fixture-key',f.client);assert.ok(calls<=2);
- await assert.rejects(createCheckout(f.env,f.agencyId,'fixture@example.com','https://bienvu.online',{plan:'pro',accepted:true},'checkout-other-key00',f.client));
+ await assert.rejects(createCheckout(f.env,f.agencyId,'fixture@example.com','https://bienvu.online',{plan:'solo',accepted:false},'checkout-fixture-key',f.client));
+ const result=await Promise.all([1,2].map(()=>createCheckout(f.env,f.agencyId,'fixture@example.com','https://bienvu.online',{plan:'solo',accepted:true},'checkout-fixture-key',f.client)));assert.equal(result[0].url,result[1].url);
+ const params=[...sessions.values()][0] as Stripe.Checkout.SessionCreateParams;assert.equal(params.line_items![0].price_data!.unit_amount,5000);assert.equal('payment_method_types' in params,false);assert.equal(params.automatic_tax!.enabled,false);assert.equal(params.managed_payments!.enabled,false);
+ await createCheckout(f.env,f.agencyId,'fixture@example.com','https://bienvu.online',{plan:'solo',accepted:true},'checkout-fixture-key',f.client);assert.ok(calls<=2);
+ await assert.rejects(createCheckout(f.env,f.agencyId,'fixture@example.com','https://bienvu.online',{plan:'equipe',accepted:true},'checkout-other-key00',f.client));
  assert.equal((await f.DB.prepare('SELECT count(*) n FROM allocations WHERE kind=?').bind('paid').first<{n:number}>())!.n,0);
 });

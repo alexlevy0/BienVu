@@ -3,6 +3,7 @@ import type {AgencyBrand, NormalizedListing} from './product';
 import {fishFrenchVoices,CartesiaVoiceId,cartesiaParisianVoices} from './voice';
 import {EditorDocument} from './editor';
 import {VideoMap} from './maps';
+import {AvatarCustomization} from './avatars';
 
 export const DEFAULT_VIDEO_VOICE='fish-manon' as const;
 
@@ -32,7 +33,7 @@ export const VideoCustomization=z.object({style:VideoStyle,
   runwayPhotos:photoOrder.optional(),
   // Draft text may be incomplete while editing; generation validates it below.
   narration:z.array(z.string().max(500)).min(4).max(6).optional(),editor:EditorDocument.optional(),map:VideoMap.optional(),
-  mapDisabled:z.boolean().optional(),mapAutomatic:z.boolean().optional(),
+  mapDisabled:z.boolean().optional(),mapAutomatic:z.boolean().optional(),avatar:AvatarCustomization.optional(),
   voiceSourceId:z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/).optional()}).strict();
 export type VideoCustomization=z.infer<typeof VideoCustomization>;
 export const GenerationCustomization=VideoCustomization.superRefine((value,context)=>{

@@ -8,6 +8,7 @@ import {HomeIcon} from './home-icons';
 import {VoicePreview} from './voice-preview';
 import {useAccount} from './account';
 import {MapScenePreview,VideoMapControls,useVideoMapDefaults,useAutomaticMapLocation} from './video-map';
+import {AvatarControls,AvatarWarning,AvatarPoster,useAvatarCatalog} from './avatar-controls';
 import {PhotoPreviewImage} from './photo-preview-image';
 
 export type CustomizerPhoto={id:string;preview:string;slot:number;state:string;file?:File|null;error?:string;removing?:boolean};
@@ -16,12 +17,12 @@ type Props={settings:VideoCustomization;onChange(value:VideoCustomization):void;
   agencyName:string;durationSeconds?:VideoDuration;aspectRatio?:VideoAspectRatio;voiceEnabled?:boolean;onVoice?(value:boolean):void;subtitlesEnabled:boolean;onSubtitles(value:boolean):void;onBack():void;onAdd(files:FileList|null):void;
   busy:boolean;ready:boolean;onEdit():void;saved:boolean;sourceUrl?:string;onRetry?(id:string):void;onRemove?(id:string):void};
 export function VideoCustomizer(p:Props){
-  const {me,voiceCatalog}=useAccount();
+  const {me,voiceCatalog}=useAccount(),{catalog:avatarCatalog}=useAvatarCatalog();
   const mapDefaults=useVideoMapDefaults(),automaticMap=Boolean(p.settings.mapAutomatic||(!p.settings.map&&!p.settings.mapDisabled&&!p.settings.editor&&mapDefaults?.enabled)),
     automaticLocation=useAutomaticMapLocation(p.fields.locality,automaticMap),mapSettings=p.settings.map??(automaticMap&&mapDefaults?videoMapFromDefaults(mapDefaults):undefined),
     previewMap=mapSettings?{...mapSettings,...(automaticMap?{location:automaticLocation}:{})}:undefined;
   const duration=p.durationSeconds??20;
-  const [tab,setTab]=useState<'photos'|'style'|'voice'|'map'>('photos'),[drag,setDrag]=useState<number|null>(null),
+  const [tab,setTab]=useState<'photos'|'style'|'voice'|'map'|'avatar'>('photos'),[drag,setDrag]=useState<number|null>(null),
     [playing,setPlaying]=useState(false),[time,setTime]=useState(0);
   const secondaryInk=()=>{const rgb=p.settings.secondaryColor.match(/[a-f\d]{2}/gi)!.map(h=>parseInt(h,16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);return rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722>.179?'#101d18':'#ffffff';};
   const upload=useRef<HTMLInputElement>(null),preview=useRef<HTMLDivElement>(null);
@@ -48,11 +49,12 @@ export function VideoCustomizer(p:Props){
       <div className="customizer-property">{p.photos[0]&&<PhotoPreviewImage src={chosen[0]?.preview??p.photos[0].preview} alt=""/>}<div><strong>{p.sourceUrl?new URL(p.sourceUrl).hostname:p.fields.title||'Votre annonce'}</strong>
         <span>{[price,p.fields.area?`${p.fields.area} m²`:'',p.fields.rooms?`${p.fields.rooms} pièces`:''].filter(Boolean).join(' · ')||'Complétez les informations du bien'}</span></div></div></header>
     <div className={`customizer-panel${p.aspectRatio==='16:9'?' is-horizontal':''}`}><div className="customizer-controls">
-      <div className="customizer-tabs" role="tablist" aria-label="Réglages vidéo">{([['photos','Photos','image'],['style','Style','palette'],['voice','Voix et texte','microphone'],['map','Carte','pin']] as const).map(([id,label,icon])=>
+      <div className="customizer-tabs" role="tablist" aria-label="Réglages vidéo">{([['photos','Photos','image'],['style','Style','palette'],['voice','Voix et texte','microphone'],['map','Carte','pin'],['avatar','Avatar IA','user']] as const).map(([id,label,icon])=>
         <button type="button" key={id} role="tab" id={`customizer-tab-${id}`} aria-controls={`customizer-panel-${id}`} aria-selected={tab===id} tabIndex={tab===id?0:-1}
-          onKeyDown={event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const ids=['photos','style','voice','map'] as const;
-            const at=ids.indexOf(tab),next=event.key==='Home'?'photos':event.key==='End'?'map':ids[(at+(event.key==='ArrowRight'?1:3))%4];setTab(next);document.getElementById(`customizer-tab-${next}`)?.focus();}}
+          onKeyDown={event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const ids=['photos','style','voice','map','avatar'] as const;
+            const at=ids.indexOf(tab),next=event.key==='Home'?'photos':event.key==='End'?'avatar':ids[(at+(event.key==='ArrowRight'?1:4))%5];setTab(next);document.getElementById(`customizer-tab-${next}`)?.focus();}}
           onClick={()=>setTab(id)}><HomeIcon name={icon} size={21}/>{label}</button>)}</div>
+      <AvatarWarning avatar={p.settings.avatar} voice={p.settings.voice??voiceCatalog?.defaultVoice??frenchVoices[0].id} catalog={avatarCatalog}/>
       <div role="tabpanel" id={`customizer-panel-${tab}`} aria-labelledby={`customizer-tab-${tab}`}>
       {tab==='photos'&&<><div className="customizer-section-title"><strong>{p.sourceUrl?'Photos de votre annonce':`${chosen.length} photo${chosen.length>1?'s':''} sélectionnée${chosen.length>1?'s':''}`}</strong><p>{p.sourceUrl?'Les photos seront récupérées avec l’annonce à la génération. Connectez-vous pour les choisir et les réordonner avant génération.':'Glissez les photos pour changer leur ordre. Gardez au moins 3 photos.'}</p></div>
         {p.photos.length?<div className="customizer-photos">{ordered.map((photo,index)=>{const at=order.indexOf(photo.slot),selected=at>=0;return <div key={photo.id} className={`customizer-photo${selected?' is-selected':''}${drag===photo.slot?' is-dragging':''}`}
@@ -82,11 +84,11 @@ export function VideoCustomizer(p:Props){
           <div className="customizer-animation-actions"><button type="button" className="customizer-add" disabled={p.busy||!me||!order.length} onClick={()=>patch({runwayClips:undefined,runwayPhotos:[...order]})}>Animer toutes les photos</button><button type="button" className="customizer-reset" disabled={p.busy} onClick={()=>patch({runwayClips:undefined,runwayPhotos:[]})}>Mouvements classiques</button></div>
           <p className="customizer-hint">{!me?'Connectez-vous pour animer les photos avec l’IA. Les zooms et translations sont inclus dans votre essai.':requestedAnimations(p.settings)?`${requestedAnimations(p.settings)} photo(s) animée(s). Choisissez chaque photo dans l’onglet Photos. Durée à l’écran adaptée au montage.`:'Zooms et translations inclus. Choisissez les photos à animer dans l’onglet Photos.'}</p>
           {Boolean(requestedAnimations(p.settings))&&<p className="customizer-hint">Les animations IA sont créées à partir des photos sélectionnées. Une animation non utilisée est remboursée en crédits. Vérifiez le rendu avant de partager.</p>}
-          <p className="customizer-credit-total" role="status">Coût prévu : <strong>{generationCreditCost(p.settings)} crédit{generationCreditCost(p.settings)>1?'s':''}</strong> · 1 vidéo{requestedAnimations(p.settings)?` + ${requestedAnimations(p.settings)} animation(s)`:''}{me?` · ${me.rights.developmentRemaining} disponible(s)`:''}</p>
+          <p className="customizer-credit-total" role="status">Coût prévu : <strong>{generationCreditCost(p.settings,p.durationSeconds)} crédit{generationCreditCost(p.settings,p.durationSeconds)>1?'s':''}</strong> · 1 vidéo{requestedAnimations(p.settings)?` + ${requestedAnimations(p.settings)} animation(s)`:''}{me?` · ${me.rights.developmentRemaining} disponible(s)`:''}</p>
         </div>
       </>}
       {tab==='voice'&&<><div className="customizer-voice-options"><div className="customizer-voice-choice"><label htmlFor="customizer-selected-voice">Voix française</label><div className="customizer-voice-choice-row"><select id="customizer-selected-voice" value={p.settings.voice} onChange={event=>patch({voice:event.target.value as VideoCustomization['voice']})} disabled={p.busy||p.voiceEnabled===false}>{frenchVoices.map(voice=><option key={voice.id} value={voice.id} disabled={voiceCatalog?.voices.find(v=>v.id===voice.id)?.available===false}>{voice.name} · {voice.provider}</option>)}</select><VoicePreview key={p.settings.voice} voice={p.settings.voice} disabled={p.busy||p.voiceEnabled===false}/></div></div>
-        <label className="customizer-checkbox"><input type="checkbox" aria-label="Activer la voix off" checked={p.voiceEnabled!==false} onChange={event=>p.onVoice?.(event.target.checked)} disabled={p.busy}/>Activer la voix off</label><label className="customizer-checkbox"><input type="checkbox" aria-label="Afficher les sous-titres" checked={p.subtitlesEnabled} onChange={event=>p.onSubtitles(event.target.checked)} disabled={p.busy||p.voiceEnabled===false}/>Afficher les sous-titres</label></div>
+        <label className="customizer-checkbox"><input type="checkbox" aria-label="Activer la voix off" checked={p.voiceEnabled!==false} onChange={event=>{p.onVoice?.(event.target.checked);if(!event.target.checked&&p.settings.avatar)patch({avatar:{...p.settings.avatar,hidden:true}});}} disabled={p.busy}/>Activer la voix off</label><label className="customizer-checkbox"><input type="checkbox" aria-label="Afficher les sous-titres" checked={p.subtitlesEnabled} onChange={event=>p.onSubtitles(event.target.checked)} disabled={p.busy||p.voiceEnabled===false}/>Afficher les sous-titres</label></div>
         <p className="customizer-hint customizer-voice-sample-note">Le même texte de démonstration pour comparer les voix.</p>
         <div className="customizer-section-title"><strong>Votre narration</strong><p>{p.voiceEnabled===false?'La voix off et les sous-titres sont désactivés.':p.settings.narration?'Relisez et ajustez chaque passage. Votre texte sera prononcé tel quel.':`Une narration tirée de la description, adaptée à ${duration} secondes. Vous pouvez la modifier ; sinon BienVu sélectionnera les passages à la génération.`}</p></div>
         {p.sourceUrl&&!p.settings.narration?<div className="customizer-empty"><p>BienVu résumera la description importée pour une voix off de {duration} secondes.</p><button type="button" className="customizer-add" onClick={()=>patch({narration:['','','','']})}>Écrire ma narration</button></div>:narration.map((text,index)=><label className="customizer-narration" key={index}><span>{index===0?'Ouverture':index===narration.length-1?'Conclusion':`Passage ${index+1}`}</span><textarea value={text} rows={2} maxLength={500} disabled={p.busy}
@@ -94,6 +96,7 @@ export function VideoCustomizer(p:Props){
         <p className={validNarration.success||p.sourceUrl&&!p.settings.narration?'customizer-hint':'customizer-error'} role="status">{p.sourceUrl&&!p.settings.narration?`Rédaction automatique · ${duration} secondes.`:validNarration.success?`${wordCount(narration.join(' '))} mots · ${duration} secondes · ${narrationWordLimit(duration)} mots conseillés maximum${wordCount(narration.join(' '))>narrationWordLimit(duration)?' — raccourcissez le texte ou choisissez une durée supérieure.':''}`:
           validNarration.error.issues[0].message}</p><button type="button" className="customizer-reset" disabled={p.busy} onClick={()=>patch({narration:undefined})}>Reprendre le texte proposé</button>
       </>}
+      {tab==='avatar'&&<AvatarControls catalog={avatarCatalog} avatar={p.settings.avatar} onChange={avatar=>patch({avatar})} voice={p.settings.voice??voiceCatalog?.defaultVoice??frenchVoices[0].id} voiceEnabled={p.voiceEnabled!==false} onEnableVoice={()=>p.onVoice?.(true)} authenticated={Boolean(me?.agency)} durationSeconds={p.durationSeconds??20} busy={p.busy}/>}
       {tab==='map'&&<VideoMapControls map={mapSettings} automatic={automaticMap} defaults={mapDefaults} onChange={(map,automatic=automaticMap)=>patch({map,mapDisabled:map?undefined:true,mapAutomatic:map&&automatic?true:undefined})} onPreview={endpoint=>{setPlaying(false);setTime((interval.startFrame+(endpoint==='end'?interval.durationFrames-1:0))/30);}} locality={p.fields.locality} aspectRatio={p.aspectRatio??'9:16'} busy={p.busy} color={mapInk(p.settings.primaryColor,p.settings.secondaryColor)} duration={duration}/>}
       </div>
       <details className="customizer-advanced"><summary><HomeIcon name="settings" size={21}/>Réglages avancés<HomeIcon name="chevron" size={17}/></summary><div>
@@ -108,6 +111,7 @@ export function VideoCustomizer(p:Props){
         <div className="customizer-poster-copy"><h2>{p.settings.style==='cinematic'?p.fields.title||'Une nouvelle adresse':time>=duration*.8?p.agencyName||'Découvrez le bien':p.fields.title||'Une nouvelle adresse'}</h2><p>{[p.fields.area?`${p.fields.area} m²`:'',p.fields.rooms?`${p.fields.rooms} pièces`:''].filter(Boolean).join(' · ')}</p><strong>{price}</strong></div>
         <div className="customizer-poster-agency">{p.agencyName||'BienVu'}</div>
         {previewMap&&mapAt!==null&&<MapScenePreview map={previewMap} automatic={automaticMap} aspectRatio={p.aspectRatio??'9:16'} frame={mapAt} primaryColor={p.settings.primaryColor} secondaryColor={p.settings.secondaryColor} agencyName={p.agencyName}/>}
+      <AvatarPoster avatar={p.settings.avatar} look={avatarCatalog?.looks.find(a=>a.id===p.settings.avatar?.lookId)} frame={time*30} total={duration*30} width={preview.current?.clientWidth??300} height={preview.current?.clientHeight??533}/>
       </div><div className="customizer-player-controls"><button type="button" aria-label={playing?'Pause':'Lecture'} disabled={!chosen.length} onClick={()=>{if(time>=duration)setTime(0);setPlaying(!playing);}}>{playing?'Ⅱ':'▶'}</button><span>0:{String(Math.floor(time)).padStart(2,'0')} / 0:{duration}</span>
         <input type="range" min="0" max={duration} step=".1" value={time} aria-label="Position de l’aperçu" onChange={event=>{setPlaying(false);setTime(Number(event.target.value));}}/>
         <button type="button" aria-label="Aperçu en plein écran" onClick={()=>void preview.current?.requestFullscreen?.()}>⛶</button></div>

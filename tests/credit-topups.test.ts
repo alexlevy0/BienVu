@@ -6,7 +6,7 @@ import {migrateNarrationProbe,seedNarrationFixture} from '../scripts/narration-f
 import {Stripe,stripeClient,processStripeEvent} from '../apps/web/lib/billing';
 import {createTopupCheckout,topupHistory} from '../apps/web/lib/credit-purchases';
 import {creditBalance,admitGeneration,failGeneration} from '../packages/db/src/index';
-import {defaultVideoCustomization} from '../packages/contracts/src/index';
+import {defaultVideoCustomization,creditPacks} from '../packages/contracts/src/index';
 import {narrationListing} from '../fixtures/narration';
 import {financeAction,financeReport,FinanceAction} from '../apps/web/lib/profitability';
 test('Migration : conserver les crédits du paiement original malgré un quota ajusté par admin',async t=>{
@@ -22,7 +22,7 @@ test('Migration : conserver les crédits du paiement original malgré un quota a
  assert.deepEqual(await DB.prepare('SELECT credits,gross_cents AS gross FROM financial_receipts').first(),{credits:40,gross:1900});
  assert.equal((await DB.prepare('SELECT quota_limit AS quota FROM allocations').first<{quota:number}>())!.quota,99);
 });
-async function fixture(t:{after(fn:()=>Promise<void>):void},label:string){
+async function fixture(t:{after(fn:()=>Promise<void>):void},label:string,modern=false){
  const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:'export default {fetch(){return new Response("fixture")}}',compatibilityDate:'2026-09-27',d1Databases:['DB']}));t.after(()=>mf.dispose());const {DB}=await mf.getBindings<{DB:D1Database}>();await migrateNarrationProbe(DB);const seed=await seedNarrationFixture(DB,label),at=new Date().toISOString();
  await DB.exec("UPDATE jobs SET status='failed',error_code='FIXTURE',lease_until=NULL; UPDATE allocations SET kind='paid',quota_limit=2; UPDATE generation_control SET enabled=1; UPDATE trial_policy SET free_enabled=1");
  await DB.prepare('INSERT INTO hosted_import_budget VALUES(?,0,9000,0)').bind(at.slice(0,7)).run();await DB.prepare('INSERT INTO generation_access VALUES(?,?,1)').bind(seed.agencyId,'allocation-'+label).run();
@@ -31,28 +31,37 @@ async function fixture(t:{after(fn:()=>Promise<void>):void},label:string){
  const listing=narrationListing();listing.id='listing-'+label;listing.agencyId=seed.agencyId;listing.photos=Array.from({length:6},(_,n)=>({...listing.photos[0],id:'photo-'+n,agencyId:seed.agencyId,listingId:listing.id,sourceOrder:n,contentHash:n.toString(16).padStart(64,'0'),objectKey:`agencies/${seed.agencyId}/imports/${listing.id}/photo-${n}.png`}));
  await DB.prepare('UPDATE listing_imports SET result_json=? WHERE id=?').bind(JSON.stringify(listing),listing.id).run();
  const session={id:'cs_wallet_'+label,mode:'payment',metadata:{agencyId:seed.agencyId,pack:'pack10',kind:'credit_topup'},client_reference_id:seed.agencyId,customer:'cus_wallet',livemode:false,status:'complete',payment_status:'paid',currency:'eur',amount_subtotal:700,amount_total:700,total_details:{amount_tax:0,amount_discount:0},invoice:null,line_items:{has_more:false,data:[{quantity:1,amount_subtotal:700,price:{id:'price_wallet',unit_amount:700,currency:'eur',recurring:null}}]},payment_intent:{id:'pi_wallet',customer:'cus_wallet',livemode:false,status:'succeeded',currency:'eur',amount_received:700,latest_charge:'ch_wallet'}};
+ if(modern){session.metadata.pack='pack20v2';session.amount_subtotal=2000;session.amount_total=2000;session.line_items.data[0].amount_subtotal=2000;session.line_items.data[0].price.unit_amount=2000;session.payment_intent.amount_received=2000;}
  const state={feePending:false,refunded:0,dispute:'none'};
- client.checkout.sessions.create=async(params)=>{assert.equal(params!.mode,'payment');assert.equal(params!.line_items![0].price_data!.unit_amount,700);return {id:session.id,url:'https://checkout.stripe.com/c/pay/wallet'} as Stripe.Response<Stripe.Checkout.Session>;};
+ client.checkout.sessions.create=async(params)=>{assert.equal(params!.mode,'payment');assert.equal(params!.line_items![0].price_data!.unit_amount,modern?2000:700);return {id:session.id,url:'https://checkout.stripe.com/c/pay/wallet'} as Stripe.Response<Stripe.Checkout.Session>;};
  client.checkout.sessions.retrieve=async()=>session as unknown as Stripe.Response<Stripe.Checkout.Session>;
  client.paymentIntents.retrieve=async()=>session.payment_intent as unknown as Stripe.Response<Stripe.PaymentIntent>;
- client.charges.retrieve=async()=>({id:'ch_wallet',payment_intent:'pi_wallet',customer:'cus_wallet',currency:'eur',amount:700,amount_refunded:state.refunded,paid:true,captured:true,livemode:false,disputed:state.dispute!=='none',balance_transaction:state.feePending?null:{id:'txn_wallet',source:'ch_wallet',currency:'eur',amount:700,fee:47,net:653}}) as unknown as Stripe.Response<Stripe.Charge>;
+ client.charges.retrieve=async()=>({id:'ch_wallet',payment_intent:'pi_wallet',customer:'cus_wallet',currency:'eur',amount:modern?2000:700,amount_refunded:state.refunded,paid:true,captured:true,livemode:false,disputed:state.dispute!=='none',balance_transaction:state.feePending?null:{id:'txn_wallet',source:'ch_wallet',currency:'eur',amount:modern?2000:700,fee:47,net:modern?1953:653}}) as unknown as Stripe.Response<Stripe.Charge>;
  client.refunds.list=(async()=>({has_more:false,data:state.refunded?[{id:'re_wallet',status:'succeeded',amount:state.refunded,balance_transaction:{id:'txn_refund',source:'re_wallet',currency:'eur',amount:-state.refunded,fee:0,net:-state.refunded}}]:[]}) ) as unknown as typeof client.refunds.list;
  client.disputes.list=(async()=>({has_more:false,data:[{id:'dp_wallet',charge:'ch_wallet',livemode:false,currency:'eur',amount:700,status:state.dispute,balance_transactions:state.dispute==='won'?[{id:'txn_dispute',source:'dp_wallet',currency:'eur',amount:0,fee:0,net:0}]:[]}]}) ) as unknown as typeof client.disputes.list;
  const event=(id:string,type:Stripe.Event.Type='checkout.session.completed')=>({id,type,livemode:false,created:Math.floor(Date.now()/1000),data:{object:type.startsWith('charge.')?{id:'ch_wallet'}:{id:session.id,mode:'payment',metadata:session.metadata}}}) as Stripe.Event;
- const pay=async()=>{await createTopupCheckout(env,seed.agencyId,'test@example.com','https://bienvu.online',{pack:'pack10',accepted:true},'wallet-checkout-key-'+label,client);await processStripeEvent(env,event('evt_wallet_'+label),'a'.repeat(64),client);};
+ const pay=async()=>{if(modern)await createTopupCheckout(env,seed.agencyId,'test@example.com','https://bienvu.online',{pack:'pack20v2',accepted:true},'wallet-checkout-key-'+label,client);else await DB.prepare('INSERT INTO billing_topup_checkouts(agency_id,mode,idempotency_key,pack,credits,price_cents,session_id,url,valid_days,expires_at,created_at) VALUES(?,\'test\',?,\'pack10\',10,700,?,NULL,0,?,?)').bind(seed.agencyId,'legacy-order-'+label,session.id,new Date(Date.now()+2700000).toISOString(),at).run();await processStripeEvent(env,event('evt_wallet_'+label),'a'.repeat(64),client);};
  return {DB,env,client,session,state,event,pay,listing,at,...seed};
 }
+test('Nouvelles recharges : 20, 50 et 100 crédits à 1 € HT ; commandes antérieures inchangées',async t=>{
+ const f=await fixture(t,'topup-new-prices',true),amounts:number[]=[];
+ f.client.checkout.sessions.create=async params=>{amounts.push(params!.line_items![0].price_data!.unit_amount!);return {id:'cs_new_price_'+amounts.length,url:'https://checkout.stripe.com/c/pay/new-price'} as Stripe.Response<Stripe.Checkout.Session>;};
+ for(const pack of creditPacks){await f.DB.exec('DELETE FROM billing_topup_checkouts');await createTopupCheckout(f.env,f.agencyId,'test@example.com','https://bienvu.online',{pack:pack.code,accepted:true},'new-pack-price-'+pack.code,f.client);
+  assert.deepEqual(await f.DB.prepare('SELECT pack,credits,price_cents AS cents FROM billing_topup_checkouts').first(),{pack:pack.code,credits:pack.credits,cents:pack.priceCents});}
+ assert.deepEqual(amounts,[2000,5000,10000]);await assert.rejects(createTopupCheckout(f.env,f.agencyId,'test@example.com','https://bienvu.online',{pack:'pack100',accepted:true},'legacy-new-purchase',f.client));
+ assert.equal((await f.DB.prepare('SELECT count(*) n FROM credit_topups').first<{n:number}>())!.n,0,'Checkout alone never creates credits');
+});
 test('Recharge : consentement, prix serveur, paiement vérifié, événements concurrents et plan inchangé',async t=>{
- const f=await fixture(t,'topup-payment');await assert.rejects(createTopupCheckout(f.env,f.agencyId,'test@example.com','https://bienvu.online',{pack:'pack10',accepted:false},'wallet-invalid-key',f.client));
- await createTopupCheckout(f.env,f.agencyId,'test@example.com','https://bienvu.online',{pack:'pack10',accepted:true},'wallet-checkout-key01',f.client);
+ const f=await fixture(t,'topup-payment',true);await assert.rejects(createTopupCheckout(f.env,f.agencyId,'test@example.com','https://bienvu.online',{pack:'pack20v2',accepted:false},'wallet-invalid-key',f.client));
+ await createTopupCheckout(f.env,f.agencyId,'test@example.com','https://bienvu.online',{pack:'pack20v2',accepted:true},'wallet-checkout-key01',f.client);
  f.session.payment_status='unpaid';await processStripeEvent(f.env,f.event('evt_unpaid'),'1'.repeat(64),f.client);assert.equal((await creditBalance(f.DB,f.agencyId)).available,2);
- f.session.payment_status='paid';f.session.amount_subtotal=699;await assert.rejects(processStripeEvent(f.env,f.event('evt_bad_amount'),'2'.repeat(64),f.client));f.session.amount_subtotal=700;
+ f.session.payment_status='paid';f.session.amount_subtotal=1999;await assert.rejects(processStripeEvent(f.env,f.event('evt_bad_amount'),'2'.repeat(64),f.client));f.session.amount_subtotal=2000;
  f.session.metadata.agencyId='foreign';await assert.rejects(processStripeEvent(f.env,f.event('evt_foreign'),'3'.repeat(64),f.client));f.session.metadata.agencyId=f.agencyId;
  const [a,b]=await Promise.all([['evt_paid1','4'],['evt_paid2','5']].map(([id,hash])=>processStripeEvent(f.env,f.event(id),hash.repeat(64),f.client)));assert.ok(a&&b);
- assert.equal((await creditBalance(f.DB,f.agencyId)).available,12);assert.equal((await creditBalance(f.DB,f.agencyId)).purchasedAvailable,10);
+ assert.equal((await creditBalance(f.DB,f.agencyId)).available,22);assert.equal((await creditBalance(f.DB,f.agencyId)).purchasedAvailable,20);
  assert.equal((await f.DB.prepare('SELECT count(*) n FROM credit_topups').first<{n:number}>())!.n,1);
  assert.equal((await f.DB.prepare('SELECT count(*) n FROM subscriptions').first<{n:number}>())!.n,0);
- assert.equal((await topupHistory(f.env,f.agencyId))[0].remaining,10);assert.equal((await topupHistory(f.env,'foreign')).length,0);
+ assert.equal((await topupHistory(f.env,f.agencyId))[0].remaining,20);assert.equal((await topupHistory(f.env,'foreign')).length,0);
  const receipt=await f.DB.prepare('SELECT fee_cents fee,fees_complete complete FROM financial_receipts').first<{fee:number;complete:number}>();assert.deepEqual(receipt,{fee:47,complete:1});
  const stored=await f.DB.prepare('SELECT expires_at FROM billing_topup_checkouts').first<{expires_at:string}>();assert.ok(stored!.expires_at<=new Date().toISOString(),'Un achat terminé libère immédiatement le prochain checkout');
 });

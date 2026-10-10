@@ -2,6 +2,7 @@ import React from 'react';
 import {AbsoluteFill,Audio,Img,OffthreadVideo,Freeze,Sequence,useCurrentFrame} from 'remotion';
 import {editorClipStarts,editorLayerStyle,editorPhotoMotion,editorCaptionStyle,editorMusicGain,editorMusicFrames,type VideoManifest,type EditorCamera} from '@bienvu/contracts';
 import {subtitleGroups} from './layout';
+import {AvatarOverlay} from './avatar';
 import {MapOverlay} from './map';
 
 function EditorPhoto({m,media,slot,index,duration,camera}:{m:VideoManifest;media:Record<string,string>;slot:number;index:number;duration:number;camera?:EditorCamera}){
@@ -40,6 +41,7 @@ export function EditorFilm({manifest:m,media,moduleUrl,workerUrl}:{manifest:Vide
         volume={f=>editorMusicGain({...doc,music:{...music,normalizationGain:music.asset.normalizationGain??music.normalizationGain}},music.startFrame+f,intervals)}/>
     </Sequence>}
     <MapOverlay manifest={m} media={media} moduleUrl={moduleUrl} workerUrl={workerUrl}/>
+    <AvatarOverlay manifest={m} media={media}/>
     {m.rights.watermarked&&<div style={{position:'absolute',top:'45%',left:'15%',width:'70%',textAlign:'center',fontSize:42,color:'#fff',background:'#132a23d9',padding:24,
       transform:'rotate(-14deg)'}}>BIENVU · VIDÉO D’ESSAI</div>}
   </AbsoluteFill>;

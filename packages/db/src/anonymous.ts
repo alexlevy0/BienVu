@@ -1,4 +1,4 @@
-import {AgencyBrand,EntityId,Timestamp,GenerationRequest,sourceForHost,sourceListingId,publicErrors,requestedAnimations,CREDIT_PRICING_VERSION,type PublicErrorCode} from '@bienvu/contracts';
+import {AgencyBrand,EntityId,Timestamp,GenerationRequest,avatarCreditCost,sourceForHost,sourceListingId,publicErrors,requestedAnimations,CREDIT_PRICING_VERSION,type PublicErrorCode} from '@bienvu/contracts';
 import type {Database} from './index';
 import {creditGrant} from './credits';
 import {findGeneration,findOwnedGeneration,GenerationFailure,type GenerationRow} from './generation';
@@ -46,6 +46,7 @@ export async function listAnonymousGenerationPage(db:Database,session:AnonymousS
 export function trialInput(input:unknown) {
   const parsed=GenerationRequest.safeParse(input);
   if(!parsed.success)throw new GenerationFailure('INVALID_URL');
+  if(avatarCreditCost(parsed.data.customization?.avatar))throw new GenerationFailure('AVATAR_LOGIN_REQUIRED');
   if(requestedAnimations(parsed.data.customization))throw new GenerationFailure('RUNWAY_LOGIN_REQUIRED');
   if('url' in parsed.data){
     const url=new URL(parsed.data.url),source=sourceForHost(url.hostname);

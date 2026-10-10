@@ -57,7 +57,10 @@ export function GenerationForm() {
       const response = await fetch('/api/imports', {method: 'POST', headers: {'Content-Type': 'application/json', 'Idempotency-Key': pending.current.key},
         body: JSON.stringify({url: parsed.data}), signal: AbortSignal.timeout(75_000)});
       const value = await response.json() as ImportView & {error?: {code?: PublicErrorCode}};
-      if (!response.ok) throw new Error(message(value.error?.code));
+      if (!response.ok) {
+        if (value.error?.code === 'IMPORT_BUDGET_LIMIT') pending.current = null;
+        throw new Error(message(value.error?.code));
+      }
       setResult(value); if (value.status === 'ready'||value.status==='failed') pending.current = null;
       if (value.status === 'ready') clearListingDraft();
       if(value.status==='ready'&&me?.rights.generationEnabled)await generate({listingId:value.id});

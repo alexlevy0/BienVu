@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {reserve,summary,containerGrossUsd,type Budget} from '../apps/pipeline/src/budget';
+import {MAX_MONTHLY_BUDGET_CENTS,MIN_BUDGET_SAFETY_MARGIN_CENTS} from '../packages/contracts/src/admin';
 const now=new Date('2026-09-27T12:00:00Z');
 const fresh=():Budget=>({month:'2026-09',paused:false,fixedAndOtherCents:800,committedCents:0,attempts:0,days:{}});
 test('5 tentatives maximum ; les échecs ne réinitialisent pas le budget',()=>{
@@ -37,7 +38,7 @@ test('hausse explicite à 50 € : la coupure 45 € garde 5 € de marge',()=>{
   assert.equal(raised.fixedAndOtherCents,old.fixedAndOtherCents);
   assert.equal(summary(raised).remainingEnvelopeCents,1450);
   assert.throws(()=>reserve({...raised,ceilingCents:4501},now),/BUDGET_CONFIG_INVALID/);
-  assert.throws(()=>reserve({...raised,envelopeCents:10001},now),/BUDGET_CONFIG_INVALID/);
+  assert.throws(()=>reserve({...raised,envelopeCents:MAX_MONTHLY_BUDGET_CENTS+1},now),/BUDGET_CONFIG_INVALID/);
 });
 
 test('enveloppe 100 € explicitement autorisée : coupure 90 €, frais historiques conservés',()=>{
@@ -46,4 +47,25 @@ test('enveloppe 100 € explicitement autorisée : coupure 90 €, frais histori
   assert.equal(summary(b).remainingEnvelopeCents,5450);
   assert.throws(()=>reserve({...b,fixedAndOtherCents:8880},now),/BUDGET_LIMIT/);
   assert.throws(()=>reserve({...b,ceilingCents:9501},now),/BUDGET_CONFIG_INVALID/);
+});
+
+test('enveloppe 200 € : rendu autorisé, marge et réservations historiques conservées',()=>{
+  const previous={...fresh(),fixedAndOtherCents:9050,committedCents:100,attempts:2,days:{'2026-09-27':2},ceilingCents:9000,envelopeCents:10000};
+  assert.throws(()=>reserve(previous,now),/BUDGET_LIMIT/);
+  const raised=reserve({...previous,ceilingCents:18000,envelopeCents:20000},now);
+  assert.equal(raised.fixedAndOtherCents,previous.fixedAndOtherCents);
+  assert.equal(raised.committedCents,150);assert.equal(raised.attempts,3);assert.equal(raised.days['2026-09-27'],3);
+  assert.equal(summary(raised).remainingEnvelopeCents,10800);
+  assert.throws(()=>reserve({...raised,fixedAndOtherCents:17801},now),/BUDGET_LIMIT/);
+  assert.doesNotThrow(()=>reserve({...raised,ceilingCents:19500},now));
+  for(const invalid of [{ceilingCents:MAX_MONTHLY_BUDGET_CENTS-MIN_BUDGET_SAFETY_MARGIN_CENTS+1},{envelopeCents:MAX_MONTHLY_BUDGET_CENTS+1},{envelopeCents:18499},{ceilingCents:18000.5}])
+    assert.throws(()=>reserve({...raised,...invalid},now),/BUDGET_CONFIG_INVALID/);
+  assert.equal(summary(fresh()).envelopeCents,3000,'Aucune augmentation implicite des anciens journaux');
+});
+
+test('montant administrateur à 300 € : rendu autorisé et coupure choisie respectée',()=>{
+  const initial={...fresh(),fixedAndOtherCents:20500,ceilingCents:28000,envelopeCents:30000};
+  const b=reserve(initial,now);assert.equal(b.committedCents,50);assert.equal(summary(b).envelopeCents,30000);
+  assert.throws(()=>reserve({...initial,fixedAndOtherCents:27951},now),/BUDGET_LIMIT/);
+  assert.throws(()=>reserve({...initial,ceilingCents:29501},now),/BUDGET_CONFIG_INVALID/);
 });

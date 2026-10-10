@@ -2,6 +2,16 @@ import {VideoMap,GenerationRequest,NormalizedListing,automaticMapLocation,Confir
 import {findDefaultGenerationMap,findImport,type GenerationRow} from '@bienvu/db';
 import {geocodeMap,prepareMapImage,MapFailure,type MapEnvironment} from '@bienvu/maps';
 
+export async function prepareGenerationMap(env:MapEnvironment,row:GenerationRow,transport:typeof fetch=fetch){
+  const input=GenerationRequest.parse(JSON.parse(row.input));
+  if(input.customization?.map?.location){
+    const map=ConfirmedVideoMap.parse(input.customization.map);
+    await prepareMapImage(env,map.location,input.aspectRatio??'9:16',transport,map.view,{zoomStart:map.zoomStart,zoomEnd:map.zoomEnd});
+    return map;
+  }
+  return prepareDefaultGenerationMap(env,row,transport);
+}
+
 // Geocoding and plate preparation happen before narration and paid animations.
 // A missing/unavailable default is omitted once; retries keep the same decision.
 export async function prepareDefaultGenerationMap(env:MapEnvironment,row:GenerationRow,transport:typeof fetch=fetch){

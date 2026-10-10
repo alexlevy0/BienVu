@@ -109,12 +109,12 @@ test('rendu produit : plafond D1 actualisé, mois archivés, plus de cinq rendus
   const options={...convertV4MiniflareOptions({modules:true,script:await readFile(scriptPath,'utf8'),compatibilityDate:'2026-10-01',compatibilityFlags:['nodejs_compat'],bindings:{PRODUCT_BUDGET:'true'},durableObjects:{COORDINATOR:{className:'FixtureVideo',useSQLite:true}},r2Buckets:['MEDIA']}),resourcePersistencePath:path.join(directory,'storage')};
   let mf=new Miniflare(options);t.after(()=>mf.dispose());
   const call=(route:string,body?:unknown)=>mf.dispatchFetch(`https://fixture${route}?name=product`,{method:body===undefined?'GET':'POST',body:body===undefined?undefined:JSON.stringify(body)});
-  const f=await videoFixture('anonymous'),bucket=(await mf.getBindings<{MEDIA:R2Bucket}>()).MEDIA;
+  const f=await videoFixture('anonymous');let bucket=(await mf.getBindings<{MEDIA:R2Bucket}>()).MEDIA;
   let latest=f.manifest,latestReport=videoReport(await videoManifestHash(latest),latest);
   const prepare=async(index:number)=>{latest=structuredClone(f.manifest);latest.jobId='product-job-'+index;
     for(const asset of videoAssets(latest)){asset.objectKey=asset.objectKey.replace('/jobs/job-fixture/','/jobs/'+latest.jobId+'/');await bucket.put(asset.objectKey,new Uint8Array(f.files.get(asset.id)!));}
     const id=await videoManifestHash(latest);latestReport={...videoReport(id,latest),preview:{...videoReport(id,latest,new Uint8Array([3,2,1])),watermarked:true}};return id;};
-  const control=async(month:string,engaged:number,ceiling=9000,paused=false)=>call('/control',{clock:Date.parse(month+'-02T12:00:00Z'),productBudget:{month,paused,fixedAndOtherCents:engaged,committedCents:0,attempts:0,days:{},ceilingCents:ceiling,envelopeCents:10000}});
+  const control=async(month:string,engaged:number,ceiling=9000,paused=false,envelope=10000)=>call('/control',{clock:Date.parse(month+'-02T12:00:00Z'),productBudget:{month,paused,fixedAndOtherCents:engaged,committedCents:0,attempts:0,days:{},ceilingCents:ceiling,envelopeCents:envelope}});
   await prepare(0);assert.equal((await call('/accept',{manifest:latest,report:latestReport})).status,409,'Mois absent fermé');
   await control('2026-09',1000);assert.equal((await call('/accept',{manifest:latest,report:latestReport})).status,200);await call('/advance');
   let state=await (await call('/state')).json() as Snapshot;assert.equal(state.state.budget.committedCents,80);
@@ -124,12 +124,21 @@ test('rendu produit : plafond D1 actualisé, mois archivés, plus de cinq rendus
   for(let i=2;i<=7;i++){await prepare(i);await control('2026-10',800+i*200);assert.equal((await call('/accept',{manifest:latest,report:latestReport})).status,200);await call('/advance');}
   state=await (await call('/state')).json() as Snapshot;assert.equal(state.state.budget.attempts,7);assert.equal(state.state.budget.committedCents,560);
   assert.equal(state.state.budget.fixedAndOtherCents+560,2200,'Le rendu est déjà compris dans D1');
-  await mf.dispose();mf=new Miniflare(options);
+  await mf.dispose();mf=new Miniflare(options);bucket=(await mf.getBindings<{MEDIA:R2Bucket}>()).MEDIA;
   assert.equal((await call('/accept',{manifest:latest,report:latestReport})).status,200);assert.equal(((await (await call('/state')).json()) as Snapshot).state.budget.attempts,7);
   // Changement de configuration immédiatement relu ; aucun démarrage en cas de coupure.
-  latest={...latest,subtitlesEnabled:false};const id=await videoManifestHash(latest);latestReport={...latestReport,id,manifestHash:id};
+  latest={...latest,subtitlesEnabled:false};const id=await videoManifestHash(latest);latestReport={...latestReport,id,manifestHash:id,preview:{...latestReport.preview!,id,manifestHash:id}};
   await control('2026-10',9001);assert.equal((await call('/accept',{manifest:latest,report:latestReport})).status,409);
   await control('2026-10',2200,9000,true);assert.equal((await call('/accept',{manifest:latest,report:latestReport})).status,409);
   await control('2026-10',2200,2100);assert.equal((await call('/accept',{manifest:latest,report:latestReport})).status,409);
   assert.equal(((await (await call('/state')).json()) as Snapshot).state.budget.attempts,7);
+  await control('2026-10',9200,18000,false,20000);
+  await Promise.all([1,2].map(()=>call('/accept',{manifest:latest,report:latestReport})));
+  state=await (await call('/state')).json() as Snapshot;
+  assert.equal(state.state.budget.attempts,8);assert.equal(state.state.budget.committedCents,640);
+  assert.equal(state.state.budget.fixedAndOtherCents+640,9200,'La hausse ne compte pas le rendu deux fois');
+  await call('/advance');state=await (await call('/state')).json() as Snapshot;assert.equal(state.job.status,'ready');
+  await prepare(9);await control('2026-10',18001,18000,false,20000);
+  assert.equal((await call('/accept',{manifest:latest,report:latestReport})).status,409,'La coupure à 180 € reste effective');
+  assert.equal(((await (await call('/state')).json()) as Snapshot).state.budget.attempts,8);
 });

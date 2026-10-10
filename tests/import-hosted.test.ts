@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {assertImportMode,photoNormalizer} from '../apps/web/lib/import-transport';
+import {assertImportMode,importPorts,photoNormalizer} from '../apps/web/lib/import-transport';
 import {RequestFailure} from '../apps/web/lib/http';
 import type {Database} from '../packages/db/src/index';
 test('transport Cloudflare fermé sans origine, binding ou secret cohérents', () => {
@@ -17,4 +17,12 @@ test('normalisation hébergée : propriétaire imposé, signal et corps borné, 
  await assert.rejects(normalize(new Uint8Array([1,2]),'image/png',AbortSignal.timeout(1000)),e=>e instanceof RequestFailure&&e.code==='IMPORT_RESOURCE_LIMIT');
  assert.equal(calls[0].url,'https://import.internal/normalize-photo');assert.equal(calls[0].headers.get('X-Agency-ID'),'agency-a');assert.equal(calls[0].headers.get('X-Import-ID'),'import-a');
  assert.equal(calls[0].headers.get('Authorization'),`Bearer ${env.IMPORT_TOKEN}`);assert.equal(new URL(calls[0].url).search,'');
+});
+test('lecture hébergée : les limites de budget et de ressources restent distinctes d’une source inaccessible',async()=>{
+ for(const code of ['IMPORT_BUDGET_LIMIT','IMPORT_RESOURCE_LIMIT'] as const){
+  const env={DB:{} as Database,PROBE_MODE:'remote',IMPORT_MODE:'cloudflare',BETTER_AUTH_URL:'https://bienvu.online',IMPORT_TOKEN:'a'.repeat(32),
+   IMPORT_SERVICE:{fetch:async()=>new Response(null,{status:code==='IMPORT_BUDGET_LIMIT'?503:429,headers:{'X-Import-Error':code}})} as unknown as Fetcher};
+  const transport=importPorts(new Request('https://bienvu.online/api/imports'),env,'agency-a').transport;
+  await assert.rejects(transport.load('https://www.orpi.com/annonce','page',[],AbortSignal.timeout(1000)),{code});
+ }
 });

@@ -11,14 +11,17 @@ export const AdminQuery = z.object({
 }).strict().refine(v=>!v.from||!v.to||v.from<=v.to,{message:'INVALID_DATE_RANGE'});
 export type AdminQuery = z.infer<typeof AdminQuery>;
 const reason = z.string().trim().min(5).max(300);
-// Autorisation du pilote : 100 €, dont au moins 5 € de marge de sécurité.
-export const MAX_MONTHLY_BUDGET_CENTS=10000;
+// The administrator chooses the financial budget explicitly. This upper bound
+// only protects numeric/storage inputs; it never authorizes or opens a budget.
+export const MAX_MONTHLY_BUDGET_CENTS=1_000_000;
+export const DEFAULT_MONTHLY_BUDGET_CENTS=20000;
+export const MIN_BUDGET_SAFETY_MARGIN_CENTS=500;
 const MonthlyBudgetAction=z.object({action:z.literal('monthly_budget'),month:z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
-  envelopeCents:z.number().int().min(500).max(MAX_MONTHLY_BUDGET_CENTS),
-  ceilingCents:z.number().int().min(0).max(MAX_MONTHLY_BUDGET_CENTS-500),
+  envelopeCents:z.number().int().min(MIN_BUDGET_SAFETY_MARGIN_CENTS).max(MAX_MONTHLY_BUDGET_CENTS),
+  ceilingCents:z.number().int().min(0).max(MAX_MONTHLY_BUDGET_CENTS-MIN_BUDGET_SAFETY_MARGIN_CENTS),
   openingCents:z.number().int().min(0).max(MAX_MONTHLY_BUDGET_CENTS),paused:z.boolean(),
   expected:z.number().int().min(0).nullable(),reason}).strict()
-  .refine(v=>v.envelopeCents-v.ceilingCents>=500&&v.openingCents<=v.ceilingCents&& (v.expected===null||v.openingCents===0),{message:'INVALID_MONTHLY_BUDGET'});
+  .refine(v=>v.envelopeCents-v.ceilingCents>=MIN_BUDGET_SAFETY_MARGIN_CENTS&&v.openingCents<=v.ceilingCents&& (v.expected===null||v.openingCents===0),{message:'INVALID_MONTHLY_BUDGET'});
 export const AdminAction = z.discriminatedUnion('action',[
   MonthlyBudgetAction,
   z.object({action:z.literal('generation_gate'),enabled:z.boolean(),expected:z.boolean(),reason}).strict(),

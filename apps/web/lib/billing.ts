@@ -1,7 +1,7 @@
 import Stripe from 'stripe';
 export {Stripe};
 import {z} from 'zod';
-import {creditPlans,EntityId} from '@bienvu/contracts';
+import {creditPlans,legacyCreditPlans,EntityId} from '@bienvu/contracts';
 import {RequestFailure} from './http';
 import {contentHash} from './manual-listings';
 import {topupMutations} from './credit-purchases';
@@ -17,7 +17,7 @@ export async function billingStatus(env:BillingEnv,agencyId:string){
  return {...billingAvailability(env),subscription,topupValidDays:policy?.validDays??0};
 }
 export async function createCheckout(env:BillingEnv,agencyId:string,email:string,origin:string,input:unknown,key:string,client=stripeClient(env)){
- const parsed=z.object({plan:z.enum(['plus','pro']),accepted:z.literal(true)}).strict().safeParse(input);if(!parsed.success||!EntityId.safeParse(agencyId).success||!/^[-a-zA-Z0-9_]{16,128}$/.test(key))throw new RequestFailure('VALIDATION_ERROR');
+ const parsed=z.object({plan:z.enum(['solo','agence','equipe','reseau']),accepted:z.literal(true)}).strict().safeParse(input);if(!parsed.success||!EntityId.safeParse(agencyId).success||!/^[-a-zA-Z0-9_]{16,128}$/.test(key))throw new RequestFailure('VALIDATION_ERROR');
  const mode=billingMode(env);if(!mode||!env.STRIPE_WEBHOOK_SECRET)throw new RequestFailure('BILLING_UNAVAILABLE');
  const plan=creditPlans.find(p=>p.code===parsed.data.plan)!,at=new Date().toISOString();
  if(await env.DB.prepare("SELECT 1 FROM subscriptions WHERE agency_id=? AND stripe_mode=? AND status NOT IN ('canceled','incomplete_expired')").bind(agencyId,mode).first())throw new RequestFailure('CONFLICT');
@@ -32,13 +32,12 @@ export async function createCheckout(env:BillingEnv,agencyId:string,email:string
  try{await env.DB.prepare('INSERT OR IGNORE INTO billing_checkouts(agency_id,idempotency_key,plan,mode,expires_at,created_at) VALUES(?,?,?,?,?,?)').bind(agencyId,key,plan.code,mode,expiresAt,at).run();}catch(e){if(e instanceof Error&&e.message.includes('CHECKOUT_IN_PROGRESS'))throw new RequestFailure('CONFLICT');throw e;}
  const journal=await env.DB.prepare('SELECT expires_at AS expires FROM billing_checkouts WHERE agency_id=? AND mode=? AND idempotency_key=?').bind(agencyId,mode,key).first<{expires:string}>();
  const stableSuffix=(await contentHash(new TextEncoder().encode(`${mode}:${agencyId}:${key}`))).slice(0,8).split('').map(c=>String.fromCharCode(97+parseInt(c,16))).join('');
- const price=plan.code==='plus'?env.STRIPE_PRICE_PLUS:env.STRIPE_PRICE_PRO;
  const session=await client.checkout.sessions.create({mode:'subscription',managed_payments:{enabled:false},integration_identifier:`bienvu_checkout_${stableSuffix}`,customer:customer!.id,client_reference_id:agencyId,locale:'fr',
   success_url:`${origin}/abonnement?paiement=confirmation`,cancel_url:`${origin}/abonnement?paiement=annule`,expires_at:Math.floor(Date.parse(journal!.expires)/1000),
-  metadata:{agencyId,plan:plan.code},subscription_data:{metadata:{agencyId,plan:plan.code}},
-  line_items:[price?{price,quantity:1}:{price_data:{currency:'eur',unit_amount:plan.price*100,tax_behavior:'exclusive',recurring:{interval:'month'},product_data:{name:`BienVu ${plan.name} · ${plan.credits} crédits par mois`}},quantity:1}],
+  metadata:{agencyId,plan:plan.code,creditCatalog:'2'},subscription_data:{metadata:{agencyId,plan:plan.code,creditCatalog:'2'}},
+  line_items:[{price_data:{currency:'eur',unit_amount:plan.price*100,tax_behavior:'exclusive',recurring:{interval:'month'},product_data:{name:`BienVu ${plan.name} · ${plan.credits} crédits par mois`,metadata:{bienvuPlan:plan.code,creditCatalog:'2'}}},quantity:1}],
   billing_address_collection:'required',customer_update:{name:'auto',address:'auto'},tax_id_collection:{enabled:true},automatic_tax:{enabled:false},
-  custom_text:{submit:{message:`${plan.credits} crédits par mois, sans report. 1 crédit par vidéo, plus 1 par nouvelle animation. Sans engagement, résiliation depuis votre abonnement.`}}},
+  custom_text:{submit:{message:`${plan.credits} crédits par mois. Crédits inutilisés reportés un mois, dans la limite de ${plan.credits} crédits, après renouvellement payé. Résiliation à la fin de la période payée.`}}},
   {idempotencyKey:`bienvu:${mode}:checkout:${agencyId}:${key}`});
  if(!session.url||new URL(session.url).hostname!=='checkout.stripe.com')throw new RequestFailure('BILLING_UNAVAILABLE');
  await env.DB.prepare('UPDATE billing_checkouts SET session_id=?,url=? WHERE agency_id=? AND mode=? AND idempotency_key=?').bind(session.id,session.url,agencyId,mode,key).run();return {url:session.url};
@@ -48,7 +47,10 @@ export async function createPortal(env:BillingEnv,agencyId:string,origin:string,
  const session=await client.billingPortal.sessions.create({customer:customer.id,return_url:`${origin}/abonnement`,...(env.STRIPE_PORTAL_CONFIGURATION?{configuration:env.STRIPE_PORTAL_CONFIGURATION}:{})});if(new URL(session.url).hostname!=='billing.stripe.com')throw new RequestFailure('BILLING_UNAVAILABLE');return {url:session.url};
 }
 const stripeId=(value:string|{id:string}|null|undefined)=>typeof value==='string'?value:value?.id??null;
-function approvedPlan(env:BillingEnv,price:Stripe.Price){return creditPlans.find(p=>p.price>0&&price.currency==='eur'&&price.unit_amount===p.price*100&&price.recurring?.interval==='month'&&price.recurring.interval_count===1&&(!(p.code==='plus'?env.STRIPE_PRICE_PLUS:env.STRIPE_PRICE_PRO)||price.id===(p.code==='plus'?env.STRIPE_PRICE_PLUS:env.STRIPE_PRICE_PRO)));}
+function approvedPlan(env:BillingEnv,price:Stripe.Price){return [...creditPlans,...legacyCreditPlans].find(p=>{
+ const configured=p.code==='plus'?env.STRIPE_PRICE_PLUS:p.code==='pro'?env.STRIPE_PRICE_PRO:undefined;
+ return p.price>0&&price.currency==='eur'&&price.unit_amount===p.price*100&&price.recurring?.interval==='month'&&price.recurring.interval_count===1&&(!configured||price.id===configured);
+});}
 export async function processStripeEvent(env:BillingEnv,event:Stripe.Event,payloadHash:string,client=stripeClient(env)){
  const mode=billingMode(env);if(!mode||event.livemode!==(mode==='live'))throw new RequestFailure('FORBIDDEN');
  const previous=await env.DB.prepare('SELECT payload_hash AS hash FROM stripe_webhook_events WHERE id=?').bind(event.id).first<{hash:string}>();

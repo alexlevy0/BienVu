@@ -4,7 +4,7 @@
 
 Site officiel : https://bienvu.online/
 Contact public : contact@bienvu.online
-Dernière mise à jour : 5 octobre 2026.
+Dernière mise à jour : 9 octobre 2026.
 
 La page d'accueil présente BienVu avec « Vous rentrez le mandat. BienVu s'occupe du marketing. » et « Création, personnalisation et publication. Tout est automatisé. ». Le service s'adresse aux agences et aux professionnels de l'immobilier qui souhaitent présenter leurs biens en vidéo et organiser leur diffusion. L'interface est en français ; les autres langues annoncées ne sont pas encore disponibles.
 
@@ -15,6 +15,7 @@ La page d'accueil présente BienVu avec « Vous rentrez le mandat. BienVu s'occu
 - Vidéos verticales 9:16 ou horizontales 16:9, de 20, 30 ou 40 secondes.
 - Génération du texte de présentation et d'une voix off française à partir des informations de l'annonce. Choix de la voix ; Manon est la voix par défaut. Voix off et sous-titres peuvent être activés ou désactivés.
 - Zooms et mouvements de caméra classiques inclus. Animation IA des photos choisies en option, après connexion. Les animations conservées peuvent être réutilisées pour la même photo au même format.
+- Avatar IA facultatif après connexion, sur toute la vidéo, au début, à la fin ou aux deux endroits. Le présentateur reprend la voix off choisie et ses pauses, sans rallonger la vidéo. Placement, taille et présentation réglables ; les clips existants avec le même audio et le même rythme sont réutilisables.
 - Logo, couleurs et coordonnées de l'agence intégrés à la vidéo. Aperçu puis téléchargement d'un fichier MP4 pour les réseaux sociaux, les échanges avec les clients ou le site de l'agence.
 
 ## Éditeur vidéo et audio
@@ -53,15 +54,19 @@ Un visiteur sans compte dispose de 1 crédit d'essai offert pour une vidéo à p
 
 Une nouvelle vidéo ou un nouvel export utilise 1 crédit, plus 1 crédit par nouvelle photo animée par IA. Une vidéo avec quatre nouvelles photos animées coûte donc 5 crédits. Le coût maximum est affiché avant le lancement. Revoir, télécharger ou publier une vidéo déjà produite ne coûte pas de crédit supplémentaire ; un aperçu complet et l'export de la même version sauvegardée réutilisent le même rendu.
 
+L’option Avatar IA ajoute 1 crédit pour un ou deux passages courts, ou 1 crédit par tranche de 10 secondes sur toute la vidéo : +2 crédits pour 20 s, +3 pour 30 s, +4 pour 40 s. Si aucun nouveau clip d’avatar n’est obtenu, ou si tous les clips sont réutilisés, le supplément réservé est rendu.
+
 Si l'export échoue, le crédit vidéo est restitué. Les suppléments d'animations échouées sont restitués ; les animations réussies restent débitées, conservées et réutilisables sans nouveau supplément tant qu'elles sont disponibles pour la même photo au même format.
 
 | Offre | Prix mensuel | Crédits mensuels |
 | --- | --- | --- |
 | Gratuit | 0 € | 3 |
-| Plus | 19 € HT | 40 |
-| Pro | 49 € HT | 120 |
+| Solo | 50 € HT | 50 |
+| Agence | 100 € HT | 100 |
+| Équipe | 200 € HT | 200 |
+| Réseau | 500 € HT | 500 |
 
-Les crédits mensuels se renouvellent sans report. Les recharges ponctuelles complètent le solde sans changer l'abonnement : 10 crédits à 7 € HT, 30 crédits à 19 € HT ou 100 crédits à 59 € HT. Les recharges sont sans expiration et les crédits mensuels sont consommés en premier. La page des offres propose un estimateur selon le nombre de photos animées, le solde et l'historique des crédits après connexion.
+Pour les nouvelles offres payantes, les crédits mensuels inutilisés et non réservés sont reportables au mois suivant après renouvellement payé, dans la limite d'une mensualité. Ils sont consommés en premier et ne se reportent pas une seconde fois. L'offre gratuite conserve ses 3 crédits mensuels sans report ; les abonnements Plus et Pro existants gardent leurs conditions. Les recharges ponctuelles complètent le solde sans changer l'abonnement : 20, 50 ou 100 crédits à 1 € HT par crédit, sans expiration. Les achats antérieurs conservent leur barème. La page des offres propose un estimateur selon le nombre de photos animées, le solde et l'historique des crédits après connexion.
 
 La page des offres indique la disponibilité des abonnements et des recharges, ainsi que les modalités de souscription et de paiement. Les factures, le moyen de paiement et la résiliation se gèrent depuis l'abonnement. Pour changer d'offre, contacter le support.
 
@@ -73,7 +78,7 @@ Explorer permet de découvrir les vidéos partagées volontairement et les exemp
 
 - [Studio BienVu](https://bienvu.online/): Création, démonstrations, kit du mandat, partage et présentation de l'éditeur.
 - [Explorer](https://bienvu.online/explorer): Vidéos partagées et exemples de rendu.
-- [Offres et crédits](https://bienvu.online/abonnement): Offres Gratuit, Plus et Pro, estimateur, recharges et disponibilité des paiements.
+- [Offres et crédits](https://bienvu.online/abonnement): Offres Gratuit, Solo, Agence, Équipe et Réseau, simulateur avec présentateur IA, report plafonné et recharges.
 - [Sources testées](https://bienvu.online/sources): Compatibilité des sites d'annonces, limites connues et alternatives à l'import par lien.
 - [Programme partenaires](https://bienvu.online/partenaires): Candidature ouverte aux professionnels qui recommandent BienVu, validation manuelle des recommandations, simulateur indicatif et commission de 15 % des paiements HT encaissés pendant 12 mois à partir du premier paiement du client, avec des versements mensuels.
 - [Vidéo immobilière IA](https://bienvu.online/video-immobiliere-ia): Création à partir d’une annonce et de ses photos, formats et crédits.

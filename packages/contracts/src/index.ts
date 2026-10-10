@@ -24,6 +24,7 @@ export * from './voice';
 export * from './voice-catalog';
 export * from './narration';
 export * from './ai-quality';
+export * from './avatars';
 export * from './video';
 export * from './generation';
 export * from './homepage';
@@ -35,7 +36,8 @@ export const ProbeRender = z.object({
 export type ProbeRender = z.infer<typeof ProbeRender>;
 
 export const errorCodes = ['INVALID_URL', 'UNSAFE_URL', 'SOURCE_BLOCKED', 'SOURCE_UNAVAILABLE',
-  'NOT_A_LISTING', 'INCOMPLETE_LISTING', 'CONFLICTING_FACTS', 'INSUFFICIENT_PHOTOS', 'IMPORT_TIMEOUT'] as const;
+  'NOT_A_LISTING', 'INCOMPLETE_LISTING', 'CONFLICTING_FACTS', 'INSUFFICIENT_PHOTOS', 'IMPORT_TIMEOUT',
+  'IMPORT_BUDGET_LIMIT', 'IMPORT_RESOURCE_LIMIT'] as const;
 export type ImportErrorCode = typeof errorCodes[number];
 export const importFailureReasons = ['access_denied', 'login_required', 'rate_limited', 'challenge', 'not_found',
   'listing_redirect', 'not_listing', 'structure_changed'] as const;

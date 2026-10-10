@@ -1,11 +1,11 @@
-import {PricingSimulationInput, cartesiaPricingPlans, creditPacks, creditPlans, defaultPricingSimulation,
-  type PricingUsageProfile, VIDEO_CREDITS, PHOTO_ANIMATION_CREDITS} from '@bienvu/contracts';
+import {PricingSimulationInput, cartesiaPricingPlans, creditPacks, creditPlans, legacyCreditPacks, legacyCreditPlans, defaultPricingSimulation,
+  type PricingUsageProfile, VIDEO_CREDITS, PHOTO_ANIMATION_CREDITS,AVATAR_SECONDS_PER_CREDIT} from '@bienvu/contracts';
 
 // Forecast amounts are decimal euros, not a ledger of billable transactions.
 // The same pure engine runs in the browser, API, saved scenarios and exports.
-export type PricingCostParts = {runway: number; text: number; voice: number; compute: number;
+export type PricingCostParts = {avatar:number;runway: number; text: number; voice: number; compute: number;
   browser: number; storage: number; operations: number; workers: number; support: number; other: number};
-const zero = (): PricingCostParts => ({runway: 0, text: 0, voice: 0, compute: 0, browser: 0,
+const zero = (): PricingCostParts => ({avatar:0,runway: 0, text: 0, voice: 0, compute: 0, browser: 0,
   storage: 0, operations: 0, workers: 0, support: 0, other: 0});
 const sum = (p: PricingCostParts) => Object.values(p).reduce((a, b) => a + b, 0);
 const positive = (n: number) => Math.max(0, n);
@@ -43,8 +43,8 @@ function measures(s: PricingSimulationInput, p: PricingUsageProfile): VideoMeasu
   const active = (p.renderSeconds + (p.map ? production.mapExtraRenderSeconds : 0)) * (1 + production.extraRenderPercent / 100);
   const uptime = active + c.idleSeconds * (1 + production.extraRenderPercent / 100);
   const imports = production.importsPerVideo;
-  return {credits: VIDEO_CREDITS + newAnimations * PHOTO_ANIMATION_CREDITS, newAnimations,
-    storageGB: (production.outputMB + production.photoMB * p.photos + production.animationMB * p.animations + (p.voice ? production.voiceMB : 0)) / 1000,
+  return {credits: VIDEO_CREDITS + newAnimations * PHOTO_ANIMATION_CREDITS+(p.avatar?(p.avatar.coverage==='full'?Math.ceil(p.durationSeconds/AVATAR_SECONDS_PER_CREDIT):1)*(1-(production.avatar?.reusePercent??0)/100):0), newAnimations,
+    storageGB: (production.outputMB + production.photoMB * p.photos + production.animationMB * p.animations + (p.voice ? production.voiceMB : 0)+(p.avatar?production.avatar?.mediaMB??4:0)) / 1000,
     voiceMinutes: p.voice ? p.durationSeconds / 60 * (1 + production.voiceExtraPercent / 100) : 0,
     voiceCalls: p.voice ? 1 + production.voiceExtraPercent / 100 : 0,
     cpuSeconds: active * c.vcpu + imports * production.importCpuSeconds * 0.25,
@@ -55,7 +55,7 @@ function measures(s: PricingSimulationInput, p: PricingUsageProfile): VideoMeasu
 }
 function videoCosts(s: PricingSimulationInput, p: PricingUsageProfile, plan: VoicePlan, storageMonths: number) {
   const m = measures(s, p), r = s.production, c = s.cloudflare, fx = s.market.eurPerUsd;
-  const parts: PricingCostParts = {
+  const parts: PricingCostParts = {avatar:p.avatar?(p.avatar.coverage==='full'?p.durationSeconds:p.avatar.seconds)/60*(p.avatar.engine==='avatar_iii'?r.avatar?.priceIII??.99:r.avatar?.priceIV??4.83)*(1-(r.avatar?.reusePercent??0)/100)*fx:0,
     runway: m.newAnimations * r.runwayCreditsPerSecond * r.runwaySeconds * r.runwayUsdPerCredit * fx * (1 + r.extraAnimationAttemptsPercent / 100),
     text: r.textEurPerVideo,
     voice: r.voiceMode === 'per_video' ? m.voiceCalls * r.voiceEurPerVideo : m.voiceMinutes * plan.referenceEurPerMinute,
@@ -205,8 +205,8 @@ function project(s: PricingSimulationInput) {
     const minimumPriceHt = denominator > 0 && sharedPerCredit !== null
       ? Math.ceil((productionEur + sharedEur + fixedFees + market.otherPerOrderEur) / denominator * 100 - 1e-9) / 100 : null;
     const pct = margin(profit, revenueHt);
-    const ref = creditPacks.find(p => p.code === o.referenceCode);
-    const plan = creditPlans.find(p => p.code === o.referenceCode);
+    const ref = [...creditPacks,...legacyCreditPacks].find(p => p.code === o.referenceCode);
+    const plan = [...creditPlans,...legacyCreditPlans].find(p => p.code === o.referenceCode);
     const currentPriceHt = ref ? ref.priceCents / 100 : plan ? plan.price : null;
     return {id: o.id, name: o.name, enabled: o.enabled, kind: o.kind, credits, priceHt: o.priceHt,
       priceTtc: o.priceHt * (1 + market.vatPercent / 100), pricePerCredit: o.priceHt / credits, currentPriceHt,
@@ -257,7 +257,7 @@ export function calculatePricing(input: unknown, includeComparisons = true): Pri
   if (base.offers.some(o => o.enabled && o.minimumPriceHt === null) && base.months[0].soldCredits > 0)
     add('UNREACHABLE_MARGIN', 'L’objectif de marge est incompatible avec les frais et pertes paramétrés pour au moins une offre.');
   if (s.market.storageRetentionMonths === 0) add('PERMANENT_STORAGE', `Les médias sont conservés durablement. Le prix cible provisionne ${s.market.horizonMonths} mois de stockage ; les frais continuent au-delà de cet horizon.`);
-  if (s.market.consumptionPercent < 100) add('UNUSED_CREDITS', 'Les recharges inutilisées sont reportées et peuvent être consommées plus tard. Leur coût potentiel reste affiché ; les crédits mensuels d’abonnement non consommés ne sont pas reportés.');
+  if (s.market.consumptionPercent < 100) add('UNUSED_CREDITS', 'Les recharges inutilisées sont reportées et peuvent être consommées plus tard. Leur coût potentiel reste affiché ; les nouvelles offres mensuelles payantes ont un report plafonné à une mensualité après renouvellement payé. La projection de consommation mensuelle doit inclure l’utilisation de ces reports.');
   if (s.market.eurPerUsd === 1) add('FX_ASSUMPTION', 'Le taux 1 USD = 1 EUR est une hypothèse prudente, à remplacer par votre taux de conversion effectif.');
   const enabled = base.offers.filter(o => o.enabled);
   const subscriptions = enabled.filter(o => o.kind === 'subscription');

@@ -1,5 +1,5 @@
 import {z} from 'zod';
-import {VoiceCatalog,AdminVoices,VoiceSample,VoiceText,VideoVoice,frenchVoices,NormalizedListing,VoiceFailure} from '@bienvu/contracts';
+import {voiceGender,VoiceCatalog,AdminVoices,VoiceSample,VoiceText,VideoVoice,frenchVoices,NormalizedListing,VoiceFailure} from '@bienvu/contracts';
 import {voiceSettings,setDefaultVoice,cartesiaFreeUsage,reserveCartesiaVoice,finishCartesiaVoice,type Database} from '@bienvu/db';
 import {frenchVoiceProvider,frenchVoiceConfig,voiceCacheKey,measureVoiceWav,localitySpeechText,type VoiceProviderEnvironment} from '@bienvu/voice';
 import {requireAdmin} from './admin-access';
@@ -13,7 +13,7 @@ const available=(env:VoiceProviderEnvironment,id:string)=>provider(id)==='cartes
   provider(id)==='fish'?env.FISH_TTS_ENABLED==='true'&&Boolean(env.FISH_API_KEY):Boolean(env.GOOGLE_SERVICE_ACCOUNT_JSON&&env.GOOGLE_CLOUD_PROJECT);
 export async function publicVoiceCatalog(env:{DB:Database}&VoiceProviderEnvironment){
   const settings=await voiceSettings(env.DB);
-  return VoiceCatalog.parse({defaultVoice:settings.voice,revision:settings.revision,voices:frenchVoices.map(v=>({id:v.id,name:v.name,provider:provider(v.id),
+  return VoiceCatalog.parse({defaultVoice:settings.voice,revision:settings.revision,voices:frenchVoices.map(v=>({id:v.id,name:v.name,gender:voiceGender(v.id),provider:provider(v.id),
     model:provider(v.id)==='cartesia'?'Sonic 3.6':provider(v.id)==='fish'?'S2.1 Pro':'Chirp 3 HD',
     accent:provider(v.id)==='cartesia'?'Français · Parisien':provider(v.id)==='google'?'Français · France':'Français',available:available(env,v.id)}))});
 }
