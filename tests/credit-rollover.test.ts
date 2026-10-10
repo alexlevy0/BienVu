@@ -65,7 +65,7 @@ test('Nouvelles souscriptions : quatre prix serveur exacts, anciens choix refus√
  f.client.checkout.sessions.create=async params=>{calls.push(params!);return {id:'cs_'+calls.length,url:'https://checkout.stripe.com/c/pay/fixture'} as Stripe.Response<Stripe.Checkout.Session>;};
  await assert.rejects(createCheckout(f.env,f.agencyId,'fixture@example.com','https://bienvu.online',{plan:'plus',accepted:true},'old-price-selection',f.client));
  for(const plan of creditPlans.filter(p=>p.price>0)){
-  await f.DB.exec('DELETE FROM billing_checkouts');await createCheckout(f.env,f.agencyId,'fixture@example.com','https://bienvu.online',{plan:plan.code,accepted:true},'new-price-selection-'+plan.code,f.client);
+  await f.DB.exec('DELETE FROM billing_checkouts');await createCheckout(f.env,f.agencyId,'fixture@example.com','https://bienvu.online',{plan:plan.code},'new-price-selection-'+plan.code,f.client);
   assert.equal(calls.at(-1)!.line_items![0].price_data!.unit_amount,plan.price*100);const submit=calls.at(-1)!.custom_text!.submit;assert.ok(submit&&typeof submit==='object');assert.match(submit.message,/report√©s un mois/);
  }
  assert.equal((await f.DB.prepare("SELECT count(*) n FROM allocations WHERE period_key LIKE 'stripe:%'").first<{n:number}>())!.n,0);

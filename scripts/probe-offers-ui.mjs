@@ -5,7 +5,7 @@ import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright-core';
-const out=resolve('evidence/local/offers-2026-10-09');await mkdir(out,{recursive:true});
+const out=resolve('evidence/local/offers-direct-checkout-2026-10-10');await mkdir(out,{recursive:true});
 const require=createRequire(import.meta.url),esbuild=createRequire(require.resolve('tsx'))('esbuild');
 const fixture={role:'owner',user:{id:'offers-user',name:'Utilisateur de recette',email:'fixture@example.com'},agency:{id:'offers-agency',name:'Agence de recette',primaryColor:'#214F43',secondaryColor:'#DFE7D5',ownerUserId:'offers-user',logoAssetId:null,createdAt:'2026-10-09T12:00:00Z',phone:null,email:'fixture@example.com',website:null,updatedAt:'2026-10-09T12:00:00Z',brandVersion:1},rights:{generationEnabled:true,developmentRemaining:100,creditTotal:103,creditReserved:0,creditConsumed:3,trial:'eligible',watermarked:false}};
 const source=`import React from 'react';import {createRoot} from 'react-dom/client';import {AccountProvider} from './components/account';import {Offers} from './components/offers';
@@ -19,22 +19,22 @@ const entry={id:'job-fixture',title:'Villa de recette',at:'2026-10-09T12:00:00Z'
 const server=createServer(async(req,res)=>{
  const url=new URL(req.url,'http://127.0.0.1');
  function json(value,status=200){res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(value));}
- if(req.method==='POST'){let body='';for await(const chunk of req)body+=chunk;writes.push({path:url.pathname,body:JSON.parse(body)});json({error:'FIXTURE_ONLY'},503);return;}
+ if(req.method==='POST'){let body='';for await(const chunk of req)body+=chunk;const payment=req.headers['x-fixture-payment'];writes.push({path:url.pathname,body:JSON.parse(body),key:req.headers['idempotency-key'],payment});await new Promise(r=>setTimeout(r,350));if(payment==='expired-once'&&writes.filter(w=>w.payment===payment).length===1)json({fields:{checkout:'expired'}},409);else if(payment==='confirmed'||payment==='busy')json({fields:{checkout:payment}},409);else if(payment==='success'||payment==='expired-once')json({url:url.pathname.endsWith('/portal')?'https://billing.stripe.com/p/session/fixture':'https://checkout.stripe.com/c/pay/fixture'});else json({error:'FIXTURE_ONLY'},503);return;}
  if(url.pathname==='/bundle.js'){res.setHeader('Content-Type','text/javascript');res.end(compiled.outputFiles[0].contents);return;}
  if(url.pathname==='/style.css'){res.setHeader('Content-Type','text/css');res.end(css);return;}
  if(url.pathname==='/portrait.png'){res.setHeader('Content-Type','image/png');res.end(photo);return;}
  if(url.pathname==='/demo.mp4'){res.setHeader('Content-Type','video/mp4');res.end(video);return;}
  if(url.pathname.startsWith('/fonts/')){try{res.end(await readFile(resolve('apps/web/public',url.pathname.slice(1))));}catch{res.writeHead(404);res.end();}return;}
- if(url.pathname==='/api/me'){json({...fixture,role:req.headers['x-fixture-role']??'owner'});return;}
+ if(url.pathname==='/api/me'){if(req.headers['x-fixture-role']==='guest')json({},401);else json({...fixture,role:req.headers['x-fixture-role']??'owner'});return;}
  if(url.pathname==='/api/avatars'){json(catalog);return;}
  if(url.pathname==='/api/voices'){json({},503);return;}
- if(url.pathname==='/api/billing'){json({enabled:true,mode:'test',topupValidDays:0,subscription:null});return;}
+ if(url.pathname==='/api/billing'){json({enabled:true,mode:'test',topupValidDays:0,subscription:req.headers['x-fixture-subscription']?{plan:'agence',status:'active',cancelAtPeriodEnd:0,periodEnd:'2026-11-10',mode:'test'}:null});return;}
  if(url.pathname==='/api/billing/topups'){json({purchases:[]});return;}
  if(url.pathname==='/api/credits'){json({balance,entries:[{...entry,id:url.searchParams.has('cursor')?'job-next':entry.id}],nextCursor:url.searchParams.has('cursor')?null:'fixture-next'});return;}
  res.setHeader('Content-Type','text/html');res.end('<html lang="fr"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"><div id="root"></div><script src="/bundle.js"></script></html>');
 });
 await new Promise(r=>server.listen(0,'127.0.0.1',r));
-const browser=await chromium.launch({executablePath:resolve('apps/renderer/node_modules/.remotion/chrome-headless-shell/mac-arm64/chrome-headless-shell-mac-arm64/chrome-headless-shell'),headless:true}),reports=[];
+const browser=await chromium.launch({executablePath:process.env.CHROME_PATH??resolve('apps/renderer/node_modules/.remotion/chrome-headless-shell/mac-arm64/chrome-headless-shell-mac-arm64/chrome-headless-shell'),headless:true}),reports=[];
 try{
  for(const width of [1536,900,390,320]){
   const page=await browser.newPage({viewport:{width,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
@@ -51,15 +51,31 @@ try{
   await page.getByRole('radio',{name:/50 crédits/}).check();await page.locator('.offers-topup-consent input').check();
   assert.match(await page.locator('.offers-topup-pay').innerText(),/Acheter 50 crédits/);await page.getByRole('button',{name:/Essayer avec 20 crédits/}).click();
   assert.equal(await page.locator('.offers-topup-consent input').isChecked(),false);assert.equal(await page.getByRole('radio',{name:/20 crédits/}).isChecked(),true);
-  await page.getByRole('button',{name:'Choisir Solo'}).click();assert.match(await page.locator('.offers-checkout-confirm').innerText(),/50 € HT · 50 crédits/);
-  assert.equal(await page.getByRole('button',{name:'Continuer vers Stripe'}).isDisabled(),true);await page.locator('.offers-checkout-confirm input').check();
-  assert.equal(await page.getByRole('button',{name:'Continuer vers Stripe'}).isEnabled(),true);await page.getByRole('button',{name:'Annuler',exact:true}).click();
+  if(width===1536)await page.evaluate(()=>sessionStorage.setItem('bienvu:checkout:test:offers-agency:agence','invalid-json'));
+  if(width===900)await page.evaluate(()=>{const get=Storage.prototype.getItem,set=Storage.prototype.setItem;Storage.prototype.getItem=function(key){if(this===sessionStorage)throw Error('Storage unavailable');return get.call(this,key);};Storage.prototype.setItem=function(key,value){if(this===sessionStorage)throw Error('Storage unavailable');return set.call(this,key,value);};});
+  const before=writes.length;await page.locator('.offers-card-agence button').scrollIntoViewIfNeeded();const scroll=await page.evaluate(()=>scrollY);
+  await page.evaluate(()=>{const button=document.querySelector('.offers-card-agence button');button.click();button.click();});
+  await page.getByRole('button',{name:'Ouverture de Stripe…'}).waitFor();assert.equal(await page.locator('.offers-card-solo button').isDisabled(),true);
+  await page.locator('.offers-card-agence [role=alert]').waitFor();assert.equal(writes.length,before+1,'Une seule requête malgré deux clics');
+  assert.deepEqual(writes.at(-1).body,{plan:'agence'});assert.equal(writes.at(-1).path,'/api/billing/checkout');assert.ok(writes.at(-1).key);
+  assert.equal(await page.locator('.offers-checkout-confirm').count(),0);assert.ok(Math.abs(await page.evaluate(()=>scrollY)-scroll)<=1,'Aucun défilement vers une validation');
+  const key=writes.at(-1).key;await page.getByRole('button',{name:'Choisir Agence'}).click();await page.locator('.offers-card-agence [role=alert]').waitFor();
+  assert.equal(writes.length,before+2);assert.equal(writes.at(-1).key,key,'Reprise avec la même clé de paiement');
+  assert.equal(await page.locator('.offers-purchase-terms a').count(),2);
   await page.getByRole('link',{name:/Voir l’historique/}).click();assert.equal(await page.locator('#credit-history').evaluate(e=>e.open),true);
   await page.getByRole('button',{name:/Voir la suite/}).click();await page.waitForFunction(()=>document.querySelectorAll('#credit-history tbody tr').length===2);assert.equal(await page.locator('#credit-history tbody tr').count(),2);
   await page.getByRole('button',{name:'Voir la démonstration du présentateur'}).click();await page.locator('.offers-demo video').waitFor();
   assert.equal(await page.locator('.offers-demo video').evaluate(e=>e.muted),true);await page.getByRole('button',{name:'Arrêter la démonstration du présentateur'}).click();assert.equal(await page.locator('.offers-demo video').count(),0);
-  assert.deepEqual(errors,[]);reports.push({width,noOverflow:true,defaultCost:8,maxCost:17,newPrices:true,consent:true,discovery:true,history:true,inlineMutedDemo:true});await page.close();
+  assert.deepEqual(errors,[]);reports.push({width,noOverflow:true,defaultCost:8,maxCost:17,newPrices:true,directCheckout:true,doubleClickBlocked:true,retrySameKey:true,storageFailure:width===900,malformedStorage:width===1536,noConfirmationScroll:true,discovery:true,history:true,inlineMutedDemo:true});await page.close();
  }
  const member=await browser.newPage({extraHTTPHeaders:{'x-fixture-role':'editor'}});await member.goto('http://127.0.0.1:'+server.address().port);await member.locator('.offers-wallet').waitFor();assert.equal(await member.getByRole('button',{name:'Choisir Solo'}).isDisabled(),true);await member.locator('.offers-topup-consent input').check();assert.equal(await member.locator('.offers-topup-pay').isDisabled(),true);await member.close();
- assert.deepEqual(writes,[]);await writeFile(out+'/ui-report.json',JSON.stringify({reports,editorCannotBuy:true,purchases:0,providerCalls:0},null,2));console.log(JSON.stringify(reports));
+ const beforeGuest=writes.length,guest=await browser.newPage({extraHTTPHeaders:{'x-fixture-role':'guest'}});await guest.goto('http://127.0.0.1:'+server.address().port);await guest.getByRole('button',{name:'Choisir Agence'}).click();await guest.waitForURL('**/connexion?next=/abonnement');assert.equal(writes.length,beforeGuest);await guest.close();
+ for(const plan of ['Solo','Agence','Équipe','Réseau']){
+  const page=await browser.newPage({extraHTTPHeaders:{'x-fixture-payment':'success'}});await page.route('https://checkout.stripe.com/**',route=>route.fulfill({contentType:'text/html',body:'<h1>Stripe Checkout simulé</h1>'}));
+  await page.goto('http://127.0.0.1:'+server.address().port);await page.getByRole('button',{name:'Choisir '+plan}).click();await page.waitForURL('https://checkout.stripe.com/**');assert.deepEqual(writes.at(-1).body,{plan:plan==='Équipe'?'equipe':plan==='Réseau'?'reseau':plan.toLowerCase()});await page.close();
+ }
+ const subscribed=await browser.newPage({extraHTTPHeaders:{'x-fixture-payment':'success','x-fixture-subscription':'active'}});await subscribed.route('https://billing.stripe.com/**',route=>route.fulfill({contentType:'text/html',body:'<h1>Portail Stripe simulé</h1>'}));await subscribed.goto('http://127.0.0.1:'+server.address().port);await subscribed.getByRole('button',{name:'Gérer mon offre',exact:true}).click();await subscribed.waitForURL('https://billing.stripe.com/**');assert.equal(writes.at(-1).path,'/api/billing/portal');assert.deepEqual(writes.at(-1).body,{});await subscribed.close();
+ const expired=await browser.newPage({extraHTTPHeaders:{'x-fixture-payment':'expired-once'}});await expired.route('https://checkout.stripe.com/**',route=>route.fulfill({contentType:'text/html',body:'<h1>Stripe Checkout simulé</h1>'}));await expired.goto('http://127.0.0.1:'+server.address().port);const beforeExpired=writes.length;await expired.getByRole('button',{name:'Choisir Agence'}).click();await expired.waitForURL('https://checkout.stripe.com/**');const recovered=writes.slice(beforeExpired);assert.equal(recovered.length,2);assert.notEqual(recovered[0].key,recovered[1].key);assert.deepEqual(recovered[0].body,recovered[1].body);await expired.close();
+ for(const reason of ['confirmed','busy']){const page=await browser.newPage({extraHTTPHeaders:{'x-fixture-payment':reason}});await page.goto('http://127.0.0.1:'+server.address().port);const before=writes.length;await page.getByRole('button',{name:'Choisir Agence'}).click();await page.locator('.offers-card-agence [role=alert]').waitFor();assert.equal(writes.length,before+1);assert.match(await page.locator('.offers-card-agence [role=alert]').innerText(),reason==='confirmed'?/confirmé votre paiement/:/cours de préparation/);await page.close();}
+ await writeFile(out+'/ui-report.json',JSON.stringify({reports,editorCannotBuy:true,guestLogin:true,fourPlansRedirect:true,existingSubscriptionPortal:true,expiredKeyRecovered:true,pendingPaymentNoNewIntent:true,fixtureRequests:writes,purchases:0,providerCalls:0},null,2));console.log(JSON.stringify(reports));
 }finally{await browser.close();await new Promise(r=>server.close(r));}

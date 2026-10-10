@@ -1,5 +1,27 @@
 # BienVu — suivi des sprints
 
+### 10/10/2026 — Checkout : reprendre et changer d’offre sans blocage
+
+Diagnostic réel : une session **Solo** ouverte et non payée retenait le verrou d’achat pendant 45 minutes ; choisir Agence renvoyait un conflit que l’actualisation ne résolvait pas. Pas d’abonnement existant sur ce compte. Le serveur relit désormais la session Stripe et contrôle son agence, son client et son mode avant toute reprise. Pour la même offre, il reprend le lien existant ; pour une autre, il expire le lien Stripe précédent avant de libérer son journal et de préparer le nouveau Checkout. Une création incertaine peut être reprise depuis un autre onglet avec sa clé Stripe d’origine.
+
+Une session expirée entraîne une seule reprise automatique côté navigateur avec une nouvelle clé. Un paiement confirmé, y compris après son heure d’expiration initiale, empêche un deuxième abonnement pendant la synchronisation du webhook. Un échec d’expiration ne libère pas le verrou ; deux demandes concurrentes restent bornées par le trigger D1 existant. Un abonnement synchronisé et terminé autorise une nouvelle souscription. Les erreurs distinguent préparation, expiration et paiement confirmé.
+
+**17/17 tests ciblés**, types web et tests, frontières **488 fichiers**, build OpenNext et dry-run Wrangler réussis ; Chrome **1536/900/390/320 px**, dont récupération automatique d’une ancienne clé, absence de nouvelle intention sur paiement confirmé et protection des doubles clics.
+
+Vérification réelle de la fonction serveur avec D1 distante et Stripe **test**, sur la demande concernée : **Solo open/unpaid → expired**, nouvelle demande **Agence open/unpaid**, **100 € HT/mois**, aucun abonnement créé ni achat validé ; allocations/crédits identiques avant/après. La demande Agence reste disponible pour être reprise par l’utilisateur. Ce contrôle porte sur la logique serveur et les ressources réelles, sans ouvrir de session d’authentification au nom du client. Preuves privées ignorées dans `evidence/checkout-recovery/` ; fixtures et journaux sous `evidence/local/checkout-recovery-*`.
+
+Web publié à **100 %**, version **`9ace8e75-4615-4f19-bb1b-535a2a95495b`**, **58 bindings conservés à l’identique**. Page offres 200, POST Checkout anonyme 401 ; assets JavaScript/CSS publiés identiques au build par SHA-256. Aucun commit ou push à cette étape.
+
+### 10/10/2026 — Abonnements : accès direct à Stripe
+
+« Choisir Solo / Agence / Équipe / Réseau » prépare immédiatement Checkout pour le compte connecté autorisé, sans défilement vers une bannière ni case de validation intermédiaire. Les visiteurs passent par la connexion ; les abonnés existants ouvrent le portail de gestion. État de chargement sur les boutons, verrou immédiat contre les doubles clics, erreur près de l’offre choisie et reprise avec la même clé de paiement, y compris avec un stockage navigateur indisponible. Les conditions et la confidentialité restent liées sous les offres et dans le footer ; le renouvellement mensuel est indiqué.
+
+L’API d’abonnement accepte désormais `{plan}`. Le champ historique `accepted:true` reste toléré pour les anciens onglets ouverts, sans constituer un enregistrement de consentement. Prix serveur, permissions de facturation, contrôle d’origine, journal d’intention et attribution des crédits par facture Stripe payée conservés. Les paramètres Checkout existants ne changent pas, pour maintenir les reprises idempotentes déjà engagées.
+
+**14/14 tests ciblés** (Stripe, report des crédits, droits d’équipe), types packages/apps et tests, frontières **488 fichiers**, build OpenNext et dry-run Wrangler réussis. Recette des composants réels dans Chrome à **1536/900/390/320 px** : quatre redirections Checkout simulées, portail des abonnés, connexion anonyme, membre non autorisé, double clic, erreur/reprise avec clé identique, stockage malformé ou indisponible et absence de défilement de confirmation. Captures inspectées, aucun débordement ni achat ou appel fournisseur réel. Preuves ignorées : `evidence/local/offers-direct-checkout-2026-10-10/`, journaux `evidence/local/offers-direct-*` et snapshot privé `evidence/offers-direct-checkout/`.
+
+Web publié à **100 %**, version **`635617c2-6fa6-4960-a8b1-b0f7cb544e6b`**, **58 bindings conservés à l’identique**. `/abonnement` en 200 avec les nouveaux liens sous les offres ; JavaScript et CSS publiés identiques au build par SHA-256. `/api/billing` et le POST Checkout sans session restent en 401. Aucun paiement Stripe réel n’a été déclenché pour la recette. Aucun commit ou push à cette étape.
+
 ### 10/10/2026 — Admin Greg et messageries personnelles
 
 Panneau **Admin** pour le seul compte vérifié `vonlanthen.greg@gmail.com` (`ADMIN_EMAIL`), compte existant et vérifié confirmé sans modification. Comptes, agences et vidéos en lecture seule, recherche/export/lecture compris, et messagerie `greg@bienvu.online`. Routes techniques et financières toujours réservées au superadmin ; réponses et exports limités sans sessions/fournisseurs d’authentification ni coûts API. Le superadmin choisit entre `contact@bienvu.online` et `alex@bienvu.online`. Listes, compteurs, recherches, références RFC, uploads, téléchargements, relances et réponses isolés côté serveur par boîte. Expéditeur et Reply-To conservés lors des reprises du cron ; limites globales d’envoi inchangées.

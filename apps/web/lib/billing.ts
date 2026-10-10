@@ -10,6 +10,8 @@ export type BillingEnv=Pick<CloudflareEnv,'DB'>&{BILLING_MODE?:string;STRIPE_SEC
 export function billingMode(env:BillingEnv):'test'|'live'|null{return env.BILLING_MODE==='test'&&env.STRIPE_SECRET_KEY?.startsWith('sk_test_')?'test':env.BILLING_MODE==='live'&&env.STRIPE_SECRET_KEY?.startsWith('sk_live_')?'live':null;}
 export function billingAvailability(env:BillingEnv){const mode=billingMode(env);return {enabled:Boolean(mode&&env.STRIPE_WEBHOOK_SECRET),mode};}
 export type BillingAvailability=ReturnType<typeof billingAvailability>;
+const checkoutConflict=(reason:string)=>new RequestFailure('CONFLICT',{checkout:reason});
+const checkoutUrl=(url:string|null)=>{if(!url||new URL(url).protocol!=='https:'||new URL(url).hostname!=='checkout.stripe.com')throw new RequestFailure('BILLING_UNAVAILABLE');return url;};
 export function stripeClient(env:BillingEnv){if(!billingMode(env))throw new RequestFailure('BILLING_UNAVAILABLE');return new Stripe(env.STRIPE_SECRET_KEY!,{httpClient:Stripe.createFetchHttpClient(),maxNetworkRetries:1,timeout:15000});}
 export async function billingStatus(env:BillingEnv,agencyId:string){
  const subscription=await env.DB.prepare('SELECT plan_code AS plan,status,period_end AS periodEnd,cancel_at_period_end AS cancelAtPeriodEnd,stripe_mode AS mode FROM subscriptions WHERE agency_id=?').bind(agencyId).first();
@@ -17,19 +19,45 @@ export async function billingStatus(env:BillingEnv,agencyId:string){
  return {...billingAvailability(env),subscription,topupValidDays:policy?.validDays??0};
 }
 export async function createCheckout(env:BillingEnv,agencyId:string,email:string,origin:string,input:unknown,key:string,client=stripeClient(env)){
- const parsed=z.object({plan:z.enum(['solo','agence','equipe','reseau']),accepted:z.literal(true)}).strict().safeParse(input);if(!parsed.success||!EntityId.safeParse(agencyId).success||!/^[-a-zA-Z0-9_]{16,128}$/.test(key))throw new RequestFailure('VALIDATION_ERROR');
+ // Older open tabs may still send this field; it is not a consent record.
+ const parsed=z.object({plan:z.enum(['solo','agence','equipe','reseau']),accepted:z.literal(true).optional()}).strict().safeParse(input);if(!parsed.success||!EntityId.safeParse(agencyId).success||!/^[-a-zA-Z0-9_]{16,128}$/.test(key))throw new RequestFailure('VALIDATION_ERROR');
  const mode=billingMode(env);if(!mode||!env.STRIPE_WEBHOOK_SECRET)throw new RequestFailure('BILLING_UNAVAILABLE');
  const plan=creditPlans.find(p=>p.code===parsed.data.plan)!,at=new Date().toISOString();
- if(await env.DB.prepare("SELECT 1 FROM subscriptions WHERE agency_id=? AND stripe_mode=? AND status NOT IN ('canceled','incomplete_expired')").bind(agencyId,mode).first())throw new RequestFailure('CONFLICT');
- const previous=await env.DB.prepare('SELECT plan,url,expires_at AS expires FROM billing_checkouts WHERE agency_id=? AND mode=? AND idempotency_key=?').bind(agencyId,mode,key).first<{plan:string;url:string|null;expires:string}>();
- if(previous&&(previous.plan!==plan.code||previous.expires<=at))throw new RequestFailure('CONFLICT');if(previous?.url)return {url:previous.url};
- const active=await env.DB.prepare('SELECT idempotency_key AS key,plan,url FROM billing_checkouts WHERE agency_id=? AND mode=? AND expires_at>? ORDER BY created_at DESC LIMIT 1').bind(agencyId,mode,at).first<{key:string;plan:string;url:string|null}>();
- if(active&&active.key!==key){if(active.url&&active.plan===plan.code)return {url:active.url};throw new RequestFailure('CONFLICT');}
+ const subscription=await env.DB.prepare('SELECT stripe_subscription_id AS id,status FROM subscriptions WHERE agency_id=? AND stripe_mode=?').bind(agencyId,mode).first<{id:string;status:string}>();
+ if(subscription&&!['canceled','incomplete_expired'].includes(subscription.status))throw checkoutConflict('subscription');
+ let previous=await env.DB.prepare('SELECT plan,url,expires_at AS expires FROM billing_checkouts WHERE agency_id=? AND mode=? AND idempotency_key=?').bind(agencyId,mode,key).first<{plan:string;url:string|null;expires:string}>();
+ if(previous?.plan&&previous.plan!==plan.code)throw checkoutConflict('invalid_intent');
+ if(previous&&previous.expires<=at)throw checkoutConflict('expired');
+ const active=await env.DB.prepare('SELECT idempotency_key AS key,plan,url,session_id AS sessionId,expires_at AS expires FROM billing_checkouts WHERE agency_id=? AND mode=? ORDER BY created_at DESC,rowid DESC LIMIT 1').bind(agencyId,mode).first<{key:string;plan:string;url:string|null;sessionId:string|null;expires:string}>();
  let customer=await env.DB.prepare('SELECT customer_id AS id FROM billing_customers WHERE agency_id=? AND mode=?').bind(agencyId,mode).first<{id:string}>();
+ if(active?.sessionId){
+  let session=await client.checkout.sessions.retrieve(active.sessionId);
+  const owned=()=>session.id===active.sessionId&&stripeId(session.customer)===customer?.id&&session.client_reference_id===agencyId&&session.mode==='subscription'&&session.livemode===(mode==='live');
+  if(!owned())throw new RequestFailure('FORBIDDEN');
+  // Check completed sessions even after their original expiry, before the webhook
+  // has synchronized the subscription. An ended, already synchronized one is safe.
+  const alreadyEnded=()=>session.status==='complete'&&subscription?.id===stripeId(session.subscription);
+  if(session.status==='complete'&&!alreadyEnded())throw checkoutConflict('confirmed');
+  if(session.status==='open'&&active.plan===plan.code)return {url:checkoutUrl(session.url)};
+  if(session.status==='open'){
+   try{session=await client.checkout.sessions.expire(active.sessionId,{}, {idempotencyKey:`bienvu:${mode}:expire-checkout:${active.sessionId}`});}
+   catch{session=await client.checkout.sessions.retrieve(active.sessionId);}
+   if(!owned())throw new RequestFailure('FORBIDDEN');
+   if(session.status==='complete')throw checkoutConflict('confirmed');
+  }
+  if(session.status!=='expired'&&!alreadyEnded())throw new RequestFailure('BILLING_UNAVAILABLE');
+  // Unlock only after Stripe confirms that the old link cannot take a payment.
+  await env.DB.prepare('UPDATE billing_checkouts SET expires_at=min(expires_at,?) WHERE agency_id=? AND mode=? AND idempotency_key=? AND session_id=?').bind(at,agencyId,mode,active.key,active.sessionId).run();
+  if(active.key===key)throw checkoutConflict('expired');
+ }else if(active&&active.expires>at){
+  if(active.plan!==plan.code)throw checkoutConflict('busy');
+  // Recover an uncertain creation from another tab with its original Stripe key.
+  key=active.key;previous=active;
+ }
  if(!customer){const created=await client.customers.create({email,metadata:{agencyId}},{idempotencyKey:`bienvu:${mode}:customer:${agencyId}`});
   await env.DB.prepare('INSERT OR IGNORE INTO billing_customers VALUES(?,?,?,?)').bind(agencyId,mode,created.id,at).run();customer=await env.DB.prepare('SELECT customer_id AS id FROM billing_customers WHERE agency_id=? AND mode=?').bind(agencyId,mode).first<{id:string}>();}
  const expiresAt=previous?.expires??new Date(Date.now()+2700_000).toISOString();
- try{await env.DB.prepare('INSERT OR IGNORE INTO billing_checkouts(agency_id,idempotency_key,plan,mode,expires_at,created_at) VALUES(?,?,?,?,?,?)').bind(agencyId,key,plan.code,mode,expiresAt,at).run();}catch(e){if(e instanceof Error&&e.message.includes('CHECKOUT_IN_PROGRESS'))throw new RequestFailure('CONFLICT');throw e;}
+ try{await env.DB.prepare('INSERT OR IGNORE INTO billing_checkouts(agency_id,idempotency_key,plan,mode,expires_at,created_at) VALUES(?,?,?,?,?,?)').bind(agencyId,key,plan.code,mode,expiresAt,at).run();}catch(e){if(e instanceof Error&&e.message.includes('CHECKOUT_IN_PROGRESS'))throw checkoutConflict('busy');throw e;}
  const journal=await env.DB.prepare('SELECT expires_at AS expires FROM billing_checkouts WHERE agency_id=? AND mode=? AND idempotency_key=?').bind(agencyId,mode,key).first<{expires:string}>();
  const stableSuffix=(await contentHash(new TextEncoder().encode(`${mode}:${agencyId}:${key}`))).slice(0,8).split('').map(c=>String.fromCharCode(97+parseInt(c,16))).join('');
  const session=await client.checkout.sessions.create({mode:'subscription',managed_payments:{enabled:false},integration_identifier:`bienvu_checkout_${stableSuffix}`,customer:customer!.id,client_reference_id:agencyId,locale:'fr',
@@ -39,8 +67,8 @@ export async function createCheckout(env:BillingEnv,agencyId:string,email:string
   billing_address_collection:'required',customer_update:{name:'auto',address:'auto'},tax_id_collection:{enabled:true},automatic_tax:{enabled:false},
   custom_text:{submit:{message:`${plan.credits} crédits par mois. Crédits inutilisés reportés un mois, dans la limite de ${plan.credits} crédits, après renouvellement payé. Résiliation à la fin de la période payée.`}}},
   {idempotencyKey:`bienvu:${mode}:checkout:${agencyId}:${key}`});
- if(!session.url||new URL(session.url).hostname!=='checkout.stripe.com')throw new RequestFailure('BILLING_UNAVAILABLE');
- await env.DB.prepare('UPDATE billing_checkouts SET session_id=?,url=? WHERE agency_id=? AND mode=? AND idempotency_key=?').bind(session.id,session.url,agencyId,mode,key).run();return {url:session.url};
+ const url=checkoutUrl(session.url);
+ await env.DB.prepare('UPDATE billing_checkouts SET session_id=?,url=? WHERE agency_id=? AND mode=? AND idempotency_key=?').bind(session.id,url,agencyId,mode,key).run();return {url};
 }
 export async function createPortal(env:BillingEnv,agencyId:string,origin:string,client=stripeClient(env)){
  const customer=await env.DB.prepare('SELECT customer_id AS id FROM billing_customers WHERE agency_id=? AND mode=?').bind(agencyId,billingMode(env)).first<{id:string}>();if(!customer)throw new RequestFailure('NOT_FOUND');
