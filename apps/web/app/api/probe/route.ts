@@ -3,6 +3,7 @@ import {getCloudflareContext} from '@opennextjs/cloudflare';
 import {timingSafeEqual} from 'node:crypto';
 import {publicFailure} from '@bienvu/contracts';
 import {requestContext, logDiagnostic} from '@bienvu/observability';
+import {captureServerException} from '../../../lib/error-tracking-server';
 
 export const dynamic = 'force-dynamic';
 const reply = (body: unknown, status = 200) => Response.json(body, {status, headers:{'Cache-Control':'no-store'}});
@@ -65,7 +66,8 @@ async function observed(action: (request: Request) => Promise<Response>, request
     response.headers.set('X-Request-ID', trace.requestId);
     logDiagnostic(trace, {event: 'request_completed', status: response.status});
     return response;
-  } catch {
+  } catch (error) {
+    captureServerException(error,{source:'api',requestId:trace.requestId,path:'/api/probe'});
     const failure = publicFailure('INTERNAL_ERROR', trace.requestId);
     logDiagnostic(trace, {event: 'request_failed', status: 500, code: 'INTERNAL_ERROR'});
     return Response.json(failure.body, {status: 500, headers: {'Cache-Control': 'no-store', 'X-Request-ID': trace.requestId}});

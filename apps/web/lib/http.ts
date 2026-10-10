@@ -1,6 +1,7 @@
 import {publicFailure, type PublicErrorCode} from '@bienvu/contracts';
 import {logDiagnostic, requestContext} from '@bienvu/observability';
 import {authOrigin, type AuthEnvironment} from './auth';
+import {captureServerException} from './error-tracking-server';
 
 export class RequestFailure extends Error {
   constructor(readonly code: PublicErrorCode, readonly fields?: Record<string, string>) {super(code);}
@@ -39,6 +40,7 @@ export async function respond(action: () => Promise<Response>) {
   const context = requestContext();
   let response: Response;
   try {response = await action();} catch (error) {
+    if(!(error instanceof RequestFailure)||error.code==='INTERNAL_ERROR')captureServerException(error,{source:'api',requestId:context.requestId});
     const failure = publicFailure(error instanceof RequestFailure ? error.code : 'INTERNAL_ERROR', context.requestId);
     response = Response.json({...failure.body, ...(error instanceof RequestFailure && error.fields ? {fields: error.fields} : {})}, {status: failure.status});
     logDiagnostic(context, {event: 'request_completed', status: failure.status, code: failure.body.error.code});

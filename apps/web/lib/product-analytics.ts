@@ -1,4 +1,5 @@
 import type {PostHog,PostHogConfig,CaptureResult} from 'posthog-js';
+import {ERROR_RELEASE,safeExceptionProperties} from './error-tracking-policy';
 import {ANALYTICS_CONSENT_KEY,CONSENT_DURATION_MS,analyticsPath,analyticsUrl,analyticsEvents,readAnalyticsConsent,replayAllowed,replayAttribute,replayUrl,safeAnalyticsProperties,
   type AnalyticsConsent,type AnalyticsConfig,type AnalyticsProperties} from './analytics-policy';
 
@@ -8,6 +9,7 @@ let revision=0;
 const pending:{name:string;properties:AnalyticsProperties}[]=[],once=new Set<string>();
 const lastAction=new Map<string,number>();
 const replayImages=new Map<string,string>();
+const capturedErrors=new WeakSet<object>(),pendingErrors:{error:unknown;source:string}[]=[];
 const locationAllowed=()=>typeof window!=='undefined'&&analyticsPath(window.location.href)!==null;
 const mayCapture=()=>accountReady&&!excluded&&Boolean(consent?.analytics)&&Date.now()-(consent?.at??0)<CONSENT_DURATION_MS&&locationAllowed();
 const mayRecord=()=>mayCapture()&&Boolean(consent?.replay)&&replayAllowed(window.location.href);
@@ -27,6 +29,11 @@ function rememberReplayImage(image:HTMLImageElement){
 }
 export function redactAnalyticsEvent(event:CaptureResult|null):CaptureResult|null {
   if(!event||!mayCapture())return null;
+  if(event.event==='$exception'){
+    if(config?.errorTracking===false)return null;
+    event.properties={...safeExceptionProperties(event.properties),$current_url:analyticsUrl(window.location.href),$pathname:analyticsPath(window.location.href),
+      is_internal:internal,bv_release:ERROR_RELEASE,token:config?.token};delete event.$set;delete event.$set_once;return event;
+  }
   if(event.event==='$snapshot'){
     if(!mayRecord())return null;
     for(const image of document.images)rememberReplayImage(image);
@@ -69,7 +76,7 @@ export function posthogOptions():Partial<PostHogConfig> {
     capture_pageview:false,capture_pageleave:false,
     autocapture:{dom_event_allowlist:['click'],capture_copied_text:false},mask_all_text:false,mask_all_element_attributes:false,
     person_profiles:'identified_only',ip:false,disable_surveys:true,enable_heatmaps:false,
-    capture_exceptions:false,enable_recording_console_log:false,capture_performance:false,
+    capture_exceptions:config?.errorTracking===false?false:{capture_unhandled_errors:true,capture_unhandled_rejections:true,capture_console_errors:false},enable_recording_console_log:false,capture_performance:false,
     advanced_disable_feature_flags:true,disable_session_recording:true,
     mask_personal_data_properties:false,before_send:redactAnalyticsEvent,
     session_recording:{maskAllInputs:false,maskInputOptions:{password:true},maskTextSelector:'[data-analytics-sensitive]',maskAllElementAttributes:false,
@@ -80,7 +87,7 @@ export function posthogOptions():Partial<PostHogConfig> {
       compress_events:false},
   };
 }
-function halt(){active=false;lastPage='';pending.length=0;replayImages.clear();if(typeof document!=='undefined')document.removeEventListener('load',imageLoaded,true);if(sdk){sdk.stopSessionRecording();sdk.opt_out_capturing();}}
+function halt(){active=false;lastPage='';pending.length=0;pendingErrors.length=0;replayImages.clear();if(typeof document!=='undefined')document.removeEventListener('load',imageLoaded,true);if(sdk){sdk.stopSessionRecording();sdk.opt_out_capturing();}}
 // Next's hook executes before the destination DOM renders, including navigation into the admin.
 export function suspendProductAnalytics(){revision++;halt();}
 async function synchronize(){
@@ -107,6 +114,25 @@ async function synchronize(){
   const page=analyticsPath(window.location.href)!;
   if(page!==lastPage){lastPage=page;sdk.capture('$pageview',{page,account_type:userId?'authenticated':'anonymous'});if(page==='/editeur')trackProductEvent('editor_opened');}
   for(const event of pending.splice(0))sdk.capture(event.name,event.properties);
+  for(const event of pendingErrors.splice(0))sdk.captureException(event.error,{bv_error_source:event.source,bv_release:ERROR_RELEASE});
+}
+export function captureProductException(error:unknown,source='react'){
+  if(!mayCapture()||config?.errorTracking===false)return;
+  if(error&&typeof error==='object'){if(capturedErrors.has(error))return;capturedErrors.add(error);}
+  if(active&&sdk)sdk.captureException(error,{bv_error_source:source,bv_release:ERROR_RELEASE});
+  else if(pendingErrors.length<20)pendingErrors.push({error,source});
+}
+// Root layout failures replace AccountProvider as well. Only a still-valid,
+// previously granted choice can initialize the same SDK from this fallback.
+export async function captureBoundaryException(error:unknown,source='react'){
+  if(mayCapture()){captureProductException(error,source);return;}
+  const choice=storedAnalyticsConsent();if(!choice?.analytics||!locationAllowed())return;
+  try{
+    const response=await fetch('/api/analytics/config');if(!response.ok)return;
+    const next=await response.json() as AnalyticsConfig;
+    if(!next.enabled||next.host!=='https://eu.i.posthog.com'||!/^phc_[A-Za-z0-9_-]{20,150}$/.test(next.token)||!storedAnalyticsConsent()?.analytics)return;
+    configureProductAnalytics(next,choice,{ready:true,excluded:false,userId:null});captureProductException(error,source);
+  }catch{/* Error reporting must not make recovery fail. */}
 }
 export function configureProductAnalytics(next:AnalyticsConfig,choice:AnalyticsConsent|null,identity:{ready:boolean;excluded:boolean;userId:string|null;internal?:boolean}) {
   if(!choice)clearAnalyticsStorage(next.token);

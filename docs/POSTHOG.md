@@ -73,6 +73,30 @@ La livraison du 9 octobre 2026 est documentée dans `evidence/remote/posthog-202
 
 Documentation : [SDK Next.js](https://posthog.com/docs/libraries/next-js), [contrôles des replays](https://posthog.com/docs/session-replay/privacy), [capture des canvas](https://posthog.com/docs/session-replay/canvas-recording), [collecte et consentement](https://posthog.com/docs/privacy/data-collection).
 
+## Error Tracking
+
+[Erreurs BienVu](https://eu.posthog.com/project/299212/error_tracking) reçoit les événements `$exception` du navigateur et du Worker web. Le SDK navigateur capture les erreurs non interceptées et les promesses rejetées après accord pour la mesure d’audience, sans exiger l’accord pour les replays. Les frontières React `error.tsx` et `global-error.tsx` proposent de réessayer et signalent l’interruption. Si le layout principal échoue, le fallback peut réutiliser un consentement encore valide. Aucun accord n’est créé automatiquement. Les exclusions de routes analytiques restent applicables.
+
+Le serveur utilise `posthog-node/edge`, compatible avec workerd. Le hook Next `onRequestError`, les exceptions inattendues converties en HTTP 500 dans `respond()`, les exceptions du Worker externe et celles de son cron sont capturés. Les refus attendus (validation, droits, quotas) ne deviennent pas des exceptions de suivi. Les Workers d’import, de génération et de rendu conservent leurs diagnostics et le suivi Qualité IA existants ; cette installation ne leur ajoute pas de nouveau SDK d’erreurs.
+
+Une portée `AsyncLocalStorage` propre à chaque requête est partagée entre le Worker externe et le bundle Next. Les exceptions répétées sont dédoublonnées par objet, avec cinq signalements maximum par requête. Chaque envoi utilise un client distinct, `ctx.waitUntil`, un délai réseau de 2,5 secondes et aucune relance réseau automatique. Un échec de télémétrie ne change pas la réponse ni la reprise métier. Les erreurs serveur opérationnelles sont envoyées sans cookies analytiques ; le lien avec une session n’est ajouté que si les en-têtes de corrélation consentie sont présents et valides. Ces en-têtes n’accordent aucun accès.
+
+Le filtrage conserve type, message, fichier, ligne, colonne, identifiant de chunk, version et identifiant de diagnostic. Il retire les paramètres/signatures d’URL, clés, mots de passe, e-mails, téléphones, variables des frames et corps/en-têtes de requête. Les messages techniques peuvent encore contenir des noms métier : ne pas y interpoler des données de client. Les `console.error` ne sont pas collectés automatiquement, pour éviter de transformer les diagnostics attendus en bugs. `POSTHOG_ERROR_TRACKING_ENABLED=false` désactive uniquement le suivi d’erreurs au prochain chargement ; `POSTHOG_ENABLED=false` arrête aussi les statistiques.
+
+### Builds et sourcemaps privées
+
+Ajouter `POSTHOG_PERSONAL_API_KEY` dans `.env.posthog` ou dans l’environnement de compilation. Cette clé personnelle doit autoriser « Error tracking : Write » et « Organization : Read » sur le projet 299212. Elle n’est ni une variable `NEXT_PUBLIC_` ni un binding du Worker. Ne jamais versionner `.env.posthog`, les bundles de sonde ou les journaux d’envoi.
+
+1. `pnpm build:web` compile OpenNext avec Webpack et le plugin officiel PostHog, associe la version Git (suffixée pour une arborescence modifiée), envoie les maps à PostHog EU et retire les `.map` Next après l’envoi. Sans clé, la CI reste fonctionnelle mais ne produit pas de sourcemaps de production.
+2. Pour une publication Cloudflare avec symboles serveur : `pnpm prepare:web --config apps/web/wrangler.<environment>.jsonc`. La commande compile le Worker final en dry-run, injecte ses identifiants et envoie sa map avec le CLI. Elle prépare une configuration privée `.open-next/posthog-worker/wrangler.jsonc` en conservant les bindings et ajoute `BIENVU_RELEASE` et `BIENVU_WORKER_CHUNK_ID`. Ce dernier rattache les frames du Worker à son bundle final, plutôt qu’aux identifiants des modules Next intermédiaires.
+3. Publier exactement ce bundle : `pnpm --filter @bienvu/web exec wrangler deploy --config .open-next/posthog-worker/wrangler.jsonc --keep-vars --strict`. `no_bundle=true` évite de modifier les positions des frames après l’envoi. Un simple déploiement de `worker.ts` sans cette préparation ne bénéficie pas de la map du Worker final.
+
+Les maps navigateur renvoient aux sources TypeScript/TSX. La map finale du Worker résout ses modules originaux ; certains modules internes Next/OpenNext peuvent rester des fichiers JavaScript compilés. Les maps et les sources restent privées dans PostHog, hors des assets publics. La clé personnelle n’est jamais requise au runtime.
+
+### Recette des erreurs
+
+`pnpm exec tsx --test tests/error-tracking.test.ts tests/product-analytics.test.ts` couvre le filtrage, l’isolation de requêtes, les choix du visiteur, la déduplication, les erreurs attendues et un véritable Worker local avec le SDK edge. `node scripts/probe-product-analytics.mjs` teste aussi les erreurs JavaScript, les promesses rejetées, les frontières React et leur récupération dans Chrome, avec ingestion interceptée localement. Après préparation, `node scripts/probe-error-tracking-worker.mjs` exécute le bundle final et sa vraie route Next contre D1/R2 jetables ; `--send-test` vérifie en plus l’ingestion réelle. Les exceptions synthétiques portent `is_test=true`, sont résolues après recette et ne doivent pas servir d’indicateur d’incidents clients.
+
 ## Qualité des générations IA
 
 Le suivi serveur et les évaluations Hog sont décrits dans [QUALITE-IA.md](QUALITE-IA.md). Le [dashboard Qualité IA BienVu](https://eu.posthog.com/project/299212/dashboard/1010344) contient 16 graphiques : contrôles, couverture, sources, voix, versions de narration, délais, coûts partiels, réutilisation, imports, publications et verdicts humains. Les requêtes SQL utilisent les filtres de dates du dashboard.

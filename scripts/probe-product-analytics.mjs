@@ -10,9 +10,11 @@ import {chromium} from 'playwright-core';
 const require=createRequire(import.meta.url),esbuild=createRequire(require.resolve('tsx/package.json'))('esbuild');
 const output=resolve('evidence/local/posthog'),web=resolve('apps/web'),token='phc_public_fixture_project_key';
 await mkdir(output,{recursive:true,mode:0o700});
-const files=await esbuild.build({stdin:{contents:`import React from 'react';import{createRoot}from'react-dom/client';import{AccountProvider}from'./components/account';import{ProductAnalytics,CookiePreferencesButton}from'./components/product-analytics';import * as analytics from './lib/product-analytics';
-window.fixtureAnalytics=analytics;window.fixturePosthog=()=>import('posthog-js').then(m=>m.default);createRoot(document.getElementById('root')).render(<AccountProvider><main><h1 data-analytics-public>BienVu, test local</h1><label>Annonce<input id="private-input" defaultValue="PRIVATE_FORM_VALUE"/></label><p id="private-text">PRIVATE_CUSTOMER_TEXT</p><img src="/api/private/PRIVATE_ASSET"/><video src="/video-preview.mp4" poster="/api/private/PRIVATE_ASSET"/><input type="password" id="secret-password" defaultValue="SECRET_PASSWORD"/><input type="hidden" value="SECRET_HIDDEN"/><a id="private-link" href="/editeur?draft=PRIVATE_DRAFT&amp;access_token=SECRET_ACCESS_TOKEN">Éditeur</a><button id="safe-action" onClick={()=>analytics.trackProductEvent('editor_action',{action:'photo_reordered',email:'PRIVATE_EMAIL'})}>Réordonner</button><CookiePreferencesButton/></main><ProductAnalytics/></AccountProvider>);`,resolveDir:web,loader:'tsx'},bundle:true,write:false,outdir:resolve(output,'bundle'),format:'esm',splitting:true,jsx:'automatic',minify:true,
-  define:{'process.env.NODE_ENV':'"production"'},plugins:[{name:'local-next',setup(build){
+const files=await esbuild.build({stdin:{contents:`import React from 'react';import{createRoot}from'react-dom/client';import{AccountProvider}from'./components/account';import{ProductAnalytics,CookiePreferencesButton}from'./components/product-analytics';import{ErrorFallback}from'./components/error-fallback';import * as analytics from './lib/product-analytics';
+function Broken(){throw new TypeError('REACT_FIXTURE token=SECRET_REACT');}
+class FixtureBoundary extends React.Component{state={error:null,fail:false};static getDerivedStateFromError(error){return{error};}render(){return this.state.error?<ErrorFallback error={this.state.error} retry={()=>this.setState({error:null,fail:false})}/>:<><button id="react-error" onClick={()=>this.setState({fail:true})}>Tester une interruption</button>{this.state.fail&&<Broken/>}</>;}}
+window.fixtureAnalytics=analytics;window.fixturePosthog=()=>import('posthog-js').then(m=>m.default);createRoot(document.getElementById('root')).render(location.search==='?fixture=fatal'?<ErrorFallback error={new TypeError('ROOT_FIXTURE token=SECRET_ROOT')} global retry={()=>location.assign('/')}/>:<AccountProvider><main><h1 data-analytics-public>BienVu, test local</h1><label>Annonce<input id="private-input" defaultValue="PRIVATE_FORM_VALUE"/></label><p id="private-text">PRIVATE_CUSTOMER_TEXT</p><img src="/api/private/PRIVATE_ASSET"/><video src="/video-preview.mp4" poster="/api/private/PRIVATE_ASSET"/><input type="password" id="secret-password" defaultValue="SECRET_PASSWORD"/><input type="hidden" value="SECRET_HIDDEN"/><a id="private-link" href="/editeur?draft=PRIVATE_DRAFT&amp;access_token=SECRET_ACCESS_TOKEN">Éditeur</a><button id="safe-action" onClick={()=>analytics.trackProductEvent('editor_action',{action:'photo_reordered',email:'PRIVATE_EMAIL'})}>Réordonner</button><button id="automatic-errors" onClick={()=>{setTimeout(()=>{throw new TypeError("BROWSER_FIXTURE token=SECRET_TOKEN")},0);Promise.reject(new Error("REJECTION_FIXTURE password=SECRET_PASSWORD"));}}>Tester les erreurs automatiques</button><FixtureBoundary/><CookiePreferencesButton/></main><ProductAnalytics/></AccountProvider>);`,resolveDir:web,loader:'tsx'},bundle:true,write:false,outdir:resolve(output,'bundle'),format:'esm',splitting:true,jsx:'automatic',minify:true,
+  define:{'process.env.NODE_ENV':'"production"','process.env.NEXT_PUBLIC_BIENVU_RELEASE':'"analytics-fixture"'},plugins:[{name:'local-next',setup(build){
     // Local automation is classified as test/bot traffic by PostHog. Override
     // only that documented SDK switch in this fixture, never in production.
     build.onLoad({filter:/[/\\]lib[/\\]product-analytics\.ts$/},async args=>({contents:(await readFile(args.path,'utf8')).replace('capture_pageview:false','opt_out_useragent_filter:true,capture_pageview:false').replace('const snapshots=event.properties.$snapshot_data;', 'const snapshots=event.properties.$snapshot_data;window.fixtureSnapshotShape={keys:Object.keys(event.properties),type:typeof snapshots,isArray:Array.isArray(snapshots),first:snapshots?.[0]};'),loader:'ts',resolveDir:dirname(args.path)}));
@@ -34,7 +36,7 @@ const server=createServer(async(req,res)=>{
   res.writeHead(200,{'Content-Type':'text/html'});res.end('<!doctype html><html lang="fr"><head><link rel="stylesheet" href="/style.css"></head><body><div id="root"></div><script type="module" src="/stdin.js"></script></body></html>');
 });
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
-const base='http://127.0.0.1:'+server.address().port,browser=await chromium.launch({channel:'chrome',headless:true});
+const base='http://127.0.0.1:'+server.address().port,browser=await chromium.launch({...(process.env.CHROME_PATH?{executablePath:process.env.CHROME_PATH}:{channel:'chrome'}),headless:true});
 const results=[];
 function decode(buffer){
   if(!buffer)return null;
@@ -64,8 +66,8 @@ async function scenario(name,fn,width=1280){
     return route.fulfill({json:{autocapture_opt_out:false,featureFlags:{},supportedCompression:[],sessionRecording:{enabled:true,endpoint:'/s/',sampleRate:'1',consoleLogRecordingEnabled:true,networkPayloadCapture:{recordBody:true,recordHeaders:true},masking:{maskAllInputs:false}},config:{enable_collect_everything:false}},headers:{'Access-Control-Allow-Origin':'*'}});
   });
   const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(base,{waitUntil:'domcontentloaded',timeout:60000});await page.locator('.privacy-banner').waitFor();
-  await fn({page,requests,events,context});assert.deepEqual(errors,[],name+' JavaScript');
+  await page.goto(base,{waitUntil:'domcontentloaded',timeout:60000});await page.locator('.privacy-banner').waitFor().catch(()=>{throw Error(name+': '+JSON.stringify(errors));});
+  await fn({page,requests,events,context});assert.deepEqual(errors.filter(e=>!/BROWSER_FIXTURE|REJECTION_FIXTURE/.test(e)),[],name+' JavaScript');
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,name+' width');
   results.push({name,requests:requests.length,events:events.map(e=>e.event),passed:true});await context.close();
 }
@@ -74,12 +76,31 @@ try{
     await page.waitForTimeout(700);assert.equal(requests.length,0);await page.getByRole('button',{name:'Tout refuser',exact:true}).first().click();
     await page.click('#safe-action');await page.waitForTimeout(700);assert.equal(requests.length,0);assert.equal(events.length,0);
     await page.reload();await page.locator('.privacy-settings-link').click();await page.locator('.privacy-dialog[open]').waitFor();assert.equal(await page.locator('.privacy-banner').count(),0);assert.equal(requests.length,0);
+    await page.evaluate(()=>window.fixtureAnalytics.captureProductException(Error('REFUSED_FIXTURE')));assert.equal(requests.length,0);
   },390);
   await scenario('analytics-without-replay',async({page,requests,events})=>{
     await page.getByRole('button',{name:'Personnaliser',exact:true}).click();await page.getByRole('checkbox',{name:'Mesure d’audience et actions'}).check();
     await page.getByRole('button',{name:'Enregistrer mes choix'}).click();await page.click('#safe-action');await page.waitForTimeout(7000);
     assert.ok(events.some(e=>e.event==='$pageview'),JSON.stringify({requests,events,stored:await page.evaluate(async()=>{const s=await window.fixturePosthog();return {storage:{...localStorage},optedOut:s.has_opted_out_capturing(),loaded:s.__loaded,ua:navigator.userAgent,redact:window.fixtureAnalytics.redactAnalyticsEvent({event:'$pageview',properties:{}}),capture:s.capture('editor_action',{action:'redo'})}})}));assert.ok(events.some(e=>e.event==='editor_action'));assert.ok(!events.some(e=>e.event==='$snapshot'));
     assert.ok(!requests.some(p=>/recorder/.test(p)),'recorder stays unloaded');assert.ok(!JSON.stringify(events).includes('SECRET_'));
+  });
+  await scenario('exceptions-autocapture-without-replay',async({page,events,requests})=>{
+    await page.getByRole('button',{name:'Personnaliser',exact:true}).click();await page.getByRole('checkbox',{name:'Mesure d’audience et actions'}).check();await page.getByRole('button',{name:'Enregistrer mes choix'}).click();
+    await page.waitForFunction(async()=>Boolean((await window.fixturePosthog()).exceptionObserver?._unwrapOnError));
+    await page.click('#automatic-errors');
+    await page.waitForTimeout(7000);
+    const exceptions=events.filter(e=>e.event==='$exception');assert.equal(exceptions.length,2,JSON.stringify({requests,events:events.map(e=>e.event),sdk:await page.evaluate(async()=>{const p=await window.fixturePosthog();return {optedOut:p.has_opted_out_capturing(),enabled:p.exceptionObserver?.isEnabled,options:p.config.capture_exceptions,storage:{...localStorage},redact:window.fixtureAnalytics.redactAnalyticsEvent({event:'$exception',properties:{$exception_list:[{type:'Test',value:'Fixture'}]}})}})}));assert.ok(exceptions.every(e=>e.properties.$exception_list.length));assert.ok(!JSON.stringify(exceptions).includes('SECRET_'));assert.ok(!events.some(e=>e.event==='$snapshot'));
+    const count=exceptions.length;await page.locator('.privacy-settings-link').click();await page.getByRole('button',{name:'Tout refuser',exact:true}).click();await page.evaluate(()=>window.fixtureAnalytics.captureProductException(Error('WITHDRAWN_FIXTURE')));await page.waitForTimeout(2500);assert.equal(events.filter(e=>e.event==='$exception').length,count);
+  });
+  await scenario('react-boundary-and-recovery',async({page,events})=>{
+    await page.getByRole('button',{name:'Tout accepter',exact:true}).first().click();await page.waitForTimeout(1000);await page.click('#react-error');await page.getByRole('heading',{name:'Une interruption momentanée.'}).waitFor();
+    await page.waitForTimeout(7000);const exceptions=events.filter(e=>e.event==='$exception'&&JSON.stringify(e).includes('REACT_FIXTURE'));assert.equal(exceptions.length,1);assert.equal(exceptions[0].properties.bv_error_source,'react_boundary');assert.ok(!JSON.stringify(exceptions).includes('SECRET_REACT'));
+    await page.screenshot({path:resolve(output,'error-fallback-mobile.png')});await page.getByRole('button',{name:'Réessayer',exact:true}).click();await page.locator('#react-error').waitFor();
+  },390);
+  await scenario('root-fallback-with-existing-consent',async({page,events})=>{
+    await page.getByRole('button',{name:'Tout accepter',exact:true}).first().click();await page.waitForTimeout(1000);await page.goto(base+'/?fixture=fatal');await page.getByRole('heading',{name:'Une interruption momentanée.'}).waitFor();await page.waitForTimeout(7000);
+    const exceptions=events.filter(e=>e.event==='$exception'&&JSON.stringify(e).includes('ROOT_FIXTURE'));assert.equal(exceptions.length,1);assert.equal(exceptions[0].properties.bv_error_source,'react_global');assert.ok(!JSON.stringify(exceptions).includes('SECRET_ROOT'));
+    await page.screenshot({path:resolve(output,'error-fallback-desktop.png')});
   });
   await scenario('replay-visibility-credentials-navigation-and-withdrawal',async({page,events,requests})=>{
     await page.getByRole('button',{name:'Tout accepter',exact:true}).first().click();

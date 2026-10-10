@@ -3,7 +3,7 @@ import {publicSeoPaths} from './seo-paths';
 export const ANALYTICS_CONSENT_KEY='bienvu:privacy:v2';
 export const CONSENT_DURATION_MS=180*24*60*60*1000;
 export type AnalyticsConsent={version:2;analytics:boolean;replay:boolean;at:number};
-export type AnalyticsConfig={enabled:boolean;token:string;host:string};
+export type AnalyticsConfig={enabled:boolean;token:string;host:string;errorTracking?:boolean};
 export type AnalyticsProperties=Record<string,string|number|boolean|undefined>;
 const privateParameters=new Set(['token','code','state','grant','socialError','socialConnected','session_id','checkout','homePreview','facebookPage']);
 const studioPaths=new Set(['/connexion','/agence','/biens','/historique','/editeur','/projets','/publications','/equipe']);
@@ -27,9 +27,9 @@ export function readAnalyticsConsent(raw:string|null,now=Date.now()):AnalyticsCo
     return {version:2,analytics:c.analytics,replay:c.replay,at:c.at};
   }catch{return null;}
 }
-export function analyticsConfiguration(env:{POSTHOG_ENABLED?:string;POSTHOG_PROJECT_TOKEN?:string;POSTHOG_HOST?:string}):AnalyticsConfig {
+export function analyticsConfiguration(env:{POSTHOG_ENABLED?:string;POSTHOG_PROJECT_TOKEN?:string;POSTHOG_HOST?:string;POSTHOG_ERROR_TRACKING_ENABLED?:string}):AnalyticsConfig {
   const token=env.POSTHOG_PROJECT_TOKEN??'',host=env.POSTHOG_HOST??'https://eu.i.posthog.com';
-  return {enabled:env.POSTHOG_ENABLED==='true'&&/^phc_[A-Za-z0-9_-]{20,150}$/.test(token)&&host==='https://eu.i.posthog.com',token,host};
+  return {enabled:env.POSTHOG_ENABLED==='true'&&/^phc_[A-Za-z0-9_-]{20,150}$/.test(token)&&host==='https://eu.i.posthog.com',token,host,errorTracking:env.POSTHOG_ERROR_TRACKING_ENABLED!=='false'};
 }
 
 const enums:Record<string,readonly string[]>={

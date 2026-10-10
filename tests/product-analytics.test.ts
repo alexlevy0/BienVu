@@ -7,6 +7,7 @@ test('analytics is disabled without a valid EU project configuration',()=>{
   assert.equal(analyticsConfiguration({POSTHOG_ENABLED:'true',POSTHOG_PROJECT_TOKEN:'phx_personal_secret'}).enabled,false);
   assert.equal(analyticsConfiguration({POSTHOG_ENABLED:'true',POSTHOG_PROJECT_TOKEN:'phc_public_fixture_project_key',POSTHOG_HOST:'https://us.i.posthog.com'}).enabled,false);
   assert.equal(analyticsConfiguration({POSTHOG_ENABLED:'true',POSTHOG_PROJECT_TOKEN:'phc_public_fixture_project_key'}).enabled,true);
+  assert.equal(analyticsConfiguration({POSTHOG_ENABLED:'true',POSTHOG_PROJECT_TOKEN:'phc_public_fixture_project_key',POSTHOG_ERROR_TRACKING_ENABLED:'false'}).errorTracking,false);
 });
 test('consent expires, rejects contradictory choices, and never implies agreement',()=>{
   const now=20000000000;
