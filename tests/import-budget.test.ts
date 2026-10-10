@@ -1,4 +1,5 @@
 import {test} from 'node:test';
+import {URL_IMPORT_QUOTAS} from '../packages/contracts/src/import-quotas';
 import assert from 'node:assert/strict';
 import {readFile, readdir} from 'node:fs/promises';
 import {Miniflare, convertV4MiniflareOptions} from 'miniflare';
@@ -55,14 +56,14 @@ test('photos personnelles après quota de scraping : plus de 30 brouillons permi
     await DB.exec((await readFile(`packages/db/migrations/${file}`,'utf8')).replace(/^--.*$/gm,'').replace(/\n/g,' '));
   const at=new Date().toISOString(),day=at.slice(0,10),month=at.slice(0,7);
   await DB.prepare("INSERT INTO agencies(id,owner_user_id,name,created_at,updated_at) VALUES('photos','photos','Photos',?,?)").bind(at,at).run();
-  await DB.prepare('INSERT INTO import_usage(day,attempts) VALUES(?,20)').bind(day).run();
+  await DB.prepare('INSERT INTO import_usage(day,attempts) VALUES(?,?)').bind(day,URL_IMPORT_QUOTAS.daily).run();
   await DB.prepare('INSERT INTO hosted_import_budget(month,baseline_cents,ceiling_cents,paused) VALUES(?,1650,1700,0)').bind(month).run();
   await assert.rejects(beginImport(DB,'photos','https://fixtures.bienvu.example/vente','blocked-url-quota-01'),/IMPORT_LIMIT/);
   const first=(await beginManualImport(DB,'photos','manual-allowed-quota-01','{}','a'.repeat(64))).row;
   await reserveHostedImport(DB,'photos',first.id);
   const second=(await beginManualImport(DB,'photos','manual-allowed-quota-02','{}','a'.repeat(64))).row;
   await assert.rejects(reserveHostedImport(DB,'photos',second.id),/IMPORT_BUDGET_LIMIT/);
-  assert.equal((await DB.prepare('SELECT attempts FROM import_usage WHERE day=?').bind(day).first<{attempts:number}>())?.attempts,20);
+  assert.equal((await DB.prepare('SELECT attempts FROM import_usage WHERE day=?').bind(day).first<{attempts:number}>())?.attempts,URL_IMPORT_QUOTAS.daily);
   for(let i=2;i<30;i++)await beginManualImport(DB,'photos',`manual-storage-limit-${i}`,'{}','a'.repeat(64));
   const extra=(await beginManualImport(DB,'photos','manual-storage-limit-30','{}','a'.repeat(64))).row;
   assert.equal(extra.sourceKind,'manual');

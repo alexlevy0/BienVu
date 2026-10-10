@@ -1,4 +1,5 @@
 import {test} from 'node:test';
+import {URL_IMPORT_QUOTAS} from '../packages/contracts/src/import-quotas';
 import assert from 'node:assert/strict';
 import {readFile, readdir} from 'node:fs/promises';
 import {Miniflare, convertV4MiniflareOptions} from 'miniflare';
@@ -90,14 +91,17 @@ test('imports : D1 et R2 réels en local, aucune génération ni consommation de
   await t.test('plafond persistant sous concurrence, purge sans restitution du budget d’essai', async () => {
     // Midi UTC évite de franchir un jour de quota avec +700 s près de minuit.
     const tomorrow = Date.parse(`${new Date(now + 2 * 86400_000).toISOString().slice(0, 10)}T12:00:00.000Z`);
-    const attempts = await Promise.allSettled([...'bcdefghijklmnopqrstuvw'].map(a => beginImport(DB, a, source, `quota-key-fixture-${a}`, tomorrow)));
-    assert.equal(attempts.filter(x => x.status === 'fulfilled').length, 20, attempts.map(x => x.status === 'fulfilled' ? 'accepted' : String(x.reason)).join(', '));
+    // Each agency has its own in-flight lock; use distinct agencies to test the shared quota.
+    const agencies=Array.from({length:URL_IMPORT_QUOTAS.daily+1},(_,i)=>`quota-fixture-${i}`);
+    for(const id of agencies)await DB.prepare('INSERT INTO agencies(id,owner_user_id,name,created_at,updated_at) VALUES(?,?,?,?,?)').bind(id,`owner-${id}`,id,at,at).run();
+    const attempts = await Promise.allSettled(agencies.map(id=>beginImport(DB,id,source,`quota-key-fixture-${id}`,tomorrow)));
+    assert.equal(attempts.filter(x => x.status === 'fulfilled').length, URL_IMPORT_QUOTAS.daily, attempts.map(x => x.status === 'fulfilled' ? 'accepted' : String(x.reason)).join(', '));
     for (const outcome of attempts) if (outcome.status === 'fulfilled') {
       const row = outcome.value.row; await failImport(DB, row.agencyId, row.id, 'NOT_A_LISTING', {});
       await purgeImport(env, row.agencyId, row.id, tomorrow + 600_000);
     }
     await assert.rejects(beginImport(DB, 'h', source, 'quota-key-after-cleanup', tomorrow + 700_000), /IMPORT_LIMIT/);
-    assert.equal((await DB.prepare('SELECT attempts FROM import_usage WHERE day=?').bind(new Date(tomorrow).toISOString().slice(0, 10)).first<{attempts: number}>())?.attempts, 20);
+    assert.equal((await DB.prepare('SELECT attempts FROM import_usage WHERE day=?').bind(new Date(tomorrow).toISOString().slice(0, 10)).first<{attempts: number}>())?.attempts, URL_IMPORT_QUOTAS.daily);
   });
 });
 test('transport local impossible en staging, sur URL publique ou sans secret', () => {

@@ -92,7 +92,8 @@ test('migration historique 0029 : compteurs conservés, 20/jour et 60/mois, reno
     assert.equal(replay.row.id, accepted.row.id);
   }
   const atDailyLimit = await usage();
-  assert.equal((await generationRights(DB, 'double-quota', 'true', now)).importRetryAt, '2026-10-04T00:00:00.000Z');
+  // Check the historical trigger directly; current rights use the newer allowance.
+  assert.equal((await DB.prepare('SELECT attempts FROM import_usage WHERE day=?').bind(at.slice(0,10)).first<{attempts:number}>())?.attempts,20);
   await assert.rejects(beginImport(DB, 'double-quota', source, 'twenty-first-daily-attempt', now), /IMPORT_LIMIT/);
   assert.deepEqual(await usage(), atDailyLimit);
   const tomorrow = now + 86400_000;
@@ -143,12 +144,12 @@ test('migration 0053 : 55 essais conservés, ancien plafond de 60 débloqué, 20
   const replay = await beginImport(DB, 'monthly-quota', source, 'monthly-sixty-first-import', now);
   assert.equal(replay.fresh, false);
   assert.equal(replay.row.id, accepted.row.id);
-  for (let attempt = 12; attempt <= URL_IMPORT_QUOTAS.daily; attempt++) {
+  for (let attempt = 12; attempt <= 20; attempt++) {
     const row = (await beginImport(DB, 'monthly-quota', source, `raised-monthly-daily-${attempt}`, now)).row;
     await failImport(DB, 'monthly-quota', row.id, 'SOURCE_BLOCKED', {});
   }
   const fullDay = await usage();
-  assert.equal((await generationRights(DB, 'monthly-quota', 'true', now)).importRetryAt, '2026-10-09T00:00:00.000Z');
+  assert.equal((await DB.prepare('SELECT attempts FROM import_usage WHERE day=?').bind(at.slice(0,10)).first<{attempts:number}>())?.attempts,20);
   await assert.rejects(beginImport(DB, 'monthly-quota', source, 'raised-monthly-daily-overflow', now), /IMPORT_LIMIT/);
   assert.deepEqual(await usage(), fullDay);
   assert.equal((await generationRights(DB, 'monthly-quota', 'true', now + 86400_000)).importRetryAt, null);
@@ -169,10 +170,14 @@ test('quota mensuel 300 : dernière place atomique entre agences, rejeu et formu
     await DB.prepare('INSERT INTO agencies(id,owner_user_id,name,created_at,updated_at) VALUES(?,?,?,?,?)')
       .bind(agency, agency, agency, at, at).run();
   }
-  // Fourteen complete days plus nineteen attempts: every daily count is valid.
-  for (let day = 1; day <= 15; day++)
+  // Fill the month to one remaining slot without exceeding any daily limit.
+  let remaining=URL_IMPORT_QUOTAS.monthly-1;
+  for (let day=1;remaining>0;day++) {
+    const count=Math.min(remaining,URL_IMPORT_QUOTAS.daily);
     await DB.prepare('INSERT INTO import_usage(day,attempts) VALUES(?,?)')
-      .bind(`2026-10-${String(day).padStart(2, '0')}`, day < 15 ? URL_IMPORT_QUOTAS.daily : URL_IMPORT_QUOTAS.daily - 1).run();
+      .bind(`2026-10-${String(day).padStart(2, '0')}`,count).run();
+    remaining-=count;
+  }
   const usage = () => DB.prepare("SELECT coalesce(sum(attempts),0) AS n FROM import_usage WHERE substr(day,1,7)='2026-10'").first<{n:number}>();
   assert.equal((await usage())?.n, URL_IMPORT_QUOTAS.monthly - 1);
   assert.equal((await generationRights(DB, 'first-agency', 'true', now)).importRetryAt, null);

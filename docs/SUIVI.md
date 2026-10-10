@@ -1,5 +1,11 @@
 # BienVu — suivi des sprints
 
+### 10/10/2026 — Imports par lien : 40 tentatives par jour
+
+Quota quotidien partagé augmenté de **20 à 40/jour UTC**, quota mensuel **300 inchangé**. Migration additive **0065**, contrat `URL_IMPORT_QUOTAS`, droits d’admission et affichage superadmin alignés. Compteurs, budgets et historiques conservés ; échecs toujours comptés, rejeux idempotents et formulaires manuels hors compteur. Verrou individuel d’import toujours appliqué.
+
+**17 tests ciblés réussis** après correction des fixtures repérées dans la batterie complète initiale de 623 tests ; aucun autre échec observé. Types complets, frontières **484 fichiers**, migrations locales répétées, build OpenNext et dry-run des deux Workers validés. Migration distante appliquée avec bookmark préalable : compteurs et budgets identiques, nombres de lignes des données métier conservés. Web **`54fb4dff-e696-4e45-9053-e4b6a967dc70`** et génération **`5fa8752d-caa8-4778-b055-c8ab1da28688`** publiés à 100 %, **56/32 bindings** et renderer conservés. Bundle admin 40/300 vérifié, pages 200/API privées 401. Aucun import de portail ou appel fournisseur payant. [Preuves et détail des tests](preuves/maintenance/IMPORTS-40-JOUR-10-10.md).
+
 ### 10/10/2026 — Conseil de durée et réparation de la CI
 
 Conseil facultatif de **30 s pour 7–9 photos**, **40 s dès 10 photos**, sur l’estimation d’import, la fiche manuelle et la personnalisation. Bouton appliquant la préférence existante ; choix initial conservé, coût partagé recalculé (y compris avatar), aucune nouvelle lecture de source. Conseil retiré si la durée suffit. Mise en page mobile inspectée et corrigée.

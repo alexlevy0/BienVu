@@ -60,7 +60,7 @@ Avec `allowPartial`, une photo refusée, invalide ou expirée n'efface pas les f
 
 ## Limites effectives
 
-Depuis le 08/10/2026, les plafonds partagés des imports par lien sont **20 tentatives/jour UTC et 300/mois UTC** (migration `0053`, après les 60/mois de `0029`, compteurs conservés). `URL_IMPORT_QUOTAS` synchronise les droits affichés, l’admission de génération et le compteur superadmin avec les seuils du trigger D1. Les uploads personnels restent hors de ce compteur depuis `0028`. La capacité de stockage et les réservations financières continuent à s’appliquer ; cette hausse ne relève pas le budget mensuel.
+Depuis le 10/10/2026, les plafonds partagés des imports par lien sont **40 tentatives/jour UTC et 300/mois UTC** (migration quotidienne `0065`, après `0053` pour le mois, compteurs conservés). `URL_IMPORT_QUOTAS` synchronise les droits affichés, l’admission de génération et le compteur superadmin avec les seuils du trigger D1. Les uploads personnels restent hors de ce compteur depuis `0028`. La capacité de stockage et les réservations financières continuent à s’appliquer ; cette hausse ne relève pas le budget mensuel.
 
 ### Registre et portails
 
@@ -89,7 +89,7 @@ Le diagnostic navigateur et l’import complet restent distincts : Le Figaro fou
 | Image décodée | 16 millions de pixels maximum ; minimum 640×360 |
 | JPEG stocké | 2 048×2 048 maximum, ratio préservé |
 | Imports URL actifs / dossiers stockés par agence | 1 / 30, tous modes pour le stockage |
-| Tentatives d’import, toutes agences | 20 par jour UTC / 300 par mois UTC |
+| Tentatives d’import, toutes agences | 40 par jour UTC / 300 par mois UTC |
 | Récupérations simultanées du pont/conteneur | 2 |
 | Conservation / bail / délai avant purge | 30 jours / 90 s URL, 15 min saisie / bail + 5 min |
 
@@ -214,7 +214,7 @@ Les deux pages fournies par Alex le 30/09 ont été téléchargées par le trans
 
 Le nombre total de lignes `listing_imports` n’est plus un quota : l’ancien plafond de 30 lignes par agence bloquait aussi « Nouveau projet » et « Utiliser la démo ». Les projets et imports existants restent conservés. La création `/api/imports/draft` ne sollicite plus le transport d’import et ne réserve plus 0,50 € simplement pour ouvrir un éditeur vide ou copier les médias déjà publiés de la démo. L’envoi de photos personnelles conserve sa réservation avant normalisation dans la route d’upload.
 
-Les imports par lien gardent leur compteur partagé de 20 par jour UTC et 300 par mois depuis `0053`, leur réservation financière, les bornes réseau et la purge existantes. Les photos restent limitées à 12 et 50 Mio par brouillon. Aucun compteur, crédit consommé ou coût déjà provisionné n’est remboursé par ce changement.
+Les imports par lien gardent leur compteur partagé de 40 par jour UTC et 300 par mois depuis `0065`, leur réservation financière, les bornes réseau et la purge existantes. Les photos restent limitées à 12 et 50 Mio par brouillon. Aucun compteur, crédit consommé ou coût déjà provisionné n’est remboursé par ce changement.
 
 La migration `0047_project_creation_rate.sql` ajoute une protection indépendante : 60 nouvelles créations manuelles par agence et par heure UTC. Elle reprend l’historique des projets existants. Un rejeu idempotent ne compte pas deux fois, la suppression d’un projet ne réinitialise pas le registre et une autre agence dispose de son propre compteur.
 

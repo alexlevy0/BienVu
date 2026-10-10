@@ -1,4 +1,5 @@
 import {test} from 'node:test';
+import {URL_IMPORT_QUOTAS} from '../packages/contracts/src/import-quotas';
 import assert from 'node:assert/strict';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import {migrateNarrationProbe,seedNarrationFixture} from '../scripts/narration-fixtures';
@@ -21,7 +22,7 @@ test('admission D1 atomique : idempotence, budget, isolation, quota et résultat
   const now=new Date().toISOString();await env.DB.prepare('INSERT INTO hosted_import_budget(month,baseline_cents,ceiling_cents,paused) VALUES(?,0,3500,0)').bind(now.slice(0,7)).run();
   await env.DB.exec("UPDATE generation_control SET enabled=1");
   await env.DB.prepare('INSERT INTO generation_access(agency_id,allocation_id,enabled) VALUES(?,?,1)').bind(agencyId,'allocation-admission').run();
-  await env.DB.prepare('INSERT INTO import_usage(day,attempts) VALUES(?,20) ON CONFLICT(day) DO UPDATE SET attempts=20').bind(now.slice(0,10)).run();
+  await env.DB.prepare('INSERT INTO import_usage(day,attempts) VALUES(?,?) ON CONFLICT(day) DO UPDATE SET attempts=excluded.attempts').bind(now.slice(0,10),URL_IMPORT_QUOTAS.daily).run();
   await assert.rejects(admitGeneration(env.DB,agencyId,'import-full-before-cost',{url:'https://agence.example/annonce/1'},'true'),/IMPORT_LIMIT/);
   assert.equal((await env.DB.prepare('SELECT baseline_cents AS n FROM hosted_import_budget').first<{n:number}>())!.n,0);
   assert.ok((await generationRights(env.DB,agencyId,'true')).importRetryAt);
