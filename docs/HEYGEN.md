@@ -2,6 +2,8 @@
 
 L’option est dans **Personnaliser → Avatar IA**, et dans les réglages audio de l’Éditeur. Elle est désactivée dans les nouveaux projets et réservée aux comptes connectés. L’utilisateur choisit le présentateur, l’ouverture, la conclusion, les deux ou **Pendant toute la vidéo**, le médaillon, le cadre ou une silhouette vérifiée sans fond, la taille et la position. Le présentateur reprend la voix off existante. Un choix de voix féminine avec un avatar masculin, ou l’inverse, affiche un avertissement non bloquant. Aucun genre n’est déduit d’une photo ou d’un nom : une métadonnée inconnue n’entraîne pas d’alerte.
 
+La taille est réglable de **15 à 100 % de la largeur de la vidéo**, avec une valeur initiale de 25 %. Le même réglage sert à l’aperçu et à l’export. Augmenter la taille ne nécessite pas de nouvelle génération HeyGen : le clip est redimensionné au montage. Les Workers web/génération et l’image du renderer doivent tous accepter cette plage.
+
 ## Crédits et coûts
 
 Décisions d’Alex du 09/10/2026 : **1 crédit BienVu supplémentaire** pour un ou deux passages courts ; **1 crédit par tranche entamée de 10 secondes** pour la présence continue, quel que soit le moteur autorisé.

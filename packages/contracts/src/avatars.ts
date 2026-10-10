@@ -7,7 +7,7 @@ export const AvatarEngine=z.enum(['avatar_iii','avatar_iv']);
 export type AvatarMoment='intro'|'outro'|'full';
 export const AvatarCustomization=z.object({lookId:AvatarId,engine:AvatarEngine,
   moments:z.enum(['intro','outro','both','full']),appearance:z.enum(['circle','card','cutout']),
-  x:z.number().min(10).max(90),y:z.number().min(15).max(85),width:z.number().min(15).max(40),
+  x:z.number().min(10).max(90),y:z.number().min(15).max(85),width:z.number().min(15).max(100),
   maxSeconds:z.number().int().min(3).max(8),hidden:z.boolean().optional()}).strict();
 export type AvatarCustomization=z.infer<typeof AvatarCustomization>;
 export function avatarMoments(settings?:AvatarCustomization):readonly AvatarMoment[]{return !settings||settings.hidden?[]:
