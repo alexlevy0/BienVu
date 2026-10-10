@@ -1,5 +1,5 @@
-// Real SDK and components. All PostHog requests are intercepted locally;
-// no customer, production analytics event, paid generation or payment is used.
+// Real SDK and components, with local ingestion by default. The opt-in native
+// analytics smoke sends only marked test events, without replay or product writes.
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {createServer} from 'node:http';
@@ -8,7 +8,9 @@ import {basename,dirname,resolve} from 'node:path';
 import {gunzipSync} from 'node:zlib';
 import {chromium} from 'playwright-core';
 const require=createRequire(import.meta.url),esbuild=createRequire(require.resolve('tsx/package.json'))('esbuild');
-const output=resolve('evidence/local/posthog'),web=resolve('apps/web'),token='phc_public_fixture_project_key';
+const live=process.env.POSTHOG_LIVE_SMOKE==='true';
+if(live&&process.env.POSTHOG_TEST_SCENARIO!=='web-analytics-native-events')throw Error('Live smoke is limited to the native Web Analytics scenario');
+const output=resolve('evidence/local/posthog'),web=resolve('apps/web'),token=live?(await(await fetch('https://bienvu.online/api/analytics/config')).json()).token:'phc_public_fixture_project_key';
 await mkdir(output,{recursive:true,mode:0o700});
 const files=await esbuild.build({stdin:{contents:`import React from 'react';import{createRoot}from'react-dom/client';import{AccountProvider}from'./components/account';import{ProductAnalytics,CookiePreferencesButton}from'./components/product-analytics';import{ErrorFallback}from'./components/error-fallback';import * as analytics from './lib/product-analytics';
 function Broken(){throw new TypeError('REACT_FIXTURE token=SECRET_REACT');}
@@ -17,14 +19,23 @@ window.fixtureAnalytics=analytics;window.fixturePosthog=()=>import('posthog-js')
   define:{'process.env.NODE_ENV':'"production"','process.env.NEXT_PUBLIC_BIENVU_RELEASE':'"analytics-fixture"'},plugins:[{name:'local-next',setup(build){
     // Local automation is classified as test/bot traffic by PostHog. Override
     // only that documented SDK switch in this fixture, never in production.
-    build.onLoad({filter:/[/\\]lib[/\\]product-analytics\.ts$/},async args=>({contents:(await readFile(args.path,'utf8')).replace('capture_pageview:false','opt_out_useragent_filter:true,capture_pageview:false').replace('const snapshots=event.properties.$snapshot_data;', 'const snapshots=event.properties.$snapshot_data;window.fixtureSnapshotShape={keys:Object.keys(event.properties),type:typeof snapshots,isArray:Array.isArray(snapshots),first:snapshots?.[0]};'),loader:'ts',resolveDir:dirname(args.path)}));
+    build.onLoad({filter:/[/\\]lib[/\\]product-analytics\.ts$/},async args=>({contents:(await readFile(args.path,'utf8')).replace('capture_pageview:false','loaded:p=>p.register({is_test:true}),opt_out_useragent_filter:true,capture_pageview:false').replace('const snapshots=event.properties.$snapshot_data;', 'const snapshots=event.properties.$snapshot_data;window.fixtureSnapshotShape={keys:Object.keys(event.properties),type:typeof snapshots,isArray:Array.isArray(snapshots),first:snapshots?.[0]};'),loader:'ts',resolveDir:dirname(args.path)}));
     build.onResolve({filter:/^next\/(link|navigation)$/},args=>({path:args.path,namespace:'local-next'}));
     build.onLoad({filter:/.*/,namespace:'local-next'},args=>({contents:args.path==='next/link'?`import React from 'react';export default React.forwardRef(({href,children,...p},ref)=><a href={href} ref={ref} {...p}>{children}</a>);`:
       `import{useSyncExternalStore,useMemo}from'react';const subscribe=f=>{window.addEventListener('fixture-navigation',f);return()=>window.removeEventListener('fixture-navigation',f)};export function usePathname(){return useSyncExternalStore(subscribe,()=>location.pathname,()=>'/')};export function useSearchParams(){const s=useSyncExternalStore(subscribe,()=>location.search,()=> '');return useMemo(()=>new URLSearchParams(s),[s])};`,loader:'jsx',resolveDir:web}));
   }}]});
 const bundles=new Map(files.outputFiles.map(file=>[basename(file.path),file.contents]));
+const beacons=new Map();
 const server=createServer(async(req,res)=>{
   const url=new URL(req.url,'http://localhost'),json=(body,status=200)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(body));};
+  // A real same-origin receiver observes beacons after their frame unloads;
+  // Playwright's interception of cross-origin unload requests is unreliable.
+  if(url.pathname==='/fixture-beacon'){
+    const target=new URL(url.searchParams.get('target')),holder=beacons.get(url.searchParams.get('scenario'));assert.ok(holder&&target.hostname==='eu.i.posthog.com');
+    const chunks=[];for await(const chunk of req)chunks.push(chunk);const bytes=Buffer.concat(chunks),payload=decode(bytes),batch=(Array.isArray(payload)?payload:payload?.batch??[payload]).filter(Boolean);holder.requests.push('beacon:'+target.pathname);holder.events.push(...batch);
+    if(live){assert.ok(batch.every(event=>event.properties?.is_test===true));const receipt=await fetch(target,{method:'POST',headers:{'Content-Type':req.headers['content-type']??'text/plain'},body:bytes});assert.equal(receipt.status,200);}
+    return json({status:1});
+  }
   if(url.pathname==='/api/analytics/config')return json({enabled:true,token,host:'https://eu.i.posthog.com'});
   if(url.pathname==='/api/me')return json({},401);
   if(url.pathname==='/api/voices')return json({},503);
@@ -50,13 +61,17 @@ function decode(buffer){
 async function scenario(name,fn,width=1280){
   if(process.env.POSTHOG_TEST_SCENARIO&&!name.includes(process.env.POSTHOG_TEST_SCENARIO))return;
   const context=await browser.newContext({viewport:{width,height:900},userAgent:'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36'}),requests=[],events=[];
+  beacons.set(name,{requests,events});
+  await context.addInitScript(name=>{const send=navigator.sendBeacon.bind(navigator);navigator.sendBeacon=(target,body)=>send('/fixture-beacon?scenario='+encodeURIComponent(name)+'&target='+encodeURIComponent(target),body);},name);
   await context.route(url=>url.hostname.endsWith('.posthog.com'),async route=>{
     const request=route.request(),url=new URL(request.url());requests.push(url.pathname);
+    if(request.method()==='OPTIONS')return route.fulfill({status:204,headers:{'Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'*'}});
     if(url.pathname.endsWith('/config.js'))return route.fulfill({status:404,body:''});
     if(request.method()==='POST'&&!/flags/.test(url.pathname)){
       const decoded=decode(request.postDataBuffer());
       if(decoded?.unparsed)throw Error('Unparsed SDK payload '+JSON.stringify(decoded));
       events.push(...(Array.isArray(decoded)?decoded:decoded?.batch??[decoded]).filter(Boolean));
+      if(live){assert.ok(events.every(event=>event.properties.is_test===true),'only marked test events may reach PostHog');const receipt=await route.fetch();assert.equal(receipt.status(),200);return route.fulfill({response:receipt});}
       return route.fulfill({json:{status:1},headers:{'Access-Control-Allow-Origin':'*'}});
     }
     if(/\.js$/.test(url.pathname)&&!url.pathname.includes('/array/')){
@@ -83,6 +98,24 @@ try{
     await page.getByRole('button',{name:'Enregistrer mes choix'}).click();await page.click('#safe-action');await page.waitForTimeout(7000);
     assert.ok(events.some(e=>e.event==='$pageview'),JSON.stringify({requests,events,stored:await page.evaluate(async()=>{const s=await window.fixturePosthog();return {storage:{...localStorage},optedOut:s.has_opted_out_capturing(),loaded:s.__loaded,ua:navigator.userAgent,redact:window.fixtureAnalytics.redactAnalyticsEvent({event:'$pageview',properties:{}}),capture:s.capture('editor_action',{action:'redo'})}})}));assert.ok(events.some(e=>e.event==='editor_action'));assert.ok(!events.some(e=>e.event==='$snapshot'));
     assert.ok(!requests.some(p=>/recorder/.test(p)),'recorder stays unloaded');assert.ok(!JSON.stringify(events).includes('SECRET_'));
+  });
+  await scenario('web-analytics-native-events',async({page,events,context})=>{
+    await page.getByRole('button',{name:'Personnaliser',exact:true}).click();await page.getByRole('checkbox',{name:'Mesure d’audience et actions'}).check();await page.getByRole('button',{name:'Enregistrer mes choix'}).click();
+    await page.waitForFunction(async()=>Boolean((await window.fixturePosthog()).webVitalsAutocapture?._initialized));
+    // Actual paint and interaction observers, not manually invented metrics.
+    await page.click('#safe-action');
+    for(let n=0;n<15&&!events.some(e=>e.event==='$web_vitals');n++)await page.waitForTimeout(1000);
+    const vitals=events.filter(e=>e.event==='$web_vitals');assert.ok(vitals.length,'native Web Vitals received');assert.ok(vitals.some(e=>typeof e.properties.$web_vitals_FCP_value==='number'));assert.ok(vitals.some(e=>typeof e.properties.$web_vitals_LCP_value==='number'));
+    await page.waitForTimeout(1100);
+    await page.evaluate(()=>{window.fixtureAnalytics.suspendProductAnalytics('/blog');history.pushState(null,'','/blog');window.dispatchEvent(new Event('fixture-navigation'));});
+    for(let n=0;n<10&&!events.some(e=>e.event==='$pageview'&&e.properties.$pathname==='/blog');n++)await page.waitForTimeout(1000);
+    const initial=events.find(e=>e.event==='$pageview'&&e.properties.$pathname==='/'),leave=events.find(e=>e.event==='$pageleave'&&e.properties.$pathname==='/');assert.ok(leave);assert.equal(leave.properties.$prev_pageview_id,initial.uuid);assert.ok(leave.properties.$prev_pageview_duration>=1);assert.equal(leave.properties.$prev_pageview_pathname,'/');assert.equal(events.filter(e=>e.event==='$pageleave'&&e.properties.$pathname==='/').length,1);
+    await page.goto(base+'/partenaires');for(let n=0;n<10&&!events.some(e=>e.event==='$pageleave'&&e.properties.$pathname==='/blog');n++)await page.waitForTimeout(1000);assert.equal(events.filter(e=>e.event==='$pageleave'&&e.properties.$pathname==='/blog').length,1,'document unload leaves the previous page once');
+    await page.locator('#safe-action').waitFor();await page.waitForTimeout(1200);
+    const other=await context.newPage();await other.goto(base+'/excluded-privacy-fixture');await other.evaluate(()=>localStorage.setItem('bienvu:privacy:v2',JSON.stringify({version:2,analytics:false,replay:false,at:Date.now()})));await page.waitForTimeout(4000);await other.close();
+    assert.ok(!events.some(e=>e.event==='$pageleave'&&e.properties.$pathname==='/partenaires'),'another tab withdrawing consent never records an exit');
+    const count=events.length;await page.goto(base+'/');await page.waitForTimeout(1500);assert.equal(events.length,count,'withdrawal stops performance and exits as well');assert.ok(!events.some(e=>e.event==='$snapshot'));assert.ok(!JSON.stringify(events).includes('SECRET_'));
+    await writeFile(resolve(output,live?'web-analytics-live.json':'web-analytics-local.json'),JSON.stringify({at:new Date().toISOString(),live,events},null,2),{mode:0o600});
   });
   await scenario('exceptions-autocapture-without-replay',async({page,events,requests})=>{
     await page.getByRole('button',{name:'Personnaliser',exact:true}).click();await page.getByRole('checkbox',{name:'Mesure d’audience et actions'}).check();await page.getByRole('button',{name:'Enregistrer mes choix'}).click();

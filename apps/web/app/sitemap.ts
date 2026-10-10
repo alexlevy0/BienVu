@@ -17,6 +17,7 @@ export default async function sitemap():Promise<MetadataRoute.Sitemap>{
     .map(path=>({url:absoluteUrl(path||'/'),lastModified:path===''?dates(latestHome):editorialDate}));
   pages.push({url:absoluteUrl('/blog'),lastModified:blogUpdatedAt()});
   pages.push({url:absoluteUrl('/partenaires'),lastModified:'2026-10-08'});
+  pages.push({url:absoluteUrl('/avatar'),lastModified:'2026-10-10'});
   for(const article of blogArticles)pages.push({url:absoluteUrl(`/blog/${article.slug}`),lastModified:blogArticleDates(article).modifiedAt,
     images:[absoluteUrl(`/images/blog/${article.slug}.jpg`)]});
   for(const example of examples){const video=(await publicExample(example.id,config))!;

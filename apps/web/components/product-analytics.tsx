@@ -3,7 +3,7 @@ import {useEffect,useRef,useState} from 'react';
 import {usePathname,useSearchParams} from 'next/navigation';
 import Link from 'next/link';
 import {useAccount} from './account';
-import {analyticsPath,type AnalyticsConsent,type AnalyticsConfig} from '../lib/analytics-policy';
+import {ANALYTICS_CONSENT_KEY,analyticsPath,type AnalyticsConsent,type AnalyticsConfig} from '../lib/analytics-policy';
 import {configureProductAnalytics,openPrivacyPreferences,setAnalyticsConsent,storedAnalyticsConsent,suspendProductAnalytics,trackProductEvent} from '../lib/product-analytics';
 
 export function CookiePreferencesButton(){return <button type="button" className="privacy-settings-link" onClick={openPrivacyPreferences}>Choix des cookies</button>;}
@@ -25,7 +25,7 @@ export function ProductAnalytics(){
   },[config,loaded,choice,loading,excluded,internal,me?.user.id,pathname,params]);
   useEffect(()=>{
     const open=()=>{trigger.current=document.activeElement as HTMLElement;setAnalytics(choice?.analytics??false);setReplay(choice?.replay??false);setPreferences(true);};
-    const storage=()=>{suspendProductAnalytics();setChoice(storedAnalyticsConsent());};
+    const storage=(event:StorageEvent)=>{if(event.key!==ANALYTICS_CONSENT_KEY&&event.key!==null)return;suspendProductAnalytics();setChoice(storedAnalyticsConsent());};
     window.addEventListener('bienvu:privacy-preferences',open);window.addEventListener('storage',storage);
     return()=>{window.removeEventListener('bienvu:privacy-preferences',open);window.removeEventListener('storage',storage);};
   },[choice]);

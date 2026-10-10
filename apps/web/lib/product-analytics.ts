@@ -1,11 +1,13 @@
 import type {PostHog,PostHogConfig,CaptureResult} from 'posthog-js';
 import {ERROR_RELEASE,safeExceptionProperties} from './error-tracking-policy';
-import {ANALYTICS_CONSENT_KEY,CONSENT_DURATION_MS,analyticsPath,analyticsUrl,analyticsEvents,readAnalyticsConsent,replayAllowed,replayAttribute,replayUrl,safeAnalyticsProperties,
+import {ANALYTICS_CONSENT_KEY,CONSENT_DURATION_MS,analyticsPath,analyticsUrl,analyticsEvents,readAnalyticsConsent,replayAllowed,replayAttribute,replayUrl,safeAnalyticsProperties,safeWebVitalsProperties,
   type AnalyticsConsent,type AnalyticsConfig,type AnalyticsProperties} from './analytics-policy';
 
 let sdk:PostHog|null=null,initializing:Promise<void>|null=null,config:AnalyticsConfig|null=null;
 let consent:AnalyticsConsent|null=null,accountReady=false,excluded=false,internal=false,userId:string|null=null,identified:string|null=null,active=false,lastPage='';
 let revision=0;
+const documentUrl=typeof window==='undefined'?'':window.location.href;
+let lifecycleStarted=false,vitalsExcluded=false;
 const pending:{name:string;properties:AnalyticsProperties}[]=[],once=new Set<string>();
 const lastAction=new Map<string,number>();
 const replayImages=new Map<string,string>();
@@ -49,8 +51,12 @@ export function redactAnalyticsEvent(event:CaptureResult|null):CaptureResult|nul
     for(const key of Object.keys(event.properties))if(/url|pathname|referrer/i.test(key))delete event.properties[key];
     return event;
   }
-  if(!analyticsEvents.has(event.event)&&!['$pageview','$pageleave','$autocapture','$rageclick','$identify'].includes(event.event))return null;
-  const props:Record<string,unknown>={...safeAnalyticsProperties(event.properties)};
+  if(!analyticsEvents.has(event.event)&&!['$pageview','$pageleave','$web_vitals','$autocapture','$rageclick','$identify'].includes(event.event))return null;
+  if(event.event==='$pageleave'&&!lastPage)return null;
+  const eventUrl=event.event==='$web_vitals'?documentUrl:event.event==='$pageleave'?'https://bienvu.online'+lastPage:window.location.href;
+  const path=analyticsPath(eventUrl);if(!path||event.event==='$web_vitals'&&vitalsExcluded)return null;
+  const props:Record<string,unknown>={...safeAnalyticsProperties(event.properties),...(event.event==='$web_vitals'?safeWebVitalsProperties(event.properties,documentUrl):{})};
+  if(event.event==='$web_vitals'&&!['LCP','INP','CLS','FCP'].some(metric=>props[`$web_vitals_${metric}_value`]!==undefined))return null;
   for(const key of ['distinct_id','$device_id','$session_id','$window_id','$lib','$lib_version','$browser','$browser_version','$os','$os_version','$device_type',
     '$screen_height','$screen_width','$viewport_height','$viewport_width','$event_type','$is_identified','$pageview_id','$prev_pageview_id','$prev_pageview_duration','$anon_distinct_id','$elements','$elements_chain','$el_text','$referring_domain',
     'utm_source','utm_medium','utm_campaign','utm_content','utm_term']){
@@ -64,19 +70,28 @@ export function redactAnalyticsEvent(event:CaptureResult|null):CaptureResult|nul
     }return clean;
   });
   if(typeof props.$elements_chain==='string'&&/token=|code=|secret=/i.test(props.$elements_chain))delete props.$elements_chain;
-  props.$current_url=analyticsUrl(window.location.href);props.$pathname=analyticsPath(window.location.href);props.$host='bienvu.online';props.is_internal=internal;
+  for(const key of ['$prev_pageview_duration','$prev_pageview_last_scroll','$prev_pageview_max_scroll','$prev_pageview_last_content','$prev_pageview_max_content','$prev_pageview_last_scroll_percentage','$prev_pageview_max_scroll_percentage','$prev_pageview_last_content_percentage','$prev_pageview_max_content_percentage']){
+    const value=event.properties[key];if(typeof value==='number'&&Number.isFinite(value)&&value>=0&&value<=86_400_000)props[key]=value;
+  }
+  if(typeof event.properties.$prev_pageview_pathname==='string'){
+    const previous=analyticsPath(event.properties.$prev_pageview_pathname);if(previous)props.$prev_pageview_pathname=previous;
+  }
+  props.$current_url=analyticsUrl(eventUrl);props.$pathname=path;props.$host='bienvu.online';props.is_internal=internal;
   props.token=config?.token; // Required by the SDK's ingestion queue; this is the public project token.
   // Person properties are intentionally empty: names, emails and addresses aren't analytics inputs.
-  delete event.$set;delete event.$set_once;event.properties=props;return event;
+  delete event.$set;delete event.$set_once;event.properties=props;if(event.event==='$pageleave')lastPage='';return event;
 }
 export function posthogOptions():Partial<PostHogConfig> {
   return {api_host:config!.host,ui_host:'https://eu.posthog.com',defaults:'2026-05-30',
     persistence:'localStorage',cross_subdomain_cookie:false,cookie_expiration:180,save_referrer:true,store_google:true,
     opt_out_capturing_by_default:true,opt_out_persistence_by_default:true,
-    capture_pageview:false,capture_pageleave:false,
+    // Pageviews and SPA pageleaves are explicit. The SDK handles the final
+    // unload before draining its queues; the filter deduplicates every exit.
+    capture_pageview:false,capture_pageleave:true,
     autocapture:{dom_event_allowlist:['click'],capture_copied_text:false},mask_all_text:false,mask_all_element_attributes:false,
     person_profiles:'identified_only',ip:false,disable_surveys:true,enable_heatmaps:false,
-    capture_exceptions:config?.errorTracking===false?false:{capture_unhandled_errors:true,capture_unhandled_rejections:true,capture_console_errors:false},enable_recording_console_log:false,capture_performance:false,
+    capture_exceptions:config?.errorTracking===false?false:{capture_unhandled_errors:true,capture_unhandled_rejections:true,capture_console_errors:false},enable_recording_console_log:false,
+    capture_performance:{web_vitals:true,web_vitals_allowed_metrics:['LCP','INP','CLS','FCP'],network_timing:false},
     advanced_disable_feature_flags:true,disable_session_recording:true,
     mask_personal_data_properties:false,before_send:redactAnalyticsEvent,
     session_recording:{maskAllInputs:false,maskInputOptions:{password:true},maskTextSelector:'[data-analytics-sensitive]',maskAllElementAttributes:false,
@@ -87,9 +102,17 @@ export function posthogOptions():Partial<PostHogConfig> {
       compress_events:false},
   };
 }
+function capturePageLeave(){
+  if(!active||!sdk||!lastPage||!mayCapture())return;
+  sdk.capture('$pageleave',{page:lastPage,$current_url:'https://bienvu.online'+lastPage},{transport:'sendBeacon',send_instantly:true});lastPage='';
+}
+function startPageLifecycle(){
+  if(lifecycleStarted)return;lifecycleStarted=true;
+  window.addEventListener('pageshow',event=>{if(event.persisted)void synchronize();});
+}
 function halt(){active=false;lastPage='';pending.length=0;pendingErrors.length=0;replayImages.clear();if(typeof document!=='undefined')document.removeEventListener('load',imageLoaded,true);if(sdk){sdk.stopSessionRecording();sdk.opt_out_capturing();}}
 // Next's hook executes before the destination DOM renders, including navigation into the admin.
-export function suspendProductAnalytics(){revision++;halt();}
+export function suspendProductAnalytics(destination?:string){if(destination)capturePageLeave();if(destination&&analyticsPath(destination)===null)vitalsExcluded=true;revision++;halt();}
 async function synchronize(){
   if(!config?.enabled||!mayCapture()){halt();return;}
   if(!sdk){
@@ -105,14 +128,14 @@ async function synchronize(){
     if(identified!==null&&identified!==userId||sdk.get_distinct_id().startsWith('user:')&&sdk.get_distinct_id()!=='user:'+userId)sdk.reset(true);
     identified=userId;once.clear();
   }
-  sdk.opt_in_capturing({captureEventName:false});active=true;
+  sdk.opt_in_capturing({captureEventName:false});active=true;startPageLifecycle();
   if(userId&&sdk.get_distinct_id()!=='user:'+userId)sdk.identify('user:'+userId);
   if(userId)try{const login=JSON.parse(sessionStorage.getItem('bienvu:analytics-login')??'null') as {at:number;method:string}|null;
     if(login){sessionStorage.removeItem('bienvu:analytics-login');if(login.method==='google'&&Date.now()-login.at<900000)trackProductEvent('login_completed',{method:'google'});}
   }catch{}
   if(mayRecord()){document.addEventListener('load',imageLoaded,true);sdk.startSessionRecording();}else{document.removeEventListener('load',imageLoaded,true);replayImages.clear();sdk.stopSessionRecording();}
   const page=analyticsPath(window.location.href)!;
-  if(page!==lastPage){lastPage=page;sdk.capture('$pageview',{page,account_type:userId?'authenticated':'anonymous'});if(page==='/editeur')trackProductEvent('editor_opened');}
+  if(page!==lastPage){capturePageLeave();lastPage=page;sdk.capture('$pageview',{page,account_type:userId?'authenticated':'anonymous'});if(page==='/editeur')trackProductEvent('editor_opened');}
   for(const event of pending.splice(0))sdk.capture(event.name,event.properties);
   for(const event of pendingErrors.splice(0))sdk.captureException(event.error,{bv_error_source:event.source,bv_release:ERROR_RELEASE});
 }

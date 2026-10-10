@@ -1,6 +1,6 @@
 import {z} from 'zod';
-import {AdminAvatarData,AvatarId,AvatarSettings,AvatarLook,publicErrors,type PublicErrorCode} from '@bienvu/contracts';
-import {avatarCatalog,avatarLooks,avatarSettings,avatarUsage,recentAvatarTasks,findAvatarLook,saveAvatarLook,setAvatarSettings} from '@bienvu/db';
+import {AdminAvatarData,AvatarId,AvatarSettings,AvatarLook,AvatarGalleryQuery,publicErrors,type PublicErrorCode} from '@bienvu/contracts';
+import {avatarCatalog,avatarGallery,avatarLooks,avatarSettings,avatarUsage,recentAvatarTasks,findAvatarLook,saveAvatarLook,setAvatarSettings} from '@bienvu/db';
 import {heygenClient,downloadHeygenMedia,avatarCatalogKey,avatarMediaVersion,AvatarFailure,verifyHeygenSignature,type HeygenEnvironment} from '@bienvu/avatars';
 import type {AuthEnvironment} from './auth';
 import {requireAdmin} from './admin-access';
@@ -12,6 +12,11 @@ const update=z.union([z.object({settings:AvatarSettings,revision:z.number().int(
   z.object({enableLooks:z.array(AvatarId).min(1).max(100)}).strict(),
   z.object({lookId:AvatarId,enabled:z.boolean(),transparentVerified:z.boolean()}).strict()]);
 export async function publicAvatarRequest(env:Env){return respond(async()=>Response.json(await avatarCatalog(env.DB)));}
+export async function publicAvatarGalleryRequest(request:Request,env:Pick<Env,'DB'>){return respond(async()=>{
+  const input=AvatarGalleryQuery.safeParse(Object.fromEntries(new URL(request.url).searchParams));
+  if(!input.success)throw new RequestFailure('VALIDATION_ERROR');
+  return Response.json(await avatarGallery(env.DB,input.data));
+});}
 export async function adminAvatarRequest(request:Request,env:Env){return respond(async()=>{
   const actor=await requireAdmin(request,env);
   if(request.method!=='GET')assertSameOrigin(request,env);

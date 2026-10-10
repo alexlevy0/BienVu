@@ -66,6 +66,30 @@ export function safeAnalyticsProperties(input:Record<string,unknown>):AnalyticsP
 export function analyticsUrl(value:string):string {
   const path=analyticsPath(value);return path?'https://bienvu.online'+path:'';
 }
+// Native Web Analytics properties. Retain measurements and their correlation,
+// without DOM targets, asset URLs, query strings or arbitrary metric metadata.
+export function safeWebVitalsProperties(input:Record<string,unknown>,documentUrl:string):Record<string,unknown> {
+  const result:Record<string,unknown>={},url=analyticsUrl(documentUrl);if(!url)return result;
+  for(const metric of ['LCP','INP','CLS','FCP']){
+    const value=input[`$web_vitals_${metric}_value`];
+    if(typeof value!=='number'||!Number.isFinite(value)||value<0||value>3_600_000)continue;
+    result[`$web_vitals_${metric}_value`]=value;
+    const raw=input[`$web_vitals_${metric}_event`];if(!raw||typeof raw!=='object'||Array.isArray(raw))continue;
+    const event=raw as Record<string,unknown>,clean:Record<string,unknown>={name:metric,value,$current_url:url};
+    for(const key of ['delta','timestamp'])if(typeof event[key]==='number'&&Number.isFinite(event[key]))clean[key]=event[key];
+    if(typeof event.id==='string'&&/^[\w-]{1,100}$/.test(event.id))clean.id=event.id;
+    if(['good','needs-improvement','poor'].includes(event.rating as string))clean.rating=event.rating;
+    if(['navigate','reload','back-forward','back-forward-cache','prerender','restore'].includes(event.navigationType as string))clean.navigationType=event.navigationType;
+    for(const key of ['$session_id','$window_id'])if(typeof event[key]==='string'&&/^[a-f\d-]{36}$/i.test(event[key]))clean[key]=event[key];
+    if(event.attribution&&typeof event.attribution==='object'){
+      const attribution:Record<string,number>={};
+      for(const key of ['inputDelay','processingDuration','presentationDelay','interactionTime','nextPaintTime','timeToFirstByte','resourceLoadDelay','resourceLoadDuration','elementRenderDelay','firstByteToFCP']){
+        const value=(event.attribution as Record<string,unknown>)[key];if(typeof value==='number'&&Number.isFinite(value)&&value>=0&&value<=3_600_000)attribution[key]=value;
+      }if(Object.keys(attribution).length)clean.attribution=attribution;
+    }
+    result[`$web_vitals_${metric}_event`]=clean;
+  }return result;
+}
 // Replay keeps the real interface. Only credentials are removed from resource/link URLs.
 export function replayUrl(value:string):string {
   if(/^data:image\/(?:png|jpeg|webp|gif|svg\+xml)[;,]/i.test(value)||value.startsWith('blob:'))return value;

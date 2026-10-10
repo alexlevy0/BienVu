@@ -9,6 +9,7 @@ import {StructuredData} from '../components/structured-data';
 import {seoMetadata,siteSchema} from '../lib/seo';
 import './landing.css';
 import './home-showcase.css';
+import './home-avatars.css';
 import './home-mandate-kit.css';
 import './home-sharing.css';
 import './home-editor-showcase.css';

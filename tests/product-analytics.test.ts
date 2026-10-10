@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {ANALYTICS_CONSENT_KEY,CONSENT_DURATION_MS,analyticsConfiguration,analyticsPath,analyticsUrl,readAnalyticsConsent,replayAllowed,replayAttribute,replayUrl,safeAnalyticsProperties} from '../apps/web/lib/analytics-policy';
+import {ANALYTICS_CONSENT_KEY,CONSENT_DURATION_MS,analyticsConfiguration,analyticsPath,analyticsUrl,readAnalyticsConsent,replayAllowed,replayAttribute,replayUrl,safeAnalyticsProperties,safeWebVitalsProperties} from '../apps/web/lib/analytics-policy';
 
 test('analytics is disabled without a valid EU project configuration',()=>{
   assert.equal(analyticsConfiguration({}).enabled,false);
@@ -47,4 +47,10 @@ test('replay never exposes credentials in resource URLs or secret attributes',()
   assert.equal(replayUrl('https://user:SECRET@assets.example.fr/photo.jpg?signature=SECRET'),'https://assets.example.fr/photo.jpg');
   assert.equal(replayAttribute('data-access-token','SECRET'),'');
   assert.equal(replayAttribute('src','data:image/jpeg;base64,aGVsbG8='),'data:image/jpeg;base64,aGVsbG8=');
+});
+test('native web vitals preserve measurements and page identity without DOM targets or signed asset URLs',()=>{
+  const safe=safeWebVitalsProperties({$web_vitals_LCP_value:1234.56789,$web_vitals_LCP_event:{name:'LCP',value:1234.56789,id:'v5-123',rating:'good',navigationType:'navigate',timestamp:123456,entries:['SECRET_ENTRY'],$current_url:'/admin',attribution:{url:'https://agency.fr/photo?token=SECRET_TOKEN',element:'PRIVATE_ELEMENT',resourceLoadDuration:200}},$web_vitals_CLS_value:0,$web_vitals_INP_value:Infinity,$web_vitals_FCP_value:-1},'/editeur?draft=PRIVATE_DRAFT');
+  assert.equal(safe.$web_vitals_LCP_value,1234.56789);assert.equal(safe.$web_vitals_CLS_value,0);assert.equal(safe.$web_vitals_INP_value,undefined);
+  assert.equal((safe.$web_vitals_LCP_event as any).$current_url,'https://bienvu.online/editeur');assert.deepEqual((safe.$web_vitals_LCP_event as any).attribution,{resourceLoadDuration:200});assert.ok(!JSON.stringify(safe).includes('SECRET'));assert.ok(!JSON.stringify(safe).includes('PRIVATE'));
+  assert.deepEqual(safeWebVitalsProperties({$web_vitals_LCP_value:1234},'/admin'),{});
 });

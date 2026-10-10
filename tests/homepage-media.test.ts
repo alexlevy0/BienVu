@@ -110,7 +110,7 @@ test('Home : banque globale privée, copie indépendante, publication atomique e
   await assert.rejects(db.prepare("UPDATE homepage_audit SET action='discard'").run(),/HOMEPAGE_AUDIT_IMMUTABLE/);
   await assert.rejects(db.prepare('DELETE FROM homepage_audit').run(),/HOMEPAGE_AUDIT_IMMUTABLE/);
   await assign('hero.video',null);await publish();assert.equal((await homepageMediaRequest(req(live.url,''),env,live.id)).status,404,'Une sélection retirée n’est plus lisible publiquement');
-  assert.equal(homepageSlots.length,34);
+  assert.equal(homepageSlots.length,38);
  });
  await t.test('kit du mandat : les dix nouveaux emplacements acceptent et publient les médias de la banque',async()=>{
   const slots=homepageSlots.filter(slot=>slot.group==='Un mandat, sept contenus');
@@ -125,6 +125,19 @@ test('Home : banque globale privée, copie indépendante, publication atomique e
   assert.deepEqual(await readHomepageConfig(db),previous,'Les nouveaux choix restent privés jusqu’à la publication');
   selected=await publish();const config=await readHomepageConfig(db);assert.equal(config.version,previous.version+1);
   for(const slot of slots){const asset=config.slots[slot.id]!;assert.ok(asset);assert.equal(asset.kind,slot.kind==='video'||slot.id==='kit.tiktok.visual'?'video':'image');assert.equal((await homepageMediaRequest(req(asset.url,''),env,asset.id)).status,200);}
+ });
+ await t.test('avatars : quatre médias configurables, brouillon privé et publication sans toucher aux autres sections',async()=>{
+  const slots=homepageSlots.filter(slot=>slot.group==='Vos annonces prennent la parole'),before=await readHomepageConfig(db),previousSelections=JSON.parse((await homepageSettings(db)).published_json);
+  assert.equal(slots.length,4);
+  for(const slot of slots){
+   if(slot.kind==='video')await assert.rejects(assign(slot.id,{kind:'photo',id:second.listing.photos[1].id}),/VALIDATION_ERROR/);
+   selected=await assign(slot.id,slot.kind==='video'?{kind:'library',id:second.library.id}:{kind:'photo',id:second.listing.photos[1].id});
+   const id=selected.draft[slot.id]!;assert.equal((await homepageMediaRequest(req('/api/homepage/media/'+id,''),env,id)).status,404);
+  }
+  assert.deepEqual(await readHomepageConfig(db),before);
+  await publish();const after=await readHomepageConfig(db);
+  const selections=JSON.parse((await homepageSettings(db)).published_json);for(const [slot,id] of Object.entries(previousSelections))assert.equal(selections[slot],id);
+  for(const slot of slots){const asset=after.slots[slot.id]!;assert.equal(asset.kind,slot.kind==='video'?'video':'image');assert.equal((await homepageMediaRequest(req(asset.url,''),env,asset.id)).status,200);}
  });
  await t.test('SEO : déduplication publique, aperçu allégé, repli et révocation des variantes',async()=>{
   const config=await readHomepageConfig(db),groups=new Map<string,Set<string>>();for(const asset of Object.values(config.slots)){const group=groups.get(asset.sha256)??new Set<string>();group.add(asset.url);groups.set(asset.sha256,group);}for(const group of groups.values())assert.equal(group.size,1);

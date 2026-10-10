@@ -39,11 +39,16 @@ export type AvatarSettings=z.infer<typeof AvatarSettings>;
 export const DEFAULT_AVATAR_SETTINGS:AvatarSettings={enabled:false,allowPremium:false,defaultLookId:null,maxSeconds:6,
   monthlyUsd:5,perVideoUsd:1,concurrent:2,priceIII:.99,priceIVPhoto:2.31,priceIVStudio:4.83};
 export const AvatarCatalog=z.object({enabled:z.boolean(),allowPremium:z.boolean(),maxSeconds:z.number(),defaultLookId:AvatarId.nullable(),
-  looks:z.array(AvatarLook).max(1000)}).strict();
+  looks:z.array(AvatarLook).max(5000)}).strict();
 export type AvatarCatalog=z.infer<typeof AvatarCatalog>;
+export const AvatarGalleryQuery=z.object({query:z.string().trim().max(100).default(''),gender:AvatarGender.or(z.literal('all')).default('all'),
+  offset:z.coerce.number().int().min(0).max(5000).default(0)}).strict();
+export type AvatarGalleryQuery=z.infer<typeof AvatarGalleryQuery>;
+export const AvatarGallery=z.object({looks:z.array(AvatarLook).max(32),total:z.number().int().min(0),offset:z.number().int().min(0),hasMore:z.boolean()}).strict();
+export type AvatarGallery=z.infer<typeof AvatarGallery>;
 export const AvatarAdmission=z.object({settings:AvatarSettings,look:AvatarLook,voice:z.string().min(1).max(128)}).strict();
 export type AvatarAdmission=z.infer<typeof AvatarAdmission>;
-export const AdminAvatarData=z.object({settings:AvatarSettings,revision:z.number().int().positive(),looks:z.array(AvatarLook).max(1000),
+export const AdminAvatarData=z.object({settings:AvatarSettings,revision:z.number().int().positive(),looks:z.array(AvatarLook).max(5000),
   connected:z.boolean(),wallet:z.object({currency:z.string().nullable(),balance:z.number().nullable(),autoReload:z.boolean(),billingType:z.string().nullable()}).nullable(),
   usage:z.object({month:z.string(),reservedUsd:z.number(),ready:z.number(),reused:z.number(),active:z.number(),uncertain:z.number()}),
   tasks:z.array(z.object({id:AvatarId,jobId:z.string(),moment:z.string(),engine:AvatarEngine,state:z.string(),reused:z.boolean(),

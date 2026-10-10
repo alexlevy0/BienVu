@@ -5,9 +5,9 @@ import {HomeIcon} from './home-icons';
 
 // Portraits load near the visible strip, not several screens ahead. Videos are
 // mounted only after deliberate interest; leaving also cancels a pending hover.
-export function AvatarPortrait({look,playing,root,onUnavailable}:{look:AvatarLook;playing?:boolean;root?:RefObject<HTMLDivElement|null>;onUnavailable?():void}){
+export function AvatarPortrait({look,playing,root,onUnavailable,priority=false}:{look:AvatarLook;playing?:boolean;root?:RefObject<HTMLDivElement|null>;onUnavailable?():void;priority?:boolean}){
   const frame=useRef<HTMLSpanElement>(null),video=useRef<HTMLVideoElement>(null);
-  const [visible,setVisible]=useState(false),[ready,setReady]=useState(false),[failed,setFailed]=useState(false),[videoReady,setVideoReady]=useState(false);
+  const [visible,setVisible]=useState(priority),[ready,setReady]=useState(priority),[failed,setFailed]=useState(false),[videoReady,setVideoReady]=useState(false);
   useEffect(()=>{const node=frame.current;if(!node)return;
     const observer=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)){setVisible(true);observer.disconnect();}},
       {root:root?.current??null,rootMargin:'160px'});observer.observe(node);return()=>observer.disconnect();
@@ -19,7 +19,7 @@ export function AvatarPortrait({look,playing,root,onUnavailable}:{look:AvatarLoo
   },[playing,look.preview,onUnavailable]);
   useEffect(()=>{setVideoReady(false);},[playing]);
   return <span className={`avatar-portrait${ready?' is-ready':''}`} ref={frame}>
-    {visible&&look.thumbnail&&!failed?<img src={look.thumbnail} alt="" width={320} height={400} decoding="async"
+    {visible&&look.thumbnail&&!failed?<img src={look.thumbnail} alt="" width={320} height={400} decoding="async" loading={priority?'eager':'lazy'} fetchPriority={priority?'high':'auto'}
       onLoad={()=>setReady(true)} onError={()=>{setFailed(true);setReady(true);}}/>:<HomeIcon name="user" size={36}/>}
     {playing&&look.preview&&<video ref={video} src={look.preview} muted autoPlay loop playsInline preload="none"
       className={videoReady?'is-playing':''} onPlaying={()=>setVideoReady(true)} onError={onUnavailable} aria-label={`Extrait de ${look.name}`}/>}

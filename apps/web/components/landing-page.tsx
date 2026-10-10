@@ -6,6 +6,7 @@ import {HomeCreate} from './home-create';
 import {AgencySeal, HomeIcon} from './home-icons';
 import {StudioSidebar} from './studio-sidebar';
 import {HomeShowcase} from './home-showcase';
+import {HomeAvatarShowcase} from './home-avatar-showcase';
 import {HomeMandateKit} from './home-mandate-kit';
 import {HomeSharing} from './home-sharing';
 import {HomeEditorShowcase} from './home-editor-showcase';
@@ -79,6 +80,7 @@ export function LandingPage() {
           </aside>
         </section>
         {!conversationActive && <section id="explorer" className="home-discover" aria-labelledby="home-discover-title"><div className="home-discover-heading"><div><h2 id="home-discover-title">À découvrir sur BienVu</h2><p>Des inspirations pour donner une autre dimension à vos biens.</p></div><button type="button" className="home-explore-link" onClick={() => {setCategory('Tous'); setDialog('explore');}}>Tout explorer <HomeIcon name="external" size={17}/></button></div><div className="home-example-grid">{examples.map(example => <ExampleCard key={example.id} example={example} onPlay={play}/>)}</div></section>}
+        {!conversationActive && <HomeAvatarShowcase paused={modalOpen}/>}
         {!conversationActive && <HomeShowcase paused={modalOpen || heroPlaying} onCreate={focusComposer}/>}
         {!conversationActive && <HomeMandateKit onPlay={playSlot} onCreate={focusComposer}/>}
         {!conversationActive && <HomeSharing onPlay={context => playSlot(`share.${context}.video`)} onCreate={focusComposer}/>}

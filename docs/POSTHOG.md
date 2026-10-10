@@ -20,7 +20,7 @@ Un identifiant anonyme relie les pages d’un parcours après accord. Après con
 
 | Parcours | Événements principaux |
 | --- | --- |
-| Navigation | `$pageview`, `$autocapture` des clics avec leurs libellés, `control_interacted` avec zone et type de commande, `navigation_clicked` |
+| Navigation | `$pageview`, `$pageleave`, `$autocapture` des clics avec leurs libellés, `control_interacted` avec zone et type de commande, `navigation_clicked` |
 | Compte | `signup_requested/completed/failed`, `login_requested/redirected/completed/failed`, `logout_completed` |
 | Import | `import_requested/completed/failed`, `description_requested/completed/failed`, `manual_form_opened`, `manual_listing_saved/failed` |
 | Génération | `generation_requested/accepted/request_failed`, `generation_ready/failed` |
@@ -29,7 +29,7 @@ Un identifiant anonyme relie les pages d’un parcours après accord. Après con
 | Réseaux | `social_connection_requested/completed/removed`, `publication_requested/created/failed/completed` |
 | Paiement | `checkout_requested/opened/failed` |
 | Partenaires | `partner_application_started/requested/received/failed` |
-| Médias et performances | `video_played`, `video_download_clicked`, `web_vital` |
+| Médias et performances | `video_played`, `video_download_clicked`, `$web_vitals` natif ; `web_vital` historique du suivi SEO |
 
 `publication_created` confirme l’enregistrement dans BienVu, pas une diffusion réussie chez Meta. `publication_completed` signale la transition d’une destination vers publiée quand le calendrier est ouvert. De même, les événements de fin de génération reflètent les transitions observées par le navigateur ; fermer BienVu n’arrête pas le traitement, mais sa fin n’émet pas d’événement client. Les historiques existants ne sont pas comptés comme de nouvelles générations/publications. `checkout_opened` confirme la création du lien de paiement, pas un achat. Aucune transaction réelle n’est lancée pour tester la mesure.
 
@@ -44,6 +44,18 @@ Les photos déjà affichées sont mises en cache pour le replay sous forme de pe
 Les mots de passe et codes à usage unique sont masqués. Les entrées `hidden`/`file` et les éléments explicitement marqués `data-analytics-secret` sont bloqués ; `data-analytics-sensitive` permet un masquage ciblé. Les attributs d’authentification et paramètres de jetons sont supprimés des liens avant transport. Les snapshots passent par ce filtrage avant compression. Les URLs des événements analytiques restent normalisées pour ne pas exposer les liens privés des biens ; les références nécessaires à l’affichage du replay conservent leurs chemins ordinaires.
 
 Une navigation App Router suspend la collecte avant l’affichage de la destination ; elle reprend uniquement sur une route autorisée avec l’accord du visiteur. Les statistiques agrégées existantes dans D1 restent indépendantes.
+
+## Web Analytics : performances et sorties de page
+
+Le SDK active `capture_performance.web_vitals` pour **LCP, INP, CLS et FCP**. L’événement natif `$web_vitals` alimente [Web Vitals](https://eu.posthog.com/project/299212/web/web-vitals), avec ses champs numériques et les informations de mesure nécessaires. Les timings d’attribution sont conservés, mais pas les sélecteurs DOM, les URLs de médias et leurs paramètres. Le chargement des observers commence uniquement après accord pour les statistiques ; le replay n’est pas requis. Le suivi SEO D1 déjà présent reste indépendant.
+
+Les métriques stables décrivent le document initial, même si l’application change ensuite de route. Leur URL est donc celle de ce document, nettoyée, et non celle affichée au moment où le buffer est transmis. La mesure est écartée si le document initial est privé/exclu, ou si une transition passe dans un espace exclu. La mesure expérimentale des « soft navigations » n’est pas activée : un changement de route SPA ne constitue pas une nouvelle mesure LCP de document.
+
+Les vues restent explicites pour éviter les doublons et conserver les exclusions. Les transitions App Router envoient un `$pageleave` pour la page précédente avant suspension. `capture_pageleave=true` laisse le SDK envoyer la sortie finale par beacon avant de vider ses queues, et un garde empêche de compter deux fois la même sortie. Le retour depuis le cache arrière du navigateur réouvre une vue. Les identifiants de vue, la durée (en secondes), le chemin précédent normalisé et les mesures de défilement sont conservés. Le retrait du consentement, y compris depuis un autre onglet, ne produit pas de sortie ni de nouvelle mesure. Les changements de stockage sans rapport avec le consentement ne redémarrent pas la collecte.
+
+[Web Analytics](https://eu.posthog.com/project/299212/web) utilise ces sorties avec les pages vues et clics autocapturés pour sa définition native du rebond : une seule page vue, aucun clic autocapturé et moins de dix secondes, selon le seuil configuré dans le projet. Les anciennes visites sans sortie ne sont pas reconstruites. Les avertissements de santé PostHog sont recalculés périodiquement et peuvent rester affichés après les premiers événements.
+
+Documentation : [Web Vitals natifs](https://posthog.com/docs/web-analytics/web-vitals), [taux de rebond](https://posthog.com/docs/web-analytics/dashboard#bounce-rate), [contrôle des sorties de page](https://posthog.com/docs/health-checks/pageleave-events).
 
 Les anciennes sessions conservent leur masquage : les pixels et textes absents lors de l’enregistrement ne peuvent pas être récupérés après coup.
 
@@ -67,7 +79,7 @@ Ces indicateurs sont opérationnels : les fins de traitement dépendent de leur 
 
 ## Vérification
 
-`pnpm exec tsx --test tests/product-analytics.test.ts` vérifie configuration, choix, routes, lisibilité des attributs et filtrage des secrets. `node scripts/probe-product-analytics.mjs` utilise le vrai SDK et les vrais composants dans un navigateur, avec des APIs et une ingestion **entièrement locales** : aucun client, paiement, génération ni événement de production. La recette vérifie accord/refus, absence de SDK avant accord, textes et champs lisibles, copie des photos privées, protection des mots de passe et jetons, navigation privée, identité, marquage des visites internes et retrait. Les preuves sont écrites dans `evidence/local/posthog/`, ignoré par Git.
+`pnpm exec tsx --test tests/product-analytics.test.ts` vérifie configuration, choix, routes, lisibilité des attributs, valeurs natives de Web Vitals et filtrage des secrets. `node scripts/probe-product-analytics.mjs` utilise le vrai SDK et les vrais composants dans un navigateur, avec des APIs et une ingestion **entièrement locales** par défaut : aucun client, paiement ou génération. La recette vérifie aussi les observers natifs, la sortie d’une route SPA, la sortie réelle du document par beacon, leurs durées/identifiants et le retrait. Les beacons de la fixture passent par un récepteur HTTP local pour survivre au déchargement du frame. `POSTHOG_LIVE_SMOKE=true POSTHOG_TEST_SCENARIO=web-analytics-native-events` autorise exclusivement cette recette à transmettre quelques événements explicitement `is_test=true` au projet réel ; aucune session n’est enregistrée. Les preuves sont écrites dans `evidence/local/posthog/`, ignoré par Git.
 
 La livraison du 9 octobre 2026 est documentée dans `evidence/remote/posthog-2026-10-09/`. Les 21 graphiques ont été exécutés avec les filtres du dashboard ; leur disposition stockée ne contient aucun chevauchement.
 

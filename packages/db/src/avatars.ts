@@ -1,4 +1,4 @@
-import {AvatarSettings,AvatarLook,AvatarAdmission,AvatarCatalog,DEFAULT_AVATAR_SETTINGS,avatarCreditCost,type AvatarCustomization} from '@bienvu/contracts';
+import {AvatarSettings,AvatarLook,AvatarAdmission,AvatarCatalog,AvatarGallery,AvatarGalleryQuery,DEFAULT_AVATAR_SETTINGS,avatarCreditCost,type AvatarCustomization} from '@bienvu/contracts';
 import type {Database} from './index';
 
 export async function avatarSettings(db:Database){
@@ -6,8 +6,24 @@ export async function avatarSettings(db:Database){
   return {settings:AvatarSettings.parse(row?JSON.parse(row.settings):DEFAULT_AVATAR_SETTINGS),revision:row?.revision??1};
 }
 export async function avatarLooks(db:Database,enabledOnly=false){
-  const row=await db.prepare(`SELECT json_group_array(json(look_json)) AS data FROM (SELECT look_json FROM avatar_looks ${enabledOnly?'WHERE enabled=1':''} ORDER BY id LIMIT 1000)`).first<{data:string}>();
+  const row=await db.prepare(`SELECT json_group_array(json(look_json)) AS data FROM (SELECT look_json FROM avatar_looks ${enabledOnly?'WHERE enabled=1':''} ORDER BY id LIMIT 5000)`).first<{data:string}>();
   return (JSON.parse(row?.data??'[]') as unknown[]).map(value=>AvatarLook.parse(value));
+}
+// A public gallery request reads only one page; provider URLs and private looks
+// never enter its response. Stable ordering keeps pagination deterministic.
+export async function avatarGallery(db:Database,input:AvatarGalleryQuery){
+  const {query,gender,offset}=AvatarGalleryQuery.parse(input),{settings}=await avatarSettings(db);
+  const where=`enabled=1 AND json_extract(look_json,'$.ownership')='public'
+    AND EXISTS(SELECT 1 FROM json_each(look_json,'$.engines') WHERE value='avatar_iii' OR (?=1 AND value='avatar_iv'))
+    AND (?='all' OR json_extract(look_json,'$.gender')=?) AND json_extract(look_json,'$.name') LIKE ? ESCAPE '\\'`;
+  const params=[settings.allowPremium?1:0,gender,gender,'%'+query.replace(/[\\%_]/g,'\\$&')+'%'];
+  const [count,row]=await Promise.all([
+    db.prepare(`SELECT count(*) AS total FROM avatar_looks WHERE ${where}`).bind(...params).first<{total:number}>(),
+    db.prepare(`SELECT json_group_array(json(look_json)) AS data FROM (SELECT look_json FROM avatar_looks WHERE ${where}
+      ORDER BY (id=?) DESC,json_extract(look_json,'$.name') COLLATE NOCASE,id LIMIT 32 OFFSET ?)`).bind(...params,settings.defaultLookId,offset).first<{data:string}>()
+  ]);
+  const looks=JSON.parse(row?.data??'[]');
+  return AvatarGallery.parse({looks,total:count?.total??0,offset,hasMore:offset+looks.length<(count?.total??0)});
 }
 export async function avatarCatalog(db:Database){const {settings}=await avatarSettings(db);
   const looks=(await avatarLooks(db,true)).filter(look=>look.ownership==='public'&&(look.engines.includes('avatar_iii')||settings.allowPremium&&look.engines.includes('avatar_iv')))
