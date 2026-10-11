@@ -59,7 +59,7 @@ export function StudioSidebar({active}: {active: 'create' | 'videos' | 'explore'
         {item('/agence', 'Mon agence', 'building', 'agency')}
         {me&&item('/ma-vitrine', 'Ma vitrine', 'globe', 'showcase')}
         {item('/editeur', 'Éditeur', 'clapper', 'editor')}
-        {item('/projets', 'Dossiers & modèles', 'folder', 'projects')}
+        {me&&item('/projets', 'Dossiers & modèles', 'folder', 'projects')}
         {item('/publications', 'Publications', 'calendar', 'social')}
       </nav>
       <section className="home-recents" aria-labelledby="home-recents-title"><h2 id="home-recents-title">RÉCENTS</h2>

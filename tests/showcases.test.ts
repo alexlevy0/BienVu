@@ -4,7 +4,7 @@ import {ensureAgency,readShowcase,readShowcaseItems,admitGeneration,findOwnedGen
 import {ShowcaseSlug,defaultShowcaseProperty,defaultVideoCustomization,GoogleVoiceConfig} from '../packages/contracts/src/index';
 import {migrateNarrationProbe} from '../scripts/narration-fixtures';import {fixtureImportTransport} from '../scripts/import-fixtures';
 import {createPrivateImport} from '../apps/web/lib/imports';import {readPropertyGroups,archiveProperty} from '../apps/web/lib/properties';
-import {ensureShowcase,mutateShowcase,resolvePublicShowcase,showcaseView,publicShowcaseProperty,publicShowcaseMedia} from '../apps/web/lib/showcases';
+import {ensureShowcase,mutateShowcase,resolvePublicShowcase,showcaseView,publicShowcaseProperty,publicShowcaseMedia,uploadShowcaseImage} from '../apps/web/lib/showcases';
 import {submitShowcaseContact,listShowcaseLeads,mutateShowcaseLead,sendShowcaseNotifications,showcaseStatistics,recordShowcaseEvent,type ShowcaseContactEnv} from '../apps/web/lib/showcase-contacts';
 import {showcaseManagement} from '../apps/web/lib/showcase-management';import {respond} from '../apps/web/lib/http';
 import {publicShowcaseSitemap,protectShowcaseResponse,cleanupShowcases} from '../apps/web/lib/showcase-maintenance';
@@ -39,6 +39,18 @@ test('Ma vitrine : adresses réservées, création privée et présentation publ
   const preview=await showcaseView(f.env,(await readShowcase(f.env.DB,f.agency.id))!,new URLSearchParams(),true);assert.equal(preview.config.name,'Présentation en brouillon');assert.equal(preview.config.address,'');assert.ok(preview.properties[0].photos[0].url.startsWith('/api/vitrine/assets/'));
   await f.action({action:'publish'});assert.equal((await resolvePublicShowcase(f.env,'agence-lumiere')).published!.slug,'nouvelle-agence');assert.equal((await resolvePublicShowcase(f.env,'nouvelle-agence')).published!.name,'Présentation en brouillon');
   assert.equal((await f.env.DB.prepare('SELECT count(*) n FROM generation_shares').first<{n:number}>())!.n,0);assert.equal((await f.env.DB.prepare('SELECT count(*) n FROM generation_runs').first<{n:number}>())!.n,0);
+});
+test('Le logo et la couverture d’agence ne remplacent pas les photos publiques du bien',async t=>{const f=await fixture(t),photo=f.group.photos[0],source=await f.env.MEDIA.get(photo.objectKey);assert.ok(source);
+  const pixels=new Uint8Array(await source.arrayBuffer()),logo=await uploadShowcaseImage(f.env,f.agency.id,pixels,photo.mime,'logo'),cover=await uploadShowcaseImage(f.env,f.agency.id,pixels,photo.mime,'cover');
+  await f.action({action:'save',config:{...f.config,name:'Agence Lumière',slug:'agence-lumiere',logoAssetId:logo.id,coverAssetId:cover.id}});
+  await f.action({action:'property-save',propertyId:f.group.summary.id,settings:defaultShowcaseProperty()});const item=(await readShowcaseItems(f.env.DB,f.agency.id))[0];
+  const management=await showcaseManagement(f.env,f.agency,'owner');assert.equal(management.items[0].issues.length,1);assert.match(management.items[0].issues[0],/photo de ce bien/);
+  const refused=await respond(async()=>{await f.action({action:'publish'});return Response.json({ok:true});});assert.equal(refused.status,422);
+  const failure=await refused.json() as{fields:Record<string,string>};assert.ok(failure.fields[item.id].includes(f.group.summary.title));assert.match(failure.fields[item.id],/onglet Biens/);
+  await assert.rejects(resolvePublicShowcase(f.env,'agence-lumiere'),/NOT_FOUND/);assert.equal((await readShowcaseItems(f.env.DB,f.agency.id))[0].published,null);
+  await f.action({action:'property-save',propertyId:f.group.summary.id,settings:{...f.settings,coverPhotoId:null}});const missingCover=await showcaseManagement(f.env,f.agency,'owner');assert.deepEqual(missingCover.items[0].issues,['Choisissez la photo de couverture de ce bien.']);
+  await f.action({action:'property-save',propertyId:f.group.summary.id,settings:f.settings});await f.action({action:'publish'});const publicData=await showcaseView(f.env,await resolvePublicShowcase(f.env,'agence-lumiere'));
+  assert.equal(publicData.logo!.id,logo.id);assert.equal(publicData.cover!.id,cover.id);assert.equal(publicData.properties[0].photos.length,1);assert.ok(publicData.properties[0].cover);assert.notEqual(publicData.properties[0].cover!.id,cover.id);
 });
 test('Ma vitrine : isolation, conflits de version et publication explicite de chaque média',async t=>{const f=await fixture(t),item=await f.publish(),publicRow=await resolvePublicShowcase(f.env,'agence-lumiere');
   await assert.rejects(f.action({action:'property-save',propertyId:f.group.summary.id,settings:f.settings},f.foreign),/NOT_FOUND/);

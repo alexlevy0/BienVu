@@ -76,8 +76,8 @@ async function prepareItem(env:ShowcaseEnv,agency:string,group:PropertyGroup,set
 export function showcasePropertyIssues(group:PropertyGroup|null,item:ShowcaseStoredProperty){const issues:string[]=[];
   if(!group)return ['Ce bien n’est plus disponible dans Mes biens.'];if(group.summary.archived)issues.push('Ce bien est archivé.');
   if(!group.summary.fields.title)issues.push('Ajoutez un titre au bien.');if(!group.summary.fields.locality)issues.push('Renseignez la commune.');
-  if(!group.summary.fields.transaction)issues.push('Précisez vente ou location.');if(!item.photos.length)issues.push('Sélectionnez au moins une photo publique.');
-  if(!item.settings.coverPhotoId||!item.photos.some(p=>p.sourceHash===item.settings.coverPhotoId))issues.push('Choisissez une photo de couverture.');
+  if(!group.summary.fields.transaction)issues.push('Précisez vente ou location.');if(!item.photos.length)issues.push('Sélectionnez au moins une photo de ce bien à rendre publique.');
+  else if(!item.settings.coverPhotoId||!item.photos.some(p=>p.sourceHash===item.settings.coverPhotoId))issues.push('Choisissez la photo de couverture de ce bien.');
   if(item.settings.showAddress&&!item.settings.address)issues.push('Renseignez l’adresse dont vous autorisez la publication.');return issues;}
 function groupFor(groups:PropertyGroup[],id:string){return groups.find(g=>g.summary.id===id||g.aliases.includes(id))??null;}
 async function validConfigAssets(env:ShowcaseEnv,agency:string,config:Config){for(const[id,kind]of[[config.logoAssetId,'logo'],[config.coverAssetId,'cover']]as const){if(!id)continue;const a=await showcaseAsset(env,agency,id);if(!a||a.kind!==kind||!await env.MEDIA.head(a.objectKey))throw new RequestFailure('NOT_FOUND');}}
@@ -110,7 +110,7 @@ export async function mutateShowcase(env:ShowcaseEnv,agency:AgencyProfile,role:s
     if(!config||!config.name.trim()||!config.phone&&!config.email&&!config.website||action.action==='property-publish'&&row.status!=='published')throw new RequestFailure('VALIDATION_ERROR',{'vitrine':'Renseignez le nom, un contact et publiez la présentation de l’agence.'});
     await validConfigAssets(env,agency.id,config);
     const publishedGroups=new Set<string>();
-    for(const item of chosen){const group=groupFor(groups,item.propertyId),issues=showcasePropertyIssues(group,item.draft);if(issues.length)throw new RequestFailure('VALIDATION_ERROR',{[item.id]:issues.join(' ')});if(publishedGroups.has(group!.summary.id))continue;publishedGroups.add(group!.summary.id);await validateItemAssets(env,agency.id,item.draft);
+    for(const item of chosen){const group=groupFor(groups,item.propertyId),issues=showcasePropertyIssues(group,item.draft);if(issues.length)throw new RequestFailure('VALIDATION_ERROR',{[item.id]:`Le bien « ${group?.summary.title??'Bien retiré'} » reste à compléter : ${issues.join(' ')} Rendez-vous dans l’onglet Biens.`});if(publishedGroups.has(group!.summary.id))continue;publishedGroups.add(group!.summary.id);await validateItemAssets(env,agency.id,item.draft);
       statements.push(env.DB.prepare(`UPDATE showcase_properties SET removed=1,published_json=NULL,updated_at=? WHERE agency_id=? AND id!=? AND property_id IN (SELECT value FROM json_each(?)) AND ${gate}`).bind(at,agency.id,item.id,JSON.stringify([...group!.aliases,group!.summary.id]),agency.id,token));
       statements.push(env.DB.prepare(`UPDATE showcase_properties SET published_json=draft_json,removed=0,updated_at=? WHERE agency_id=? AND id=? AND ${gate}`).bind(at,agency.id,item.id,agency.id,token));}
     if(action.action==='publish'){statements.push(env.DB.prepare(`UPDATE showcase_slugs SET public=1 WHERE agency_id=? AND slug=? AND ${gate}`).bind(agency.id,config.slug,agency.id,token),
