@@ -76,6 +76,13 @@ test('contrôleur durable workerd : budget, concurrence, R2, timeout et coupures
   await call('stale-cancel','/cancel',{id});state=await snapshot('stale-cancel');
   assert.equal(state.job.id,nextId);assert.equal(state.job.status,'rendering');assert.equal(state.stopped,false);
   await call('stale-cancel','/cancel',{id:nextId});
+  await accept('stop-uncertain');await call('stop-uncertain','/control',{stopBlocked:true});await call('stop-uncertain','/advance');
+  state=await snapshot('stop-uncertain');assert.equal(state.job.status,'publishing');assert.equal(state.state.active,id);
+  assert.equal((await call('stop-uncertain','/accept',{manifest:next,report:videoReport(nextId,next)})).status,409,'Le serveur reste réservé jusqu’à confirmation de son arrêt');
+  await call('stop-uncertain','/control',{stopBlocked:false});await call('stop-uncertain','/advance');
+  state=await snapshot('stop-uncertain');assert.equal(state.job.status,'ready');assert.equal(state.state.active,null);assert.equal(state.stopped,true);
+  await call('stop-uncertain','/accept',{manifest:next,report:videoReport(nextId,next)});await call('stop-uncertain','/advance');
+  state=await snapshot('stop-uncertain');assert.equal(state.job.status,'ready');assert.equal(state.starts,2);
   // Paired outputs use the same rendered job. Both objects are required before ready.
   const anonymous=await videoFixture('anonymous'),anonymousId=await videoManifestHash(anonymous.manifest);
   const paired={...videoReport(anonymousId,anonymous.manifest),preview:{...videoReport(anonymousId,anonymous.manifest,new Uint8Array([3,2,1])),watermarked:true}};

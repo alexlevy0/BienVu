@@ -65,6 +65,18 @@ export class FixtureGenerationRenderer extends DurableObject<GenerationEnv>{
     return Response.json(await this.ctx.storage.get(path.split('/')[2])??null);
   }
 }
+// Tests can hold two different server slots while a third workflow waits.
+export class FixtureHeldGenerationRenderer extends FixtureGenerationRenderer{
+  override async fetch(request:Request){
+    const path=new URL(request.url).pathname;
+    if(path==='/release'){await this.ctx.storage.put('released',true);return Response.json({released:true});}
+    const result=await super.fetch(request);
+    if(path.startsWith('/status/')&&!await this.ctx.storage.get('released')){
+      await result.body?.cancel();return Response.json({status:'rendering',progressPercent:25});
+    }
+    return result;
+  }
+}
 export default {async fetch(request:Request,env:GenerationEnv){
   if(new URL(request.url).pathname==='/tick'){await reconcileBatch(env);return Response.json({reconciled:true});}
   if(new URL(request.url).pathname.startsWith('/reconcile/')){const row=await findGeneration(env.DB,request.headers.get('X-Agency-ID')!,new URL(request.url).pathname.split('/')[2]);if(row)await reconcileGeneration(env,row);return Response.json({reconciled:true});}

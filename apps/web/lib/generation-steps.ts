@@ -50,9 +50,16 @@ export function generationSteps(job:GenerationView|null,manual=false):Generation
 }
 
 export function generationProgressText(job:GenerationView):string{
+  if(job.queue&&!['ready','failed'].includes(job.status))return generationQueueText(job);
   if(job.status==='queued')return 'En attente de démarrage';
   if(job.status==='retry_wait')return 'Reprise en attente';
   if(job.status==='failed')return 'La préparation n’a pas abouti';
   if(job.status==='ready')return 'Votre vidéo est prête';
   return generationSteps(job).find(step=>step.state==='current')?.label??'Préparation de la vidéo';
+}
+
+export function generationQueueText(job:GenerationView):string{
+  const phase=job.queue?.resource;
+  const label=phase==='render'?'Assemblage en attente':phase==='runway'?'Animations des photos en attente':phase==='avatar'?'Présentateur en attente':'Votre vidéo attend son tour';
+  return job.queue?`${label} · position ${job.queue.position}`:label;
 }

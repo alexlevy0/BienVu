@@ -11,7 +11,7 @@ import {admitGeneration,setGenerationProgress,findGeneration,findNarration,gener
 import {videoFixture} from '../fixtures/video';
 import {propertyDescription} from '../fixtures/listing-description';
 import {getJobVideo} from '../apps/pipeline/src/video-manifest';
-import {CartesiaVoiceConfig,CARTESIA_DEFAULT_VOICE,DEFAULT_AVATAR_SETTINGS,defaultAvatarCustomization,defaultVideoCustomization} from '../packages/contracts/src/index';
+import {CartesiaVoiceConfig,CARTESIA_DEFAULT_VOICE,DEFAULT_AVATAR_SETTINGS,defaultAvatarCustomization,defaultVideoCustomization,generationRendererName} from '../packages/contracts/src/index';
 import {hashJson,DEFAULT_SCRIPT_MODEL} from '../packages/narration/src/index';
 import {LOCALITY_SPEECH_VERSION} from '../packages/voice/src/index';
 
@@ -106,6 +106,7 @@ for(const {voiceEnabled,invalidScript,avatarFallback} of [{voiceEnabled:true,inv
   assert.equal((await env.DB.prepare('SELECT count(*) AS n FROM generation_artifacts').first<{n:number}>())!.n,1);
   assert.equal((await env.DB.prepare('SELECT count(*) AS n FROM narration_calls').first<{n:number}>())!.n,beforeCalls);
   assert.equal((await env.DB.prepare('SELECT count(*) AS n FROM generation_runs').first<{n:number}>())!.n,1);
-  const {RENDERER:render}=await mf.getBindings<{RENDERER:DurableObjectNamespace}>();const count=await render.get(render.idFromName('generation-single-slot-v1')).fetch('https://fixture/count');
+  const route=generationRendererName((await findGeneration(env.DB,scope.agencyId,job.id))!.renderSlot);
+  const {RENDERER:render}=await mf.getBindings<{RENDERER:DurableObjectNamespace}>();const count=await render.get(render.idFromName(route)).fetch('https://fixture/count');
   assert.equal((await count.json() as {starts:number}).starts,1);
 });

@@ -98,6 +98,7 @@ export async function submitJobAvatars(env:AvatarEnv,agency:string,job:string){
         cached?1:0,micros,clip?JSON.stringify(clip):null,tooLong?'AVATAR_AUDIO_TOO_LONG':null,now,now).run();}
     catch(error){if(await findAvatarTask(env.DB,agency,job,moment))continue;
       const code=errorCode(error);if(!['AVATAR_BUSY','AVATAR_BUDGET_LIMIT','AVATAR_UNAVAILABLE'].includes(code))throw error;
+      if(code==='AVATAR_BUSY')continue; // Retry this unsubmitted moment after another clip finishes.
       await env.DB.prepare(`INSERT INTO avatar_tasks(id,agency_id,job_id,moment,cache_key,audio_json,start_frame,state,engine,mode,reused,reserved_micros,error_code,created_at,updated_at)
         VALUES(?,?,?,?,?,?,?,'failed',?,'real',0,0,?,?,?)`).bind(id,agency,job,moment,cacheKey,JSON.stringify(audio),startFrame,settings!.engine,code,now,now).run();}
     const task=(await findAvatarTask(env.DB,agency,job,moment))!;
@@ -131,7 +132,9 @@ export async function pollJobAvatars(env:AvatarEnv,agency:string,job:string){
   for(const task of tasks){if((task.state==='submitted'||task.state==='uncertain')&&task.providerId){
     try{await complete(env,task);}catch(error){if(['AVATAR_UNAVAILABLE','AVATAR_RATE_LIMIT','AVATAR_MEDIA_UNAVAILABLE'].includes(errorCode(error)))continue;await failTask(env,task,errorCode(error));}
   }else if(task.state==='submitting')await failTask(env,task,'AVATAR_UNCERTAIN',true);}
-  const next=await jobAvatarTasks(env.DB,agency,job);return {done:next.every(t=>t.state==='ready'||t.state==='failed'||t.state==='uncertain'&&!t.providerId),ready:next.filter(t=>t.state==='ready').length};
+  const next=await jobAvatarTasks(env.DB,agency,job),run=await findGeneration(env.DB,agency,job);
+  const expected=run?.avatarCredits?avatarMoments(GenerationRequest.parse(JSON.parse(run.input)).customization?.avatar).length:0;
+  return {done:next.length===expected&&next.every(t=>t.state==='ready'||t.state==='failed'||t.state==='uncertain'&&!t.providerId),ready:next.filter(t=>t.state==='ready').length};
 }
 export async function timeoutJobAvatars(env:AvatarEnv,agency:string,job:string){
   for(const task of await jobAvatarTasks(env.DB,agency,job))if(!['ready','failed'].includes(task.state))await failTask(env,task,'AVATAR_TIMEOUT',Boolean(task.providerId)||task.state!=='claimed',task.state==='claimed');

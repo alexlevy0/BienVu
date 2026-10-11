@@ -19,7 +19,9 @@ export class FixtureVideo extends DurableObject<Env> {
       if(init?.method==='DELETE'){await this.ctx.storage.put('cleaned',true);return Response.json({ok:true});}
       return Response.json({id:await this.ctx.storage.get('id'),status:await this.ctx.storage.get('hold')?'rendering':'ready',
         progressPercent:await this.ctx.storage.get('progressPercent')??0,report:await this.ctx.storage.get('report')});
-    },running:async()=>!await this.ctx.storage.get('stopped'),stop:async()=>{await this.ctx.storage.put('stopped',true);},schedule:async()=>{},
+    },running:async()=>!await this.ctx.storage.get('stopped'),stop:async()=>{
+      if(await this.ctx.storage.get('stopBlocked'))throw Error('FIXTURE_STOP_UNCERTAIN');
+      await this.ctx.storage.put('stopped',true);},schedule:async()=>{},
     productBudget:this.env.PRODUCT_BUDGET==='true'?async()=>{const snapshot=await this.ctx.storage.get<import('../apps/pipeline/src/budget').Budget>('productBudget');if(!snapshot)throw new Error('VIDEO_BUDGET_LIMIT');return snapshot;}:undefined,
     now:()=>this.clock,maxAttempts:4,budget:{month:new Date().toISOString().slice(0,7),paused:false,fixedAndOtherCents:2425,
       ceilingCents:3500,envelopeCents:4000,committedCents:0,attempts:0,days:{}}});
@@ -29,7 +31,7 @@ export class FixtureVideo extends DurableObject<Env> {
     const path=new URL(request.url).pathname;
     if(path==='/accept') {
       const {manifest,report}=await request.json() as {manifest:VideoManifest;report:VideoReport};
-      await this.ctx.storage.put({id:report.id,report});try{return Response.json(await this.engine.accept(manifest));}catch(error){return Response.json({error:(error as Error).message},{status:409});}
+      try{const job=await this.engine.accept(manifest);await this.ctx.storage.put({id:report.id,report});return Response.json(job);}catch(error){return Response.json({error:(error as Error).message},{status:409});}
     }
     if(path==='/cancel'){const {id}=await request.json() as {id:string};return Response.json(await this.engine.cancel(id)??null);}
     if(path==='/advance'){await this.engine.advance();return Response.json(await this.engine.state());}

@@ -5,6 +5,7 @@ export * from './creation-drafts';
 export * from './import-budget';
 export * from './narration';
 export * from './generation';
+export * from './generation-queue';
 export * from './generation-preparation';
 export * from './generation-map-confirmation';
 export * from './editor-voice';

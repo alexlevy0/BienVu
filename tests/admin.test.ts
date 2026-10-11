@@ -4,7 +4,7 @@ import {randomBytes,createHmac} from 'node:crypto';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import {migrateNarrationProbe,seedNarrationFixture} from '../scripts/narration-fixtures';
 import {adminPage,adminOverview,adminAction,adminVideoDetail,ensureAgency,admitGeneration,findGeneration,beginImport,failImport,findImport} from '../packages/db/src/index';
-import {AdminQuery,Me,VideoReport,DEFAULT_VIDEO_MAP} from '../packages/contracts/src/index';
+import {AdminQuery,Me,VideoReport,DEFAULT_VIDEO_MAP,DEFAULT_GENERATION_QUEUE} from '../packages/contracts/src/index';
 import {isSuperAdmin,requireAdmin} from '../apps/web/lib/admin-access';
 import {financeRequest} from '../apps/web/lib/profitability';
 import {adminRequest,adminJobRequest} from '../apps/web/lib/admin';
@@ -15,6 +15,7 @@ import {importResult} from '../apps/web/lib/imports';
 import {adminVideoMapRequest} from '../apps/web/lib/video-map-settings';
 import {adminAiQualityRequest} from '../apps/web/lib/ai-quality';
 import {promotionsRequest} from '../apps/web/lib/subscription-promotions';
+import {adminGenerationQueueRequest} from '../apps/web/lib/generation-queue';
 
 test('Super admin : accès fermé par défaut, adresse exacte et vérification obligatoires',()=>{
   const user={id:'admin',email:'Owner@Example.com',emailVerified:true};
@@ -43,6 +44,28 @@ test('Admin avec Better Auth/D1/R2 locaux : isolation, pagination globale, actio
     assert.ok(session);cookies.push(context.authCookies.sessionToken.name+'='+encodeURIComponent(session.token+'.'+createHmac('sha256',env.BETTER_AUTH_SECRET).update(session.token).digest('base64')));}
   const agency=await ensureAgency(db,users[0]),otherAgency=await ensureAgency(db,users[1]);
   const req=(path:string,cookie=cookies[0],options:RequestInit={})=>new Request(env.BETTER_AUTH_URL+path,{...options,headers:{cookie,...options.headers}});
+  await t.test('file de génération : superadmin seul, CSRF, révisions et lecture gratuite des quotas',async()=>{
+    let refreshes=0;
+    const e={...env,ADMIN_EMAIL:users[1].email,GENERATION_TOKEN:'fixture-generation-token',GENERATION_SERVICE:{fetch:async(_url:unknown,init:RequestInit)=>{
+      assert.equal(new Headers(init.headers).get('X-Agency-ID'),users[0].id);refreshes++;
+      await db.prepare("UPDATE generation_provider_limits SET concurrency=3,checked_at=?,last_error=NULL WHERE provider='runway'").bind(new Date().toISOString()).run();
+      return Response.json({checked:true});
+    }} as unknown as Fetcher};
+    const patch=(body:unknown,cookie=cookies[0],origin=env.BETTER_AUTH_URL)=>adminGenerationQueueRequest(req('/api/admin/generation-queue',cookie,{method:'PATCH',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify(body)}),e);
+    for(const [cookie,expected] of [['',401],[cookies[1],403],[cookies[2],401]] as const){
+      assert.equal((await adminGenerationQueueRequest(req('/api/admin/generation-queue',cookie),e)).status,expected);
+      assert.equal((await patch({settings:DEFAULT_GENERATION_QUEUE,revision:1},cookie)).status,expected);
+      assert.equal((await adminGenerationQueueRequest(req('/api/admin/generation-queue',cookie,{method:'POST',headers:{origin:env.BETTER_AUTH_URL,'Content-Type':'application/json'},body:'{"action":"refresh-runway"}'}),e)).status,expected);
+    }
+    assert.equal(refreshes,0);
+    assert.equal((await patch({settings:DEFAULT_GENERATION_QUEUE,revision:1},cookies[0],'https://other.example')).status,403);
+    assert.equal((await patch({settings:{...DEFAULT_GENERATION_QUEUE,renderConcurrency:6},revision:1})).status,422);
+    assert.equal((await patch({settings:{...DEFAULT_GENERATION_QUEUE,renderConcurrency:2},revision:1})).status,200);
+    assert.equal((await patch({settings:DEFAULT_GENERATION_QUEUE,revision:1})).status,409);
+    const response=await adminGenerationQueueRequest(req('/api/admin/generation-queue',cookies[0],{method:'POST',headers:{origin:env.BETTER_AUTH_URL,'Content-Type':'application/json'},body:'{"action":"refresh-runway"}'}),e);
+    assert.equal(response.status,200);assert.equal(refreshes,1);assert.equal(response.headers.get('cache-control'),'private, no-store');
+    const result=await response.json() as {runway:{concurrency:number}};assert.equal(result.runway.concurrency,3);
+  });
   await t.test('codes bonus : accès superadmin seul, CSRF, campagnes et journal',async()=>{
     const e={...env,ADMIN_EMAIL:users[1].email,BILLING_MODE:'test',STRIPE_SECRET_KEY:'sk_test_fixture',STRIPE_WEBHOOK_SECRET:'whsec_fixture'};
     const post=(body:unknown,cookie=cookies[0],origin=env.BETTER_AUTH_URL)=>promotionsRequest(req('/api/admin/promotions',cookie,{method:'POST',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify(body)}),e);

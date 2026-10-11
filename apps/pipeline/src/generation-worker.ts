@@ -1,6 +1,6 @@
 import {WorkflowEntrypoint,type WorkflowEvent,type WorkflowStep} from 'cloudflare:workers';
-import {EntityId,GenerationRequest,VideoReport,publicErrors,videoObjectKey,videoPreviewKey,DEFAULT_VIDEO_VOICE} from '@bienvu/contracts';
-import {admitGeneration,findGeneration,generationView,GenerationFailure,failGeneration,setGenerationStage,setGenerationProgress,setGenerationPreparation,type GenerationRow} from '@bienvu/db';
+import {EntityId,GenerationRequest,VideoReport,publicErrors,videoObjectKey,videoPreviewKey,DEFAULT_VIDEO_VOICE,MAX_RENDER_SERVERS} from '@bienvu/contracts';
+import {admitGeneration,findGeneration,generationView,GenerationFailure,failGeneration,setGenerationStage,setGenerationProgress,setGenerationPreparation,releaseGenerationResource,adminGenerationQueue,type GenerationRow} from '@bienvu/db';
 import {authorized,json} from './auth';
 import {VideoRenderer} from './video-worker';
 import {getJobVideo,prepareJobVideo} from './video-manifest';
@@ -15,6 +15,7 @@ import {prepareGenerationMap,MapConfirmationRequired} from './default-video-map'
 import {safeAiEvent} from '@bienvu/observability';
 import {submitJobAvatars,pollJobAvatars,timeoutJobAvatars,reconcileAvatarTasks} from './avatars';
 import type {HeygenEnvironment} from '@bienvu/avatars';
+import {generationController,waitForGenerationResource,syncRunwayLimits} from './generation-queue';
 export {VideoRenderer};
 export type GenerationEnv=VideoEnv&Pick<NarrationEnv,'GOOGLE_SERVICE_ACCOUNT_JSON'|'GOOGLE_CLOUD_PROJECT'|'GOOGLE_TTS_VOICE'|'OPENAI_API_KEY'|'SCRIPT_MODEL'>&FishVoiceEnv&HeygenEnvironment&{
   GENERATIONS_ENABLED:string;GENERATION_TOKEN:string;IMPORT_TOKEN:string;IMPORT_SERVICE:Fetcher;GENERATION_WORKFLOW:Workflow<{agencyId:string;jobId:string}>;
@@ -25,7 +26,7 @@ const diagnosticCode=(error:unknown)=>{
   return error instanceof Error?/^(?:[A-Za-z]+: )?([A-Z_]{3,80})$/.exec(error.message)?.[1]??'UNCLASSIFIED':'UNCLASSIFIED';
 };
 const safeCode=(error:unknown)=>{const code=diagnosticCode(error);return code in publicErrors?code:'GENERATION_FAILED';};
-const controller=(env:GenerationEnv)=>env.RENDERER.getByName('generation-single-slot-v1');
+const controller=generationController;
 async function active(env:GenerationEnv,agencyId:string,jobId:string){
   const row=await findGeneration(env.DB,agencyId,jobId);
   if(!row||row.retention!=='available'||['ready','failed'].includes(row.status))throw new Error('GENERATION_TERMINAL');
@@ -69,10 +70,10 @@ export async function reconcileGeneration(env:GenerationEnv,row:GenerationRow,co
   if(['ready','failed'].includes(row.status))return;
   const frozen=await getJobVideo(env.DB,row.agencyId,row.jobId);
   if(frozen){
-    const status=await controller(env).fetch(`https://video/status/${frozen.hash}`);
+    const status=await controller(env,row).fetch(`https://video/status/${frozen.hash}`);
     if(status.ok&&await settleVideo(env,row,await status.json()))return;
     // Arrêt confirmé avant libération du quota ; une panne conserve la réservation.
-    const cancelled=await controller(env).fetch(`https://video/cancel/${frozen.hash}`,{method:'POST'});
+    const cancelled=await controller(env,row).fetch(`https://video/cancel/${frozen.hash}`,{method:'POST'});
     if(!cancelled.ok)throw new Error('GENERATION_CANCEL_UNCERTAIN');
     if(await settleVideo(env,row,await cancelled.json()))return;
   }
@@ -89,6 +90,7 @@ export class GenerationWorkflow extends WorkflowEntrypoint<GenerationEnv,{agency
     const {agencyId,jobId}=event.payload;
     const once={retries:{limit:0,delay:'1 second' as const},timeout:'10 minutes' as const};
     try {
+      await waitForGenerationResource(this.env,step,agencyId,jobId,'preparation');
       await step.do('import-or-load',once,async()=>{const row=await active(this.env,agencyId,jobId);await setGenerationStage(this.env.DB,row,'importing');
         return loadGenerationListing(this.env,row);});
       const resolveMap=async()=>{
@@ -123,12 +125,14 @@ export class GenerationWorkflow extends WorkflowEntrypoint<GenerationEnv,{agency
         return {prepared:true,avatarRequested:Boolean(row.avatarCredits)};
       });
       if(narration.avatarRequested){
+        await waitForGenerationResource(this.env,step,agencyId,jobId,'avatar');
         await step.do('prepare-avatar-clips',{...once,timeout:'3 minutes'},async()=>{
           const row=await active(this.env,agencyId,jobId);await setGenerationPreparation(this.env.DB,row,'avatar','working');return this.avatars(agencyId,jobId);});
         let done=false;
         for(let poll=0;poll<60;poll++){
           const status=await step.do(`avatar-status-${poll}`,{retries:{limit:1,delay:'2 seconds'},timeout:'2 minutes'},async()=>{
-            const row=await active(this.env,agencyId,jobId),status=await this.pollAvatars(agencyId,jobId);
+            const row=await active(this.env,agencyId,jobId);await this.avatars(agencyId,jobId);
+            const status=await this.pollAvatars(agencyId,jobId);
             if(status.done)await setGenerationPreparation(this.env.DB,row,'avatar',status.ready?'ready':'skipped');
             return status;});
           if(status.done){done=true;break;}await step.sleep(`avatar-wait-${poll}`,'10 seconds');
@@ -136,6 +140,13 @@ export class GenerationWorkflow extends WorkflowEntrypoint<GenerationEnv,{agency
         if(!done)await step.do('avatar-timeout',once,async()=>{
           await timeoutJobAvatars(this.env,agencyId,jobId);
           const row=await active(this.env,agencyId,jobId);await setGenerationPreparation(this.env.DB,row,'avatar',row.avatarReady?'ready':'skipped');return {done:true};});
+        await step.do('release-avatar-slot',once,async()=>{await releaseGenerationResource(this.env.DB,agencyId,jobId,'avatar');return {released:true};});
+      }
+      const needsRunway=await step.do('runway-queue-required',once,async()=>{
+        const row=await active(this.env,agencyId,jobId);return {required:(row.animationsRequested??0)>(row.animationsReused??0)};});
+      if(needsRunway.required){
+        await step.do('read-runway-limits',{...once,timeout:'30 seconds'},()=>syncRunwayLimits(this.env));
+        await waitForGenerationResource(this.env,step,agencyId,jobId,'runway');
       }
       await step.do('animate-selected-photos',{...once,timeout:'10 minutes'},async()=>{
         const row=await active(this.env,agencyId,jobId);
@@ -144,11 +155,15 @@ export class GenerationWorkflow extends WorkflowEntrypoint<GenerationEnv,{agency
         if(row.animationsRequested)await setGenerationPreparation(this.env.DB,row,'animations',result.ready+(row.animationsReused??0)>0?'ready':'skipped');
         return result;
       });
+      await step.do('release-preparation-slots',once,async()=>{
+        await releaseGenerationResource(this.env.DB,agencyId,jobId,'runway');
+        await releaseGenerationResource(this.env.DB,agencyId,jobId,'preparation');return {released:true};});
+      await waitForGenerationResource(this.env,step,agencyId,jobId,'render');
       const render=await step.do('prepare-and-submit-render',once,async()=>{
         const row=await active(this.env,agencyId,jobId),frozen=await prepareJobVideo(this.env,agencyId,jobId);
         await setGenerationStage(this.env.DB,row,'rendering');
         await active(this.env,agencyId,jobId);
-        const response=await controller(this.env).fetch('https://video/render',{method:'POST',body:JSON.stringify(frozen.manifest)});
+        const response=await controller(this.env,row).fetch('https://video/render',{method:'POST',body:JSON.stringify(frozen.manifest)});
         if(!response.ok)throw new Error('VIDEO_SUBMIT_FAILED');await response.body?.cancel();return {hash:frozen.hash};
       });
       for(let poll=0;poll<120;poll++){
@@ -157,7 +172,7 @@ export class GenerationWorkflow extends WorkflowEntrypoint<GenerationEnv,{agency
           const row=await findGeneration(this.env.DB,agencyId,jobId);if(!row)throw new Error('GENERATION_NOT_FOUND');
           if(['ready','failed'].includes(row.status))return {done:true};
           if(row.deadline<=new Date().toISOString())throw new Error('GENERATION_TIMEOUT');
-          const response=await controller(this.env).fetch(`https://video/status/${render.hash}`);if(!response.ok)throw new Error('VIDEO_STATE_UNAVAILABLE');
+          const response=await controller(this.env,row).fetch(`https://video/status/${render.hash}`);if(!response.ok)throw new Error('VIDEO_STATE_UNAVAILABLE');
           const data=await response.json() as {status:string;progressPercent?:number};if(data.status==='failed')throw new Error('VIDEO_RENDER_FAILED');
           if(data.status==='rendering'||data.status==='publishing')await setGenerationProgress(this.env.DB,row,data.progressPercent??0);
           return {done:await settleVideo(this.env,row,data)};
@@ -180,7 +195,7 @@ export async function reconcileBatch(env:GenerationEnv){
     .bind(new Date().toISOString(),new Date(Date.now()-60_000).toISOString()).all<{agencyId:string;jobId:string}>();
   for(const ref of rows.results){const row=await findGeneration(env.DB,ref.agencyId,ref.jobId);if(!row)continue;
     try{if(row.deadline<=new Date().toISOString())await reconcileGeneration(env,row);else if(row.launchStatus==='pending')await launchGeneration(env,row);
-      else {const frozen=await getJobVideo(env.DB,row.agencyId,row.jobId);if(frozen){const response=await controller(env).fetch(`https://video/status/${frozen.hash}`);if(response.ok)await settleVideo(env,row,await response.json());}}}
+      else {const frozen=await getJobVideo(env.DB,row.agencyId,row.jobId);if(frozen){const response=await controller(env,row).fetch(`https://video/status/${frozen.hash}`);if(response.ok)await settleVideo(env,row,await response.json());}}}
     catch{console.log(JSON.stringify({event:'generation_reconcile_pending',jobId:row.jobId,stage:row.stage}));}}
 }
 export default {
@@ -189,7 +204,17 @@ export default {
     const agencyId=request.headers.get('X-Agency-ID'),path=new URL(request.url).pathname;
     if(!EntityId.safeParse(agencyId).success)return json({error:'UNAUTHORIZED'},401);
     try{
-      if(path==='/operator/state'&&request.method==='GET')return controller(env).fetch('https://video/state');
+      if(path==='/operator/state'&&request.method==='GET'){
+        const renderers=await Promise.all([null,...Array.from({length:MAX_RENDER_SERVERS},(_,slot)=>slot)].map(async slot=>{
+          const response=await controller(env,{renderSlot:slot}).fetch('https://video/state');
+          if(!response.ok)throw Error('VIDEO_STATE_UNAVAILABLE');
+          return {slot,...await response.json() as {active:string|null;[key:string]:unknown}};
+        }));
+        const active=renderers.filter(r=>r.active);
+        return json({...renderers[0],active:active[0]?.active??null,activeCount:active.length,renderers});
+      }
+      if(path==='/operator/queue'&&request.method==='GET')return json(await adminGenerationQueue(env.DB));
+      if(path==='/operator/queue/runway'&&request.method==='POST'){await syncRunwayLimits(env,true);return json(await adminGenerationQueue(env.DB));}
       if(path==='/operator/pause'&&request.method==='POST'){
         await env.DB.prepare("UPDATE generation_control SET enabled=0,updated_at=? WHERE id='generations'").bind(new Date().toISOString()).run();return json({paused:true});
       }
@@ -236,5 +261,5 @@ export default {
       return json({error:'NOT_FOUND'},404);
     }catch(error){const code=error instanceof GenerationFailure?error.code:'INTERNAL_ERROR';return json({error:code},publicErrors[code][0]);}
   },
-  scheduled(_event:ScheduledController,env:GenerationEnv,ctx:ExecutionContext){ctx.waitUntil(reconcileBatch(env).then(()=>reconcileAvatarTasks(env)).then(()=>cleanupAnonymousTrials(env)).then(()=>cleanupAnimations(env)));},
+  scheduled(_event:ScheduledController,env:GenerationEnv,ctx:ExecutionContext){ctx.waitUntil(syncRunwayLimits(env).then(()=>reconcileBatch(env)).then(()=>reconcileAvatarTasks(env)).then(()=>cleanupAnonymousTrials(env)).then(()=>cleanupAnimations(env)));},
 };

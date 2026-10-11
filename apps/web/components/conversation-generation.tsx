@@ -10,6 +10,7 @@ import {ProgressiveVideo} from './progressive-video';
 import {VideoBacklight} from './video-backlight';
 import {GenerationRenderProgress} from './generation-estimate';
 import {GenerationMapConfirmation} from './generation-map-confirmation';
+import {GenerationQueueNotice} from './generation-queue-notice';
 
 type RequestMessage={kind:'url'|'manual';text:string};
 
@@ -47,6 +48,7 @@ export function ConversationGeneration({job,request,sending,anonymous,unavailabl
               {assembling&&<span className="home-poster-percent">Assemblage · {percent} %</span>}</div>
             <small>{horizontal?'Horizontal 16:9':'Vertical 9:16'} · {job?.syntheticVoice===false?'Sans voix off':'Voix française'}</small></div></div>}
       </div><div className="home-conversation-status">
+        <GenerationQueueNotice job={job}/>
         {active||sending?<ol className="home-conversation-steps" aria-label="Étapes de création">{stages.map(({key,state,label,detail})=>{
           const confirmMap=key==='map'&&job?.mapConfirmation;
           return <li className={`step-${state}${detail||confirmMap?' step-with-detail':''}${confirmMap?' step-needs-confirmation':''}`} key={key} data-rendering={assembling&&key==='rendering'||undefined} aria-current={state==='current'?'step':undefined}>

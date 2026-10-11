@@ -80,10 +80,13 @@ test('D1 et pipeline avatars simulés : réservations, reprise sans double dépe
   const input={listingId:listing.id,durationSeconds:20,customization};
   await assert.rejects(admitGeneration(env.DB,scope.agencyId,'avatar-key-before-enable',input,'true'),/AVATAR_UNAVAILABLE/);
   await saveAvatarLook(env.DB,'fixture-admin',look,{image:null,video:null});
-  await setAvatarSettings(env.DB,'fixture-admin',{...DEFAULT_AVATAR_SETTINGS,enabled:true,defaultLookId:look.id},1);
+  await setAvatarSettings(env.DB,'fixture-admin',{...DEFAULT_AVATAR_SETTINGS,enabled:true,defaultLookId:look.id,concurrent:1},1);
   await assert.rejects(setAvatarSettings(env.DB,'fixture-admin',DEFAULT_AVATAR_SETTINGS,1),/CONFLICT/);
   await assert.rejects(admitGeneration(env.DB,scope.agencyId,'avatar-key-unreviewed-cutout',{...input,customization:{...customization,avatar:{...avatar,appearance:'cutout'}}},'true'),/AVATAR_UNAVAILABLE/);
-  const config=frenchVoiceConfig(customization.voice,'fixture'),tts=googleTts(config as Parameters<typeof googleTts>[0],async()=>'fixture-token-never-networked',{fetch:async()=>Response.json({audioContent:Buffer.from(toneFixture(1500)).toString('base64')})});
+  const config=frenchVoiceConfig(customization.voice,'fixture'),tts=googleTts(config as Parameters<typeof googleTts>[0],async()=>'fixture-token-never-networked',{fetch:async(_url,init)=>{
+    const bytes=toneFixture(1500);bytes[100]=createHash('sha256').update(init!.body as string).digest()[0];
+    return Response.json({audioContent:Buffer.from(bytes).toString('base64')});
+  }});
   const providers={mode:'mock' as const,script:{model:'gpt-5.4-mini',plan:async():Promise<never>=>{throw Error('NO_OPENAI_CALL');}},voice:{config,synthesize:tts.synthesize}};
   let creates=0,done=false;const fetchBefore=globalThis.fetch;t.after(()=>{globalThis.fetch=fetchBefore;});
   globalThis.fetch=async(url)=>{const path=new URL(String(url)).pathname;
@@ -97,8 +100,12 @@ test('D1 et pipeline avatars simulés : réservations, reprise sans double dépe
   async function create(key:string){const row=await admitGeneration(env.DB,scope.agencyId,key,input,'true');await env.DB.prepare("UPDATE jobs SET status='scripting',stage='scripting' WHERE id=?").bind(row.jobId).run();await prepareJobNarration(env,scope.agencyId,row.jobId,providers);return row;}
   const row=await create('avatar-idempotency-fixture-1');assert.equal(generationView(row).creditsReserved,2);assert.equal((await creditBalance(env.DB,scope.agencyId)).reserved,2);
   assert.equal((await admitGeneration(env.DB,scope.agencyId,'avatar-idempotency-fixture-1',input,'true')).jobId,row.jobId);
-  await submitJobAvatars(runtime,scope.agencyId,row.jobId);await submitJobAvatars(runtime,scope.agencyId,row.jobId);assert.equal(creates,2);
-  assert.equal((await pollJobAvatars(runtime,scope.agencyId,row.jobId)).done,false);done=true;assert.equal((await pollJobAvatars(runtime,scope.agencyId,row.jobId)).ready,2);
+  await submitJobAvatars(runtime,scope.agencyId,row.jobId);await submitJobAvatars(runtime,scope.agencyId,row.jobId);assert.equal(creates,1);
+  assert.equal((await jobAvatarTasks(env.DB,scope.agencyId,row.jobId)).length,1,'Le second passage attend une place sans échec facturé');
+  assert.equal((await pollJobAvatars(runtime,scope.agencyId,row.jobId)).done,false);done=true;
+  assert.deepEqual(await pollJobAvatars(runtime,scope.agencyId,row.jobId),{done:false,ready:1});
+  await submitJobAvatars(runtime,scope.agencyId,row.jobId);assert.equal(creates,2);
+  assert.deepEqual(await pollJobAvatars(runtime,scope.agencyId,row.jobId),{done:true,ready:2});
   const frozen=await prepareJobVideo(env,scope.agencyId,row.jobId);assert.equal(frozen.manifest.avatar?.clips.length,2);
   const report=videoReport(frozen.hash,frozen.manifest);await env.DB.prepare('INSERT INTO generation_artifacts VALUES(?,?,?,?)').bind(row.jobId,`agencies/${scope.agencyId}/jobs/${row.jobId}/master.mp4`,JSON.stringify(report),new Date().toISOString()).run();
   await env.DB.prepare("UPDATE jobs SET status='ready',stage='rendering',lease_until=NULL WHERE id=?").bind(row.jobId).run();

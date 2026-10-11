@@ -27,6 +27,7 @@ export * from './ai-quality';
 export * from './avatars';
 export * from './video';
 export * from './generation';
+export * from './generation-queue';
 export * from './homepage';
 
 export const ProbeRender = z.object({

@@ -11,6 +11,7 @@ import {AdminPricingSimulator} from './admin-pricing-simulator';
 import {AdminPromotions} from './admin-promotions';
 import {AdminBudgetSettings} from './admin-budget-settings';
 import {AdminVideoMapDefaults} from './admin-video-map-settings';
+import {AdminGenerationQueueSettings} from './admin-generation-queue';
 import {AdminAvatars} from './admin-avatars';
 import {AdminVoiceLibrary} from './admin-voices';
 import {AdminMusicLibrary} from './admin-music-library';
@@ -139,6 +140,7 @@ export function AdminPanel({restricted=false}:{restricted?:boolean}){
     {view==='mailbox'&&accountId&&<AdminMailbox revision={revision}/>}
     {view==='ai-quality'&&accountId&&<AdminAiQuality revision={revision}/>}
     {!restricted&&view==='videos'&&accountId&&<AdminVideoMapDefaults key={accountId+':'+revision}/>}
+    {!restricted&&view==='videos'&&accountId&&<AdminGenerationQueueSettings key={'queue:'+accountId+':'+revision}/>}
     {failure&&<p role="alert" className="admin-error">{failure}</p>}
     {busy||loading?<div className="admin-loading" role="status"><span className="admin-spinner"/>Lecture des données…</div>:<>
       {overview&&view==='overview'&&<><AdminAttention data={overview} onFocus={focus}/><Overview data={overview} choose={choose}/></>}

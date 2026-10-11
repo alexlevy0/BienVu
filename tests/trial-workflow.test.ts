@@ -13,6 +13,7 @@ import {uploadManualPhoto,finishManualListing,contentHash} from '../apps/web/lib
 import {normalizePhoto} from '../scripts/import-transport';
 import {generationVideo} from '../apps/web/lib/generations';
 import {getJobVideo} from '../apps/pipeline/src/video-manifest';
+import {generationRendererName} from '../packages/contracts/src/index';
 for(const source of ['url','manual'] as const)test(`Workflow anonyme ${source} complet workerd : voix/rendu simulés une fois, claim pendant rendu et reprise après crash`,async t=>{
   const directory=await mkdtemp(path.join(tmpdir(),'bienvu-trial-workflow-'));t.after(()=>rm(directory,{recursive:true,force:true}));
   const require=createRequire(import.meta.url),wrangler=createRequire(require.resolve('wrangler/package.json'));
@@ -49,7 +50,7 @@ for(const source of ['url','manual'] as const)test(`Workflow anonyme ${source} c
   const [a,b]=await Promise.all([1,2].map(()=>claimTrial(env.DB,session,agency.id,pending.jobId)));assert.equal(a.jobId,b.jobId);
   assert.equal((await creditGrant(env.DB,agency.id))!.remaining,3);assert.equal((await listGenerations(env.DB,agency.id)).jobs.length,1);
   assert.equal((await env.DB.prepare('SELECT count(*) AS n FROM narration_calls').first<{n:number}>())!.n,before);assert.equal(imports,source==='manual'?0:4);
-  const {RENDERER}=await mf.getBindings<{RENDERER:DurableObjectNamespace}>();assert.equal((await (await RENDERER.get(RENDERER.idFromName('generation-single-slot-v1')).fetch('https://fixture/count')).json() as {starts:number}).starts,1);
+  const {RENDERER}=await mf.getBindings<{RENDERER:DurableObjectNamespace}>();assert.equal((await (await RENDERER.get(RENDERER.idFromName(generationRendererName(done.renderSlot))).fetch('https://fixture/count')).json() as {starts:number}).starts,1);
   const master=await generationVideo(new Request('https://test?download=1'),env,agency.id,pending.jobId);assert.deepEqual(new Uint8Array(await master.arrayBuffer()),new Uint8Array([1,2,3,4]));
   assert.equal((await env.DB.prepare('SELECT count(*) AS n FROM generation_shares').first<{n:number}>())!.n,0);
 });

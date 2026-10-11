@@ -13,9 +13,12 @@ export class GenerationFailure extends Error {constructor(public code:PublicErro
 export type GenerationRow={ownerAgencyId:string|null;anonymousSessionId:string|null;retention:'available'|'expiring'|'expired';creditStatus:'unfunded'|'reserved'|'consumed'|'released';previewKey:string|null;previewReport:string|null;jobId:string;agencyId:string;inputHash:string;input:string;brand:string;deadline:string;expiresAt:string|null;
   status:GenerationView['status'];stage:GenerationView['stage'];progressPercent:number;attempt:number;errorCode:string|null;narrationErrorCode?:string|null;createdAt:string;updatedAt:string;sourceKind:'url'|'manual'|null;
   workflowId:string;listingId:string|null;objectKey:string|null;report:string|null;launchStatus:string;title:string;locality:string|null;
-  preparation?:string|null;narrationState?:string|null;mapResolved?:number;resolvedMap?:string|null;mapOmissionReason?:string|null;mapConfirmationJson?:string|null;manifestMap?:number|null;animationsReady?:number;animationsActive?:number;animationsReused?:number;
+  renderSlot?:number|null;queue?:string|null;queued?:number;preparation?:string|null;narrationState?:string|null;mapResolved?:number;resolvedMap?:string|null;mapOmissionReason?:string|null;mapConfirmationJson?:string|null;manifestMap?:number|null;animationsReady?:number;animationsActive?:number;animationsReused?:number;
   creditVersion?:number;creditsReserved?:number;creditsUsed?:number;animationsRequested?:number;selectedVoice?:string;defaultMap?:string|null;avatarConfig?:string|null;avatarCredits?:number;avatarUsed?:number;avatarReady?:number;avatarFailed?:number;avatarActive?:number};
 const columns=`g.owner_agency_id AS ownerAgencyId,g.anonymous_session_id AS anonymousSessionId,g.retention,r.status AS creditStatus,p.object_key AS previewKey,p.report_json AS previewReport,g.job_id AS jobId,g.agency_id AS agencyId,g.input_hash AS inputHash,g.input_json AS input,g.brand_json AS brand,
+  g.render_slot AS renderSlot,EXISTS(SELECT 1 FROM generation_queue WHERE job_id=g.job_id AND resource='preparation') AS queued,
+  (SELECT json_object('resource',q.resource,'position',(SELECT count(*) FROM generation_queue ahead WHERE ahead.resource=q.resource AND ahead.state='waiting' AND ahead.sequence<=q.sequence),'since',q.created_at)
+    FROM generation_queue q WHERE q.job_id=g.job_id AND q.state='waiting' ORDER BY q.sequence DESC LIMIT 1) AS queue,
   g.deadline,CASE WHEN g.storage_permanent=1 THEN NULL ELSE g.expires_at END AS expiresAt,j.status,j.stage,j.progress_percent AS progressPercent,j.attempt,j.error_code AS errorCode,n.error_code AS narrationErrorCode,j.created_at AS createdAt,j.updated_at AS updatedAt,
   j.workflow_id AS workflowId,j.listing_id AS listingId,a.object_key AS objectKey,a.report_json AS report,l.status AS launchStatus,
   coalesce(json_extract(i.result_json,'$.facts.title.value'),'Votre annonce') AS title,
@@ -82,7 +85,7 @@ export function generationView(row:GenerationRow,now=Date.now(),audience:'owner'
   const preview=available&&Boolean(row.previewKey);
   const errorCode=row.status==='failed'&&row.errorCode==='GENERATION_FAILED'&&row.narrationErrorCode==='SCRIPT_INVALID'
     ?row.narrationErrorCode:row.errorCode;
-  return GenerationView.parse({preparation,narrationReady:row.narrationState==='prepared'||afterPreparation,ownership:row.ownerAgencyId?'owned':'anonymous',masterAccess:unlocked?'unlocked':row.creditStatus==='reserved'?'reserved':'locked',retention:row.retention,id:row.jobId,status:row.status,stage:row.stage,progressPercent:row.progressPercent,attempt:row.attempt,sourceKind:row.sourceKind,
+  return GenerationView.parse({preparation,...(row.queue&&!['ready','failed'].includes(row.status)?{queue:JSON.parse(row.queue)}:{}),narrationReady:row.narrationState==='prepared'||afterPreparation,ownership:row.ownerAgencyId?'owned':'anonymous',masterAccess:unlocked?'unlocked':row.creditStatus==='reserved'?'reserved':'locked',retention:row.retention,id:row.jobId,status:row.status,stage:row.stage,progressPercent:row.progressPercent,attempt:row.attempt,sourceKind:row.sourceKind,
     ...(preparation.map==='skipped'&&mapReason.success?{mapOmissionReason:mapReason.data}:{}),
     ...(confirmation?.state==='pending'&&row.status==='importing'&&!row.mapResolved&&!row.manifestMap&&Date.parse(confirmation.expiresAt)>now
       ?{mapConfirmation:{expiresAt:confirmation.expiresAt,options:GenerationMapCandidates.parse(confirmation.options).map(({id,label})=>({id,label}))}}:{}),
@@ -147,7 +150,7 @@ export async function admitGeneration(db:Database,agencyId:string,key:string,inp
   let avatarConfig:string|null;try{avatarConfig=await admitAvatar(db,parsed.data.customization?.avatar,selectedVoice,parsed.data.voiceEnabled!==false);}catch{throw new GenerationFailure('AVATAR_UNAVAILABLE');}
   try {await db.prepare(`INSERT INTO generation_runs(job_id,agency_id,allocation_id,reservation_id,idempotency_key,input_hash,input_json,brand_json,
     created_at,deadline,expires_at,month,credit_version,credits_total,animations_requested,reuse_pricing,animations_reused,animation_reuses_json,funding_version,financial_mode,selected_voice,default_map_json,avatar_credits,avatar_config_json,avatar_extra_credits) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,1,(SELECT mode FROM credit_payment_policy WHERE id=1),?,?,?,?,?)`)
-    .bind(id,agencyId,grant.id,crypto.randomUUID(),key,hash,body,JSON.stringify(brand.data),at,new Date(now+(avatarCredits?1800_000:900_000)).toISOString(),
+    .bind(id,agencyId,grant.id,crypto.randomUUID(),key,hash,body,JSON.stringify(brand.data),at,new Date(now+7200_000).toISOString(),
       new Date(now+7*86400_000).toISOString(),at.slice(0,7),CREDIT_PRICING_VERSION,credits,animations,reuses.length,JSON.stringify(reuses),selectedVoice,await generationMapDefault(db,parsed.data),Math.min(1,avatarCredits),avatarConfig,Math.max(0,avatarCredits-1)).run();
   }catch(error){
     // Une course sur la même clé doit converger, même si le trigger voit le slot occupé.
@@ -155,7 +158,7 @@ export async function admitGeneration(db:Database,agencyId:string,key:string,inp
       .bind(agencyId,key).first<{id:string;hash:string}>();
     if(winner){if(winner.hash!==hash)throw new GenerationFailure('CONFLICT');return (await findGeneration(db,agencyId,winner.id))!;}
     const message=error instanceof Error?error.message:'';
-    const code=(['GENERATIONS_PAUSED','QUOTA_EXHAUSTED','GENERATION_BUSY','GENERATION_BUDGET_LIMIT','AVATAR_UNAVAILABLE','AVATAR_BUDGET_LIMIT','AVATAR_BUSY','AVATAR_LOGIN_REQUIRED'] as const).find(c=>message.includes(c));
+    const code=(['GENERATIONS_PAUSED','QUOTA_EXHAUSTED','GENERATION_BUSY','GENERATION_QUEUE_FULL','GENERATION_BUDGET_LIMIT','AVATAR_UNAVAILABLE','AVATAR_BUDGET_LIMIT','AVATAR_BUSY','AVATAR_LOGIN_REQUIRED'] as const).find(c=>message.includes(c));
     if(code)throw new GenerationFailure(code);throw error;
   }
   return (await findGeneration(db,agencyId,id))!;

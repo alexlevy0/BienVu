@@ -30,7 +30,7 @@
       "class_name": "VideoRenderer",
       "image": "../renderer/Dockerfile",
       "image_build_context": "../..",
-      "max_instances": 1,
+      "max_instances": 5,
       "instance_type": "standard-4"
     }
   ],

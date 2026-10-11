@@ -70,7 +70,7 @@ export async function admitAnonymous(db:Database,session:AnonymousSession,key:st
   if('listingId' in parsed&&!await db.prepare(`SELECT i.id FROM listing_imports i JOIN anonymous_manual_imports m ON m.import_id=i.id
     WHERE i.id=? AND i.agency_id=? AND m.session_id=? AND i.source_kind='manual' AND i.status='ready' AND i.expires_at>?`)
     .bind(parsed.listingId,session.scopeId,session.id,new Date(now).toISOString()).first())throw new GenerationFailure('NOT_FOUND');
-  const policy=await trialPolicy(db),id=crypto.randomUUID(),at=new Date(now).toISOString(),deadline=new Date(now+policy.active_minutes*60_000).toISOString();
+  const policy=await trialPolicy(db),id=crypto.randomUUID(),at=new Date(now).toISOString(),deadline=new Date(now+Math.max(60,policy.active_minutes)*60_000).toISOString();
   const brand=AgencyBrand.parse({id:session.scopeId,ownerUserId:session.id,name:'BienVu',neutral:true,logoAssetId:null,
     primaryColor:'#E1E8D9',secondaryColor:'#171714',phone:null,email:null,website:null,createdAt:at});
   try {await db.prepare(`INSERT INTO generation_runs(job_id,agency_id,allocation_id,reservation_id,idempotency_key,input_hash,input_json,brand_json,created_at,deadline,expires_at,month,

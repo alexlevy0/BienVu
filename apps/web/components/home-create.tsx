@@ -67,14 +67,16 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   const currentJob = me ? job : trial.job;
   const selectedJob = screen.kind === 'job' ? me?jobs.find(item=>item.id===screen.id)??null:
     currentJob?.id===screen.id?currentJob:null:null;
-  const activeOtherJob = Boolean(currentJob && generationActive(currentJob) && screen.kind !== 'job');
+  // A connected agency can start another video while its earlier jobs continue.
+  const activeOtherJob = Boolean(!me && currentJob && generationActive(currentJob) && screen.kind !== 'job');
+  const activeGuestJob = Boolean(!me && screen.kind === 'job' && generationActive(selectedJob));
   const guestManualBusy=trial.preparingManual||Boolean(trial.pendingManual);
   const busy = screen.kind === 'sending' || screen.kind==='extracting' || manualBusy||guestManualBusy;
   const canGenerate = Boolean(me?.rights.generationEnabled);
   const importPaused = Boolean(me?.rights.importRetryAt);
   const manual = screen.kind === 'manual';
   const estimate=useUrlImportEstimate(url,me?.agency.id,!loading&&!busy&&!manual&&!composerPhotos.length&&
-    screen.kind!=='guest-customizing'&&!importPaused&&!(screen.kind==='job'&&generationActive(selectedJob)));
+    screen.kind!=='guest-customizing'&&!importPaused&&!activeGuestJob);
   function settingsForImport(imported:PreparedUrlImport):VideoCustomization{
     const slots=urlImportPhotoSlots(imported);
     return {...guestSettings??defaultVideoCustomization(me?.agency,defaultVoice),photoOrder:slots,runwayPhotos:slots,runwayClips:undefined};
@@ -86,7 +88,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   const estimateFailed=Boolean(me&&estimate.source&&!manual&&!composerPhotos.length&&estimate.phase==='error');
   const inConversation = screen.kind !== 'landing' && screen.kind !== 'error';
   const canDropPhotos=!loading&&!busy&&!incomingPhotos&&!photoChecking&&
-    !(screen.kind==='job'&&generationActive(selectedJob));
+    !activeGuestJob;
   function clearComposerPhotos(){
     photoVersion.current++;stagedPhotos.current.forEach(p=>URL.revokeObjectURL(p.preview));
     stagedPhotos.current=[];setComposerPhotos([]);setIncomingPhotos(null);setDropActive(false);dropDepth.current=0;
@@ -267,7 +269,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     setUrl('');
   }
   function openManual(fromText = '',initialData:CreationDraftData|null=null) {
-    if (manualBusy||guestManualBusy||screen.kind==='sending'||(screen.kind === 'job' && generationActive(selectedJob))) return;
+    if (manualBusy||guestManualBusy||screen.kind==='sending'||activeGuestJob) return;
     trackProductEvent('manual_form_opened',{source_kind:fromText?'description':'manual'});
     previousComposer.current=composerDock.current?.getBoundingClientRect()??null;
     interactionVersion.current++;lock.current=false;startFresh.current = true;forget();
@@ -366,7 +368,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
         (document.getElementById('manual-guided-form') as HTMLFormElement | null)?.requestSubmit();
       return;
     }
-    if (loading || busy || lock.current || estimatePending || estimateFailed || noCredits || activeOtherJob || screen.kind === 'job' && generationActive(selectedJob)) return;
+    if (loading || busy || lock.current || estimatePending || estimateFailed || noCredits || activeOtherJob || activeGuestJob) return;
     previousComposer.current=composerDock.current?.getBoundingClientRect()??null;
     const value = url.trim();
     const parsed = ImportUrl.safeParse(value);
@@ -433,10 +435,10 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   const resultReady = screen.kind === 'job' && selectedJob?.status === 'ready';
   const composerPlaceholder = composerPhotos.length?'Décrivez votre bien, ou appuyez sur Entrée…':manual?'Ajoutez des précisions sur votre bien…':resultReady?'Collez le lien d’une autre annonce…':'Collez un lien ou décrivez votre bien…';
   const composerDisabled = screen.kind==='guest-customizing'&&guestSettings&&!GenerationCustomization.safeParse(guestSettings).success || loading || busy || estimatePending || estimateFailed || photoChecking || Boolean(incomingPhotos) || (composerPhotos.length
-    ? screen.kind==='job'&&generationActive(selectedJob) : manual
+    ? activeGuestJob : manual
     ? !manualReady||Boolean(noCredits)||!editingProperty&&activeOtherJob
     : Boolean(noCredits)||Boolean(importPaused&&!estimate.value&&ImportUrl.safeParse(url.trim()).success)||activeOtherJob||screen.kind==='job'&&
-      (generationActive(selectedJob)||resultReady&&!url.trim()));
+      (activeGuestJob||!url.trim()));
   const contextNote = !me ? estimate.source?'Essai classique gratuit. Connectez-vous pour animer les photos par IA et estimer leur coût en crédits.':'Essayez gratuitement.' : canGenerate
     ? (noCredits?'Crédits insuffisants pour ce montage. Réduisez les animations ou consultez vos crédits.':'')
     : 'Accès anticipé · Préparez votre annonce';
@@ -484,12 +486,12 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
       <div className="home-composer-main"><div className="home-url-row"><HomeIcon name="link" size={28}/><label htmlFor="home-listing-url" className="sr-only">{manual?'Précisions sur votre bien':'Lien ou description de votre annonce'}</label>
         <span className="home-url-input"><input ref={composerInput} id="home-listing-url" name="url" type="text" autoComplete="off" spellCheck={false} placeholder={composerPlaceholder}
           readOnly={customizing} value={manual?customizing?importDraft?.sourceUrl??importDraft?.data.canonicalUrl??importDraft?.data.fields.title??description:description:screen.kind==='sending'?'':url} onChange={event=>{if(manual)setDescription(event.target.value);
-            else {if(screen.kind==='extracting'){interactionVersion.current++;lock.current=false;guestPending.current=null;
+            else {if(me&&screen.kind==='job'){startFresh.current=true;forget();setScreen({kind:'landing'});}if(screen.kind==='extracting'){interactionVersion.current++;lock.current=false;guestPending.current=null;
               trial.setToken('');trial.setChallenge(false);trial.setWidgetVersion(n=>n+1);setScreen({kind:'landing'});}setUrl(event.target.value);}
             setFeedback('');}} disabled={screen.kind==='sending'} aria-invalid={Boolean(feedback || screen.kind==='error')} aria-describedby="home-url-error home-create-note"/>
           <span className="home-url-placeholder" aria-hidden="true">{composerPlaceholder}</span></span></div>
         <div className="home-composer-actions"><HomeCreateButton disabled={composerDisabled} aria-describedby={manual&&!manualReady?'home-manual-action-note':undefined}>
-          {incomingPhotos?'Ajout des photos…':composerPhotos.length?'Compléter mon annonce':screen.kind==='sending'||manualBusy?'Envoi en cours':screen.kind==='job'&&generationActive(selectedJob)?'Génération en cours':manual&&me&&!canGenerate?'Enregistrer mon annonce':'Créer ma vidéo'}<HomeIcon name="arrow" size={20}/></HomeCreateButton>
+          {incomingPhotos?'Ajout des photos…':composerPhotos.length?'Compléter mon annonce':screen.kind==='sending'||manualBusy?'Envoi en cours':activeGuestJob?'Génération en cours':manual&&me&&!canGenerate?'Enregistrer mon annonce':'Créer ma vidéo'}<HomeIcon name="arrow" size={20}/></HomeCreateButton>
           <span className="home-credit-cost" aria-live="polite">{estimatePending?'Estimation en cours…':estimateFailed?'Estimation indisponible':`${creditCost} crédit${creditCost>1?'s':''}${me&&estimate.value?' estimés':''}`}
             {me&&estimate.value&&<small className="home-credit-estimate-detail">{urlImportPhotoSlots(estimate.value).length} photos · Animations IA activées</small>}
           </span></div>
@@ -501,19 +503,19 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
       {photoChecking&&<p className="home-photo-status" role="status">Vérification des photos…</p>}
       <div className="home-composer-bottom"><div className="home-format-tags">
         <label className="home-format-control"><span className="home-select-content"><HomeIcon name={aspectRatio==='16:9'?'landscape':'phone'} size={21}/><select aria-label="Format de la vidéo" value={aspectRatio} title="Format de la vidéo"
-          disabled={loading||busy||screen.kind==='job'&&generationActive(selectedJob)} onChange={event=>setAspectRatio(event.target.value==='16:9'?'16:9':'9:16')}>
+          disabled={loading||busy||activeGuestJob} onChange={event=>setAspectRatio(event.target.value==='16:9'?'16:9':'9:16')}>
           <option value="9:16">Vertical 9:16</option><option value="16:9">Horizontal 16:9</option></select><HomeIcon name="chevron" size={16}/></span></label>
         <label className="home-duration-pill"><span className="home-select-content"><HomeIcon name="clock" size={20}/><select aria-label="Durée de la vidéo" value={durationSeconds} title="Durée de la vidéo"
-          disabled={loading||busy||screen.kind==='job'&&generationActive(selectedJob)} onChange={event=>setDurationSeconds(VideoDuration.parse(Number(event.target.value)))}>
+          disabled={loading||busy||activeGuestJob} onChange={event=>setDurationSeconds(VideoDuration.parse(Number(event.target.value)))}>
           <option value={20}>20 s</option><option value={30}>30 s</option><option value={40}>40 s</option></select></span></label>
-        <button type="button" className={`home-voice-pill home-setting-toggle${voiceEnabled?' is-active':''}`} aria-pressed={voiceEnabled} aria-label="Voix off" title="Activer ou désactiver la voix off" disabled={loading||busy||screen.kind==='job'&&generationActive(selectedJob)} onClick={()=>setVoiceEnabled(!voiceEnabled)}><span className="home-option-label">Voix off</span><span className="home-toggle-track" aria-hidden="true"/></button>
+        <button type="button" className={`home-voice-pill home-setting-toggle${voiceEnabled?' is-active':''}`} aria-pressed={voiceEnabled} aria-label="Voix off" title="Activer ou désactiver la voix off" disabled={loading||busy||activeGuestJob} onClick={()=>setVoiceEnabled(!voiceEnabled)}><span className="home-option-label">Voix off</span><span className="home-toggle-track" aria-hidden="true"/></button>
         <button type="button" className={`home-subtitles-pill home-setting-toggle${subtitlesEnabled?' is-active':''}`} aria-pressed={subtitlesEnabled} aria-label="Sous-titres de la voix off"
-          title={voiceEnabled?"Afficher ou masquer les sous-titres de la voix off":"Activez la voix off pour ajouter des sous-titres"} disabled={!voiceEnabled||loading||busy||screen.kind==='job'&&generationActive(selectedJob)}
+          title={voiceEnabled?"Afficher ou masquer les sous-titres de la voix off":"Activez la voix off pour ajouter des sous-titres"} disabled={!voiceEnabled||loading||busy||activeGuestJob}
           onClick={()=>setSubtitlesEnabled(!subtitlesEnabled)}><span className="home-option-label">Sous-titres</span><span className="home-toggle-track" aria-hidden="true"/></button>
-        </div><button type="button" className="home-customize-button" aria-pressed={customizing||screen.kind==='guest-customizing'} disabled={loading||busy||photoChecking||activeOtherJob||screen.kind==='job'&&generationActive(selectedJob)} onClick={()=>void personalize()}><HomeIcon name="settings" size={21}/>Personnaliser</button>
+        </div><button type="button" className="home-customize-button" aria-pressed={customizing||screen.kind==='guest-customizing'} disabled={loading||busy||photoChecking||activeOtherJob||activeGuestJob} onClick={()=>void personalize()}><HomeIcon name="settings" size={21}/>Personnaliser</button>
       </div>
     </form>
-    <button type="button" className={manual?'home-mode-pill is-active':'home-mode-pill'} aria-pressed={manual} disabled={busy || photoChecking || Boolean(incomingPhotos) || screen.kind==='job' && generationActive(selectedJob)} onClick={()=>{if(manual)void manualForm.current?.cancel();else if(composerPhotos.length)openWithPhotos();else openManual();}}><HomeIcon name="pencil" size={20}/>Saisie manuelle</button>
+    <button type="button" className={manual?'home-mode-pill is-active':'home-mode-pill'} aria-pressed={manual} disabled={busy || photoChecking || Boolean(incomingPhotos) || activeGuestJob} onClick={()=>{if(manual)void manualForm.current?.cancel();else if(composerPhotos.length)openWithPhotos();else openManual();}}><HomeIcon name="pencil" size={20}/>Saisie manuelle</button>
     </>}
     {manual&&!manualReady&&<p id="home-manual-action-note" className="home-form-note" role="status">{manualReason}</p>}
     {screen.kind==='error'&&<p className="home-form-feedback" role="alert">{screen.message} Votre saisie est conservée pour réessayer.</p>}

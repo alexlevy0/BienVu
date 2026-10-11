@@ -216,7 +216,8 @@ export class VideoCoordinator {
       if(uncertain&&job.failures<1&&this.now()-job.startedAt<=600_000) {
         await this.save({...job,failures:job.failures+1});await this.deps.schedule();return;
       }
-      await this.deps.stop().catch(()=>{});
+      try{await this.deps.stop();if(await this.deps.running())throw Error('VIDEO_CONTAINER_STILL_RUNNING');}
+      catch{await this.save({...job,error:code,failures:job.failures+1});await this.deps.schedule();return;}
       await this.finish({...job,status:'failed',error:code,failures:job.failures+1});
     }
   }
@@ -234,11 +235,14 @@ export class VideoCoordinator {
     return true;
   }
   private async complete(job:VideoJob) {
-    await this.finish({...job,status:'ready',progressPercent:100});
     // Le résultat R2 est autoritaire avant le nettoyage de l'espace éphémère.
     try {if(await this.deps.running()) {
       const response=await this.deps.call(`/videos/${job.id}`,{method:'DELETE'});await response.body?.cancel();
     }}catch {/* L'arrêt supprime aussi le disque éphémère ; le MP4 R2 reste prêt. */}
-    await this.deps.stop().catch(()=>{});
+    // Publish terminal state only after this slot can safely be reused. A late
+    // stop from the previous job must never kill the following render.
+    await this.deps.stop();
+    if(await this.deps.running())throw Error('VIDEO_CONTAINER_STILL_RUNNING');
+    await this.finish({...job,status:'ready',progressPercent:100});
   }
 }

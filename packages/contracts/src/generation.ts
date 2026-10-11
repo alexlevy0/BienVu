@@ -2,6 +2,7 @@ import {z} from 'zod';
 import {EntityId, Job, Timestamp, GenerationInput,VideoAspectRatio} from './product';
 import {MAX_AVATAR_CREDITS} from './avatars';
 import {MapLocation} from './maps';
+import {GenerationQueueView} from './generation-queue';
 export const GenerationRequest = GenerationInput;
 export type GenerationRequest = z.infer<typeof GenerationRequest>;
 export const GenerationPreparation = z.object({
@@ -22,6 +23,7 @@ export const GenerationView = z.object({avatar:z.object({requested:z.number().in
   preparation:GenerationPreparation.optional(),narrationReady:z.boolean().optional(),
   mapOmissionReason:GenerationMapOmissionReason.optional(),
   mapConfirmation:GenerationMapConfirmation.optional(),
+  queue:GenerationQueueView.optional(),
   progressPercent:z.number().int().min(0).max(100).default(0),
   creditsReserved:z.number().int().nonnegative().default(1),creditsUsed:z.number().int().nonnegative().default(0),
   creditsRefunded:z.number().int().nonnegative().default(0),animationsRequested:z.number().int().min(0).max(12).default(0),

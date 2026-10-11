@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import {GenerationView} from '../packages/contracts/src/index';
-import {admitGeneration,findGeneration,generationView,setGenerationPreparation} from '../packages/db/src/index';
+import {admitGeneration,findGeneration,generationView,setGenerationPreparation,claimGenerationResource} from '../packages/db/src/index';
 import {migrateNarrationProbe,seedNarrationFixture} from '../scripts/narration-fixtures';
 import {generationSteps,generationProgressText,generationMapOmissionText} from '../apps/web/lib/generation-steps';
 
@@ -58,6 +58,7 @@ test('checkpoints D1 : états durables, replay monotone, isolation, anciens jobs
   assert.deepEqual(generationView(row).preparation,{map:'pending'});
   const balance=async()=>(await db.prepare('SELECT reserved,consumed,quota_limit FROM allocations ORDER BY id').all()).results;
   const before=await balance();
+  await claimGenerationResource(db,seed.agencyId,row.jobId,'preparation');
   await db.prepare("UPDATE jobs SET status='importing',stage='importing' WHERE id=?").bind(row.jobId).run();
   await setGenerationPreparation(db,row,'map','working');
   let fresh=(await findGeneration(db,seed.agencyId,row.jobId))!;

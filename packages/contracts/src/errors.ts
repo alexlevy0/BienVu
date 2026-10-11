@@ -51,6 +51,8 @@ export const publicErrors = {
   RUNWAY_LOGIN_REQUIRED: [401, 'Connectez-vous pour animer des photos avec l’IA. Votre essai offert permet une vidéo avec les mouvements de caméra inclus.'],
   GENERATIONS_PAUSED: [503, 'La génération de vidéos est temporairement indisponible. Aucun crédit n’a été utilisé.'],
   GENERATION_BUSY: [409, 'Une vidéo est déjà en préparation. Retrouvez-la dans votre historique.'],
+  GENERATION_QUEUE_FULL: [429, 'La file de création est pleine. Vos vidéos en cours restent disponibles dans Mes biens. Réessayez dans quelques minutes.'],
+  GENERATION_QUEUE_TIMEOUT: [422, 'L’attente a dépassé le délai autorisé. Les crédits non utilisés ont été libérés. Votre saisie est conservée pour réessayer.'],
   GENERATION_BUDGET_LIMIT: [429, 'Le budget des générations de développement est atteint.'],
   GENERATION_FAILED: [422, 'La vidéo n’a pas pu être terminée. Votre crédit vidéo a été libéré.'],
   SCRIPT_INVALID: [422, 'La rédaction de la narration a échoué. Votre crédit vidéo a été libéré. Vous pouvez réessayer depuis votre annonce.'],
