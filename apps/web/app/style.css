@@ -1220,6 +1220,7 @@ h1{
 .generation-steps [aria-current=step] {background:#214f43;color:white;}
 .generation-steps .step-done {background:#e8eee2;color:#35423a;}
 .generation-steps .step-skipped {border-style:dashed;color:#747b72;}
+.generation-step-detail {display:block;max-width:340px;font-size:12px;line-height:1.5;font-weight:400;margin-top:5px}
 .generated-video {display:block;width:min(100%,360px);max-height:70vh;aspect-ratio:9/16;background:#14261e;border-radius:12px;margin:20px 0;}
 .generation-history {max-width:900px;}
 @media(max-width:600px){.generation-progress{padding:16px}.generation-steps li{font-size:.8rem;padding:6px 10px}}

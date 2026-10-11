@@ -1,4 +1,4 @@
-import {AgencyBrand, EntityId, Timestamp, GeneratableListing, GenerationRequest, GenerationView, GenerationPreparation, VideoReport, VideoAsset, publicErrors,customizedListing,generationCreditCost,avatarCreditCost,requestedAnimations,CREDIT_PRICING_VERSION,selectedAnimationIndices,URL_IMPORT_QUOTAS, type PublicErrorCode,type NormalizedListing} from '@bienvu/contracts';
+import {AgencyBrand, EntityId, Timestamp, GeneratableListing, GenerationRequest, GenerationView, GenerationPreparation, GenerationMapOmissionReason, GenerationMapCandidates, VideoReport, VideoAsset, publicErrors,customizedListing,generationCreditCost,avatarCreditCost,requestedAnimations,CREDIT_PRICING_VERSION,selectedAnimationIndices,URL_IMPORT_QUOTAS, type PublicErrorCode,type NormalizedListing} from '@bienvu/contracts';
 import type {Database} from './index';
 import {creditGrant,creditBalance} from './credits';
 import {findImport} from './imports';
@@ -13,7 +13,7 @@ export class GenerationFailure extends Error {constructor(public code:PublicErro
 export type GenerationRow={ownerAgencyId:string|null;anonymousSessionId:string|null;retention:'available'|'expiring'|'expired';creditStatus:'unfunded'|'reserved'|'consumed'|'released';previewKey:string|null;previewReport:string|null;jobId:string;agencyId:string;inputHash:string;input:string;brand:string;deadline:string;expiresAt:string|null;
   status:GenerationView['status'];stage:GenerationView['stage'];progressPercent:number;attempt:number;errorCode:string|null;narrationErrorCode?:string|null;createdAt:string;updatedAt:string;sourceKind:'url'|'manual'|null;
   workflowId:string;listingId:string|null;objectKey:string|null;report:string|null;launchStatus:string;title:string;locality:string|null;
-  preparation?:string|null;narrationState?:string|null;mapResolved?:number;resolvedMap?:string|null;manifestMap?:number|null;animationsReady?:number;animationsActive?:number;animationsReused?:number;
+  preparation?:string|null;narrationState?:string|null;mapResolved?:number;resolvedMap?:string|null;mapOmissionReason?:string|null;mapConfirmationJson?:string|null;manifestMap?:number|null;animationsReady?:number;animationsActive?:number;animationsReused?:number;
   creditVersion?:number;creditsReserved?:number;creditsUsed?:number;animationsRequested?:number;selectedVoice?:string;defaultMap?:string|null;avatarConfig?:string|null;avatarCredits?:number;avatarUsed?:number;avatarReady?:number;avatarFailed?:number;avatarActive?:number};
 const columns=`g.owner_agency_id AS ownerAgencyId,g.anonymous_session_id AS anonymousSessionId,g.retention,r.status AS creditStatus,p.object_key AS previewKey,p.report_json AS previewReport,g.job_id AS jobId,g.agency_id AS agencyId,g.input_hash AS inputHash,g.input_json AS input,g.brand_json AS brand,
   g.deadline,CASE WHEN g.storage_permanent=1 THEN NULL ELSE g.expires_at END AS expiresAt,j.status,j.stage,j.progress_percent AS progressPercent,j.attempt,j.error_code AS errorCode,n.error_code AS narrationErrorCode,j.created_at AS createdAt,j.updated_at AS updatedAt,
@@ -30,6 +30,8 @@ const columns=`g.owner_agency_id AS ownerAgencyId,g.anonymous_session_id AS anon
   n.state AS narrationState,
   EXISTS(SELECT 1 FROM generation_map_resolutions WHERE job_id=g.job_id AND agency_id=g.agency_id) AS mapResolved,
   (SELECT map_json FROM generation_map_resolutions WHERE job_id=g.job_id AND agency_id=g.agency_id) AS resolvedMap,
+  (SELECT reason FROM generation_map_resolutions WHERE job_id=g.job_id AND agency_id=g.agency_id) AS mapOmissionReason,
+  (SELECT json_object('state',state,'expiresAt',expires_at,'options',json(options_json)) FROM generation_map_confirmations WHERE job_id=g.job_id AND agency_id=g.agency_id) AS mapConfirmationJson,
   (SELECT json_type(manifest_json,'$.map') IS NOT NULL FROM video_manifests WHERE job_id=g.job_id AND agency_id=g.agency_id) AS manifestMap,
   (SELECT count(*) FROM photo_animations WHERE job_id=g.job_id AND agency_id=g.agency_id AND state='ready') AS animationsReady,
   (SELECT count(*) FROM photo_animations WHERE job_id=g.job_id AND agency_id=g.agency_id AND state IN ('submitting','submitted')) AS animationsActive,
@@ -72,12 +74,18 @@ export function generationView(row:GenerationRow,now=Date.now(),audience:'owner'
       ?(row.animationsReady??0)+(row.animationsReused??0)>0?'ready':'skipped':'pending';
   }
   const available=generationRetained(row,now)&&row.status==='ready'&&Boolean(row.objectKey);
+  const confirmation=row.mapConfirmationJson?JSON.parse(row.mapConfirmationJson) as {state:string;expiresAt:string;options:unknown}:null;
+  const mapReason=GenerationMapOmissionReason.safeParse(row.mapOmissionReason==='ambiguous_location'&&confirmation?.state==='skipped'?'confirmation_skipped':
+    row.mapOmissionReason==='ambiguous_location'&&confirmation?.state==='expired'?'confirmation_timeout':row.mapOmissionReason);
   const gift=row.creditVersion===1&&Boolean(row.anonymousSessionId);
   const unlocked=audience==='owner'&&generationMasterUnlocked(row);
   const preview=available&&Boolean(row.previewKey);
   const errorCode=row.status==='failed'&&row.errorCode==='GENERATION_FAILED'&&row.narrationErrorCode==='SCRIPT_INVALID'
     ?row.narrationErrorCode:row.errorCode;
   return GenerationView.parse({preparation,narrationReady:row.narrationState==='prepared'||afterPreparation,ownership:row.ownerAgencyId?'owned':'anonymous',masterAccess:unlocked?'unlocked':row.creditStatus==='reserved'?'reserved':'locked',retention:row.retention,id:row.jobId,status:row.status,stage:row.stage,progressPercent:row.progressPercent,attempt:row.attempt,sourceKind:row.sourceKind,
+    ...(preparation.map==='skipped'&&mapReason.success?{mapOmissionReason:mapReason.data}:{}),
+    ...(confirmation?.state==='pending'&&row.status==='importing'&&!row.mapResolved&&!row.manifestMap&&Date.parse(confirmation.expiresAt)>now
+      ?{mapConfirmation:{expiresAt:confirmation.expiresAt,options:GenerationMapCandidates.parse(confirmation.options).map(({id,label})=>({id,label}))}}:{}),
     creditsReserved:(row.creditsReserved??1)+(row.avatarCredits??0),creditsUsed:gift?(row.status==='ready'?1:0):(row.creditsUsed??0)+(row.avatarUsed??0),
     ...(row.avatarCredits?{avatar:{requested:1,ready:row.avatarReady??0,failed:row.avatarFailed??0,active:row.avatarActive??0,creditsUsed:row.avatarUsed??0}}:{}),
     creditsRefunded:['ready','failed'].includes(row.status)?Math.max(0,((row.creditsReserved??1)+(row.avatarCredits??0))-(gift&&row.status==='ready'?1:(row.creditsUsed??0)+(row.avatarUsed??0))):0,

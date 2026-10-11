@@ -1,6 +1,6 @@
 import React from 'react';
 import {AbsoluteFill,Audio,Img,OffthreadVideo,Freeze,Sequence,useCurrentFrame} from 'remotion';
-import {editorClipStarts,editorLayerStyle,editorPhotoMotion,editorCaptionStyle,editorMusicGain,editorMusicFrames,type VideoManifest,type EditorCamera} from '@bienvu/contracts';
+import {editorClipStarts,editorLayerStyle,editorPhotoMotion,editorCaptionStyle,editorMusicGain,editorMusicFrames,type VideoManifest,type EditorCamera,type AvatarContentBounds} from '@bienvu/contracts';
 import {subtitleGroups} from './layout';
 import {AvatarOverlay} from './avatar';
 import {MapOverlay} from './map';
@@ -20,7 +20,7 @@ function EditorSpeech({m,media,index}:{m:VideoManifest;media:Record<string,strin
   return <>{audio&&<Audio src={media[audio.id]} volume={m.editor!.voiceVolume*(m.editor!.audioMix?.normalize?audio.normalizationGain??1:1)}/>}
     {m.editor!.textsVisible&&m.subtitlesEnabled!==false&&frame<voiceFrames&&<div data-bienvu-subtitle="true" style={editorCaptionStyle(m.width)}>{line}</div>}</>;
 }
-export function EditorFilm({manifest:m,media,moduleUrl,workerUrl}:{manifest:VideoManifest;media:Record<string,string>;moduleUrl?:string;workerUrl?:string}){
+export function EditorFilm({manifest:m,media,moduleUrl,workerUrl,bounds}:{manifest:VideoManifest;media:Record<string,string>;moduleUrl?:string;workerUrl?:string;bounds?:Record<string,AvatarContentBounds>}){
   const doc=m.editor!,frame=useCurrentFrame(),total=doc.durationSeconds*30;let at=0;
   const music=doc.music&&m.music?{...doc.music,asset:m.music.asset}:null,
     musicFrames=editorMusicFrames(doc);
@@ -41,7 +41,7 @@ export function EditorFilm({manifest:m,media,moduleUrl,workerUrl}:{manifest:Vide
         volume={f=>editorMusicGain({...doc,music:{...music,normalizationGain:music.asset.normalizationGain??music.normalizationGain}},music.startFrame+f,intervals)}/>
     </Sequence>}
     <MapOverlay manifest={m} media={media} moduleUrl={moduleUrl} workerUrl={workerUrl}/>
-    <AvatarOverlay manifest={m} media={media}/>
+    <AvatarOverlay manifest={m} media={media} bounds={bounds}/>
     {m.rights.watermarked&&<div style={{position:'absolute',top:'45%',left:'15%',width:'70%',textAlign:'center',fontSize:42,color:'#fff',background:'#132a23d9',padding:24,
       transform:'rotate(-14deg)'}}>BIENVU · VIDÉO D’ESSAI</div>}
   </AbsoluteFill>;

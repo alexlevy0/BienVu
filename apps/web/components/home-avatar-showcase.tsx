@@ -5,6 +5,7 @@ import {useEffect,useRef,useState,type RefObject} from 'react';
 import {HomeIcon} from './home-icons';
 import {HomeVisual,useHomepageMedia,type HomeMediaView} from './homepage-media';
 import {imageWidthUrl,previewVideoUrl} from '../lib/home-media-view';
+import {VideoBacklight} from './video-backlight';
 
 const presentations=[{id:'circle',label:'Une présence discrète'},{id:'integrated',label:'Une présence intégrée'}] as const;
 const benefits=[
@@ -13,7 +14,7 @@ const benefits=[
   {icon:'heart',title:'Un style qui vous ressemble',text:'Choisissez l’apparence qui reflète votre agence.'},
 ] as const;
 
-function AvatarPreview({id,label,movie,visual,videoRef,onPlay}:{id:string;label:string;movie:HomeMediaView;visual:HomeMediaView;videoRef:RefObject<HTMLVideoElement|null>;onPlay():void}){
+function AvatarPreview({id,label,movie,visual,videoRef,paused,onPlay}:{id:string;label:string;movie:HomeMediaView;visual:HomeMediaView;videoRef:RefObject<HTMLVideoElement|null>;paused:boolean;onPlay():void}){
   const [started,setStarted]=useState(false),[loading,setLoading]=useState(false),[error,setError]=useState(false);
   const poster=visual.kind==='image'?visual.src:visual.poster??movie.poster;
   const custom=movie.custom||visual.custom;
@@ -26,6 +27,8 @@ function AvatarPreview({id,label,movie,visual,videoRef,onPlay}:{id:string;label:
     finally{setLoading(false);}
   }
   return <figure className={`home-avatar-preview home-avatar-preview-${id}`}>
+    <div className="video-backlight-frame home-avatar-backlight-frame">
+    <VideoBacklight video={videoRef} active={!paused} poster={poster?imageWidthUrl(poster,640):null} posterLoading="lazy" className="home-avatar-backlight"/>
     <div className={`home-avatar-frame${started?' is-started':''}`}>
       <video ref={videoRef} src={previewVideoUrl(movie.src)} poster={started&&poster?imageWidthUrl(poster,640):undefined} width="540" height="960" controls={started} playsInline preload="none" tabIndex={started?0:-1} aria-label={`Démonstration d’avatar IA : ${label}`}
         onPlay={()=>{setStarted(true);setError(false);onPlay();}} onError={()=>{setLoading(false);setError(true);}}>
@@ -36,6 +39,7 @@ function AvatarPreview({id,label,movie,visual,videoRef,onPlay}:{id:string;label:
       {(!started||error)&&<button type="button" className="home-avatar-play" onClick={()=>void play()} disabled={loading} aria-label={`${error?'Réessayer':'Lire'} la démonstration : ${label}`}><HomeIcon name={loading?'refresh':'play'} size={28}/></button>}
       {!started&&<span className="home-avatar-preview-line" aria-hidden="true"/>}
       {loading&&<span className="home-avatar-loading" role="status">Chargement de la vidéo…</span>}
+    </div>
     </div>
     <figcaption>{label}</figcaption>
     {error&&<p className="home-avatar-error" role="alert">La vidéo n’a pas pu être lue. Réessayez avec le bouton Lecture.</p>}
@@ -67,8 +71,8 @@ export function HomeAvatarShowcase({paused}:{paused:boolean}){
         <p className="home-avatars-note">Sans vous filmer. À votre image.</p>
       </div>
       <div className="home-avatars-stage">
-        <AvatarPreview key={circle.src+circleVisual.src} {...presentations[0]} movie={circle} visual={circleVisual} videoRef={circleRef} onPlay={()=>started(circleRef.current)}/>
-        <AvatarPreview key={integrated.src+integratedVisual.src} {...presentations[1]} movie={integrated} visual={integratedVisual} videoRef={integratedRef} onPlay={()=>started(integratedRef.current)}/>
+        <AvatarPreview key={circle.src+circleVisual.src} {...presentations[0]} movie={circle} visual={circleVisual} videoRef={circleRef} paused={paused} onPlay={()=>started(circleRef.current)}/>
+        <AvatarPreview key={integrated.src+integratedVisual.src} {...presentations[1]} movie={integrated} visual={integratedVisual} videoRef={integratedRef} paused={paused} onPlay={()=>started(integratedRef.current)}/>
       </div>
     </div>
     <div className="home-avatars-benefits">{benefits.map(benefit=><article key={benefit.title}><span className="home-avatars-benefit-icon"><HomeIcon name={benefit.icon} size={30}/></span><div><h3>{benefit.title}</h3><p>{benefit.text}</p></div></article>)}</div>

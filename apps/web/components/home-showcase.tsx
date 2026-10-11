@@ -6,6 +6,8 @@ import {CARTESIA_DEFAULT_VOICE, cartesiaParisianVoices, type VideoCustomization}
 import {voicePreviews} from '../lib/voice-previews';
 import {HomeIcon} from './home-icons';
 import {HomeVisual,useHomepageMedia} from './homepage-media';
+import {VideoBacklight} from './video-backlight';
+import {imageWidthUrl} from '../lib/home-media-view';
 
 const voices = cartesiaParisianVoices.map(voice => voice.id);
 const peaks = [4, 5, 8, 12, 19, 26, 35, 23, 15, 12, 18, 26, 20, 15, 26, 33, 21, 13, 6, 9, 21, 34, 43, 30, 20, 15, 24, 28, 22, 13, 9, 14, 22, 32, 38, 29, 21, 15, 21, 30, 25, 18, 13, 17, 24, 20, 11, 7, 11, 20, 30, 23, 17, 9, 14, 18, 12, 9, 6, 5];
@@ -34,6 +36,7 @@ export function HomeShowcase({paused, onCreate}: {paused: boolean; onCreate(): v
   const [text, setText] = useState(editor.custom?'Votre texte':'65 m² · 3 pièces'), [font, setFont] = useState('Instrument Serif'), [largeText, setLargeText] = useState(false);
   const [color, setColor] = useState('#ffffff'), [align, setAlign] = useState<'left' | 'center' | 'right'>('center');
   const sample = voicePreviews[voice], audioActive = audioState !== 'idle';
+  const poster = visual.kind==='image'?visual.src:movie.poster;
   useEffect(() => {
     const player = audio.current;
     attempt.current++; player?.pause(); setAudioState('idle'); setAudioError(false);
@@ -74,11 +77,14 @@ export function HomeShowcase({paused, onCreate}: {paused: boolean; onCreate(): v
       <svg className="home-life-arrow" viewBox="0 0 64 50" fill="none" aria-hidden="true"><path d="M4 31C19 10 38 12 56 31m-1-12 1 12-12-2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
       <figure className="home-life-video">
         <figcaption className="home-life-badge home-life-video-badge"><HomeIcon name="play" size={17}/>Votre vidéo BienVu</figcaption>
-        <video ref={video} src={movie.src} poster={visual.kind==='image'?visual.src:movie.poster??undefined} controls={videoStarted} playsInline preload={visual.kind==='image'||movie.poster?'none':'metadata'} aria-label={movie.custom?movie.title??'Vidéo BienVu':'Exemple de vidéo BienVu : un appartement à Paris'}
+        <VideoBacklight video={video} active={!paused} poster={poster?imageWidthUrl(poster,640):null} posterLoading="lazy" className="home-life-backlight"/>
+        <div className="home-life-video-frame">
+        <video ref={video} src={movie.src} poster={poster??undefined} controls={videoStarted} playsInline preload={visual.kind==='image'||movie.poster?'none':'metadata'} aria-label={movie.custom?movie.title??'Vidéo BienVu':'Exemple de vidéo BienVu : un appartement à Paris'}
           onPlay={() => {attempt.current++; audio.current?.pause(); setAudioState('idle'); setVideoError(false); setVideoStarted(true); setVideoPlaying(true);}}
           onPause={() => setVideoPlaying(false)} onEnded={() => setVideoPlaying(false)} onError={() => {setVideoPlaying(false); setVideoError(true);}}/>
         {!movie.custom&&!visual.custom&&<div className="home-life-video-facts" aria-hidden="true"><strong>Paris</strong><span>65 m² · 3 pièces</span><b>385 000 €</b></div>}
         {!videoPlaying && <button type="button" className="home-life-video-play" aria-label="Lire la vidéo de démonstration" onClick={() => void playVideo()}><HomeIcon name="play" size={28}/></button>}
+        </div>
       </figure>
       <div className="home-life-extras">
         <span className="home-life-animation-badge"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><path d="m12 3 2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-2.4L12 3Zm7-2 1 3 3 1-3 1-1 3-1-3-3-1 3-1 1-3Z"/></svg>Animation IA en option</span>

@@ -19,6 +19,7 @@ import './manual-listing.css';
 import './customizer.css';
 import './marketing.css';
 import './home-noise.css';
+import './home-typography.css';
 
 export async function generateMetadata({searchParams}:{searchParams:Promise<Record<string,string|string[]|undefined>>}) {
   const query=await searchParams;
@@ -29,5 +30,9 @@ export default async function Page({searchParams}:{searchParams:Promise<{homePre
   const env=(await getCloudflareContext({async:true})).env,preview=(await searchParams).homePreview==='1';
   if(preview){try{await requireAdmin(new Request(env.BETTER_AUTH_URL,{headers:await headers()}),env);}catch{notFound();}}
   const config=await readHomepageConfig(env.DB,preview);
-  return <HomepageMediaProvider config={config}>{!preview&&<StructuredData data={siteSchema}/>} {preview&&<div className="homepage-preview-banner" role="status">Aperçu privé · Ces changements ne sont pas encore publiés. <a href="/admin?view=homepage">Retour à l’administration →</a></div>}<LandingPage/></HomepageMediaProvider>;
+  return <HomepageMediaProvider config={config}>
+    <link rel="preload" href="/fonts/newsreader.woff2" as="font" type="font/woff2" crossOrigin="anonymous"/>
+    <link rel="preload" href="/fonts/newsreader-italic.woff2" as="font" type="font/woff2" crossOrigin="anonymous"/>
+    {!preview&&<StructuredData data={siteSchema}/>} {preview&&<div className="homepage-preview-banner" role="status">Aperçu privé · Ces changements ne sont pas encore publiés. <a href="/admin?view=homepage">Retour à l’administration →</a></div>}<LandingPage/>
+  </HomepageMediaProvider>;
 }

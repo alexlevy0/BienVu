@@ -11,7 +11,7 @@ import {cleanupAnonymousTrials} from './trial-cleanup';
 import {extractDescription,EXTRACTION_TEXT_MAX} from '@bienvu/narration';
 import {loadGenerationListing} from './generation-import';
 import {prepareJobAnimations} from './photo-animations';
-import {prepareGenerationMap} from './default-video-map';
+import {prepareGenerationMap,MapConfirmationRequired} from './default-video-map';
 import {safeAiEvent} from '@bienvu/observability';
 import {submitJobAvatars,pollJobAvatars,timeoutJobAvatars,reconcileAvatarTasks} from './avatars';
 import type {HeygenEnvironment} from '@bienvu/avatars';
@@ -91,14 +91,27 @@ export class GenerationWorkflow extends WorkflowEntrypoint<GenerationEnv,{agency
     try {
       await step.do('import-or-load',once,async()=>{const row=await active(this.env,agencyId,jobId);await setGenerationStage(this.env.DB,row,'importing');
         return loadGenerationListing(this.env,row);});
-      await step.do('resolve-default-map',{...once,timeout:'3 minutes'},async()=>{
+      const resolveMap=async()=>{
         const row=await active(this.env,agencyId,jobId),input=GenerationRequest.parse(JSON.parse(row.input));
         const requested=Boolean(row.defaultMap||input.customization?.map?.location);
         if(requested)await setGenerationPreparation(this.env.DB,row,'map','working');
-        const map=await this.defaultMap(row);
-        if(requested)await setGenerationPreparation(this.env.DB,row,'map',map?'ready':'skipped');
-        return {prepared:true};
-      });
+        try{
+          const map=await this.defaultMap(row);
+          if(requested)await setGenerationPreparation(this.env.DB,row,'map',map?'ready':'skipped');
+          return {waiting:false,expiresAt:null};
+        }catch(cause){if(cause instanceof MapConfirmationRequired)return {waiting:true,expiresAt:cause.expiresAt};throw cause;}
+      };
+      let mapState=await step.do('resolve-default-map',{...once,timeout:'3 minutes'},resolveMap);
+      // Durable sleeps leave no Worker running while the user chooses a city.
+      // D1 is authoritative, so a committed choice survives a lost HTTP reply.
+      for(let poll=0;mapState.waiting&&poll<60;poll++){
+        await step.sleep(`map-confirmation-wait-${poll}`,'5 seconds');
+        mapState=await step.do(`map-confirmation-check-${poll}`,{...once,timeout:'3 minutes'},resolveMap);
+      }
+      if(mapState.waiting){
+        await step.sleepUntil('map-confirmation-expiry',new Date(mapState.expiresAt!));
+        await step.do('map-confirmation-timeout',{...once,timeout:'3 minutes'},resolveMap);
+      }
       const narration=await step.do('script-and-voice-checkpoints',once,async()=>{
         const row=await active(this.env,agencyId,jobId);await setGenerationStage(this.env.DB,row,'scripting');
         const input=GenerationRequest.parse(JSON.parse(row.input));

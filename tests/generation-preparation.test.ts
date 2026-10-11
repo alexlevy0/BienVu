@@ -4,7 +4,7 @@ import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import {GenerationView} from '../packages/contracts/src/index';
 import {admitGeneration,findGeneration,generationView,setGenerationPreparation} from '../packages/db/src/index';
 import {migrateNarrationProbe,seedNarrationFixture} from '../scripts/narration-fixtures';
-import {generationSteps,generationProgressText} from '../apps/web/lib/generation-steps';
+import {generationSteps,generationProgressText,generationMapOmissionText} from '../apps/web/lib/generation-steps';
 
 const job=GenerationView.parse({id:'progress-fixture',status:'voicing',stage:'voicing',attempt:1,errorCode:null,
   createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),expiresAt:null,title:'Bien de recette',videoUrl:null,downloadUrl:null,
@@ -34,6 +34,19 @@ test('suivi : voix cochée pendant l’avatar, carte et options conditionnelles,
   assert.ok(generationSteps(null).every(s=>s.state==='future'));
 });
 
+test('carte omise : motif lisible pendant et après la génération, sans inventer une cause historique',()=>{
+  const skipped={...job,locality:'La Rochelle',preparation:{map:'skipped' as const}};
+  for(const [reason,text] of [['location_missing','ville du bien n’est pas renseignée'],['ambiguous_location','« La Rochelle »'],['map_unavailable','service cartographique était indisponible']] as const){
+    const view=GenerationView.parse({...skipped,mapOmissionReason:reason});
+    assert.ok(generationMapOmissionText(view)?.includes(text));
+    assert.equal(generationSteps(view).find(s=>s.key==='map')?.detail,generationMapOmissionText(view));
+    assert.equal(generationMapOmissionText({...view,status:'ready'}),generationMapOmissionText(view));
+  }
+  assert.ok(generationMapOmissionText(skipped)?.includes('raison n’a pas été enregistrée'));
+  assert.equal(generationMapOmissionText({...skipped,preparation:{map:'ready'},mapOmissionReason:'map_unavailable'}),undefined);
+  assert.equal(generationMapOmissionText(job),undefined);assert.equal(generationMapOmissionText(null),undefined);
+});
+
 test('checkpoints D1 : états durables, replay monotone, isolation, anciens jobs et finances intactes',async t=>{
   const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:'export default {fetch(){return new Response("fixture")}}',compatibilityDate:'2026-09-27',d1Databases:['DB']}));t.after(()=>mf.dispose());
   const db=await mf.getD1Database('DB');await migrateNarrationProbe(db);
@@ -56,6 +69,14 @@ test('checkpoints D1 : états durables, replay monotone, isolation, anciens jobs
   assert.equal(await findGeneration(db,'foreign-agency',row.jobId),null);
   await setGenerationPreparation(db,row,'map','ready');await setGenerationPreparation(db,row,'map','working');
   fresh=(await findGeneration(db,seed.agencyId,row.jobId))!;assert.equal(generationView(fresh).preparation?.map,'ready');
+  const omitted={...fresh,preparation:null,mapResolved:1,resolvedMap:null};
+  for(const reason of ['location_missing','ambiguous_location','map_unavailable'] as const){
+    assert.equal(generationView({...omitted,mapOmissionReason:reason}).mapOmissionReason,reason);
+    assert.equal(generationView({...omitted,mapOmissionReason:reason},Date.now(),'anonymous').mapOmissionReason,reason);
+    assert.equal(generationView({...fresh,mapOmissionReason:reason}).mapOmissionReason,undefined);
+  }
+  assert.equal(generationView({...omitted,mapOmissionReason:'private provider error'}).mapOmissionReason,undefined);
+  assert.equal(generationView({...omitted,mapOmissionReason:null}).mapOmissionReason,undefined);
   assert.deepEqual(await balance(),before);assert.deepEqual((await db.prepare('PRAGMA foreign_key_check').all()).results,[]);
   assert.equal((await db.prepare('SELECT count(*) n FROM generation_preparation_steps WHERE job_id=?').bind(row.jobId).first<{n:number}>())!.n,1);
   // A workflow already waiting on HeyGen still exposes its actual avatar phase.

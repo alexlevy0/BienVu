@@ -59,12 +59,12 @@ export function ProgressiveVideo({jobId,anonymous=false,active,finalUrl,poster,p
     const timer=setTimeout(()=>{resume.current={time:video.current?.currentTime??0,playing:wantsPlayback.current};setBroken(true);},8000);
     return()=>clearTimeout(timer);
   },[finalUrl,final,waiting]);
-  return <div className="progressive-video video-backlight-frame" data-streaming={streamReady&&!final||undefined}>
+  return <div className="progressive-video video-backlight-frame" data-frames-ready={streamReady||undefined} data-streaming={streamReady&&!final||undefined}>
     <VideoBacklight video={video} poster={poster}/>
     <div className="progressive-video-surface">
     <video ref={video} src={final?finalUrl??undefined:undefined} poster={poster??undefined} controls={final||Boolean(streamUrl)} playsInline preload="auto" aria-label={label}
       onLoadedMetadata={()=>{const player=video.current,target=resume.current;if(final&&player&&target){resume.current=null;player.currentTime=Math.min(target.time,player.duration);if(target.playing)void player.play().catch(()=>setWaiting(false));}}}
-      onLoadedData={()=>setStreamReady(true)} onPlay={()=>{started.current=true;wantsPlayback.current=true;}}
+      onEmptied={()=>setStreamReady(false)} onLoadedData={()=>setStreamReady(true)} onPlay={()=>{started.current=true;wantsPlayback.current=true;}}
       onWaiting={()=>{if(wantsPlayback.current)setWaiting(true);}} onPlaying={()=>{wantsPlayback.current=true;setWaiting(false);}} onPause={()=>{if(!resume.current)wantsPlayback.current=false;setWaiting(false);}}
       onEnded={()=>{wantsPlayback.current=false;setWaiting(false);}} onError={()=>{if(!final){resume.current={time:video.current?.currentTime??0,playing:wantsPlayback.current};setBroken(true);setWaiting(false);}}}/>
     {!final&&!streamReady&&!broken&&<div className="progressive-video-start" role="status">

@@ -1,6 +1,7 @@
 'use client';
-import {useEffect,useState,type CSSProperties} from 'react';
-import {AvatarCatalog,defaultAvatarCustomization,avatarVoiceWarning,avatarFrameStyle,avatarCreditCost,AVATAR_SECONDS_PER_CREDIT,type AvatarCustomization,type AvatarLook,type AvatarPreviewClip} from '@bienvu/contracts';
+import {useEffect,useRef,useState,type CSSProperties} from 'react';
+import {AvatarCatalog,defaultAvatarCustomization,avatarVoiceWarning,avatarFrameStyle,avatarContentStyle,avatarCreditCost,AVATAR_SECONDS_PER_CREDIT,type AvatarCustomization,type AvatarLook,type AvatarPreviewClip} from '@bienvu/contracts';
+import {measureAvatarElement} from '../lib/avatar-placement';
 import {HomeIcon} from './home-icons';
 import {trackProductEvent} from '../lib/product-analytics';
 import {AvatarPicker} from './avatar-picker';
@@ -57,9 +58,13 @@ export function AvatarControls(p:{avatar?:AvatarCustomization;onChange(value:Ava
   </section>;
 }
 export function AvatarPoster(p:{avatar?:AvatarCustomization;look?:AvatarLook;frame:number;total:number;width:number;height:number}){
+  const image=useRef<HTMLImageElement>(null),[content,setContent]=useState<ReturnType<typeof measureAvatarElement>>(null);
+  function measure(element:HTMLImageElement){if(p.avatar?.appearance!=='cutout')return;try{const measured=measureAvatarElement(element);if(measured&&(measured.bounds.width<measured.width||measured.bounds.height<measured.height))setContent(measured);}catch{/* Opaque catalogue thumbnails retain their existing framing. */}}
+  useEffect(()=>{setContent(null);if(image.current?.complete)measure(image.current);},[p.look?.thumbnail,p.avatar?.appearance]);
   if(!p.avatar||p.avatar.hidden||!p.look?.thumbnail)return null;
   const intro=p.frame<Math.min(p.avatar.maxSeconds*30,p.total/4),outro=p.frame>=p.total-Math.min(p.avatar.maxSeconds*30,p.total/4);
   if(p.avatar.moments!=='full'&&!(intro&&p.avatar.moments!=='outro'||outro&&p.avatar.moments!=='intro'))return null;
-  return <div className="avatar-preview-poster" style={avatarFrameStyle(p.avatar,p.width,p.height) as CSSProperties}><img src={p.look.thumbnail} alt="Présentateur : aperçu de placement" style={{width:'100%',height:'100%',objectFit:'cover'}}/><span>Aperçu de placement</span></div>;
+  const cutout=p.avatar.appearance==='cutout',placement=avatarFrameStyle(p.avatar,p.width,p.height,cutout);
+  return <div className="avatar-preview-poster" style={placement as CSSProperties}><img ref={image} src={p.look.thumbnail} alt="Présentateur : aperçu de placement" onLoad={event=>measure(event.currentTarget)} style={cutout&&content?avatarContentStyle(content.bounds,content.width,content.height,placement.width,placement.height):{width:'100%',height:'100%',objectFit:'cover'}}/><span>Aperçu de placement</span></div>;
 }
 export type {AvatarPreviewClip};

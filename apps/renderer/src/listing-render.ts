@@ -7,7 +7,8 @@ import {promisify} from 'node:util';
 import path from 'node:path';
 import sharp from 'sharp';
 import {renderMedia, renderStill, selectComposition} from '@remotion/renderer';
-import {VideoManifest, VideoReport, videoAssets, videoAssetFile, videoManifestHash,editorHasAudio,MapBuildings,mapCredits} from '@bienvu/contracts';
+import {VideoManifest, VideoReport, videoAssets, videoAssetFile, videoManifestHash,editorHasAudio,MapBuildings,mapCredits,type AvatarContentBounds} from '@bienvu/contracts';
+import {measureAvatarContent} from './avatar-bounds';
 import {measureVoiceWav} from '@bienvu/voice';
 import {bundleDir} from './paths';
 import {prepareProgressiveDirectory,progressiveFfmpegArgs,readProgressiveVideo,followProgressiveVideo,type StreamOptions} from './progressive-video';
@@ -43,6 +44,7 @@ export function isFastStart(bytes: Uint8Array) {
 export async function withVideoAssets<T>(input: unknown, directory: string, use: (props: ListingVideoProps) => Promise<T>): Promise<T> {
   const manifest = VideoManifest.parse(input), files = new Map<string, {file: string; mime: string; size: number}>();
   const token = randomBytes(32).toString('hex'), media: Record<string,string> = {};
+  const avatarBounds:Record<string,AvatarContentBounds>={};
   let logoBackground = '#ffffff';
   for (const asset of videoAssets(manifest)) {
     const file = path.join(directory, videoAssetFile(asset));
@@ -59,6 +61,7 @@ export async function withVideoAssets<T>(input: unknown, directory: string, use:
       const duration=Number(metadata.format.duration);
       if(video.length!==1||(asset.mime==='video/mp4'?video[0].codec_name!=='h264':!['vp8','vp9'].includes(video[0].codec_name)||String(video[0].tags?.alpha_mode??video[0].tags?.ALPHA_MODE)!=='1')||video[0].width!==asset.width||video[0].height!==asset.height
         ||!Number.isFinite(duration)||Math.abs(duration*1000-asset.durationMs!)>200)throw Error('VIDEO_ANIMATION_INVALID');
+      if(manifest.avatar?.clips.some(clip=>clip.transparent&&clip.asset.id===asset.id))avatarBounds[asset.id]=await measureAvatarContent(file,asset.width!,asset.height!,asset.durationMs!,binary('ffmpeg'),video[0].codec_name==='vp8'?'vp8':'vp9');
     } else if(asset.mime==='application/json'){
       if(bytes.length>4*1024*1024||asset.id!==manifest.map?.buildings?.id)throw new Error('VIDEO_BUILDINGS_INVALID');
       MapBuildings.parse(JSON.parse(bytes.toString('utf8')));
@@ -100,7 +103,7 @@ export async function withVideoAssets<T>(input: unknown, directory: string, use:
     const address=server.address();if(!address || typeof address==='string')throw new Error('VIDEO_ASSET_SERVER_FAILED');
     const base=`http://127.0.0.1:${address.port}/${token}/`;
     for(const asset of videoAssets(manifest))media[asset.id]=base+videoAssetFile(asset);
-    return await use({manifest,media,logoBackground,fontUrl:base+'font.woff2',displayFontUrl:base+'display.ttf',serifFontUrl:base+'serif.woff2',
+    return await use({manifest,media,logoBackground,avatarBounds,fontUrl:base+'font.woff2',displayFontUrl:base+'display.ttf',serifFontUrl:base+'serif.woff2',
       ...(manifest.map?.buildings?{maplibreModuleUrl:base+'maplibre-gl.mjs',maplibreWorkerUrl:base+'maplibre-gl-worker.mjs'}:{})});
   }finally{server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));}
 }

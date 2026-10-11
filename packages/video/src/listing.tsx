@@ -1,6 +1,6 @@
 import React, {useEffect, useState} from 'react';
 import {AbsoluteFill, Audio, Img, OffthreadVideo, Freeze, Sequence, cancelRender, continueRender, delayRender, interpolate, useCurrentFrame} from 'remotion';
-import {VideoManifest, mapFrame, type VideoPresentation} from '@bienvu/contracts';
+import {VideoManifest, mapFrame, type VideoPresentation,type AvatarContentBounds} from '@bienvu/contracts';
 import {contrastInk, displayArea, displayLocation, displayPrice, displayRooms, fitDisplayFont, fitFont, subtitleGroups, VIDEO_SAFE as safe} from './layout';
 import {cameraMotion} from './camera-motion';
 import {HorizontalPhotoScene} from './horizontal';
@@ -10,7 +10,7 @@ import {MapOverlay} from './map';
 
 // Ces URL sont résolues uniquement par le renderer Node vers son serveur
 // loopback privé. Le manifeste serveur n'accepte jamais d'URL d'asset cliente.
-export type ListingVideoProps = {manifest: VideoManifest | null; media: Record<string, string>; logoBackground: string; fontUrl: string; displayFontUrl: string;serifFontUrl?:string;maplibreModuleUrl?:string;maplibreWorkerUrl?:string};
+export type ListingVideoProps = {manifest: VideoManifest | null; media: Record<string, string>; logoBackground: string; fontUrl: string; displayFontUrl: string;serifFontUrl?:string;maplibreModuleUrl?:string;maplibreWorkerUrl?:string;avatarBounds?:Record<string,AvatarContentBounds>};
 const dark = '#132a23', paper = '#f5f7f0';
 function PhotoScene({manifest: m, media, index}: {manifest: VideoManifest; media: Record<string,string>; index: number}) {
   const f = useCurrentFrame(), scene = m.scenes[index], photo = m.photos.find(a => a.id === scene.photoAssetId)!;
@@ -202,7 +202,7 @@ export function ListingFilm(props: ListingVideoProps) {
     Promise.all(faces.map(face=>face.load())).then(loaded=>{for(const face of loaded)document.fonts.add(face);
       setFontLoaded(true);requestAnimationFrame(()=>continueRender(fontWait));}).catch(cancelRender);
   }, [fontWait, props.fontUrl, props.displayFontUrl,props.serifFontUrl, m.templateVersion,Boolean(m.editor)]);
-  if(m.editor)return <EditorFilm manifest={m} media={props.media} moduleUrl={props.maplibreModuleUrl} workerUrl={props.maplibreWorkerUrl}/>;
+  if(m.editor)return <EditorFilm manifest={m} media={props.media} moduleUrl={props.maplibreModuleUrl} workerUrl={props.maplibreWorkerUrl} bounds={props.avatarBounds}/>;
   let at = 0;
   const scenes = m.scenes.map((s, index) => {const from = at; at += s.durationFrames; return {s,index,from};});
   const horizontal=m.templateVersion==='bienvu-horizontal/1';
@@ -236,7 +236,7 @@ export function ListingFilm(props: ListingVideoProps) {
         transformOrigin:'left center',transform:`scaleX(${f / Math.max(1,at-1)})`}}/></>}
     </>}
     <MapOverlay manifest={m} media={props.media} moduleUrl={props.maplibreModuleUrl} workerUrl={props.maplibreWorkerUrl}/>
-    <AvatarOverlay manifest={m} media={props.media}/>
+    <AvatarOverlay manifest={m} media={props.media} bounds={props.avatarBounds}/>
     {m.rights.watermarked && (!horizontal||mapFrame(m.map?.settings,at,f)!==null) && <div style={{position:'absolute',left:editorial?235:262,top:editorial?785:f >= scenes.at(-1)!.from ? 540 : 780,transform:'rotate(-14deg)',
       background:'#132a23d9',border:'2px solid #ffffffa0',borderRadius:12,padding:'18px 30px',color:'#fff',
       fontWeight:750,fontSize:35,letterSpacing:2}}>BIENVU · VIDÉO D’ESSAI</div>}

@@ -98,14 +98,24 @@ test('Admin avec Better Auth/D1/R2 locaux : isolation, pagination globale, actio
     assert.equal((await adminAiQualityRequest(req('/api/admin/ai-quality?days=365'),env)).status,422);
   });
   await t.test('toutes les sections se lisent sans secrets et les mauvais paramètres sont refusés',async()=>{
-    for(const section of ['traffic','overview','videos','agencies','users','subscriptions','quotas','imports','reports','audit']){
+    for(const section of ['traffic','performance','seo','overview','videos','agencies','users','subscriptions','quotas','imports','reports','audit']){
       const response=await adminRequest(req('/api/admin?section='+section),env);assert.equal(response.status,200,section+': '+await response.clone().text());
       assert.doesNotMatch(await response.text(),/proof_hash|password|accessToken|refreshToken|object_key|BETTER_AUTH_SECRET|ip_hmac|author_key/);
     }
     assert.equal((await adminRequest(req('/api/admin?section=users&from=2026-10-01&to=2026-01-01'),env)).status,422);
-    for(const query of ['section=traffic&days=365','section=traffic&country=FR','section=users&status=ready','section=videos&cursor=evil','section=users&secret=x','section=videos&q='+encodeURIComponent('x'.repeat(101))])assert.equal((await adminRequest(req('/api/admin?'+query),env)).status,422);
+    for(const query of ['section=performance&days=365','section=performance&agency=private','section=traffic&days=365','section=traffic&country=FR','section=users&status=ready','section=videos&cursor=evil','section=users&secret=x','section=videos&q='+encodeURIComponent('x'.repeat(101))])assert.equal((await adminRequest(req('/api/admin?'+query),env)).status,422);
     const overview=await adminOverview(db,{generations:true,anonymousTrials:true,imports:'disabled',email:'local',google:false,origin:env.BETTER_AUTH_URL});
     assert.equal(overview.counts.agencies,2);assert.equal(overview.counts.users,3);assert.equal(overview.counts.activeSubscriptions,0);
+  });
+  await t.test('historique des durées et domaines référents : superadmin seul, réponses privées et bornées',async()=>{
+    for(const section of ['performance','seo']){
+      for(const [cookie,expected] of [['',401],[cookies[1],403],[cookies[2],401]] as const){
+        const response=await adminRequest(req('/api/admin?section='+section,cookie),env);assert.equal(response.status,expected);assert.equal(response.headers.get('cache-control'),'private, no-store');
+      }
+      const staff=await adminRequest(req('/api/admin?section='+section,cookies[1]),{...env,ADMIN_EMAIL:users[1].email});assert.equal(staff.status,403);
+      const response=await adminRequest(req('/api/admin?section='+section),env);assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'private, no-store');
+    }
+    for(const days of ['7','30','90']){const response=await adminRequest(req('/api/admin?section=performance&days='+days),env);assert.equal(response.status,200);assert.equal((await response.json() as {daily:unknown[]}).daily.length,Number(days));}
   });
   await t.test('imports : diagnostic privé ciblé, sans payload brut ni exposition à l’import public',async()=>{
     const {row}=await beginImport(db,agency.id,'https://fixtures.bienvu.example/vente','diagnostic-fixture-key');

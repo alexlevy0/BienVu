@@ -1,6 +1,8 @@
 'use client';
+import {useState} from 'react';
 import type {AdminOverview,AdminSection,AdminTraffic} from '@bienvu/contracts';
 import {HomeIcon} from './home-icons';
+import {AdminPerformanceTimelineDialog} from './admin-performance-timeline';
 export type AdminTarget={view:AdminSection|'system';status?:string;from?:string};
 const n=(v:number)=>v.toLocaleString('fr-FR');
 const usd=(v:number)=>new Intl.NumberFormat('fr-FR',{style:'currency',currency:'USD',minimumFractionDigits:6,maximumFractionDigits:6}).format(v/1e6);
@@ -22,8 +24,10 @@ export function AdminAttention({data,onFocus}:{data:AdminOverview;onFocus:(targe
   return <section className="admin-card admin-attention" aria-label="Points d’attention"><div className="admin-card-heading"><h3>Points d’attention</h3><span>{alerts.length} à suivre</span></div>{alerts.length?<div className="admin-alert-grid">{alerts.map(a=><button type="button" className={`admin-alert admin-alert-${a.level}`} key={a.title} onClick={()=>onFocus(a.target)}><span><strong>{a.title}</strong><HomeIcon name="arrow" size={17}/></span><p>{a.body}</p></button>)}</div>:<p className="admin-muted">Aucune alerte dans les registres actuels. La livraison des e-mails et les factures restent à vérifier séparément.</p>}</section>;
 }
 export function AdminPerformance({data}:{data:AdminOverview}){
+  const [timelineOpen,setTimelineOpen]=useState(false);
   const p=data.performance,completed=p.ready+p.failed;
-  return <><div className="admin-insight-metrics admin-performance-metrics"><Metric label="Taux de réussite" value={percent(p.ready,completed)} note={`${n(p.ready)} prêts / ${n(completed)} jobs finalisés`}/><Metric label="Durée moyenne" value={p.averageSeconds===null?'Non mesurée':Math.round(p.averageSeconds)+' s'} note={`${n(p.measuredReady)} / ${n(p.ready)} vidéos prêtes chronométrées`}/><Metric label="Encore en cours" value={n(p.active)} note="Exclus du taux de réussite"/></div>
+  return <><div className="admin-insight-metrics admin-performance-metrics"><Metric label="Taux de réussite" value={percent(p.ready,completed)} note={`${n(p.ready)} prêts / ${n(completed)} jobs finalisés`}/><article className="admin-metric-interactive"><button type="button" aria-haspopup="dialog" aria-expanded={timelineOpen} onClick={()=>setTimelineOpen(true)}><span>Durée moyenne</span><strong>{p.averageSeconds===null?'Non mesurée':Math.round(p.averageSeconds)+' s'}</strong><small>{n(p.measuredReady)} / {n(p.ready)} vidéos prêtes chronométrées</small><span className="admin-metric-link">Voir l’évolution <HomeIcon name="arrow" size={16}/></span></button></article><Metric label="Encore en cours" value={n(p.active)} note="Exclus du taux de réussite"/></div>
+    {timelineOpen&&<AdminPerformanceTimelineDialog onClose={()=>setTimelineOpen(false)}/>}
     <section className="admin-card"><h3>Performance sur {p.days} jours</h3><p className="admin-muted">Jobs créés sur les {p.days} derniers jours calendaires UTC, comptes, anonymes et tests internes inclus. Durée de la création à l’événement « ready », attente et reprises comprises. Un événement absent reste non mesuré ; une purge ultérieure ne change pas le chronométrage.</p><div className="admin-summary-lines"><p><span>Générations enregistrées</span><strong>{n(p.total)}</strong></p><p><span>Terminées avec succès</span><strong>{n(p.ready)}</strong></p><p><span>Échecs</span><strong>{n(p.failed)}</strong></p><p><span>Au-delà de leur échéance, tous les jobs actifs</span><strong>{n(data.counts.overdue??0)}</strong></p></div></section>
     <section className="admin-card admin-insight-spaced"><h3>Erreurs conservées</h3>{data.errors.length?<div className="admin-table-scroll"><table className="admin-table"><thead><tr><th>Code</th><th>Étape</th><th>Occurrences</th></tr></thead><tbody>{data.errors.map(e=><tr key={e.code+e.stage}><td>{e.code}</td><td>{e.stage}</td><td>{n(e.count)}</td></tr>)}</tbody></table></div>:<p className="admin-muted">Aucune erreur conservée.</p>}<p className="admin-muted">Registres jobs/imports, toutes dates. Les imports déjà purgés ne sont pas reconstitués.</p></section></>;
 }

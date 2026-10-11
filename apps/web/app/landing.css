@@ -417,6 +417,12 @@
 .home-conversation-steps li.step-done {color:#35423a}
 .home-conversation-steps li.step-current {color:#161a17;font-weight:600}
 .home-conversation-steps li.step-skipped {color:#747b72}
+.home-step-label {min-width:0}
+.home-conversation-steps .step-with-detail {grid-column:1/-1}
+.home-conversation-steps .step-needs-confirmation {align-items:flex-start}
+.step-needs-confirmation .home-step-label {flex:1}
+.step-needs-confirmation .home-step-symbol {margin-top:2px}
+.home-step-detail {display:block;max-width:520px;font-size:12px;line-height:1.5;font-weight:400;margin-top:5px}
 .home-step-symbol {width:31px;height:31px;flex:none;display:grid;place-items:center;border-radius:50%;background:#eff0ec;color:#a0a2a7;font-size:22px}
 .step-done .home-step-symbol {background:#e1e8d9;color:#1a4028;font-size:18px}
 .step-current .home-step-symbol {background:transparent;border:2px dotted #263c30;color:transparent;animation:home-spin 2s linear infinite}

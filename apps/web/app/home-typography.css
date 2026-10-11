@@ -1,0 +1,74 @@
+@font-face{font-family:'Newsreader';src:url('/fonts/newsreader.woff2') format('woff2');font-style:normal;font-weight:400 700;font-display:swap}
+@font-face{font-family:'Newsreader';src:url('/fonts/newsreader-italic.woff2') format('woff2');font-style:italic;font-weight:400 700;font-display:swap}
+
+/* Page typography is independent of the wordmark, sidebar and video templates. */
+.home-studio-home{
+ --home-font-heading:'Newsreader',Georgia,serif;
+ --home-font-text:'Inter Tight',Arial,Helvetica,sans-serif;
+ --home-type-title:clamp(42px,4.3vw,64px);
+ --home-type-copy:clamp(16px,1.3vw,20px);
+ /* Contain decorative glows at the viewport edge without a scroll container. */
+ overflow-x:clip;
+}
+.home-studio-home :is(.home-topbar,.home-content,.home-premium-footer){font-family:var(--home-font-text)}
+.home-studio-home .home-hero-dashboard h1{
+ font-family:var(--home-font-heading);font-synthesis:none;
+ font-size:clamp(48px,4.65vw,76px);font-weight:400;
+ line-height:1.03;letter-spacing:-.045em;margin-bottom:28px;
+}
+.home-studio-home .home-hero-dashboard h1 em{font-family:inherit;font-weight:inherit;letter-spacing:inherit}
+.home-studio-home .home-hero-dashboard h1 strong{font-weight:650}
+.home-studio-home .home-hero-dashboard h1 em::after{bottom:-7px;height:5px}
+.home-studio-home .home-hero-dashboard .home-intro{font-size:var(--home-type-copy);line-height:1.55}
+.home-studio-home .home-hero-dashboard .home-intro strong{font-weight:500}
+
+.home-studio-home :is(.home-avatars,.home-life,.home-sharing,.home-editor-demo) h2{
+ font-family:var(--home-font-heading);font-synthesis:none;
+ font-size:var(--home-type-title);font-weight:500;
+ line-height:1.08;letter-spacing:-.035em;
+}
+.home-studio-home :is(.home-avatars,.home-life,.home-sharing,.home-editor-demo) h2 em{
+ font-family:inherit;font-size:inherit;font-weight:400;
+ line-height:inherit;letter-spacing:inherit;white-space:normal;
+}
+.home-studio-home :is(.home-avatars,.home-life,.home-sharing,.home-editor-demo) h2 em::after{left:0;right:0}
+.home-studio-home :is(.home-avatars-copy,.home-life-heading,.home-sharing-heading,.home-editor-demo-heading)>p:not(.home-avatars-note,.home-life-kicker){
+ font-size:var(--home-type-copy);line-height:1.55;
+}
+.home-studio-home :is(.home-discover,.home-resource-links) h2{
+ font-family:var(--home-font-heading);font-size:clamp(28px,2.5vw,38px);
+ font-weight:500;line-height:1.18;letter-spacing:-.03em;
+}
+.home-studio-home :is(.home-avatars-benefits,.home-life-features,.home-life-demo-card,.home-share-caption,.home-share-download-copy,.home-editor-demo-features) h3{
+ font-family:var(--home-font-text);font-size:clamp(18px,1.35vw,22px);
+ font-weight:600;line-height:1.3;letter-spacing:-.015em;
+}
+.home-studio-home :is(.home-avatars-benefits,.home-life-features,.home-life-demo-card,.home-share-caption,.home-share-download-copy,.home-editor-demo-features) p{font-size:14px;line-height:1.6}
+.home-studio-home :is(.home-life-cta,.home-share-cta,.home-editor-demo-cta) h3{
+ font-family:var(--home-font-heading);font-size:clamp(28px,2.8vw,42px);
+ font-weight:500;line-height:1.16;letter-spacing:-.03em;
+}
+.home-studio-home .home-life-faq h3{
+ font-family:var(--home-font-heading);font-weight:500;
+ font-size:28px;line-height:1.2;letter-spacing:-.025em;
+}
+.home-studio-home .home-kit h2{font-family:var(--home-font-heading);font-size:clamp(48px,24cqw,94px);font-weight:500;line-height:1.02;letter-spacing:-.04em}
+.home-studio-home .home-kit-description{font-family:var(--home-font-text);font-size:18px;line-height:1.5;letter-spacing:0}
+.home-studio-home .home-avatar-preview figcaption{font-family:var(--home-font-text);font-size:16px;font-weight:500;line-height:1.5;letter-spacing:0}
+.home-studio-home .home-premium-footer-about h2{font-family:var(--home-font-heading);font-size:clamp(28px,2.45cqw,34px);font-weight:500;line-height:1.2;letter-spacing:-.03em}
+.home-studio-home .home-premium-footer-column h3{font-family:var(--home-font-text);font-size:16px;font-weight:600;line-height:1.35;letter-spacing:0}
+.home-studio-home .home-premium-footer-signature>p{font-family:var(--home-font-heading);font-weight:400;line-height:1.16;letter-spacing:-.03em}
+
+@media(max-width:1200px) and (min-width:761px){
+ .home-studio-home .home-hero-dashboard h1{font-size:clamp(43px,4.6vw,58px)}
+}
+@media(max-width:760px){
+ .home-studio-home{--home-type-title:clamp(36px,7.4vw,52px);--home-type-copy:16px}
+ .home-studio-home .home-hero-dashboard h1{font-size:clamp(36px,7.8vw,54px);line-height:1.08;letter-spacing:-.04em;margin-bottom:22px}
+ .home-studio-home .home-hero-dashboard h1 em::after{height:4px;bottom:-4px}
+ .home-studio-home .home-kit-description{font-size:17px}
+ .home-studio-home .home-avatar-preview figcaption{font-size:14px}
+}
+@media(max-width:700px){
+ .home-studio-home .home-kit h2{font-size:clamp(46px,15cqw,70px)}
+}

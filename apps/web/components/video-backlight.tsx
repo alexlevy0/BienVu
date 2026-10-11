@@ -3,8 +3,8 @@
 import {useEffect,useRef,type ReactNode,type RefObject} from 'react';
 import './video-backlight.css';
 
-export function VideoBacklight({video,active=true,poster,children,className=''}:{
-  video?:RefObject<HTMLVideoElement|null>;active?:boolean;poster?:string|null;children?:ReactNode;className?:string}){
+export function VideoBacklight({video,active=true,poster,posterLoading='eager',children,className=''}:{
+  video?:RefObject<HTMLVideoElement|null>;active?:boolean;poster?:string|null;posterLoading?:'eager'|'lazy';children?:ReactNode;className?:string}){
   const canvas=useRef<HTMLCanvasElement>(null);
   useEffect(()=>{
     const player=video?.current,surface=canvas.current;
@@ -61,7 +61,7 @@ export function VideoBacklight({video,active=true,poster,children,className=''}:
   },[active,video]);
   return <div className={`video-backlight ${className}`} aria-hidden="true">
     {!children&&<span className="video-backlight-fallback"/>}
-    {poster&&<img key={poster} src={poster} alt="" loading="eager" decoding="async" fetchPriority="low"
+    {poster&&<img key={poster} src={poster} alt="" loading={posterLoading} decoding="async" fetchPriority="low"
       onLoad={event=>{event.currentTarget.dataset.loaded='true';}}
       onError={event=>{delete event.currentTarget.dataset.loaded;event.currentTarget.style.visibility='hidden';}}/>}
     {children}

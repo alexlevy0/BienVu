@@ -5,10 +5,11 @@ import {publicErrors,type GenerationView,type PublicErrorCode,type VideoAspectRa
 import {generationActive} from './generation-progress';
 import {HomeIcon} from './home-icons';
 import {ProblemReport} from './problem-report';
-import {generationSteps,generationProgressText} from '../lib/generation-steps';
+import {generationSteps,generationProgressText,generationMapOmissionText} from '../lib/generation-steps';
 import {ProgressiveVideo} from './progressive-video';
 import {VideoBacklight} from './video-backlight';
 import {GenerationRenderProgress} from './generation-estimate';
+import {GenerationMapConfirmation} from './generation-map-confirmation';
 
 type RequestMessage={kind:'url'|'manual';text:string};
 
@@ -21,6 +22,7 @@ export function ConversationGeneration({job,request,sending,anonymous,unavailabl
   const stages=generationSteps(sending?null:job,request.kind==='manual');
   const horizontal=(job?.aspectRatio??aspectRatio)==='16:9';
   const ready=job?.status==='ready',active=job&&generationActive(job);
+  const mapOmission=generationMapOmissionText(job);
   const assembling=job?.status==='rendering';
   const percent=assembling?job.progressPercent:0;
   async function act(path:string){setBusy(true);setFeedback('');try{const response=await fetch(path,{method:'POST'});
@@ -35,23 +37,25 @@ export function ConversationGeneration({job,request,sending,anonymous,unavailabl
       {request.kind==='url'&&<small>Créer une vidéo de cette annonce</small>}
     </div></div>
     <div className="home-conversation-response">
-      <p className="home-conversation-lead" role="status">{sending?'Envoi de votre demande…':ready?'Votre vidéo est prête.':job?.status==='failed'?'La création a été interrompue.':'Nous préparons votre visite en vidéo.'}</p>
+      <p className="home-conversation-lead" role="status">{sending?'Envoi de votre demande…':ready?'Votre vidéo est prête.':job?.status==='failed'?'La création a été interrompue.':job?.mapConfirmation?'Confirmez la ville pour continuer.':'Nous préparons votre visite en vidéo.'}</p>
       <div className={`home-conversation-result${horizontal?' is-horizontal':''}`}><div className={`home-conversation-media${horizontal?' is-horizontal':''}`}>
         {job&&(assembling||job.videoUrl)?<ProgressiveVideo key={job.id} jobId={job.id} anonymous={anonymous} active={assembling} finalUrl={job.videoUrl} poster={posterFailed?null:poster} percent={percent} label={anonymous?'Aperçu filigrané de votre vidéo':'Votre vidéo immobilière'}/>
           :<div className="video-backlight-frame"><VideoBacklight poster={posterFailed?null:poster}/><div className={`home-conversation-poster${job?.status==='failed'?' home-poster-failed':''}`}>{poster&&!posterFailed&&<img src={poster} alt="" onError={()=>setPosterFailed(true)}/>}
             {(!poster||posterFailed)&&<span className="home-poster-skeleton" aria-hidden="true"/>}
             <div className="home-poster-overlay">{job?.status==='failed'||ready?<span className="home-poster-stopped" aria-hidden="true">!</span>:<span className="home-activity-ring" aria-hidden="true"/>}
-              <strong>{sending?'Envoi en cours':job?.status==='failed'?'Création interrompue':ready?'Vidéo indisponible':'Génération en cours'}</strong>
+              <strong>{sending?'Envoi en cours':job?.status==='failed'?'Création interrompue':ready?'Vidéo indisponible':job?.mapConfirmation?'En attente de votre choix':'Génération en cours'}</strong>
               {assembling&&<span className="home-poster-percent">Assemblage · {percent} %</span>}</div>
             <small>{horizontal?'Horizontal 16:9':'Vertical 9:16'} · {job?.syntheticVoice===false?'Sans voix off':'Voix française'}</small></div></div>}
       </div><div className="home-conversation-status">
-        {active||sending?<ol className="home-conversation-steps" aria-label="Étapes de création">{stages.map(({key,state,label})=>{
-          return <li className={`step-${state}`} key={key} data-rendering={assembling&&key==='rendering'||undefined} aria-current={state==='current'?'step':undefined}>
-            <span className="home-step-symbol" aria-hidden="true">{state==='done'?'✓':state==='current'?'◌':state==='skipped'?'–':'·'}</span><span>{label}</span>
+        {active||sending?<ol className="home-conversation-steps" aria-label="Étapes de création">{stages.map(({key,state,label,detail})=>{
+          const confirmMap=key==='map'&&job?.mapConfirmation;
+          return <li className={`step-${state}${detail||confirmMap?' step-with-detail':''}${confirmMap?' step-needs-confirmation':''}`} key={key} data-rendering={assembling&&key==='rendering'||undefined} aria-current={state==='current'?'step':undefined}>
+            <span className="home-step-symbol" aria-hidden="true">{state==='done'?'✓':state==='current'?'◌':state==='skipped'?'–':'·'}</span><div className="home-step-label">{label}{detail&&<small className="home-step-detail">{detail}</small>}{confirmMap&&<GenerationMapConfirmation key={job.id} job={job} onRefresh={onRefresh}/>}</div>
             {assembling&&key==='rendering'&&<GenerationRenderProgress job={job} unavailable={unavailable} className="home-render-percent"/>}</li>;
         })}</ol>:null}
         {(active||sending)&&<div className={`home-stage-track${assembling?' is-measured':''}`} role="progressbar" aria-label="Traitement de la vidéo" aria-valuenow={assembling?percent:undefined} aria-valuemin={assembling?0:undefined} aria-valuemax={assembling?100:undefined} aria-valuetext={sending||!job?'Envoi en cours':assembling?`Assemblage de la vidéo : ${percent} %`:generationProgressText(job)}><span style={assembling?{width:`${percent}%`}:undefined}/></div>}
         {unavailable&&<p role="status" className="home-stage-note">Connexion momentanément interrompue. L’état sera actualisé à votre retour.</p>}
+        {job&&['ready','failed'].includes(job.status)&&mapOmission&&<p className="home-stage-note"><strong>Carte non ajoutée.</strong> {mapOmission}</p>}
         {job?.status==='failed'&&<p role="alert" className="home-stage-error">{publicErrors[job.errorCode as PublicErrorCode]?.[1]??publicErrors.GENERATION_FAILED[1]}</p>}
         {job?.retryAllowed&&<button type="button" className="text-button" disabled={busy} onClick={()=>void act(`/api/generations/${job.id}/retry`)}>Relancer le démarrage</button>}
         {ready&&job?.ownership==='owned'&&job.downloadUrl&&<a className="home-primary-button" href={job.downloadUrl} download>Télécharger la vidéo <span aria-hidden="true">↗</span></a>}

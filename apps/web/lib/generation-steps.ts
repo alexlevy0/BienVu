@@ -1,7 +1,19 @@
 import type {GenerationView} from '@bienvu/contracts';
 
 type StepKey='importing'|'photos'|'map'|'narration'|'avatar'|'animations'|'rendering';
-export type GenerationStep={key:StepKey;state:'future'|'current'|'done'|'skipped';label:string};
+export type GenerationStep={key:StepKey;state:'future'|'current'|'done'|'skipped';label:string;detail?:string};
+
+export function generationMapOmissionText(job:GenerationView|null):string|undefined{
+  if(job?.preparation?.map!=='skipped')return;
+  switch(job.mapOmissionReason){
+    case 'location_missing':return 'La ville du bien n’est pas renseignée. Ajoutez-la ou confirmez la localisation dans Personnaliser → Carte pour une prochaine vidéo.';
+    case 'ambiguous_location':return `${job.locality?`La localisation « ${job.locality} »`:'La localisation du bien'} n’a pas pu être identifiée sans ambiguïté. Confirmez-la dans Personnaliser → Carte pour une prochaine vidéo.`;
+    case 'map_unavailable':return 'Le service cartographique était indisponible lors de la préparation. La vidéo continue sans carte. Vous pourrez réessayer sur une prochaine génération.';
+    case 'confirmation_skipped':return 'Vous avez choisi de continuer sans carte.';
+    case 'confirmation_timeout':return 'La localisation n’a pas été confirmée à temps. La vidéo a continué sans carte.';
+    default:return 'La raison n’a pas été enregistrée pour cette génération. Vérifiez la localisation dans Personnaliser → Carte pour une prochaine vidéo.';
+  }
+}
 
 // A checklist of server checkpoints, never a progression based on elapsed time.
 export function generationSteps(job:GenerationView|null,manual=false):GenerationStep[]{
@@ -26,6 +38,9 @@ export function generationSteps(job:GenerationView|null,manual=false):Generation
     steps.push(step(key,state==='ready'?'done':state==='skipped'?'skipped':'future',pending,current,done,skipped));
   };
   optional('map','Carte','Génération de la carte','Carte prête','Carte non ajoutée');
+  const mapStep=steps.find(s=>s.key==='map');
+  if(mapStep&&job?.mapConfirmation&&!terminal&&!waiting){mapStep.state='current';mapStep.label='Confirmez la ville pour la carte';}
+  if(mapStep?.state==='skipped')mapStep.detail=generationMapOmissionText(job);
   steps.push(step('narration',voiceReady?'done':'future',job?.syntheticVoice===false?'Texte':'Voix off',
     job?.stage==='scripting'||job?.syntheticVoice===false?'Préparation du texte':'Création de la voix off',job?.syntheticVoice===false?'Texte prêt':'Voix off prête'));
   optional('avatar','Avatar IA','Génération de l’avatar','Avatar prêt','Avatar non ajouté');

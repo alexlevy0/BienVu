@@ -82,8 +82,24 @@ export type AvatarPreviewClip=z.infer<typeof AvatarPreviewClip>;
 export function avatarFrameStyle(settings:AvatarCustomization,width:number,height:number,transparent=false){
   const size=width*settings.width/100,h=settings.appearance==='circle'?size:size*1.3;
   return {position:'absolute' as const,left:Math.max(0,Math.min(width-size,width*settings.x/100-size/2)),
-    top:Math.max(0,Math.min(height-h,height*settings.y/100-h/2)),width:size,height:h,
+    top:settings.y===85?Math.max(0,height-h):Math.max(0,Math.min(height-h,height*settings.y/100-h/2)),width:size,height:h,
     borderRadius:settings.appearance==='circle'?'50%':settings.appearance==='card'?Math.round(size*.05):0,
     overflow:'hidden' as const,background:transparent?'transparent':'#e6eddf',
     boxShadow:transparent?'none':'0 4px 18px #0003',pointerEvents:'none' as const};
+}
+export type AvatarContentBounds={left:number;top:number;width:number;height:number};
+// Pure pixel/geometry helpers shared by the browser and the native renderer.
+export function avatarContentBounds(rgba:Uint8Array|Uint8ClampedArray,width:number,height:number):AvatarContentBounds|null{
+  if(!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1||rgba.length!==width*height*4)throw Error('AVATAR_PIXELS_INVALID');
+  let left=width,top=height,right=-1,bottom=-1;
+  for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+    if(rgba[(y*width+x)*4+3]<16)continue;
+    left=Math.min(left,x);right=Math.max(right,x);top=Math.min(top,y);bottom=Math.max(bottom,y);
+  }
+  return right<0?null:{left,top,width:right-left+1,height:bottom-top+1};
+}
+export function avatarContentStyle(bounds:AvatarContentBounds,sourceWidth:number,sourceHeight:number,width:number,height:number){
+  const scale=Math.min(width/bounds.width,height/bounds.height);
+  return {position:'absolute' as const,left:(width-bounds.width*scale)/2-bounds.left*scale,
+    top:height-(bounds.top+bounds.height)*scale,width:sourceWidth*scale,height:sourceHeight*scale,objectFit:'fill' as const};
 }

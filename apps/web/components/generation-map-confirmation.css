@@ -1,0 +1,12 @@
+.generation-map-confirmation{margin-top:12px;padding:14px;border:1px solid #b9cbb1;border-radius:12px;background:#f2f5ed;color:#35423a;font-size:13px;font-weight:400;line-height:1.5;max-width:520px}
+.generation-map-confirmation label{display:block;font-weight:600;margin-bottom:8px}
+.generation-map-confirmation select{display:block;width:100%;min-width:0;padding:10px 12px;border:1px solid #b9cbb1;border-radius:8px;background:#fff;color:#263c2b;font:inherit}
+.generation-map-confirmation-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.generation-map-confirmation-actions button{min-height:40px;padding:8px 12px;border:1px solid #263c2b;border-radius:8px;background:#263c2b;color:#fff;font:inherit;cursor:pointer}
+.generation-map-confirmation-actions .generation-map-skip{background:transparent;color:#35423a;border-color:#b9cbb1}
+.generation-map-confirmation-actions button:disabled{opacity:.5;cursor:default}
+.generation-map-confirmation :is(select,button):focus-visible{outline:2px solid #658555;outline-offset:3px}
+.generation-map-confirmation p{margin:8px 0 0;font-size:12px;line-height:1.5}
+.generation-map-confirmation-help{color:#66745e}
+.generation-steps .step-current:has(.generation-map-confirmation){border-radius:14px;background:#f2f5ed;color:#35423a;max-width:550px}
+@media(max-width:600px){.generation-map-confirmation{padding:12px}.generation-map-confirmation-actions{flex-direction:column}.generation-map-confirmation-actions button{width:100%}}

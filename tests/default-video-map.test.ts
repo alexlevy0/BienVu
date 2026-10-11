@@ -5,7 +5,7 @@ import sharp from 'sharp';
 import {DEFAULT_VIDEO_MAP,VideoMapDefaults,GenerationRequest,GenerationCustomization,defaultVideoCustomization,automaticMapLocation,
   mapInterval,mapZoomAt,createEditorDocument,type GenerationRequest as GenerationInput,type MapLocation,type VideoCustomization} from '../packages/contracts/src/index';
 import {videoMapSettings,setVideoMapSettings,generationMapDefault,findDefaultGenerationMap,admitGeneration,admitAnonymous,createAnonymousSession,
-  findGeneration,findImport,failGeneration} from '../packages/db/src/index';
+  findGeneration,generationView,findImport,failGeneration} from '../packages/db/src/index';
 import {migrateNarrationProbe,seedNarrationFixture} from '../scripts/narration-fixtures';
 import {prepareDefaultGenerationMap,prepareGenerationMap} from '../apps/pipeline/src/default-video-map';
 import {prepareJobNarration} from '../apps/pipeline/src/narration';
@@ -118,7 +118,13 @@ test('carte par défaut : admission figée, isolation, cache, montage et essais 
     for(const unavailable of [false,true]){
       const {job}=await create(unavailable?'default-map-offline':'default-map-unknown');
       assert.equal(await prepareDefaultGenerationMap(env,job,async()=>unavailable?new Response('unavailable',{status:503}):Response.json({features:[]})),null);
-      assert.equal((await env.DB.prepare('SELECT reason FROM generation_map_resolutions WHERE job_id=?').bind(job.jobId).first<{reason:string}>())!.reason,unavailable?'map_unavailable':'ambiguous_location');
+      const reason=unavailable?'map_unavailable':'ambiguous_location';
+      assert.equal((await env.DB.prepare('SELECT reason FROM generation_map_resolutions WHERE job_id=?').bind(job.jobId).first<{reason:string}>())!.reason,reason);
+      const resolved=(await findGeneration(env.DB,job.agencyId,job.jobId))!;
+      assert.equal(resolved.mapOmissionReason,reason);
+      assert.equal(generationView(resolved).mapOmissionReason,reason);
+      assert.equal(generationView(resolved,Date.now(),'anonymous').mapOmissionReason,reason);
+      assert.equal(await findGeneration(env.DB,'foreign-agency',job.jobId),null);
       assert.equal(await prepareDefaultGenerationMap(env,job,async()=>{throw Error('RETRY_MUST_NOT_CHANGE_TIMELINE');}),null);
       await failGeneration(env.DB,job,'GENERATION_FAILED');
     }

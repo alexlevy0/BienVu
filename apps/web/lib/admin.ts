@@ -1,5 +1,5 @@
-import {AdminQuery,AdminTrafficQuery,AdminAction,EntityId} from '@bienvu/contracts';
-import {adminPage,adminOverview,adminTraffic,adminAction,adminVideoDetail,findGeneration} from '@bienvu/db';
+import {AdminQuery,AdminTrafficQuery,AdminPerformanceQuery,AdminAction,EntityId} from '@bienvu/contracts';
+import {adminPage,adminOverview,adminTraffic,adminPerformance,adminAction,adminVideoDetail,findGeneration} from '@bienvu/db';
 import type {AuthEnvironment} from './auth';
 import {commercialSummary} from './commercial';
 import {seoSummary} from './seo-analytics';
@@ -27,6 +27,10 @@ export async function adminRequest(request:Request,env:AdminEnvironment){
     if(params.get('section')==='traffic'){
       const query=AdminTrafficQuery.safeParse(Object.fromEntries(params));if(!query.success)throw new RequestFailure('VALIDATION_ERROR');
       return Response.json(await adminTraffic(env.DB,Number(query.data.days) as 7|30,env.TRAFFIC_ENABLED==='true'));
+    }
+    if(params.get('section')==='performance'){
+      const query=AdminPerformanceQuery.safeParse(Object.fromEntries(params));if(!query.success)throw new RequestFailure('VALIDATION_ERROR');
+      return Response.json(await adminPerformance(env.DB,Number(query.data.days) as 7|30|90));
     }
     if(params.get('section')==='overview'){
       if([...params.keys()].some(key=>key!=='section'))throw new RequestFailure('VALIDATION_ERROR');

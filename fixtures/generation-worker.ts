@@ -1,15 +1,16 @@
 import {DurableObject} from 'cloudflare:workers';
 import worker,{reconcileBatch,reconcileGeneration,GenerationWorkflow, type GenerationEnv} from '../apps/pipeline/src/generation-worker';
-import {VideoManifest,VideoReport,videoManifestHash,videoObjectKey,videoPreviewKey} from '../packages/contracts/src/index';
+import {VideoManifest,VideoReport,videoManifestHash,videoObjectKey,videoPreviewKey,type ConfirmedVideoMap} from '../packages/contracts/src/index';
 import {DEFAULT_SCRIPT_MODEL} from '../packages/narration/src/index';
 import {googleTts,fishTts,cartesiaTts,frenchVoiceConfig} from '../packages/voice/src/index';
 import {toneFixture} from './voice';
 import {fixturePlan,fixtureScriptMetrics} from './narration';
-import {findGeneration,generationView} from '../packages/db/src/index';
+import {findGeneration,generationView,type GenerationRow} from '../packages/db/src/index';
+import {prepareGenerationMap} from '../apps/pipeline/src/default-video-map';
 import {productRenderBudget} from '../apps/pipeline/src/product-render-budget';
 export class FixtureGenerationWorkflow extends GenerationWorkflow {
   // The workflow fixture must never contact the real map service.
-  protected override async defaultMap(){return null;}
+  protected override async defaultMap(_row:GenerationRow):Promise<ConfirmedVideoMap|null>{return null;}
   protected override diagnostic(error:unknown){console.error(error);}
   protected override async providers(voiceName?:string,voiceEnabled=true){
     const config=frenchVoiceConfig(voiceName??'fish-manon','bienvu-fixture');
@@ -17,6 +18,19 @@ export class FixtureGenerationWorkflow extends GenerationWorkflow {
       :config.provider==='fish'?fishTts(config,'fixture-key-never-networked',{fetch:async()=>new Response(new Uint8Array(toneFixture(4500)))})
       :googleTts(config,async()=>'fixture-token-never-networked', {fetch:async()=>{const bytes=toneFixture(4500);let text='';for(const b of bytes)text+=String.fromCharCode(b);return Response.json({audioContent:btoa(text)});}});
     return {mode:'mock' as const,script:{model:DEFAULT_SCRIPT_MODEL,plan:async(context:Parameters<typeof fixturePlan>[0])=>({plan:fixturePlan(context),metrics:fixtureScriptMetrics()})},voice:{config,synthesize:voiceEnabled?voice.synthesize:async():Promise<never>=>{throw Error('TTS_MUST_NOT_RUN');}}};
+  }
+}
+export class FixtureMapConfirmationWorkflow extends FixtureGenerationWorkflow {
+  protected override async defaultMap(row:GenerationRow){
+    return prepareGenerationMap(this.env,row,async raw=>{
+      const url=new URL(String(raw));
+      if(url.hostname!=='data.geopf.fr')throw Error('EXTERNAL_NETWORK_FORBIDDEN');
+      if(url.pathname.endsWith('/search'))return Response.json({features:[
+        {geometry:{type:'Point',coordinates:[-1.15,46.16]},properties:{label:'La Rochelle',type:'municipality',postcode:'17000'}},
+        {geometry:{type:'Point',coordinates:[5.73,47.76]},properties:{label:'La Rochelle',type:'municipality',postcode:'70120'}}]});
+      const plate=await this.env.MEDIA.get('fixture-map-plate.jpg');if(!plate)throw Error('FIXTURE_MAP_MISSING');
+      return new Response(await plate.arrayBuffer(),{headers:{'Content-Type':'image/jpeg'}});
+    });
   }
 }
 export class FixtureInvalidScriptWorkflow extends FixtureGenerationWorkflow {

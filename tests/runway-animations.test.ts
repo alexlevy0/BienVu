@@ -52,7 +52,7 @@ async function setup(t:{after(fn:()=>Promise<void>):void},label:string,clips:num
     // Only the animation journal is kept legacy; admission uses current map and avatar settings.
     await env.DB.exec((await readFile(new URL('../packages/db/migrations/0056_default_video_map.sql',import.meta.url),'utf8')).replace(/^--.*$/gm,'').replace(/\n/g,' '));
     await env.DB.exec((await readFile(new URL('../packages/db/migrations/0058_heygen_avatars.sql',import.meta.url),'utf8')).replace(/^--.*$/gm,'').replace(/\n/g,' '));
-    for(const file of ['0061_full_length_avatars.sql','0062_generation_preparation_steps.sql','0063_offers_and_credit_rollover.sql'])
+    for(const file of ['0061_full_length_avatars.sql','0062_generation_preparation_steps.sql','0063_offers_and_credit_rollover.sql','0069_generation_map_confirmation.sql'])
       await env.DB.exec((await readFile(new URL('../packages/db/migrations/'+file,import.meta.url),'utf8')).replace(/^--.*$/gm,'').replace(/\n/g,' '));
     await env.DB.exec((await readFile(new URL('../packages/db/migrations/0064_automatic_import_estimates.sql',import.meta.url),'utf8')).replace(/^--.*$/gm,'').replace(/\n/g,' '));
   }else await migrateNarrationProbe(env.DB);

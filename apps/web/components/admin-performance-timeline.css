@@ -1,0 +1,36 @@
+.admin-insight-metrics article.admin-metric-interactive{padding:0;overflow:hidden}
+.admin-metric-interactive>button{width:100%;height:100%;padding:22px;border:0;background:none;color:inherit;text-align:left;font:inherit;cursor:pointer;transition:background .18s ease}
+.admin-metric-interactive>button:hover{background:#e2ebda}
+.admin-metric-interactive>button>span:first-child{font-size:12px;color:#66715d}
+.admin-metric-interactive .admin-metric-link{display:flex;align-items:center;gap:8px;color:#48683c;font-size:12px;margin-top:14px}
+.admin-metric-interactive>button:focus-visible{outline:2px solid #6e8e5c;outline-offset:-4px}
+.admin-duration-dialog{width:min(940px,calc(100vw - 32px));box-sizing:border-box}
+.admin-duration-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:24px 0;padding:18px;background:#eef2e7;border-radius:10px}
+.admin-duration-summary>div{display:grid;gap:8px;min-width:0}
+.admin-duration-summary span{font-size:12px;color:#66715d}
+.admin-duration-summary strong{font-size:20px;font-weight:500}
+.admin-duration-summary>div:last-child strong{font-size:15px}
+.admin-duration-plot{position:relative;width:100%;margin:22px 0 12px}
+.admin-duration-plot svg{display:block;width:100%;height:auto;overflow:visible}
+.admin-duration-plot text{fill:#74806b;font-size:12px;font-family:inherit}
+.admin-duration-grid{stroke:#dfe5d8;stroke-width:1}
+.admin-duration-line{stroke:#587c49;stroke-width:2.5;fill:none;stroke-linejoin:round;stroke-linecap:round}
+.admin-duration-point{fill:#587c49;stroke:#fffefb;stroke-width:2}
+.admin-duration-point.is-selected{fill:#244d30;stroke:#dfe8d6;stroke-width:3}
+.admin-duration-columns{position:absolute;display:flex}
+.admin-duration-columns button{flex:1;min-width:0;border:0;padding:0;background:none;cursor:crosshair}
+.admin-duration-columns button:focus-visible{outline:2px solid #6e8e5c;outline-offset:0;background:#89a77818}
+.admin-duration-selection{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px 16px;padding:14px 18px;border:1px solid #dfe5d8;border-radius:9px;font-size:13px;color:#66715d;min-height:48px}
+.admin-duration-selection strong{font-size:18px;color:#244d30}
+.admin-duration-values{margin-top:20px;font-size:13px}
+.admin-duration-values summary{cursor:pointer;color:#48683c;margin-bottom:12px}
+.admin-referrer-toggle{display:inline-flex;align-items:center;gap:10px;border:0;padding:0;background:none;font:inherit;font-weight:500;color:#48653b;cursor:pointer;text-align:left}
+.admin-referrer-toggle svg{transition:transform .18s ease}
+.admin-referrer-toggle[aria-expanded=true] svg{transform:rotate(180deg)}
+.admin-referrer-details{padding:4px 0 8px;white-space:normal}
+.admin-referrer-details .admin-table{white-space:normal}
+.admin-referrer-details .admin-table td:first-child{overflow-wrap:anywhere}
+.admin-referrer-details .admin-table td:last-child{white-space:nowrap}
+.admin-referrer-details p{font-size:12px!important;margin:10px 0}
+@media(max-width:600px){.admin-metric-interactive>button{padding:18px}.admin-duration-summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 12px}.admin-duration-summary>div:last-child{grid-column:1/-1}.admin-duration-dialog h2{font-size:25px}.admin-duration-selection{gap:8px 12px;padding:12px}.admin-duration-selection>span:last-child{flex-basis:100%;line-height:1.6}}
+@media(prefers-reduced-motion:reduce){.admin-metric-interactive>button,.admin-referrer-toggle svg{transition:none}}

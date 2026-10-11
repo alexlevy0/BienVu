@@ -22,6 +22,9 @@ async function bounded(response:Response,limit:number){
   const bytes=new Uint8Array(size);let offset=0;for(const part of parts){bytes.set(part,offset);offset+=part.length;}return bytes;
 }
 export async function geocodeMap(query:string,transport:typeof fetch=fetch,municipalityOnly=false):Promise<MapLocation[]>{
+  return (await geocodeMapCandidates(query,transport,municipalityOnly)).map(c=>c.location);
+}
+export async function geocodeMapCandidates(query:string,transport:typeof fetch=fetch,municipalityOnly=true):Promise<{location:MapLocation;postalCode?:string}[]>{
   const {query:q}=MapSearch.parse({query}),url=new URL('https://data.geopf.fr/geocodage/search');
   url.search=new URLSearchParams({q,limit:'5',index:'address'}).toString();
   if(municipalityOnly)url.searchParams.set('type','municipality');
@@ -29,14 +32,15 @@ export async function geocodeMap(query:string,transport:typeof fetch=fetch,munic
     const response=await transport(url,{redirect:'manual',signal:AbortSignal.timeout(10000)});
     const json=JSON.parse(new TextDecoder().decode(await bounded(response,100_000))) as {features?:unknown[]};
     if(!Array.isArray(json.features))throw new MapFailure('MAP_UNAVAILABLE');
-    const locations:MapLocation[]=[];
+    const locations:{location:MapLocation;postalCode?:string}[]=[];
     for(const item of json.features.slice(0,5)){
-      const f=item as {geometry?:{type?:string;coordinates?:number[]};properties?:{label?:string;type?:string}};
+      const f=item as {geometry?:{type?:string;coordinates?:number[]};properties?:{label?:string;type?:string;postcode?:unknown}};
       if(f.geometry?.type!=='Point'||!Array.isArray(f.geometry.coordinates)||!f.properties)continue;
-      const type=f.properties.type,sourceType=type==='housenumber'?'housenumber':type==='street'?'street':'municipality';
+      const type=f.properties.type,sourceType=type==='housenumber'?'housenumber':type==='street'?'street':type==='municipality'?'municipality':null;
+      if(!sourceType)continue;
       const parsed=MapLocation.safeParse({latitude:f.geometry.coordinates[1],longitude:f.geometry.coordinates[0],label:f.properties.label,
         sourceType,precision:sourceType==='housenumber'?'exact':'approximate'});
-      if(parsed.success)locations.push(parsed.data);
+      if(parsed.success)locations.push({location:parsed.data,...(typeof f.properties.postcode==='string'&&/^\d{5}$/.test(f.properties.postcode)?{postalCode:f.properties.postcode}:{})});
     }
     return locations;
   }catch(error){if(error instanceof MapFailure)throw error;throw new MapFailure('MAP_UNAVAILABLE');}

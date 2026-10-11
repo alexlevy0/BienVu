@@ -1,5 +1,6 @@
 import {AdminQuery,AdminAction,EntityId,type AdminRow,type AdminPage,type AdminOverview,type AdminVideoDetail,type AdminNarrationCall,type AdminSection} from '@bienvu/contracts';
 import type {Database} from './index';
+import {readySecondsSql} from './admin-performance';
 
 // Queries project explicit fields only. Auth tokens, passwords, IPs and storage
 // credentials are never selected. Authorization is required by the web adapter.
@@ -162,7 +163,7 @@ export async function adminOverview(db:Database,config:AdminOverview['config'],n
     db.prepare('SELECT enabled,free_enabled,free_monthly,global_daily,global_monthly,session_daily,ip_daily,render_concurrency,retention_hours,budget_ceiling_cents FROM trial_policy WHERE id=1').first<AdminOverview['policy']>(),
     db.prepare(`SELECT 30 AS days,count(*) AS total,coalesce(sum(status='ready'),0) AS ready,coalesce(sum(status='failed'),0) AS failed,
       coalesce(sum(status NOT IN ('ready','failed')),0) AS active,count(seconds) AS measuredReady,avg(seconds) AS averageSeconds FROM (
-        SELECT j.status,CASE WHEN j.status='ready' AND julianday(e.created_at)>=julianday(j.created_at) THEN round((julianday(e.created_at)-julianday(j.created_at))*86400,3) END AS seconds
+        SELECT j.status,${readySecondsSql} AS seconds
         FROM jobs j LEFT JOIN generation_events e ON e.job_id=j.id AND e.event='ready' WHERE j.created_at>=? AND j.created_at<=?)`)
       .bind(new Date(now-29*86400_000).toISOString().slice(0,10),at).first<AdminOverview['performance']>(),
     selectRows(db,`SELECT provider,sum(mode='real') AS realCalls,sum(mode='real' AND estimatedMicros IS NOT NULL) AS measuredCalls,

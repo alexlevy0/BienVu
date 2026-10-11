@@ -27,6 +27,8 @@ export function VideoCustomizer(p:Props){
     [playing,setPlaying]=useState(false),[time,setTime]=useState(0);
   const secondaryInk=()=>{const rgb=p.settings.secondaryColor.match(/[a-f\d]{2}/gi)!.map(h=>parseInt(h,16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);return rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722>.179?'#101d18':'#ffffff';};
   const upload=useRef<HTMLInputElement>(null),preview=useRef<HTMLDivElement>(null);
+  const [previewSize,setPreviewSize]=useState({width:300,height:533});
+  useEffect(()=>{const element=preview.current;if(!element)return;const measure=()=>setPreviewSize({width:element.clientWidth,height:element.clientHeight});measure();const observer=new ResizeObserver(measure);observer.observe(element);return()=>observer.disconnect();},[]);
   const order=p.settings.photoOrder??p.photos.map(photo=>photo.slot);
   const ordered=[...order.map(slot=>p.photos.find(photo=>photo.slot===slot)).filter((photo):photo is CustomizerPhoto=>!!photo),
     ...p.photos.filter(photo=>!order.includes(photo.slot))];
@@ -113,7 +115,7 @@ export function VideoCustomizer(p:Props){
         <div className="customizer-poster-copy"><h2>{p.settings.style==='cinematic'?p.fields.title||'Une nouvelle adresse':time>=duration*.8?p.agencyName||'Découvrez le bien':p.fields.title||'Une nouvelle adresse'}</h2><p>{[p.fields.area?`${p.fields.area} m²`:'',p.fields.rooms?`${p.fields.rooms} pièces`:''].filter(Boolean).join(' · ')}</p><strong>{price}</strong></div>
         <div className="customizer-poster-agency">{p.agencyName||'BienVu'}</div>
         {previewMap&&mapAt!==null&&<MapScenePreview map={previewMap} automatic={automaticMap} aspectRatio={p.aspectRatio??'9:16'} frame={mapAt} primaryColor={p.settings.primaryColor} secondaryColor={p.settings.secondaryColor} agencyName={p.agencyName}/>}
-      <AvatarPoster avatar={p.settings.avatar} look={avatarCatalog?.looks.find(a=>a.id===p.settings.avatar?.lookId)} frame={time*30} total={duration*30} width={preview.current?.clientWidth??300} height={preview.current?.clientHeight??533}/>
+      <AvatarPoster avatar={p.settings.avatar} look={avatarCatalog?.looks.find(a=>a.id===p.settings.avatar?.lookId)} frame={time*30} total={duration*30} width={previewSize.width} height={previewSize.height}/>
       </div><div className="customizer-player-controls"><button type="button" aria-label={playing?'Pause':'Lecture'} disabled={!chosen.length} onClick={()=>{if(time>=duration)setTime(0);setPlaying(!playing);}}>{playing?'Ⅱ':'▶'}</button><span>0:{String(Math.floor(time)).padStart(2,'0')} / 0:{duration}</span>
         <input type="range" min="0" max={duration} step=".1" value={time} aria-label="Position de l’aperçu" onChange={event=>{setPlaying(false);setTime(Number(event.target.value));}}/>
         <button type="button" aria-label="Aperçu en plein écran" onClick={()=>void preview.current?.requestFullscreen?.()}>⛶</button></div>
