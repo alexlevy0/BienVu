@@ -18,6 +18,7 @@ import './home-composer.css';
 import './manual-listing.css';
 import './customizer.css';
 import './marketing.css';
+import './home-noise.css';
 
 export async function generateMetadata({searchParams}:{searchParams:Promise<Record<string,string|string[]|undefined>>}) {
   const query=await searchParams;

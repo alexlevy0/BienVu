@@ -1,0 +1,32 @@
+/* One small, static SVG tile shared by the homepage's green surfaces. */
+.home-studio-home{--home-paper-noise:url('/media/ui/home-paper-noise.svg')}
+.home-studio-home :is(
+ .home-hero-dashboard,.home-life-stage,.home-life-cta,.home-kit-panel,
+ .home-share-social,.home-editor-demo-cta,
+ .home-nav-active,.home-nav-badge,.home-avatar,.home-recent-placeholder,
+ .home-avatars-new,.home-avatars-benefit-icon,.home-life-feature-icon,
+ .home-life-mini-play,.home-life-audio-player>button,.home-editor-demo-feature-icon,
+ .home-share-avatar,.home-share-download-icon,.home-share-cta button,.home-editor-demo-caption>span,
+ .home-kit-content-list li>span
+){position:relative;isolation:isolate}
+.home-studio-home :is(
+ .home-hero-dashboard,.home-life-stage,.home-life-cta,.home-kit-panel,
+ .home-share-social,.home-editor-demo-cta,
+ .home-nav-active,.home-nav-badge,.home-avatar,.home-recent-placeholder,
+ .home-avatars-new,.home-avatars-benefit-icon,.home-life-feature-icon,
+ .home-life-mini-play,.home-life-audio-player>button,.home-editor-demo-feature-icon,
+ .home-share-avatar,.home-share-download-icon,.home-share-cta button,.home-editor-demo-caption>span,
+ .home-kit-content-list li>span
+)::before{
+ content:'';position:absolute;inset:0;z-index:-1;border-radius:inherit;
+ background-image:var(--home-paper-noise);background-size:180px 180px;background-repeat:repeat;
+ mix-blend-mode:soft-light;pointer-events:none;
+}
+/* Keep the avatar backdrop's existing elliptical fade, including its texture. */
+.home-studio-home .home-avatars-stage::before{
+ background-image:var(--home-paper-noise),linear-gradient(#e2e9d9,#e2e9d9);
+ background-size:180px 180px,100% 100%;background-repeat:repeat,no-repeat;
+ background-blend-mode:soft-light,normal;
+ mask-image:radial-gradient(ellipse at 52% 36%,#000 0,#000 62%,transparent 76%);
+}
+@media(forced-colors:active){.home-studio-home{--home-paper-noise:none}}
