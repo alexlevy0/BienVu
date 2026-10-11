@@ -2,12 +2,12 @@
 
 import Link from 'next/link';
 import {useEffect, useRef, useState} from 'react';
-import type {VideoCustomization} from '@bienvu/contracts';
+import {CARTESIA_DEFAULT_VOICE, cartesiaParisianVoices, type VideoCustomization} from '@bienvu/contracts';
 import {voicePreviews} from '../lib/voice-previews';
 import {HomeIcon} from './home-icons';
 import {HomeVisual,useHomepageMedia} from './homepage-media';
 
-const voices = ['fish-manon', 'fish-lucas', 'fish-camille'] as const;
+const voices = cartesiaParisianVoices.map(voice => voice.id);
 const peaks = [4, 5, 8, 12, 19, 26, 35, 23, 15, 12, 18, 26, 20, 15, 26, 33, 21, 13, 6, 9, 21, 34, 43, 30, 20, 15, 24, 28, 22, 13, 9, 14, 22, 32, 38, 29, 21, 15, 21, 30, 25, 18, 13, 17, 24, 20, 11, 7, 11, 20, 30, 23, 17, 9, 14, 18, 12, 9, 6, 5];
 function Waveform({active = false}: {active?: boolean}) {
   return <svg className={`home-life-waveform${active ? ' is-playing' : ''}`} viewBox="0 0 300 46" preserveAspectRatio="none" aria-hidden="true">
@@ -29,7 +29,7 @@ export function HomeShowcase({paused, onCreate}: {paused: boolean; onCreate(): v
   const photo=useHomepageMedia('life.photo'),visual=useHomepageMedia('life.visual'),movie=useHomepageMedia('life.video'),editor=useHomepageMedia('life.editor');
   const video = useRef<HTMLVideoElement>(null), audio = useRef<HTMLAudioElement>(null), attempt = useRef(0);
   const [videoPlaying, setVideoPlaying] = useState(false), [videoStarted, setVideoStarted] = useState(false), [videoError, setVideoError] = useState(false);
-  const [voice, setVoice] = useState<VideoCustomization['voice']>('fish-manon');
+  const [voice, setVoice] = useState<VideoCustomization['voice']>(CARTESIA_DEFAULT_VOICE);
   const [audioState, setAudioState] = useState<'idle' | 'loading' | 'playing'>('idle'), [audioError, setAudioError] = useState(false);
   const [text, setText] = useState(editor.custom?'Votre texte':'65 m² · 3 pièces'), [font, setFont] = useState('Instrument Serif'), [largeText, setLargeText] = useState(false);
   const [color, setColor] = useState('#ffffff'), [align, setAlign] = useState<'left' | 'center' | 'right'>('center');
