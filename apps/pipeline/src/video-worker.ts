@@ -9,7 +9,7 @@ export class VideoRenderer extends Container<Env> {
   defaultPort=8080;
   sleepAfter='30s';
   enableInternet=false;
-  envVars={RENDER_TOKEN:this.env.RENDER_TOKEN??'',RENDER_ENV:'cloudflare-container',INSTANCE_TYPE:'standard-4'};
+  envVars={RENDER_TOKEN:this.env.RENDER_TOKEN??'',RENDER_ENV:'cloudflare-container',INSTANCE_TYPE:'standard-4',BIENVU_PROGRESSIVE_VIDEO:'true'};
   private engine=new VideoCoordinator({storage:this.ctx.storage,bucket:this.env.MEDIA,
     call:async(path,init={})=>{const headers=new Headers(init.headers);headers.set('Authorization',`Bearer ${this.env.RENDER_TOKEN}`);
       if((await this.getState()).status!=='healthy') {
@@ -27,7 +27,7 @@ export class VideoRenderer extends Container<Env> {
       }
       return this.containerFetch(`http://container${path}`,{...init,headers,signal:AbortSignal.timeout(60_000)});},
     running:async()=>['running','healthy'].includes((await this.getState()).status),stop:()=>this.stop(),
-    schedule:async()=>{this.deleteSchedules('advance');await this.schedule(5,'advance');},
+    schedule:async()=>{this.deleteSchedules('advance');await this.schedule(2,'advance');},
     productBudget:this.env.GENERATION_TOKEN?(manifest,now)=>productRenderBudget(this.env.DB,manifest,now):undefined,
     maxAttempts:Number(this.env.VIDEO_MAX_ATTEMPTS),budget:{month:this.env.VIDEO_BUDGET_MONTH,paused:false,
       fixedAndOtherCents:Number(this.env.VIDEO_OTHER_CENTS),ceilingCents:Number(this.env.VIDEO_CEILING_CENTS),

@@ -22,6 +22,7 @@
     "@opennextjs/cloudflare": "1.20.6",
     "better-auth": "1.7.6",
     "fast-png": "8.0.0",
+    "hls.js": "1.7.3",
     "jpeg-js": "0.4.4",
     "maplibre-gl": "6.12.0",
     "next": "16.3.6",

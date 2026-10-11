@@ -1,6 +1,7 @@
 import {VideoManifest, VideoReport, videoAssets, videoManifestHash, videoObjectKey,videoPreviewKey,editorHasAudio} from '@bienvu/contracts';
 import {reserve, budgetLimits, type Budget} from './budget';
 import {storeRenderArtifact} from './render-artifact';
+import {publishProgressiveVideo} from './progressive-video';
 
 export type VideoJob = {id:string;manifest:VideoManifest;status:'accepted'|'staging'|'starting'|'rendering'|'publishing'|'ready'|'failed';
   startedAt:number;updatedAt:number;report?:VideoReport;objectKey?:string;error?:string;failures:number;progressPercent?:number;
@@ -174,6 +175,11 @@ export class VideoCoordinator {
         const result=await response.json() as {id?:string;status?:string;report?:unknown;error?:string;progressPercent?:number};
         if(result.id!==id)throw new Error('VIDEO_STATE_LOST');
         if(result.status==='failed')throw new Error(result.error??'VIDEO_RENDER_FAILED');
+        // A preview transport error must never restart or fail the paid render.
+        try{await publishProgressiveVideo(this.deps.bucket,this.deps.call,job.manifest,id);}catch{
+          console.warn(JSON.stringify({event:'video_stream_publish_retry',manifestHash:id}));
+          // Next poll retries the same immutable segments.
+        }
         if(result.status!=='ready'){
           const percent=result.progressPercent;
           if(typeof percent==='number'&&Number.isInteger(percent)&&percent>=0&&percent<=95&&percent>(job.progressPercent??0)){

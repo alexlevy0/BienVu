@@ -10,6 +10,7 @@ import {renderMedia, renderStill, selectComposition} from '@remotion/renderer';
 import {VideoManifest, VideoReport, videoAssets, videoAssetFile, videoManifestHash,editorHasAudio,MapBuildings,mapCredits} from '@bienvu/contracts';
 import {measureVoiceWav} from '@bienvu/voice';
 import {bundleDir} from './paths';
+import {prepareProgressiveDirectory,progressiveFfmpegArgs,readProgressiveVideo,followProgressiveVideo,type StreamOptions} from './progressive-video';
 import type {ListingVideoProps} from '../../../packages/video/src/listing';
 const exec = promisify(execFile), sha = (b: Uint8Array) => createHash('sha256').update(b).digest('hex');
 const binary = (name: 'ffmpeg' | 'ffprobe') => process.env[name === 'ffmpeg' ? 'BIENVU_FFMPEG_PATH' : 'BIENVU_FFPROBE_PATH'] ?? name;
@@ -136,15 +137,18 @@ export async function verifyVideoArtifact(file:string,id:string,frames:number,wa
 }
 // One bounded derivative from the finished master. The AAC stream is copied;
 // neither Remotion, narration nor the importer runs a second time.
-export async function createWatermarkedPreview(master:string,directory:string,id:string,frames:number,voiceEnabled=true,dimensions:Pick<VideoManifest,'width'|'height'>={width:1080,height:1920}) {
-  const start=performance.now(),startedAt=new Date().toISOString(),watermark=path.join(directory,'trial-watermark.png');
-  const output=path.join(directory,'preview.mp4');
+export async function writeTrialWatermark(watermark:string){
   const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="660" height="112" viewBox="0 0 660 112">
     <rect x="1" y="1" width="658" height="110" rx="18" fill="#171714" fill-opacity=".72" stroke="#fff" stroke-opacity=".7"/>
     <g fill="none" stroke="#fff" stroke-width="4"><path d="M25 48V27H46 M77 27H98V48 M25 66V87H46 M77 87H98V66"/></g>
     <text x="122" y="58" font-family="sans-serif" font-weight="700" font-size="40" fill="#fff">bienvu · aperçu</text>
     <text x="124" y="88" font-family="sans-serif" font-size="22" fill="#fff">bienvu.online</text></svg>`;
   await sharp(Buffer.from(svg)).png().toFile(watermark);
+}
+export async function createWatermarkedPreview(master:string,directory:string,id:string,frames:number,voiceEnabled=true,dimensions:Pick<VideoManifest,'width'|'height'>={width:1080,height:1920}) {
+  const start=performance.now(),startedAt=new Date().toISOString(),watermark=path.join(directory,'trial-watermark.png');
+  const output=path.join(directory,'preview.mp4');
+  await writeTrialWatermark(watermark);
   try {
     await exec(binary('ffmpeg'),['-v','error','-i',master,'-i',watermark,'-filter_complex',`[0:v][1:v]overlay=(W-w)/2:${dimensions.width>dimensions.height?'(H-h)/2':'690'}:format=auto[v]`,
       '-map','[v]',...(voiceEnabled?['-map','0:a:0']:[]),'-c:v','libx264','-preset','veryfast','-crf','21','-pix_fmt','yuv420p','-threads','1','-c:a','copy','-movflags','+faststart','-y',output],
@@ -174,10 +178,30 @@ export async function renderListingVideo(input: unknown, directory: string): Pro
     progress(0);
     await withVideoAssets(manifest,directory,async props=>{
       const composition=await selectComposition({serveUrl:bundleDir,id:'BienVuListing',inputProps:props,...browser(manifest)});
-      await renderMedia({serveUrl:bundleDir,composition,inputProps:props,...browser(manifest),codec:'h264',audioCodec:'aac',muted:!editorHasAudio(manifest),
+      let streamOptions:StreamOptions|undefined;
+      if(process.env.BIENVU_PROGRESSIVE_VIDEO!=='false'){
+        try{
+          await stat(process.env.BIENVU_FFMPEG_PATH??'/usr/bin/ffmpeg');
+          const streamDirectory=await prepareProgressiveDirectory(directory),audio=editorHasAudio(manifest)?path.join(directory,'stream-audio.wav'):undefined;
+          // Prepare the exact Remotion audio mix once, before image rendering.
+          // This captures editor gain, trims, fades and music as well as speech.
+          if(audio)await renderMedia({serveUrl:bundleDir,composition,inputProps:props,...browser(manifest),codec:'wav',
+            outputLocation:audio,concurrency:4,timeoutInMilliseconds:120_000,logLevel:'error'});
+          const watermark=manifest.rights.kind==='anonymous'?path.join(directory,'trial-watermark.png'):undefined;
+          if(watermark)await writeTrialWatermark(watermark);
+          streamOptions={directory:streamDirectory,audio,watermark,width:manifest.width,height:manifest.height};
+        }catch{streamOptions=undefined;await rm(path.join(directory,'stream'),{recursive:true,force:true});}
+      }
+      let stream:ReturnType<typeof followProgressiveVideo>|undefined,success=false;
+      try{await renderMedia({serveUrl:bundleDir,composition,inputProps:props,...browser(manifest),codec:'h264',audioCodec:'aac',muted:!editorHasAudio(manifest),
         // Quatre frames en parallèle sur le conteneur de production à 4 vCPU.
         pixelFormat:'yuv420p',outputLocation:raw,concurrency:4,timeoutInMilliseconds:120_000,
-        audioBitrate:'192k',crf:21,logLevel:'error',onProgress:state=>progress(state.progress*85)});
+        audioBitrate:'192k',crf:21,logLevel:'error',onProgress:state=>progress(state.progress*85),
+        ...(streamOptions?{ffmpegOverride:({type,args})=>{
+          if(type!=='pre-stitcher')return args;
+          stream=followProgressiveVideo(args.at(-1)!,streamOptions!);return progressiveFfmpegArgs(args);
+        }}:{}),
+      });success=true;}finally{if(stream&&!await stream.finish(success))console.warn(JSON.stringify({event:'video_stream_unavailable',manifestHash:id}));}
     });
     progress(85);
     if((await stat(raw)).size>50*1024*1024)throw new Error('VIDEO_TOO_LARGE');
@@ -191,7 +215,18 @@ export async function renderListingVideo(input: unknown, directory: string): Pro
     const report=await verifyVideoArtifact(partial,id,frames,manifest.rights.watermarked,startedAt,start,editorHasAudio(manifest),dimensions,manifest.editor?-90:-50);
     await rename(partial,output);await chmod(output,0o600);
     progress(90);
-    if(manifest.rights.kind==='anonymous')report.preview=await createWatermarkedPreview(output,directory,id,frames,editorHasAudio(manifest),dimensions);
+    if(manifest.rights.kind==='anonymous'){
+      let reused=false;
+      try{
+        const stream=await readProgressiveVideo(directory,manifest,id);
+        if(stream?.complete&&stream.watermarked&&stream.segments.length){
+          const preview=path.join(directory,'preview.mp4');
+          await exec(binary('ffmpeg'),['-v','error','-i',path.join(directory,'stream/index.m3u8'),'-map','0','-c','copy','-movflags','+faststart','-y',preview],{cwd:cwd(binary('ffmpeg')),timeout:60_000});
+          report.preview=await verifyVideoArtifact(preview,id,frames,true,startedAt,start,editorHasAudio(manifest),dimensions);await chmod(preview,0o600);reused=true;
+        }
+      }catch{/* The normal watermarked derivative remains the safe fallback. */}
+      if(!reused)report.preview=await createWatermarkedPreview(output,directory,id,frames,editorHasAudio(manifest),dimensions);
+    }
     progress(94);
     await writeFile(path.join(directory,'report.json'),JSON.stringify(report,null,2)+'\n',{mode:0o600});
     progress(95);

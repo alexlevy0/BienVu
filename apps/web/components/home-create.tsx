@@ -7,6 +7,7 @@ import {VideoDuration,ImportUrl, GenerationView, defaultVideoCustomization,Gener
 import {useAnonymousTrial, TrialChallenge} from './anonymous-trial';
 import {useAccount} from './account';
 import {HomeIcon} from './home-icons';
+import {HomeCreateButton} from './home-create-button';
 import {PhotoDurationAdvice} from './photo-duration-advice';
 import {ManualListingForm, type ManualListingFormHandle,type PreparedManualListing} from './manual-listing-form';
 import {generationActive, useGenerationProgress} from './generation-progress';
@@ -430,6 +431,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   }
   const statusRequest = screen.kind === 'sending' || screen.kind === 'job' ? screen.request : null;
   const resultReady = screen.kind === 'job' && selectedJob?.status === 'ready';
+  const composerPlaceholder = composerPhotos.length?'Décrivez votre bien, ou appuyez sur Entrée…':manual?'Ajoutez des précisions sur votre bien…':resultReady?'Collez le lien d’une autre annonce…':'Collez un lien ou décrivez votre bien…';
   const composerDisabled = screen.kind==='guest-customizing'&&guestSettings&&!GenerationCustomization.safeParse(guestSettings).success || loading || busy || estimatePending || estimateFailed || photoChecking || Boolean(incomingPhotos) || (composerPhotos.length
     ? screen.kind==='job'&&generationActive(selectedJob) : manual
     ? !manualReady||Boolean(noCredits)||!editingProperty&&activeOtherJob
@@ -472,7 +474,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
         </fieldset></details></div>
       <p className="home-manual-settings-summary">{aspectRatio==='16:9'?'Horizontal':'Vertical'} · {durationSeconds} s{voiceEnabled?' · Voix off':''}{subtitlesEnabled?' · Sous-titres':''}</p>
       <span className="home-credit-cost" aria-live="polite">{editingProperty?'Sans crédit':`${creditCost} crédit${creditCost>1?'s':''}`}</span>
-      <button type="submit" className="home-primary-button" disabled={composerDisabled} aria-describedby={!manualReady?'home-manual-action-note':undefined}>{trial.preparingManual?'Envoi des photos…':manualBusy?'Enregistrement…':editingProperty?'Enregistrer le bien':me&&!canGenerate?'Enregistrer mon annonce':'Créer ma vidéo'}<HomeIcon name="arrow" size={19}/></button>
+      <HomeCreateButton disabled={composerDisabled} aria-describedby={!manualReady?'home-manual-action-note':undefined}>{trial.preparingManual?'Envoi des photos…':manualBusy?'Enregistrement…':editingProperty?'Enregistrer le bien':me&&!canGenerate?'Enregistrer mon annonce':'Créer ma vidéo'}<HomeIcon name="arrow" size={19}/></HomeCreateButton>
     </form>:<><form className={`home-composer home-composer-modern${feedback || screen.kind === 'error' ? ' home-composer-invalid' : ''}${dropActive?' home-composer-dropping':''}`} onSubmit={submit} noValidate aria-label="Créer une vidéo depuis une annonce"
       onDragEnter={event=>{if(draggingFiles(event)&&canDropPhotos){event.preventDefault();dropDepth.current++;setDropActive(true);}}}
       onDragOver={event=>{if(draggingFiles(event)){event.preventDefault();event.dataTransfer.dropEffect=canDropPhotos?'copy':'none';}}}
@@ -480,13 +482,14 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
       onDrop={event=>void dropPhotos(event)}>
       {dropActive&&<div className="home-drop-overlay" aria-hidden="true"><HomeIcon name="upload" size={30}/><strong>Déposez vos photos ici</strong><span>JPEG, PNG ou WebP · Jusqu’à 12 photos</span></div>}
       <div className="home-composer-main"><div className="home-url-row"><HomeIcon name="link" size={28}/><label htmlFor="home-listing-url" className="sr-only">{manual?'Précisions sur votre bien':'Lien ou description de votre annonce'}</label>
-        <input ref={composerInput} id="home-listing-url" name="url" type="text" autoComplete="off" spellCheck={false} placeholder={composerPhotos.length?'Décrivez votre bien, ou appuyez sur Entrée…':manual?'Ajoutez des précisions sur votre bien…':resultReady?'Collez le lien d’une autre annonce…':'Collez un lien ou décrivez votre bien…'}
+        <span className="home-url-input"><input ref={composerInput} id="home-listing-url" name="url" type="text" autoComplete="off" spellCheck={false} placeholder={composerPlaceholder}
           readOnly={customizing} value={manual?customizing?importDraft?.sourceUrl??importDraft?.data.canonicalUrl??importDraft?.data.fields.title??description:description:screen.kind==='sending'?'':url} onChange={event=>{if(manual)setDescription(event.target.value);
             else {if(screen.kind==='extracting'){interactionVersion.current++;lock.current=false;guestPending.current=null;
               trial.setToken('');trial.setChallenge(false);trial.setWidgetVersion(n=>n+1);setScreen({kind:'landing'});}setUrl(event.target.value);}
-            setFeedback('');}} disabled={screen.kind==='sending'} aria-invalid={Boolean(feedback || screen.kind==='error')} aria-describedby="home-url-error home-create-note"/></div>
-        <div className="home-composer-actions"><button type="submit" className="home-primary-button" disabled={composerDisabled} aria-describedby={manual&&!manualReady?'home-manual-action-note':undefined}>
-          {incomingPhotos?'Ajout des photos…':composerPhotos.length?'Compléter mon annonce':screen.kind==='sending'||manualBusy?'Envoi en cours':screen.kind==='job'&&generationActive(selectedJob)?'Génération en cours':manual&&me&&!canGenerate?'Enregistrer mon annonce':'Créer ma vidéo'}<HomeIcon name="arrow" size={20}/></button>
+            setFeedback('');}} disabled={screen.kind==='sending'} aria-invalid={Boolean(feedback || screen.kind==='error')} aria-describedby="home-url-error home-create-note"/>
+          <span className="home-url-placeholder" aria-hidden="true">{composerPlaceholder}</span></span></div>
+        <div className="home-composer-actions"><HomeCreateButton disabled={composerDisabled} aria-describedby={manual&&!manualReady?'home-manual-action-note':undefined}>
+          {incomingPhotos?'Ajout des photos…':composerPhotos.length?'Compléter mon annonce':screen.kind==='sending'||manualBusy?'Envoi en cours':screen.kind==='job'&&generationActive(selectedJob)?'Génération en cours':manual&&me&&!canGenerate?'Enregistrer mon annonce':'Créer ma vidéo'}<HomeIcon name="arrow" size={20}/></HomeCreateButton>
           <span className="home-credit-cost" aria-live="polite">{estimatePending?'Estimation en cours…':estimateFailed?'Estimation indisponible':`${creditCost} crédit${creditCost>1?'s':''}${me&&estimate.value?' estimés':''}`}
             {me&&estimate.value&&<small className="home-credit-estimate-detail">{urlImportPhotoSlots(estimate.value).length} photos · Animations IA activées</small>}
           </span></div>

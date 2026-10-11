@@ -6,6 +6,9 @@ import {generationActive} from './generation-progress';
 import {HomeIcon} from './home-icons';
 import {ProblemReport} from './problem-report';
 import {generationSteps,generationProgressText} from '../lib/generation-steps';
+import {ProgressiveVideo} from './progressive-video';
+import {VideoBacklight} from './video-backlight';
+import {GenerationRenderProgress} from './generation-estimate';
 
 type RequestMessage={kind:'url'|'manual';text:string};
 
@@ -34,18 +37,18 @@ export function ConversationGeneration({job,request,sending,anonymous,unavailabl
     <div className="home-conversation-response">
       <p className="home-conversation-lead" role="status">{sending?'Envoi de votre demande…':ready?'Votre vidéo est prête.':job?.status==='failed'?'La création a été interrompue.':'Nous préparons votre visite en vidéo.'}</p>
       <div className={`home-conversation-result${horizontal?' is-horizontal':''}`}><div className={`home-conversation-media${horizontal?' is-horizontal':''}`}>
-        {job?.videoUrl?<video src={job.videoUrl} controls playsInline preload="metadata" aria-label={anonymous?'Aperçu filigrané de votre vidéo':'Votre vidéo immobilière'}/>
-          :<div className={`home-conversation-poster${job?.status==='failed'?' home-poster-failed':''}`}>{poster&&!posterFailed&&<img src={poster} alt="" onError={()=>setPosterFailed(true)}/>}
+        {job&&(assembling||job.videoUrl)?<ProgressiveVideo key={job.id} jobId={job.id} anonymous={anonymous} active={assembling} finalUrl={job.videoUrl} poster={posterFailed?null:poster} percent={percent} label={anonymous?'Aperçu filigrané de votre vidéo':'Votre vidéo immobilière'}/>
+          :<div className="video-backlight-frame"><VideoBacklight poster={posterFailed?null:poster}/><div className={`home-conversation-poster${job?.status==='failed'?' home-poster-failed':''}`}>{poster&&!posterFailed&&<img src={poster} alt="" onError={()=>setPosterFailed(true)}/>}
             {(!poster||posterFailed)&&<span className="home-poster-skeleton" aria-hidden="true"/>}
             <div className="home-poster-overlay">{job?.status==='failed'||ready?<span className="home-poster-stopped" aria-hidden="true">!</span>:<span className="home-activity-ring" aria-hidden="true"/>}
               <strong>{sending?'Envoi en cours':job?.status==='failed'?'Création interrompue':ready?'Vidéo indisponible':'Génération en cours'}</strong>
               {assembling&&<span className="home-poster-percent">Assemblage · {percent} %</span>}</div>
-            <small>{horizontal?'Horizontal 16:9':'Vertical 9:16'} · {job?.syntheticVoice===false?'Sans voix off':'Voix française'}</small></div>}
+            <small>{horizontal?'Horizontal 16:9':'Vertical 9:16'} · {job?.syntheticVoice===false?'Sans voix off':'Voix française'}</small></div></div>}
       </div><div className="home-conversation-status">
         {active||sending?<ol className="home-conversation-steps" aria-label="Étapes de création">{stages.map(({key,state,label})=>{
-          return <li className={`step-${state}`} key={key} aria-current={state==='current'?'step':undefined}>
+          return <li className={`step-${state}`} key={key} data-rendering={assembling&&key==='rendering'||undefined} aria-current={state==='current'?'step':undefined}>
             <span className="home-step-symbol" aria-hidden="true">{state==='done'?'✓':state==='current'?'◌':state==='skipped'?'–':'·'}</span><span>{label}</span>
-            {assembling&&key==='rendering'&&<strong className="home-render-percent">{percent} %</strong>}</li>;
+            {assembling&&key==='rendering'&&<GenerationRenderProgress job={job} unavailable={unavailable} className="home-render-percent"/>}</li>;
         })}</ol>:null}
         {(active||sending)&&<div className={`home-stage-track${assembling?' is-measured':''}`} role="progressbar" aria-label="Traitement de la vidéo" aria-valuenow={assembling?percent:undefined} aria-valuemin={assembling?0:undefined} aria-valuemax={assembling?100:undefined} aria-valuetext={sending||!job?'Envoi en cours':assembling?`Assemblage de la vidéo : ${percent} %`:generationProgressText(job)}><span style={assembling?{width:`${percent}%`}:undefined}/></div>}
         {unavailable&&<p role="status" className="home-stage-note">Connexion momentanément interrompue. L’état sera actualisé à votre retour.</p>}

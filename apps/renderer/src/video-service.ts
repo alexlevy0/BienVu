@@ -6,6 +6,7 @@ import path from 'node:path';
 import {VideoManifest,VideoSubmission,VideoReport,videoAssets,videoAssetFile,videoManifestHash} from '@bienvu/contracts';
 import {parseRange} from './listing-render';
 import {renderVideoInProcess} from './render-process';
+import {readProgressiveVideo} from './progressive-video';
 
 type State={id:string;status:'staging'|'rendering'|'ready'|'failed';startedAt?:string;error?:string;report?:VideoReport};
 type Options={root:string;signal?:AbortSignal;claim:(id:string)=>boolean;release:(id:string)=>void;run?:typeof renderVideoInProcess};
@@ -59,11 +60,21 @@ export class VideoService {
         catch(error){if((error as NodeJS.ErrnoException).code!=='EEXIST')throw error;}
         json(res,await this.load(input.id),202);return true;
       }
-      const match=url.pathname.match(/^\/videos\/([a-f0-9]{64})(?:\/(file|preview|start|cancel|assets\/([a-zA-Z0-9_-]{1,64})))?$/);
+      const match=url.pathname.match(/^\/videos\/([a-f0-9]{64})(?:\/(file|preview|start|cancel|assets\/([a-zA-Z0-9_-]{1,64})|stream(?:\/(segment-\d{6}\.ts))?))?$/);
       if(!match){json(res,{error:'NOT_FOUND'},404);return true;}
       const id=match[1],state=await this.load(id);if(!state){json(res,{error:'NOT_FOUND'},404);return true;}
       const directory=this.dir(id),manifest=VideoManifest.parse(JSON.parse(await readFile(path.join(directory,'manifest.json'),'utf8')));
       if(await videoManifestHash(manifest)!==id)throw new Error('VIDEO_MANIFEST_CONFLICT');
+      if(match[2]?.startsWith('stream')&&['GET','HEAD'].includes(req.method??'')){
+        if(!['rendering','ready'].includes(state.status)){json(res,{error:'VIDEO_NOT_READY'},404);return true;}
+        const stream=await readProgressiveVideo(directory,manifest,id);
+        if(!stream?.segments.length){json(res,{error:'VIDEO_NOT_READY'},404);return true;}
+        if(!match[4]){json(res,stream);return true;}
+        const segment=stream.segments.find(s=>s.file===match[4]);if(!segment){json(res,{error:'NOT_FOUND'},404);return true;}
+        res.writeHead(200,{'Content-Type':'video/mp2t','Content-Length':segment.sizeBytes,'Cache-Control':'no-store'});
+        if(req.method==='HEAD')res.end();else createReadStream(path.join(directory,'stream',segment.file)).on('error',()=>res.destroy()).pipe(res);
+        return true;
+      }
       if(!match[2]&&req.method==='GET'){
         let progressPercent=state.status==='ready'?100:0;
         if(state.status==='rendering'){

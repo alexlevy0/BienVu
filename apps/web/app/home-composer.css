@@ -7,7 +7,17 @@
 .home-studio .home-composer-modern .home-url-row {min-width:0;min-height:58px;gap:15px;padding:7px 14px;border:1px solid #d9dcd6;border-radius:11px;background:#fffefa;transition:border-color .15s,box-shadow .15s}
 .home-studio .home-composer-modern .home-url-row:focus-within {border-color:#96ad87;box-shadow:0 0 0 2px #b4c5a729}
 .home-studio .home-composer-modern .home-url-row>svg {flex:none;width:24px;height:24px;margin:0;color:#171c16}
-.home-studio .home-composer-modern .home-url-row input {height:40px;font-size:18px;min-width:0;letter-spacing:-.2px}
+.home-studio .home-composer-modern .home-url-row input {height:40px;min-width:0}
+.home-studio .home-composer-modern .home-url-row input,.home-url-placeholder {font-size:18px;letter-spacing:-.2px}
+.home-url-input {position:relative;display:block;flex:1;min-width:0}
+.home-url-input input {display:block;width:100%}
+.home-url-placeholder {display:none;position:absolute;inset:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;line-height:40px;pointer-events:none}
+@supports (background-clip:text) or (-webkit-background-clip:text) {
+ .home-studio .home-composer-modern .home-url-input input::placeholder {color:transparent}
+ .home-url-input input:placeholder-shown+.home-url-placeholder {display:block;color:transparent;background:linear-gradient(105deg,#71777a 44%,#bbc7b0 49%,#f7f8f1 50%,#bbc7b0 51%,#71777a 56%);background-size:250% 100%;background-position:100% 50%;background-clip:text;-webkit-background-clip:text;animation:home-placeholder-shimmer 9.6s ease-in-out infinite}
+ .home-url-input input:disabled+.home-url-placeholder {opacity:.5;animation-play-state:paused}
+}
+@keyframes home-placeholder-shimmer {0%,18% {background-position:100% 50%}62%,100% {background-position:0% 50%}}
 .home-studio .home-composer-modern .home-composer-actions {display:flex;flex-direction:column;align-items:stretch;gap:8px;width:auto;min-width:0;padding:0;margin:0;border:0}
 .home-studio .home-composer-modern .home-primary-button {grid-area:auto;min-width:205px;min-height:58px;padding:13px 20px;border-radius:10px;font-size:16px;gap:17px}
 .home-studio .home-composer-modern .home-credit-cost {grid-area:auto;align-self:center;justify-self:auto;min-height:18px;width:auto;white-space:normal;text-align:center;color:#697665;font-size:12px;line-height:1.5}
@@ -61,7 +71,7 @@
 }
 @container(max-width:570px) {
  .home-composer-main {grid-template-columns:minmax(0,1fr);gap:12px}
- .home-studio .home-composer-modern .home-url-row input {font-size:16px}
+ .home-studio .home-composer-modern .home-url-row input,.home-url-placeholder {font-size:16px}
  .home-studio .home-composer-modern .home-composer-actions {gap:5px}
  .home-studio .home-composer-modern .home-primary-button {min-width:0;width:100%;min-height:50px}
  .home-studio .home-composer-modern .home-format-tags {display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px 16px}
@@ -76,7 +86,7 @@
 @container(max-width:350px) {
  .home-studio .home-composer-modern {padding:14px 12px;gap:14px;border-radius:13px}
  .home-studio .home-composer-modern .home-url-row {padding-inline:10px;gap:10px;min-height:53px}
- .home-studio .home-composer-modern .home-url-row input {font-size:15px}
+ .home-studio .home-composer-modern .home-url-row input,.home-url-placeholder {font-size:15px}
  .home-studio .home-composer-modern .home-format-tags {display:flex;flex-wrap:wrap;gap:8px 11px}
  .home-studio .home-composer-modern .home-format-tags>.home-format-control {flex:1 1 140px}
  .home-studio .home-composer-modern .home-format-tags>.home-duration-pill {flex:0 0 91px}
@@ -91,4 +101,9 @@
 }
 @media(prefers-reduced-motion:reduce) {
  .home-toggle-track,.home-toggle-track::after,.home-studio .home-composer-modern .home-url-row {transition:none}
+ .home-url-input input:placeholder-shown+.home-url-placeholder {animation:none;background:none;color:#71777a}
+}
+@media(forced-colors:active) {
+ .home-url-input input:placeholder-shown+.home-url-placeholder {display:none}
+ .home-studio .home-composer-modern .home-url-input input::placeholder {color:CanvasText}
 }

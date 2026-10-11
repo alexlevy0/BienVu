@@ -1,0 +1,6 @@
+.generation-render-progress{display:inline-flex;align-items:baseline;flex-wrap:wrap;gap:6px 8px;font-size:14px;font-variant-numeric:tabular-nums;color:#386b42}
+.generation-render-progress strong{white-space:nowrap}
+.generation-remaining{font-size:12px;font-weight:400;color:#667462}
+.generation-steps .generation-render-progress{margin-left:10px}
+.generation-steps [aria-current=step] .generation-render-progress{color:#fff}
+.generation-steps [aria-current=step] .generation-remaining{color:#e5ebe2}

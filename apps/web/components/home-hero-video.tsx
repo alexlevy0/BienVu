@@ -4,6 +4,7 @@ import {useEffect, useRef, useState} from 'react';
 import {HomeIcon} from './home-icons';
 import {HomeVisual, useHomepageMedia, homeClock, type HomeMediaView} from './homepage-media';
 import {imageWidthUrl,previewVideoUrl} from '../lib/home-media-view';
+import {HeroBacklight} from './hero-backlight';
 
 type PlaybackProps = {paused: boolean; onPlayingChange(playing: boolean): void};
 
@@ -88,6 +89,9 @@ function HeroPlayer({visual, movie, paused, onPlayingChange}: PlaybackProps & {v
   }
 
   return <>
+    <div className="home-hero-video-frame">
+    <HeroBacklight key={poster??movie.src} video={video} active={started&&!paused&&!error}
+      poster={poster?(visual.kind==='image'?visual:{...visual,kind:'image',src:poster}):null}/>
     <div className={`home-hero-demo${started ? ' is-started' : ''}`} style={{aspectRatio}}>
       <video ref={video} src={previewVideoUrl(movie.src)} poster={poster ? imageWidthUrl(poster,640) : undefined} controls={started} muted={muted} playsInline loop
         preload={poster ? 'none' : 'metadata'} tabIndex={started ? 0 : -1} aria-hidden={!started}
@@ -107,6 +111,7 @@ function HeroPlayer({visual, movie, paused, onPlayingChange}: PlaybackProps & {v
         <span className="home-play" aria-hidden="true"><HomeIcon name="play" size={23}/></span>
         {!custom && <span className="home-hero-demo-facts"><span><HomeIcon name="house" size={18}/>65 m² · 3 pièces</span><strong>385 000 €</strong></span>}
       </button>}
+    </div>
     </div>
     {error && <p className="home-hero-video-error" role="alert">La vidéo n’a pas pu être lue. Cliquez sur Lecture pour réessayer.</p>}
   </>;

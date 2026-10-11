@@ -1,0 +1,18 @@
+.video-backlight-frame{position:relative;isolation:isolate;width:100%;height:100%;border-radius:inherit}
+.video-backlight{position:absolute;inset:0;z-index:-1;pointer-events:none;opacity:.95}
+.video-backlight>:is(img,canvas,.video-backlight-fallback){position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scale(1.16,1.08);filter:blur(36px) saturate(1.8) brightness(1.25);border-radius:20px}
+.video-backlight-fallback{background:linear-gradient(135deg,#6e8058,#b4cbb9 48%,#779693);transition:opacity .65s ease}
+.video-backlight:has(>canvas[data-painted],>img[data-loaded])>.video-backlight-fallback{opacity:0}
+.video-backlight>canvas{opacity:0;transition:opacity .65s ease}
+.video-backlight>canvas[data-painted]{opacity:1}
+.video-backlight>img{transition:opacity .65s ease}
+.video-backlight:has(>canvas[data-painted])>img{opacity:0}
+@media(max-width:760px){
+ .video-backlight{opacity:.85}
+ .video-backlight>:is(img,canvas,.video-backlight-fallback){transform:scale(1.12,1.06);filter:blur(25px) saturate(1.65) brightness(1.2)}
+}
+@media(prefers-reduced-motion:reduce){
+ .video-backlight>canvas{display:none;transition:none}
+ .video-backlight:has(>canvas[data-painted])>img{opacity:1;transition:none}
+ .video-backlight:has(>canvas[data-painted])>.video-backlight-fallback{opacity:1;transition:none}
+}
