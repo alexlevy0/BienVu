@@ -84,9 +84,13 @@ export async function customizeImportedListing(env:Env&{MEDIA:Env['MEDIA']&Pick<
   }
   return required(await findImport(env.DB,agencyId,row.id));
 }
-export async function deleteCreationDraft(env:Env,agencyId:string,id:string,now=Date.now()){
+export async function deleteCreationDraft(env:Omit<Env,'DB'>&{DB:Pick<D1Database,'prepare'>},agencyId:string,id:string,now=Date.now()){
   if(!await findImport(env.DB,agencyId,id))throw new RequestFailure('NOT_FOUND');
+  const storefront=await env.DB.prepare('SELECT 1 FROM showcase_properties WHERE agency_id=? AND removed=0 LIMIT 1').bind(agencyId).first();
+  const groups=storefront?await (await import('./properties')).readPropertyGroups(env,agencyId):[];
+  const group=groups.find(g=>g.aliases.includes('listing:'+id));
   if(!await markCreationDraftDeleting(env.DB,agencyId,id,now))throw new RequestFailure('CONFLICT');
+  await env.DB.prepare('UPDATE showcase_properties SET removed=1,published_json=NULL,updated_at=? WHERE agency_id=? AND property_id IN (SELECT value FROM json_each(?))').bind(new Date(now).toISOString(),agencyId,JSON.stringify(group?[...group.aliases,group.summary.id]:['listing:'+id])).run();
   const keys=await importObjectKeys(env.DB,agencyId,id);
   if(keys.some(key=>!key.startsWith(`agencies/${agencyId}/imports/${id}/`)))throw new Error('IMPORT_KEY_SCOPE');
   try{if(keys.length)await env.MEDIA.delete(keys);}

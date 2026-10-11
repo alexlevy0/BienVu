@@ -7,6 +7,7 @@ import {publicExample} from '../lib/public-examples';
 import {examples,featurePages,guidePages} from '../lib/marketing-content';
 import {absoluteUrl,editorialDate} from '../lib/seo';
 import {blogArticles,blogArticleDates,blogUpdatedAt} from '../lib/blog-content';
+import {publicShowcaseSitemap} from '../lib/showcase-maintenance';
 export const dynamic='force-dynamic';
 export default async function sitemap():Promise<MetadataRoute.Sitemap>{
   const {env}=await getCloudflareContext({async:true});
@@ -27,5 +28,6 @@ export default async function sitemap():Promise<MetadataRoute.Sitemap>{
   for(const video of shared)pages.push({url:absoluteUrl(video.pageUrl),lastModified:video.publishedAt,images:[absoluteUrl(video.posterUrl)],videos:[
     {title:video.title,description:`Vidéo immobilière partagée par ${video.agency}${video.locality?` à ${video.locality}`:''}.`,thumbnail_loc:absoluteUrl(video.posterUrl),content_loc:absoluteUrl(video.videoUrl),duration:Math.round(video.durationSeconds),publication_date:video.publishedAt}
   ]});
+  for(const entry of await publicShowcaseSitemap(env))pages.push({url:absoluteUrl(entry.path),lastModified:entry.updatedAt,...(entry.image?{images:[absoluteUrl(entry.image)]}:{})});
   return pages;
 }

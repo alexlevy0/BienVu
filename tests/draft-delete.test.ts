@@ -35,6 +35,9 @@ test('suppression de brouillon : isolation, upload tardif, reprise R2 et limites
   // extraction migration's historical fixture and add its cleanup dependency.
   await migrate('0032_editor_music.sql');
   await migrate('0033_editor_voice.sql');
+  // Deletion now also withdraws explicitly published storefront selections;
+  // keep this historical quota fixture while adding its current dependency.
+  await migrate('0071_agency_showcases.sql');
   assert.equal((await DB.prepare('SELECT attempts FROM draft_extraction_usage WHERE agency_id=? AND day=?').bind('delete-a',day).first<{attempts:number}>())?.attempts,1);
   // Different text hashes represent five distinct analysis attempts.
   for(let index=1;index<5;index++)await DB.prepare(`INSERT INTO draft_extract_calls(id,agency_id,import_id,text_hash,status,created_at)

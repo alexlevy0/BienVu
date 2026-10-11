@@ -8,6 +8,7 @@ import {HomeIcon} from './home-icons';
 import {SocialPublishDialog} from './social-publish-dialog';
 import {ProblemReport} from './problem-report';
 import {DraftActions} from './draft-actions';
+import {ShowcasePropertyAction} from './showcase-property-action';
 import {propertyRequest,downloadBlob} from '../lib/property-client';
 import {boundedDownload,propertyVisual,propertyZip} from '../lib/property-download';
 
@@ -71,6 +72,7 @@ export function PropertyDetail({id}:{id:string}){
       <div className="property-detail-intro"><h1 id="property-title">{property.title}</h1><div className="property-detail-reference"><span className={`property-badge${property.fields.transaction==='rent'?' is-rent':''}`}>{property.archived?'Archivé':property.fields.transaction==='rent'?'À louer':property.fields.transaction==='sale'?'À vendre':'À compléter'}</span><span>Réf. {property.reference}</span></div>
         <p>{propertyFacts(property.fields)||'Informations à compléter'}</p>{propertyPrice(property.fields)&&<strong>{propertyPrice(property.fields)}</strong>}</div>
       {canEdit&&<div className="property-detail-actions"><button className="property-button" type="button" disabled={Boolean(busy)} onClick={()=>void prepare('edit')}><HomeIcon name="pencil" size={18}/>{busy==='edit'?'Ouverture…':'Modifier le bien'}</button><button type="button" className="property-primary" disabled={Boolean(busy)} onClick={()=>setCreate(true)}><HomeIcon name="plus" size={20}/>Créer un contenu</button></div>}</header>
+    <ShowcasePropertyAction key={`${owner}:${id}`} id={id} agencyId={owner}/>
     <div className="property-tabs" role="tablist" aria-label="Rubriques du bien">{([['contents',`Contenus (${titleCount})`],['photos',`Photos (${property.photoCount})`],['information','Informations'],['publications',`Publications${data.publications.length?` (${data.publications.length})`:''}`]] as [Tab,string][]).map(([value,label])=>
       <button key={value} id={`property-tab-${value}`} role="tab" aria-selected={tab===value} aria-controls={`property-panel-${value}`} type="button" onClick={()=>setTab(value)} onKeyDown={event=>{
         const tabs:Tab[]=['contents','photos','information','publications'],i=tabs.indexOf(value),next=event.key==='ArrowRight'?tabs[(i+1)%4]:event.key==='ArrowLeft'?tabs[(i+3)%4]:event.key==='Home'?tabs[0]:event.key==='End'?tabs[3]:null;

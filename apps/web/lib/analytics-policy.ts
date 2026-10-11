@@ -6,7 +6,7 @@ export type AnalyticsConsent={version:2;analytics:boolean;replay:boolean;at:numb
 export type AnalyticsConfig={enabled:boolean;token:string;host:string;errorTracking?:boolean};
 export type AnalyticsProperties=Record<string,string|number|boolean|undefined>;
 const privateParameters=new Set(['token','code','state','grant','socialError','socialConnected','session_id','checkout','homePreview','facebookPage']);
-const studioPaths=new Set(['/connexion','/agence','/biens','/historique','/editeur','/projets','/publications','/equipe']);
+const studioPaths=new Set(['/connexion','/agence','/biens','/historique','/editeur','/projets','/publications','/equipe','/ma-vitrine']);
 
 // Public article slugs are retained; private property/project IDs never leave the browser.
 export function analyticsPath(value:string):string|null {
@@ -14,12 +14,15 @@ export function analyticsPath(value:string):string|null {
     if([...url.searchParams.keys()].some(key=>privateParameters.has(key))||/token=|code=/i.test(url.hash))return null;
     const path=url.pathname.replace(/\/$/,'')||'/';
     if(publicSeoPaths.includes(path)||studioPaths.has(path))return path;
+    if(/^\/agences\/[^/]+$/.test(path))return '/agences/[slug]';
+    if(/^\/agences\/[^/]+\/biens\/[^/]+$/.test(path))return '/agences/[slug]/biens/[id]';
     if(/^\/(biens|historique|explorer)\/[^/]+$/.test(path))return '/'+path.split('/')[1]+'/[id]';
     return null;
   }catch{return null;}
 }
 export function replayAllowed(value:string):boolean {
-  return analyticsPath(value)!==null;
+  const path=analyticsPath(value);
+  return path!==null&&path!=='/ma-vitrine'&&!path.startsWith('/agences/');
 }
 export function readAnalyticsConsent(raw:string|null,now=Date.now()):AnalyticsConsent|null {
   try {const c=JSON.parse(raw??'null') as AnalyticsConsent|null;

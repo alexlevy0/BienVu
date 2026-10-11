@@ -84,3 +84,4 @@ export * from './social';
 export * from './partners';
 export * from './promotions';
 export * from './progressive-video';
+export * from './showcase';

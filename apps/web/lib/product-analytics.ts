@@ -172,6 +172,7 @@ function clearAnalyticsStorage(token:string){
 export function setAnalyticsConsent(choice:AnalyticsConsent){
   consent=choice;revision++;
   try{localStorage.setItem(ANALYTICS_CONSENT_KEY,JSON.stringify(choice));}catch{/* This choice still applies to this tab. */}
+  window.dispatchEvent(new Event('bienvu:consent-changed'));
   if(!choice.analytics){halt();sdk?.reset(true);identified=null;once.clear();clearAnalyticsStorage(config?.token??'');}
   void synchronize();
 }

@@ -4,6 +4,7 @@ import {findCreationDraft,findOwnedGeneration,generationMasterUnlocked,generatio
 import {RequestFailure} from './http';
 import {contentHash} from './manual-listings';
 import {streamGenerationMedia} from './generations';
+import {readPropertyGroups} from './properties';
 type Env=Pick<CloudflareEnv,'DB'|'MEDIA'>;
 const name=z.string().trim().min(1).max(120);
 export const WorkspaceAction=z.discriminatedUnion('action',[
@@ -28,7 +29,9 @@ export async function workspaceAction(env:Env,agency:string,input:unknown){
   const n=await env.DB.prepare('SELECT count(*) n FROM property_projects WHERE agency_id=?').bind(agency).first<{n:number}>();if((n?.n??0)>=500)throw new RequestFailure('RATE_LIMITED');
   await env.DB.prepare('INSERT INTO property_projects(id,agency_id,name,created_at) VALUES(?,?,?,?)').bind(id,agency,action.name,at).run();return {id};
  }
- if(action.action==='archive'){await env.DB.prepare('UPDATE property_projects SET archived=? WHERE agency_id=? AND id=?').bind(action.archived?1:0,agency,action.id).run();return {ok:true};}
+ if(action.action==='archive'){const group=action.archived?(await readPropertyGroups(env,agency)).find(g=>g.summary.projectId===action.id):null;await env.DB.batch([
+   ...(action.archived?[env.DB.prepare('UPDATE showcase_properties SET removed=1,published_json=NULL,updated_at=? WHERE agency_id=? AND property_id IN (SELECT value FROM json_each(?))').bind(at,agency,JSON.stringify([...(group?.aliases??[]),'project:'+action.id]))]:[]),
+   env.DB.prepare('UPDATE property_projects SET archived=? WHERE agency_id=? AND id=?').bind(action.archived?1:0,agency,action.id)]);return {ok:true};}
  if(action.action==='attach'){
   if(action.kind==='draft'?!await findCreationDraft(env.DB,agency,action.id):!await findOwnedGeneration(env.DB,agency,action.id))throw new RequestFailure('NOT_FOUND');
   if(action.projectId){if(!await env.DB.prepare('SELECT 1 FROM property_projects WHERE agency_id=? AND id=? AND archived=0').bind(agency,action.projectId).first())throw new RequestFailure('NOT_FOUND');

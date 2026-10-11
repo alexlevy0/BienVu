@@ -65,3 +65,4 @@ export * from './admin';
 export * from './admin-performance';
 export * from './traffic';
 export * from './teams';
+export * from './showcase';

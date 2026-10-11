@@ -30,7 +30,7 @@ function sourcePhotos(raw:unknown,agencyId:string,importId:string|null,jobId:str
       mime:String(value.mime),agencyId,importId,jobId,url:''}];
   });
 }
-export async function readPropertyGroups(env:Env,agencyId:string):Promise<PropertyGroup[]>{
+export async function readPropertyGroups(env:{DB:Pick<D1Database,'prepare'>},agencyId:string):Promise<PropertyGroup[]>{
   EntityId.parse(agencyId);
   const [imports,jobs,projects]=await Promise.all([
     env.DB.prepare(`SELECT i.id,nullif(i.source_url,'') AS source,i.input_json AS input,i.result_json AS result,d.data_json AS draft,
@@ -111,6 +111,7 @@ export async function archiveProperty(env:Env,agencyId:string,id:string,archived
   const n=await env.DB.prepare('SELECT count(*) n FROM property_projects WHERE agency_id=?').bind(agencyId).first<{n:number}>();
   if(!group.summary.projectId&&(n?.n??0)>=500)throw new RequestFailure('RATE_LIMITED');
   await env.DB.batch([
+    ...(archived?[env.DB.prepare('UPDATE showcase_properties SET removed=1,published_json=NULL,updated_at=? WHERE agency_id=? AND property_id IN (SELECT value FROM json_each(?))').bind(at,agencyId,JSON.stringify([...group.aliases,group.summary.id]))]:[]),
     env.DB.prepare('INSERT INTO property_projects(id,agency_id,name,archived,created_at) VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET archived=excluded.archived WHERE property_projects.agency_id=excluded.agency_id')
       .bind(projectId,agencyId,group.summary.title.slice(0,120),archived?1:0,at),
     env.DB.prepare(`INSERT INTO project_items(agency_id,project_id,kind,entity_id,created_at)

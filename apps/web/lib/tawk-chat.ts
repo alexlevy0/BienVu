@@ -18,6 +18,9 @@ export function tawkChatAllowed(value:string):boolean {
   try {
     const url=new URL(value,'https://bienvu.online');
     if(/^\/(admin|api|validation)(\/|$)/.test(url.pathname))return false;
+    // A storefront visitor contacts the agency through its own form and
+    // coordinates. The platform's support widget would send them to BienVu.
+    if(url.pathname.startsWith('/agences/')||url.pathname==='/ma-vitrine/apercu')return false;
     if([...url.searchParams.keys()].some(key=>/token|code|state|grant|session_id|checkout|homePreview/i.test(key)))return false;
     return !/token=|code=|grant=/i.test(url.hash);
   }catch{return false;}

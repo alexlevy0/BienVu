@@ -3,7 +3,7 @@ import {authOrigin,type AuthEnvironment} from './auth';
 import {RequestFailure} from './http';
 
 export async function verifyBot(env:AuthEnvironment&{TURNSTILE_SECRET_KEY?:string},token:unknown,idempotency:string,
-  action:'anonymous_trial'|'partner_application',fetcher:typeof fetch=fetch) {
+  action:'anonymous_trial'|'partner_application'|'showcase_contact',fetcher:typeof fetch=fetch) {
   if(typeof token!=='string'||!token||token.length>2048||!env.TURNSTILE_SECRET_KEY)throw new RequestFailure('BOT_VERIFICATION_FAILED');
   // The verification retry belongs to both this intent and this fresh token.
   const hash=await opaqueHash(idempotency+':'+token),uuid=`${hash.slice(0,8)}-${hash.slice(8,12)}-4${hash.slice(13,16)}-8${hash.slice(17,20)}-${hash.slice(20,32)}`;

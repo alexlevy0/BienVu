@@ -4,7 +4,7 @@ import type {ReactNode} from 'react';
 import {StudioSidebar} from './studio-sidebar';
 import {CookiePreferencesButton} from './product-analytics';
 
-export function StudioFrame({active, children, showFooter=true}: {active: 'create' | 'videos' | 'explore' | 'agency' | 'offers' | 'projects' | 'admin' | 'social'; children: ReactNode; showFooter?: boolean}) {
+export function StudioFrame({active, children, showFooter=true}: {active: 'create' | 'videos' | 'explore' | 'agency' | 'showcase' | 'offers' | 'projects' | 'admin' | 'social'; children: ReactNode; showFooter?: boolean}) {
   return <div className="home-studio">
     <a className="home-skip" href="#home-content">Aller au contenu</a>
     <StudioSidebar active={active}/>

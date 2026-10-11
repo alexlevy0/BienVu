@@ -15,6 +15,7 @@ const contents = [
   {id: 'conservation', title: 'Durées de conservation'},
   {id: 'cookies', title: 'Cookies et fréquentation'},
   {id: 'droits', title: 'Vos droits et contact'},
+  {id: 'vitrines', title: 'Les vitrines des agences'},
 ] as const;
 
 export default function Page() {
@@ -110,6 +111,14 @@ export default function Page() {
       <p>Écrivez à <a href="mailto:contact@bienvu.online">contact@bienvu.online</a> en indiquant l’adresse de votre compte et votre demande. Ne transmettez pas votre mot de passe. Nous pouvons demander une vérification proportionnée de votre identité si nécessaire. Une réponse est apportée dans le délai applicable, en principe un mois ; si une prolongation autorisée est nécessaire, vous en êtes informé.</p>
       <p>Vous pouvez également saisir la <a href="https://www.cnil.fr/fr/plaintes">CNIL</a>. Les <a href="https://www.cnil.fr/fr/mes-demarches/les-droits-pour-maitriser-vos-donnees-personnelles">informations de la CNIL sur vos droits</a> précisent leurs modalités.</p>
       <p>Cette politique sera mise à jour si les pratiques de BienVu évoluent. Sa date est affichée en haut de la page ; toute évolution importante de l’utilisation de vos données fera l’objet d’une information appropriée. Consultez aussi les <Link href="/conditions">conditions d’utilisation</Link>.</p>
+    </LegalSection>
+    <LegalSection {...contents[8]}>
+      <p>Une agence choisit explicitement les biens, médias, coordonnées et éventuelles adresses précises qu’elle publie sur sa vitrine. Ses adaptations de présentation restent privées jusqu’à publication. Une vitrine mise hors ligne, un bien retiré ou archivé et ses liens de médias publics deviennent inaccessibles. Les copies de médias sélectionnées restent protégées dans le stockage et ne sont servies publiquement que pour une publication active.</p>
+      <p>Si vous contactez une agence depuis sa vitrine, votre nom, e-mail, téléphone facultatif, message et le bien concerné sont enregistrés dans son espace privé pour traiter votre demande. Seuls les membres autorisés de cette agence peuvent les consulter. Une notification peut être envoyée à l’agence ; son échec n’efface pas la demande. Ce formulaire ne vous inscrit pas à une newsletter et ne confirme pas un rendez-vous.</p>
+      <p>Les demandes et leurs coordonnées sont supprimées automatiquement après six mois, ou plus tôt par un administrateur de l’agence. Un reçu technique sans coordonnées ni message évite de recréer une demande lors d’un nouvel envoi réseau ; il est lui aussi supprimé après six mois. Les empreintes de contrôle anti-spam et les clés de dédoublonnage sont purgées à leur expiration.</p>
+      <p>Avec votre consentement à la mesure, les vues, fiches consultées et clics de contact alimentent des compteurs agrégés conservés quatre-vingt-dix jours. Les demandes reçues sont comptées à partir des formulaires effectivement enregistrés. Les prévisualisations, visites des membres de l’agence et robots reconnus sont exclus. Ni vos coordonnées ni le contenu des messages ne sont transmis dans ces événements. L’enregistrement de sessions est désactivé dans les vitrines et leur espace de gestion, même si vous l’avez autorisé sur le reste de BienVu.</p>
+      <p>Si vous ajoutez un bien aux favoris, son identifiant public est conservé dans le navigateur de cet appareil pour retrouver votre choix. Les favoris sont propres à chaque vitrine, ne sont pas envoyés à l’agence et ne constituent pas un compte visiteur. Vous pouvez les retirer avec le bouton cœur, ou les effacer en supprimant les données du site dans votre navigateur.</p>
+      <p>Pour modifier ou supprimer une demande, contactez l’agence à laquelle vous l’avez adressée, ou <a href="mailto:contact@bienvu.online">contact@bienvu.online</a> pour l’assistance technique relative au stockage dans BienVu.</p>
     </LegalSection>
   </LegalDocument>;
 }

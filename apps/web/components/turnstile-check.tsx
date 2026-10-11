@@ -10,7 +10,7 @@ function loadTurnstile(){return scriptLoading??=(new Promise<void>((resolve,reje
   script.onload=()=>{if(window.turnstile)resolve();else{scriptLoading=undefined;script.remove();reject(new Error('Vérification indisponible. Réessayez.'));}};
   script.onerror=()=>{scriptLoading=undefined;script.remove();reject(new Error('Vérification indisponible. Réessayez.'));};document.head.appendChild(script);
 }));}
-export function TurnstileCheck({siteKey,action,version,onToken,onError}:{siteKey:string;action:'anonymous_trial'|'partner_application';
+export function TurnstileCheck({siteKey,action,version,onToken,onError}:{siteKey:string;action:'anonymous_trial'|'partner_application'|'showcase_contact';
   version:number;onToken:(token:string)=>void;onError:(text:string)=>void}) {
   const container=useRef<HTMLDivElement>(null),callbacks=useRef({onToken,onError});
   useEffect(()=>{callbacks.current={onToken,onError};},[onToken,onError]);
