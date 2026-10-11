@@ -1,5 +1,11 @@
 # BienVu — suivi des sprints
 
+### 11/10/2026 — espacement avant « À découvrir sur BienVu »
+
+La marge au-dessus de la galerie de la homepage passe de **12 à 48 px** sur ordinateur et de **16 à 32 px** jusqu’à 760 px de largeur. Deux règles existantes de `landing.css` ajustées, limitées à `.home-studio-home`. Alignements horizontaux, dimensions du bloc de création et typographies conservés.
+
+Comparaison de la homepage réelle avec les deux nouvelles règles à **1536/1280/390/320 px** : marges mesurées exactes, géométrie du hero identique, aucun débordement ou erreur JavaScript ; captures inspectées. Build OpenNext, TypeScript intégré, préparation des sourcemaps privées Next/Worker et contrôle du diff réussis. Web **`8e9230db-b647-4dfa-ab5d-988c9ceb138e`** publié à **100 %**, **60 bindings** conservés ; pipeline, importer et renderer version **31** inchangés. CSS distant identique au build par SHA-256 et recette du site publié, sans injection des nouvelles marges, réussie aux quatre largeurs. Preuves privées `evidence/local/home-discover-spacing/`. Aucun import, appel IA, génération ou écriture de données client. Chrome et mobiles émulés ; aucun commit/push à cette étape.
+
 ### 11/10/2026 — Ma vitrine : lecteur vidéo sans bandes latérales
 
 Les cartes photo en 2:3 imposaient leur cadre aux vidéos en 9:16, dont la lecture en `contain` produisait des bandes sur les côtés. Le cadre suit désormais le format déclaré dès l’ouverture, puis les dimensions réelles de la vidéo à réception des métadonnées. La limite mobile de hauteur ne comprime plus ce cadre. Image entière conservée, commandes natives, démarrage volontaire et fermeture préservés ; retour au format photo initial et cartes voisines inchangées.

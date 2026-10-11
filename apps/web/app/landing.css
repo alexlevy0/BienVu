@@ -535,7 +535,7 @@
 .home-hero-demo-facts {position:absolute;left:21px;right:15px;bottom:16px;color:#fffefa;display:grid;gap:5px;text-shadow:0 1px 10px #15191050}
 .home-hero-demo-facts>span {display:flex;align-items:center;gap:8px;font-size:13px}
 .home-hero-demo-facts>strong {font-family:'Times New Roman',Times,serif;font-size:28px;line-height:1;font-weight:600}
-.home-studio-home .home-discover {margin:12px 18px 0;padding-top:0;border-top:0}
+.home-studio-home .home-discover {margin:48px 18px 0;padding-top:0;border-top:0}
 .home-studio-home .home-discover h2 {font-family:'Times New Roman',Times,serif;font-size:39px;letter-spacing:-1.35px;line-height:1.1}
 .home-studio-home .home-discover .home-example-cover {aspect-ratio:1.28}
 .home-studio-home .home-example-agency {min-height:49px;font-size:13px}
@@ -584,7 +584,7 @@
  .home-hero-dashboard .home-primary-button {grid-column:2;grid-row:2;width:100%;min-width:0;font-size:13px!important;min-height:46px;padding:10px!important;gap:8px}
  .home-hero-showcase {grid-column:1;grid-row:3;justify-self:center;width:min(100%,310px);margin-top:0}
  .home-hero-demo-heading {top:27px}
- .home-studio-home .home-discover {margin:16px 3px 0}
+ .home-studio-home .home-discover {margin:32px 3px 0}
  .home-studio-home .home-discover h2 {font-size:30px}
  .home-studio-home .home-discover .home-example-cover {aspect-ratio:4/5}
  .home-duration-pill select {padding-left:34px}
