@@ -1,0 +1,43 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      cloudflare:
+        patterns:
+          - '@cloudflare/*'
+          - '@opennextjs/*'
+          - miniflare
+          - wrangler
+        update-types:
+          - minor
+          - patch
+      remotion:
+        patterns:
+          - '@remotion/*'
+          - remotion
+        update-types:
+          - minor
+          - patch
+      application:
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+  - package-ecosystem: docker
+    directories:
+      - /apps/importer
+      - /apps/renderer
+    schedule:
+      interval: weekly
+      day: monday

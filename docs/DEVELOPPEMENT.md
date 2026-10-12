@@ -4,7 +4,7 @@ Les sprints 01–03 avancent en local à la demande d'Alex sans attendre la rece
 
 ## Installation et commandes
 
-Node 24.17.0, pnpm 10.33.2 ; versions exactes dans les manifests et le lockfile. Aucun Docker, compte Cloudflare ou crédit API requis pour les fondations.
+Node 24.21.0, pnpm 10.33.2 ; versions exactes dans les manifests et le lockfile. Aucun Docker, compte Cloudflare ou crédit API requis pour les fondations.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -86,6 +86,8 @@ pnpm generations:pause
 Cette commande coupe les générations dans la base **locale** ; aucun accès distant. Le journal de coûts est persistant, typé, dédupliqué, et refuse un replay contenant un montant différent. Estimation, réconciliation, frais fixes et prépaiement restent distincts ; aucun solde financier fiable ne peut être déduit d'un simple cumul de ces catégories.
 
 ## CI et limites
+
+`pnpm audit:dependencies` contrôle toutes les dépendances du lockfile, y compris les outils de développement et les dépendances transitives. La CI de sécurité l'exécute à chaque push/PR et quotidiennement ; une alerte, même faible, ou un registre indisponible fait échouer ce contrôle. Les mises à jour sont proposées chaque semaine par Dependabot, sans fusion automatique. [Correctifs, preuves et maintenance](SECURITE-DEPENDANCES.md).
 
 `.github/workflows/ci.yml` reproduit les contrôles locaux et le build, puis les sondes workerd, sans secrets externes ni déploiement. Aucun rendu Docker/Containers ou appel Browser Run, IA, TTS ou Stripe. La configuration GitHub Actions n'est considérée exécutée que si un résultat distant existe ; un passage local n'est pas un résultat GitHub.
 

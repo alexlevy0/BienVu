@@ -1,4 +1,4 @@
-FROM node:24.17.0-bookworm-slim@sha256:862263c612aa437e3037674b85419622a9d93bff80aa1eee5398dfe686375532
+FROM node:24.21.0-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates chromium=154.0.8037.92-1~deb12u1 && rm -rf /var/lib/apt/lists/*
 RUN npm install -g pnpm@10.33.2
 WORKDIR /app

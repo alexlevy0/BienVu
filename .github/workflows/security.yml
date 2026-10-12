@@ -1,0 +1,44 @@
+name: Sécurité des dépendances
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '31 6 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      # pnpm audits the whole lockfile; no install or dependency build scripts.
+      # Registry errors also fail the job. No advisory or severity is ignored.
+      - run: pnpm audit:dependencies
+  containers:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construire les deux images Linux
+        run: |
+          docker build -f apps/importer/Dockerfile -t bienvu-importer-security .
+          docker build -f apps/renderer/Dockerfile -t bienvu-renderer-security .
+      - name: Vérifier aussi Undici intégré à Node
+        run: |
+          for image in bienvu-importer-security bienvu-renderer-security; do
+            docker run --rm --network none "$image" node -e '
+              const assert = require("node:assert/strict");
+              const v = process.versions.undici.split(".").map(Number);
+              assert.ok(v[0] > 7 || v[0] === 7 && (v[1] > 29 || v[1] === 29 && v[2] >= 1));
+              console.log(JSON.stringify({node:process.versions.node,undici:process.versions.undici}));
+            '
+          done

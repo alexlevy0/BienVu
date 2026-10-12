@@ -5,13 +5,14 @@
   "type": "module",
   "packageManager": "pnpm@10.33.2",
   "engines": {
-    "node": ">=24.17.0 <25"
+    "node": ">=24.21.0 <25"
   },
   "scripts": {
     "dev": "pnpm --filter @bienvu/web dev",
     "preview": "pnpm --filter @bienvu/web preview",
     "db:migrate": "pnpm --filter @bienvu/web exec wrangler d1 migrations apply DB --local",
     "check:boundaries": "node scripts/check-boundaries.mjs",
+    "audit:dependencies": "pnpm audit --audit-level=low",
     "check": "pnpm check:boundaries && pnpm test && pnpm typecheck",
     "probe:foundations": "node scripts/probe-foundations.mjs",
     "setup:local": "node scripts/setup-local.mjs",
