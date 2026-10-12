@@ -42,3 +42,10 @@ jobs:
               console.log(JSON.stringify({node:process.versions.node,undici:process.versions.undici}));
             '
           done
+      - name: Vérifier un rendu vidéo réel avec les binaires Linux
+        # The 6-second fixture is synthetic; no provider, network or paid call.
+        # Run on native Linux: Chromium under local amd64 emulation may time out.
+        run: >-
+          docker run --rm --network none --shm-size=512m
+          bienvu-renderer-security pnpm --filter @bienvu/renderer
+          render security-short short
