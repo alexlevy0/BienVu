@@ -4,6 +4,8 @@ L'audit initial du lockfile complet remonte **18 avis : 5 élevés, 9 modérés 
 
 La page GitHub consultée avant publication affiche **20 alertes**. Plusieurs avis Next.js sont présents à la fois dans `apps/web/package.json` et `pnpm-lock.yaml` ; sa liste et celle du registre npm ne se comptent donc pas de la même façon. Les deux couvrent les quatre familles corrigées ci-dessous.
 
+Après mise à jour de `main` et réanalyse explicite, GitHub affiche **0 alerte ouverte / 28 fermées**, fichiers contrôlés le 12 octobre à 14:21 (Europe/Paris). Aucune alerte n'a été écartée manuellement. La [CI complète](https://github.com/alexlevy0/BienVu/actions/runs/38246457592) réussit sous Node 24.21.0 (**698 tests**) et la [CI de sécurité](https://github.com/alexlevy0/BienVu/actions/runs/38246457588) réussit aussi, y compris la construction et le contrôle des deux images Linux.
+
 ## Correctifs
 
 | Dépendance | Avant | Après | Avis | Emplacement |
@@ -51,6 +53,7 @@ Image officielle épinglée : `node:24.21.0-bookworm-slim@sha256:d6aa754f16b3197
 - `pnpm audit:dependencies` interroge le registre sur le lockfile complet et échoue dès le niveau faible. Aucune option `--ignore`, `--prod` ou `--ignore-registry-errors` n'est utilisée.
 - `.github/workflows/security.yml` exécute ce contrôle à chaque push, pull request, lancement manuel et chaque jour à 06:31 UTC. L'audit ne lance aucun script de dépendance et ne demande aucun secret externe. Sur push/PR, un second job construit les deux images Linux et vérifie leur copie d'Undici intégrée à Node ; les scripts de build autorisés s'exécutent uniquement dans ces conteneurs de CI sans secret.
 - `.github/dependabot.yml` prépare les mises à jour npm chaque semaine, avec des groupes Cloudflare, Remotion et application pour les patchs/mineures. Les versions majeures restent proposées séparément, sans fusion automatique. GitHub Actions et les images de base des deux Dockerfiles sont également suivis.
+- Le premier passage du bot a échoué : sa règle d'attente de 72 heures refusait la version `@posthog/nextjs-config@1.11.2`, pourtant déjà épinglée, testée et déployée, lors de mises à jour d'autres paquets. `minimumReleaseAgeExclude` exempte uniquement cette version précise, sans désactiver la règle pour les versions futures. La commande de résolution utilisée par Dependabot (`pnpm update wrangler@4.149.0 --lockfile-only --no-save -r --config.minimum-release-age=4320`) réussit avec cette exception dans une copie isolée du workspace. Cette commande ne change pas les versions retenues dans le projet.
 - Une mise à jour doit passer l'audit, l'installation figée, les tests, les types, le build OpenNext et le bundle/rendu des composants affectés avant livraison. Ne pas fermer manuellement les alertes pour masquer une version encore vulnérable.
 - Après mise à jour de la branche par défaut, vérifier la réanalyse Dependabot. Le compteur GitHub peut différer de celui de pnpm ou rester temporairement ancien ; seul un résultat distant confirme la fermeture de ses alertes.
 
