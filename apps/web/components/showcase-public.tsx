@@ -18,15 +18,15 @@ function ContactLinks({data}:{data:ShowcasePublic}){
     {data.config.website&&<a data-showcase-contact href={data.config.website} target="_blank" rel="noopener noreferrer">Site de l’agence <HomeIcon name="external" size={16}/></a>}
   </div>;
 }
-export function PublicShowcase({data,property,query={}}:{data:ShowcasePublic;property?:ShowcasePublicProperty;query?:Record<string,string>}){
-  const c=data.config,origin=`/agences/${c.slug}`,home=data.preview?'/ma-vitrine/apercu?frame=1':origin;
+export function PublicShowcase({data,property,query={},homePath}:{data:ShowcasePublic;property?:ShowcasePublicProperty;query?:Record<string,string>;homePath?:string}){
+  const c=data.config,home=homePath??(data.preview?'/ma-vitrine/apercu?frame=1':`/agences/${c.slug}`);
   const heroCover=data.cover??data.featured[0]?.cover??data.properties[0]?.cover;
   const isFiltered=Object.entries(query).some(([key,value])=>!['page','frame'].includes(key)&&Boolean(value));
   const advancedFilters=Object.entries(query).some(([key,value])=>!['page','frame','transaction'].includes(key)&&Boolean(value));
   const gallery=!isFiltered&&data.page===1?[...new Map([...data.featured,...data.properties].map(item=>[item.id,item])).values()]:data.properties;
   const location=[c.city,...c.sectors.filter(sector=>sector.toLocaleLowerCase('fr-FR')!==c.city.toLocaleLowerCase('fr-FR'))].filter(Boolean).join(' · ');
   function catalogueUrl(values:Record<string,string|null>){
-    const params=new URLSearchParams(query);if(data.preview)params.set('frame','1');
+    const params=new URLSearchParams(query);if(data.preview&&!homePath)params.set('frame','1');
     for(const[key,value]of Object.entries(values))if(value)params.set(key,value);else params.delete(key);
     return `${home.split('?')[0]}${params.size?'?'+params:''}#catalogue`;
   }
@@ -70,7 +70,7 @@ export function PublicShowcase({data,property,query={}}:{data:ShowcasePublic;pro
             <nav className="showcase-transaction-filters" aria-label="Type de transaction">{[['','Tous les biens'],['sale','À vendre'],['rent','À louer']].map(([value,label])=><Link key={label} href={catalogueUrl({transaction:value||null,page:null})} prefetch={false} aria-current={(query.transaction??'')===value?'page':undefined}>{label}</Link>)}</nav>
             <details className="showcase-filter-panel"><summary><HomeIcon name="settings" size={18}/><span>Filtres{advancedFilters?' actifs':''}</span><HomeIcon name="chevron" size={14}/></summary>
               <form className="showcase-filters" action={home.split('?')[0]} method="GET">
-                {data.preview&&<input type="hidden" name="frame" value="1"/>}
+                {data.preview&&!homePath&&<input type="hidden" name="frame" value="1"/>}
                 <label>Rechercher<input name="q" defaultValue={query.q??''} placeholder="Un bien, une ville…" maxLength={80}/></label>
                 <label>Transaction<select name="transaction" defaultValue={query.transaction??''}><option value="">Toutes</option><option value="sale">Vente</option><option value="rent">Location</option></select></label>
                 <label>Type<select name="type" defaultValue={query.type??''}><option value="">Tous les biens</option><option value="apartment">Appartement</option><option value="house">Maison</option><option value="other">Autre</option></select></label>

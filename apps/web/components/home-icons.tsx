@@ -56,6 +56,7 @@ const shapes = {
   user: <><circle cx="12" cy="8" r="4"/><path d="M4 22v-2a8 8 0 0 1 16 0v2"/></>,
   heart: <path d="M20.5 4.5a5 5 0 0 0-7.1 0L12 5.9l-1.4-1.4a5 5 0 0 0-7.1 7.1L12 20l8.5-8.4a5 5 0 0 0 0-7.1Z"/>,
   link: <><path d="m9 15 6-6m-5-3 1-1a5 5 0 0 1 7 7l-3 3a5 5 0 0 1-7 0m6 3-1 1a5 5 0 0 1-7-7l3-3a5 5 0 0 1 7 0"/></>,
+  share: <><circle cx="18" cy="4" r="3"/><circle cx="5" cy="12" r="3"/><circle cx="18" cy="20" r="3"/><path d="m7.6 10.5 7.8-5m-7.8 8 7.8 5"/></>,
   search: <><circle cx="10.5" cy="10.5" r="7.5"/><path d="m16 16 5 5"/></>,
   download: <><path d="M12 2v14m-5-5 5 5 5-5M3 18v4h18v-4"/></>,
   upload: <><path d="M12 17V3m-5 5 5-5 5 5M3 17v4h18v-4"/></>,

@@ -1,5 +1,15 @@
 # Visuels de l’accueil BienVu
 
+## Bloc Ma vitrine — 12 octobre 2026
+
+Le bloc promotionnel utilise une fenêtre de navigateur et un téléphone composés en HTML/CSS, avec les quatre illustrations déjà présentes dans `images/studio-home/`. Les cartes reprennent la galerie vidéo de Ma vitrine. Aucune capture d’agence cliente ni donnée privée n’est utilisée.
+
+La couverture provient de l’illustration synthétique `images/landing/riviera.webp` ci-dessous. Deux dérivés statiques dans `images/showcase-example/` : **640×250, 26 404 octets** et **1024×400, 65 866 octets**, WebP qualité 77, Sharp `resize({width,height,fit:'cover',position:'centre'})`, effort 6. Dimensions explicites, `srcset` et chargement différé ; les miniatures réutilisent les variantes 320 px existantes. Aucune vidéo ou iframe chargée par le bloc.
+
+`/ma-vitrine/exemple` est une démonstration publique **noindex**, avec agence, prix et caractéristiques fictifs explicitement signalés. Elle utilise les composants publics actuels, les clips de démonstration existants, les filtres et les fiches, avec contact désactivé et sans lecture de données d’agence. Le lien de création conserve le parcours `/ma-vitrine` et son accès après connexion. Aucun nouvel appel de génération d’images ou de vidéo.
+
+## Visuels d’origine
+
 Créés le 28 septembre 2026 avec le **générateur d’images intégré** (skill imagegen), à partir de la direction visuelle de la maquette fournie par Alex. Ce sont des illustrations synthétiques ; aucune annonce réelle, agence cliente ou vidéo produit n’est revendiquée.
 
 Les trois fichiers WebP sont dans `apps/web/public/images/landing/`. Conversion WebP qualité 83 sans modification du contenu ; les originaux restent dans le dossier des images générées de Codex. Les cadrages verticaux sont réalisés en CSS. Aucun appel à l’API OpenAI du projet.

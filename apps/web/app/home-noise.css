@@ -2,7 +2,7 @@
 .home-studio-home{--home-paper-noise:url('/media/ui/home-paper-noise.svg')}
 .home-studio-home :is(
  .home-hero-dashboard,.home-life-stage,.home-life-cta,.home-kit-panel,
- .home-share-social,.home-editor-demo-cta,
+ .home-share-social,.home-editor-demo-cta,.home-vitrine,
  .home-nav-active,.home-nav-badge,.home-avatar,.home-recent-placeholder,
  .home-avatars-new,.home-avatars-benefit-icon,.home-life-feature-icon,
  .home-life-mini-play,.home-life-audio-player>button,.home-editor-demo-feature-icon,
@@ -11,7 +11,7 @@
 ){position:relative;isolation:isolate}
 .home-studio-home :is(
  .home-hero-dashboard,.home-life-stage,.home-life-cta,.home-kit-panel,
- .home-share-social,.home-editor-demo-cta,
+ .home-share-social,.home-editor-demo-cta,.home-vitrine,
  .home-nav-active,.home-nav-badge,.home-avatar,.home-recent-placeholder,
  .home-avatars-new,.home-avatars-benefit-icon,.home-life-feature-icon,
  .home-life-mini-play,.home-life-audio-player>button,.home-editor-demo-feature-icon,

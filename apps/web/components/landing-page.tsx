@@ -10,6 +10,7 @@ import {HomeAvatarShowcase} from './home-avatar-showcase';
 import {HomeMandateKit} from './home-mandate-kit';
 import {HomeSharing} from './home-sharing';
 import {HomeEditorShowcase} from './home-editor-showcase';
+import {HomeVitrineShowcase} from './home-vitrine-showcase';
 import {HomeHeroVideo} from './home-hero-video';
 import {HomeFooter} from './home-footer';
 import {HomeVisual, useHomepageMedia, useHomepageConfig, homeClock} from './homepage-media';
@@ -84,6 +85,7 @@ export function LandingPage() {
         {!conversationActive && <HomeShowcase paused={modalOpen || heroPlaying} onCreate={focusComposer}/>}
         {!conversationActive && <HomeMandateKit onPlay={playSlot} onCreate={focusComposer}/>}
         {!conversationActive && <HomeSharing onPlay={context => playSlot(`share.${context}.video`)} onCreate={focusComposer}/>}
+        {!conversationActive && <HomeVitrineShowcase/>}
         {!conversationActive && <HomeEditorShowcase paused={modalOpen || heroPlaying} onCreate={focusComposer}/>}
         {!conversationActive && <section className="home-resource-links" aria-labelledby="home-resources-title"><h2 id="home-resources-title">Le marketing immobilier IA, de l’annonce à la publication.</h2><p>Créez une vidéo à partir de vos annonces et photos, personnalisez-la avec l’identité de votre agence et programmez sa publication sur Instagram et Facebook.</p><nav aria-label="Découvrir les fonctionnalités">{featurePages.map(page=><Link key={page.slug} href={`/${page.slug}`}>{page.heading}</Link>)}<Link href="/guides">Conseils et guides</Link><Link href="/blog">Le blog BienVu</Link><Link href="/sources">Sources d’import testées</Link></nav></section>}
       </main>

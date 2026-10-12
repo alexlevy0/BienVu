@@ -12,6 +12,7 @@ import './home-showcase.css';
 import './home-avatars.css';
 import './home-mandate-kit.css';
 import './home-sharing.css';
+import './home-vitrine.css';
 import './home-editor-showcase.css';
 import './home-footer.css';
 import './home-composer.css';

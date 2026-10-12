@@ -1,0 +1,6 @@
+.vitrine-example-banner{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:14px max(24px,calc((100vw - 1440px)/2));background:#e1e9da;color:#203b2d;font-family:'Inter Tight',Arial,sans-serif;font-size:13px;line-height:1.5}
+.vitrine-example-banner>a{flex-shrink:0;text-decoration:underline;text-underline-offset:4px}
+.vitrine-example-banner p{margin:0;text-align:center}
+.vitrine-example-banner .vitrine-example-create{padding:10px 16px;border-radius:8px;background:#203b2d;color:#fffefa;text-decoration:none;font-weight:600}
+.vitrine-example-banner a:focus-visible{outline:2px solid #203b2d;outline-offset:4px}
+@media(max-width:760px){.vitrine-example-banner{flex-wrap:wrap;gap:14px;padding:16px 20px}.vitrine-example-banner p{order:3;flex-basis:100%;text-align:left;font-size:12px}.vitrine-example-banner .vitrine-example-create{padding:9px 12px}}
