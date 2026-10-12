@@ -8,6 +8,7 @@ import {generationActive} from './generation-progress';
 import {generationSteps,generationMapOmissionText} from '../lib/generation-steps';
 import {GenerationMapConfirmation} from './generation-map-confirmation';
 import {GenerationQueueNotice} from './generation-queue-notice';
+import {GenerationCelebration} from './generation-celebration';
 import {anonymousGenerationScope,useGenerationStore} from './generation-store';
 import {submitTrialManual,TrialManualFailure,type TrialManualSettings,type TrialManualInput,type TrialManualIntent} from '../lib/anonymous-manual-client';
 import {TurnstileCheck} from './turnstile-check';
@@ -88,6 +89,7 @@ export function AnonymousTrialResult({job}:{job:GenerationView}) {
   async function connect(){setBusy(true);setFailure('');try{await value(await fetch(`/api/trial/${job.id}/login`,{method:'POST'}));window.location.assign('/connexion?trial=1');}catch(e){setFailure(e instanceof Error?e.message:'Réessayez.');setBusy(false);}}
   const unavailable=job.retention!=='available'||job.expiresAt!==null&&new Date(job.expiresAt).getTime()<=Date.now();
   return <section className="trial-result" aria-label="Votre essai"><h3 aria-live="polite">{unavailable?'Cet aperçu n’est plus disponible':steps[job.status]}</h3>
+    <GenerationCelebration job={unavailable?null:job}/>
     {!unavailable&&<GenerationQueueNotice job={job}/>}
     {unavailable?<p>Votre aperçu n’est plus disponible. Aucun nouveau traitement n’a été lancé.</p>:job.ownership==='owned'?<p>Cette vidéo a été enregistrée dans un compte. <Link href="/essai/recuperer">Retrouver ma vidéo</Link></p>:<>
       {generationActive(job)&&<><ol className="generation-steps" aria-label="Étapes de création">{generationSteps(job,job.sourceKind==='manual').map(({key,state,label,detail})=><li key={key} className={`step-${state}`} aria-current={state==='current'?'step':undefined}>{state==='done'?'✓ ':state==='skipped'?'– ':''}{label}{detail&&<small className="generation-step-detail">{detail}</small>}{key==='map'&&job.mapConfirmation&&<GenerationMapConfirmation key={job.id} job={job}/>}</li>)}</ol><p>Vous pouvez revenir sur cette page depuis ce navigateur. Votre vidéo y sera conservée.</p><button type="button" className="text-button" disabled={busy} onClick={()=>void connect()}>Me connecter pendant la création</button></>}

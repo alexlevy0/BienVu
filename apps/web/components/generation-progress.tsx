@@ -8,6 +8,7 @@ import {ProgressiveVideo} from './progressive-video';
 import {GenerationRenderProgress} from './generation-estimate';
 import {GenerationMapConfirmation} from './generation-map-confirmation';
 import {GenerationQueueNotice} from './generation-queue-notice';
+import {GenerationCelebration} from './generation-celebration';
 export const generationActive=(job:GenerationView|null)=>Boolean(job&&!['ready','failed'].includes(job.status));
 export function useGenerationProgress(agencyId?:string){
   const store=useGenerationStore();
@@ -22,6 +23,7 @@ export function GenerationProgress({job,unavailable=false}:{job:GenerationView;u
   async function retry(){setRetrying(true);try{const r=await fetch(`/api/generations/${job.id}/retry`,{method:'POST'});
     if(!r.ok)throw 0;setFeedback('Démarrage demandé. Le même traitement sera repris.');}catch{setFeedback('La reprise reste en attente. Vous pouvez revenir plus tard.');}finally{setRetrying(false);}}
   return <section id={`video-${job.id}`} className="generation-progress panel" aria-label="Votre génération">
+    <GenerationCelebration job={job}/>
     <span className="section-kicker">{job.title}</span><h3 aria-live="polite">{generationProgressText(job)}</h3>
     <GenerationQueueNotice job={job}/>
     {generationActive(job)&&<><ol className="generation-steps" aria-label="Étapes de création">{generationSteps(job,job.sourceKind==='manual').map(({key,state,label,detail})=><li key={key} className={`step-${state}`} aria-current={state==='current'?'step':undefined}>{state==='done'?'✓ ':state==='skipped'?'– ':''}{label}{detail&&<small className="generation-step-detail">{detail}</small>}{key==='map'&&job.mapConfirmation&&<GenerationMapConfirmation key={job.id} job={job}/>} {key==='rendering'&&<GenerationRenderProgress job={job} unavailable={unavailable}/>}</li>)}</ol><p>Vous pouvez fermer cette page. Retrouvez la vidéo dans <Link href="/biens">Mes biens</Link>.</p></>}

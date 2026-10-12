@@ -75,6 +75,18 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   const canGenerate = Boolean(me?.rights.generationEnabled);
   const importPaused = Boolean(me?.rights.importRetryAt);
   const manual = screen.kind === 'manual';
+  const confettiKeyword=!manual&&url.trim().toLowerCase()==='bienvu';
+  useEffect(()=>{
+    if(!confettiKeyword||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+    let disposed=false,stop:(()=>void)|undefined;
+    // Allow a word being typed inside a longer description to pass through.
+    const timer=window.setTimeout(()=>{
+      void import('../lib/generation-confetti').then(({launchConfetti})=>{
+        if(!disposed)stop=launchConfetti()??undefined;
+      }).catch(()=>{/* This local preview never changes the creation flow. */});
+    },250);
+    return()=>{disposed=true;clearTimeout(timer);stop?.();};
+  },[confettiKeyword]);
   const estimate=useUrlImportEstimate(url,me?.agency.id,!loading&&!busy&&!manual&&!composerPhotos.length&&
     screen.kind!=='guest-customizing'&&!importPaused&&!activeGuestJob);
   function settingsForImport(imported:PreparedUrlImport):VideoCustomization{
@@ -361,6 +373,9 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    // The preview keyword must never become an import or an AI description,
+    // including when the user presses Enter or clicks the creation button.
+    if(confettiKeyword)return;
     if(loading||photoChecking||incomingPhotos)return;
     if(composerPhotos.length){openWithPhotos();return;}
     if (manual) {

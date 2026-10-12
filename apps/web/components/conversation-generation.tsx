@@ -11,6 +11,7 @@ import {VideoBacklight} from './video-backlight';
 import {GenerationRenderProgress} from './generation-estimate';
 import {GenerationMapConfirmation} from './generation-map-confirmation';
 import {GenerationQueueNotice} from './generation-queue-notice';
+import {GenerationCelebration} from './generation-celebration';
 
 type RequestMessage={kind:'url'|'manual';text:string};
 
@@ -33,6 +34,7 @@ export function ConversationGeneration({job,request,sending,anonymous,unavailabl
     await onRefresh();
   }catch(error){setFeedback(error instanceof Error?error.message:'Réessayez.');}finally{setBusy(false);}}
   return <section className="home-conversation-job" aria-label="Votre création">
+    <GenerationCelebration job={job}/>
     <div className="home-request-bubble"><HomeIcon name={request.kind==='manual'?'pencil':'link'} size={22}/><div>
       <strong>{request.kind==='manual'?'Je souhaite ajouter mon annonce manuellement.':request.text}</strong>
       {request.kind==='url'&&<small>Créer une vidéo de cette annonce</small>}
