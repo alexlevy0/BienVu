@@ -6,11 +6,14 @@ onlyBuiltDependencies:
   - esbuild
   - sharp
   - workerd
-# This exact version is already pinned, tested and deployed. Dependabot applies
+# These exact versions are already pinned, tested and deployed. Dependabot applies
 # a release-age gate even when updating unrelated packages; keep future versions
 # subject to that gate rather than exempting the whole package.
 minimumReleaseAgeExclude:
   - '@posthog/nextjs-config@1.11.2'
+  - '@posthog/plugin-utils@2.0.1'
+  - '@posthog/browser-common@0.9.4'
+  - '@posthog/core@1.58.0'
 overrides:
   # Security patches only: leave newer upstream versions free to resolve.
   # Miniflare still pins the vulnerable Undici/Sharp patch versions.
