@@ -16,6 +16,11 @@ export function qualityFacts(listing:NormalizedListing):QualityFacts {
     price:value(listing.facts.price),area:value(listing.facts.area),rooms:value(listing.facts.rooms)};
 }
 const number=(s:string)=>Number(s.replace(/[\s\u00a0\u202f]/g,'').replace(',','.'));
+export function quantityCompletenessCheck(text:string):QualityCheck {
+  const incomplete=/(?:terrasse|jardin|surface|superficie|loggia|balcon|pièce|terrain|prix|loyer)\b[^.!?;]{0,100}?\b(?:de|sur|environ|près de|plus de|moins de)\s+\d+(?:[ \u00a0\u202f]\d{3})*(?:[.,]\d+)?(?!\d|[.,]\d)(?=\s*(?:[.!?;]|,(?!\d)|$))/iu.test(text);
+  return {key:'quantity',label:'Quantités et unités',status:incomplete?'fail':/\d/u.test(text)?'pass':'na',
+    reason:incomplete?'Une quantité immobilière est incomplète : son unité manque.':'Aucune quantité immobilière tronquée détectée.'};
+}
 export function factualNarrationChecks(facts:QualityFacts,text:string):QualityCheck[] {
   const result:QualityCheck[]=[],add=(key:string,label:string,bad:boolean,applicable:boolean,reason:string)=>result.push({key,label,status:applicable?(bad?'fail':'pass'):'na',reason:applicable?reason:'Aucune mention à comparer.'});
   const prices=[...text.matchAll(/(?<![\p{L}\d.,])(\d+(?:[ \u00a0\u202f]\d{3})*(?:[,.]\d+)?)\s*(k|m|millions?)?\s*(?:€|euros?)(?![\p{L}])/giu)]
@@ -28,6 +33,7 @@ export function factualNarrationChecks(facts:QualityFacts,text:string):QualityCh
   add('rooms','Nombre de pièces',rooms.some(r=>r!==facts.rooms),rooms.length>0,'Les chambres ne sont pas comptées comme des pièces.');
   const rent=/(?:^|\s)(?:loyer|à louer|par mois|mensuel)\b/iu.test(text),sale=/(?:^|\s)(?:à vendre|prix de vente|en vente)\b/iu.test(text);
   add('transaction','Vente ou location',facts.transaction==='sale'?rent:sale,rent||sale,'Le type de transaction doit correspondre aux informations confirmées.');
+  result.push(quantityCompletenessCheck(text));
   return result;
 }
 export function qualificationChecks(source:string,text:string):QualityCheck {

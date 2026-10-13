@@ -1,23 +1,28 @@
-import {AgencyBrand, GeneratableListing, ListingScript, NarrationFailure, ScriptCopyVersion, ScriptPlan, SYNTHETIC_VOICE_DISCLOSURE,
+import {AgencyBrand, GeneratableListing, ListingScript, NarrationFailure, ScriptCopyVersion, ScriptPlan, SYNTHETIC_VOICE_DISCLOSURE,quantityCompletenessCheck,
   CustomNarration,type NormalizedListing, type SceneKind, type ScriptFactRef, type VideoDuration} from '@bienvu/contracts';
 import {displayEuros, displayNumber, frenchDecimal, frenchEuros, frenchInteger} from './french';
-import {descriptionPassages,expandedNarrationLines,narrationWordLimit,narrationWordTarget,wordCount} from './suggestion';
+import {descriptionPassages,expandedNarrationLines,narrationWordLimit,narrationWordTarget,wordCount,
+  DESCRIPTION_SEGMENTATION_VERSION,LEGACY_DESCRIPTION_SEGMENTATION_VERSION,type DescriptionSegmentationVersion} from './suggestion';
 
 export const PROMPT_VERSION = 'narration-fr/1' as const;
 export const COPY_VERSION = 'factual-copy/2' as const;
 export type Copy = {id: string; kind: SceneKind; narrationText: string; captionText: string; factRefs: ScriptFactRef[];condition?:boolean};
 export type ScriptContext = {listing: NormalizedListing; brand: AgencyBrand; contact: 'phone' | 'email' | 'website' | 'none';
-  copyVersion: ScriptCopyVersion; copies: Copy[]; provenance: ListingScript['provenance']; inputHash: string;customNarration?:string[];durationSeconds?:VideoDuration};
+  copyVersion: ScriptCopyVersion; copies: Copy[]; provenance: ListingScript['provenance']; inputHash: string;customNarration?:string[];durationSeconds?:VideoDuration;
+  descriptionSegmentationVersion?:DescriptionSegmentationVersion};
 export const scriptPromptVersion=(context:Pick<ScriptContext,'copyVersion'>)=>context.copyVersion==='description-copy/2'?'narration-fr/3' as const:context.copyVersion==='description-copy/1'?'narration-fr/2' as const:PROMPT_VERSION;
 export async function hashJson(value: unknown) {
   const bytes = new TextEncoder().encode(JSON.stringify(value)), hash = await crypto.subtle.digest('SHA-256', bytes);
   return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 export async function scriptContext(listingInput: unknown, brandInput: unknown, contact?: 'phone' | 'email' | 'website' | 'none',
-  copyVersionInput: ScriptCopyVersion = COPY_VERSION,userNarration?:string[],durationSeconds?:VideoDuration): Promise<ScriptContext> {
+  copyVersionInput: ScriptCopyVersion = COPY_VERSION,userNarration?:string[],durationSeconds?:VideoDuration,
+  descriptionSegmentationVersion:DescriptionSegmentationVersion=DESCRIPTION_SEGMENTATION_VERSION): Promise<ScriptContext> {
   const versionResult = ScriptCopyVersion.safeParse(copyVersionInput);
   if (!versionResult.success) throw new NarrationFailure('SCRIPT_INPUT_INVALID');
   const copyVersion = versionResult.data;
+  if(![DESCRIPTION_SEGMENTATION_VERSION,LEGACY_DESCRIPTION_SEGMENTATION_VERSION].includes(descriptionSegmentationVersion))
+    throw new NarrationFailure('SCRIPT_INPUT_INVALID');
   const parsed = GeneratableListing.safeParse(listingInput), parsedBrand = AgencyBrand.safeParse(brandInput);
   if (!parsed.success || !parsedBrand.success || parsed.data.agencyId !== parsedBrand.data.id) throw new NarrationFailure('SCRIPT_INPUT_INVALID');
   const listing = parsed.data, brand = parsedBrand.data;
@@ -91,7 +96,7 @@ export async function scriptContext(listingInput: unknown, brandInput: unknown, 
     {ref: 'agency.contact', status: 'user_provided', sourcePath: `agency.${channel}`});
   if(copyVersion==='description-copy/1'){
     if(![20,30,40].includes(durationSeconds??20))throw new NarrationFailure('SCRIPT_INPUT_INVALID');
-    const passages=descriptionPassages(listing.description?.text??'');
+    const passages=descriptionPassages(listing.description?.text??'',false,descriptionSegmentationVersion);
     for(const [index,passage] of passages.entries())for(const kind of ['gallery','location'] as const)
       copies.push({id:`${kind}/description-${index}`,kind,narrationText:passage.narrationText,captionText:passage.text,
         factRefs:['description'],...(passage.condition?{condition:true}:{})});
@@ -103,7 +108,7 @@ export async function scriptContext(listingInput: unknown, brandInput: unknown, 
     const facts=['price','area','rooms'].flatMap(kind=>{const c=copies.find(c=>c.id===`${kind}/direct`);return c?[{text:c.narrationText,refs:c.factRefs}]:[];});
     const maximum=narrationWordLimit(durationSeconds,copyVersion),seen=new Set<string>();
     for(const budget of [...new Set([32,40,48,56,64,72,80,88,96,98,104,112,120,maximum])].filter(n=>n<=maximum).sort((a,b)=>a-b)){
-      const lines=expandedNarrationLines({text:intro.narrationText,refs:intro.factRefs},{text:ending.narrationText,refs:ending.factRefs},facts,listing.description?.text??'',budget);
+      const lines=expandedNarrationLines({text:intro.narrationText,refs:intro.factRefs},{text:ending.narrationText,refs:ending.factRefs},facts,listing.description?.text??'',budget,descriptionSegmentationVersion);
       if(!lines.length)continue;
       const key=JSON.stringify(lines);if(seen.has(key))continue;seen.add(key);
       for(const [index,line] of lines.entries()){
@@ -121,7 +126,8 @@ export async function scriptContext(listingInput: unknown, brandInput: unknown, 
   // Aucun titre libre, URL ou secret n'est transmis au LLM.
   const inputHash = await hashJson({listingId: listing.id, agencyId: listing.agencyId, sourceKind: listing.sourceKind,
     copies, provenance, photos: listing.photos.map(p => ({id: p.id, contentHash: p.contentHash})), copyVersion,
-    ...(copyVersion.startsWith('description-copy/')?{durationSeconds:durationSeconds??20}: {})});
+    ...(copyVersion.startsWith('description-copy/')?{durationSeconds:durationSeconds??20,
+      ...(descriptionSegmentationVersion===DESCRIPTION_SEGMENTATION_VERSION?{descriptionSegmentationVersion}:{})}: {})});
   if(userNarration){
     const parsed=CustomNarration.safeParse(userNarration);if(!parsed.success)throw new NarrationFailure('SCRIPT_INPUT_INVALID');
     const middle=copies.filter(copy=>copy.id.endsWith('/direct')&&!['intro','contact'].includes(copy.kind));
@@ -131,10 +137,11 @@ export async function scriptContext(listingInput: unknown, brandInput: unknown, 
       captionText:narrationText.slice(0,180),factRefs:['narration','photos'] as ScriptFactRef[]}));
     return {listing,brand,contact:channel,copyVersion,copies:customCopies,customNarration:parsed.data,
       provenance:[{ref:'narration',status:'user_provided',sourcePath:'customization.narration'},...provenance.filter(p=>p.ref==='photos')],
-      inputHash:await hashJson({inputHash,customNarration:parsed.data})};
+      inputHash:await hashJson({inputHash,customNarration:parsed.data}),
+      ...(copyVersion.startsWith('description-copy/')?{descriptionSegmentationVersion}:{})};
   }
   return {listing, brand, contact: channel, copyVersion, copies, provenance, inputHash,
-    ...(copyVersion.startsWith('description-copy/')?{durationSeconds:durationSeconds??20}:{})};
+    ...(copyVersion.startsWith('description-copy/')?{durationSeconds:durationSeconds??20,descriptionSegmentationVersion}:{})};
 }
 // Select a coherent, sourced four-paragraph variant. Validate the provider IDs
 // before filling an under-length answer; foreign data must never be repaired.
@@ -267,6 +274,8 @@ export function compileScript(context: ScriptContext, input: unknown, model: str
     || new Set(scenes.map(s => s.photoAssetId)).size < 3 || scenes.some((s, i) => i > 0 && scenes[i - 1].photoAssetId === s.photoAssetId)
     || scenes.reduce((n, s) => n + s.narrationText.length, 0) > 1000) throw new NarrationFailure('SCRIPT_INVALID');
   if(context.copyVersion.startsWith('description-copy/')&&!context.customNarration){
+    if(context.descriptionSegmentationVersion===DESCRIPTION_SEGMENTATION_VERSION
+      &&scenes.some(s=>quantityCompletenessCheck(s.narrationText).status==='fail'))throw new NarrationFailure('SCRIPT_INVALID');
     if(wordCount(scenes.map(s=>s.narrationText).join(' '))>narrationWordLimit(context.durationSeconds,context.copyVersion))throw new NarrationFailure('SCRIPT_INVALID');
     if(context.copies.some(c=>c.factRefs.includes('description'))&&!scenes.some(s=>s.factRefs.includes('description')))
       throw new NarrationFailure('SCRIPT_INVALID');

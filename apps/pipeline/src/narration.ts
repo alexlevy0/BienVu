@@ -1,7 +1,8 @@
 import {AgencyBrand,VoiceConfig, NarrationAudio, NarrationFailure, PreparedNarration, VoiceFailure,GenerationRequest,customizedListing,customizedBrand,editorCanReuseVoice, type ListingScript} from '@bienvu/contracts';
 import {assertNarrationLease, checkpointNarrationScript, claimNarrationCall, failNarrationCall, findNarration, finishNarration,
   finishNarrationCall, narrationJobInput, releaseNarration, startNarration,findEditorVoiceSource, type Database, type NarrationLease} from '@bienvu/db';
-import {generateScript, hashJson, scriptContext,scriptPromptVersion,customScript, shortenScript, fitNarrationDuration,fitCachedNarration, validateScript, type ScriptContext, type ScriptProvider, type ScriptReply} from '@bienvu/narration';
+import {generateScript, hashJson, scriptContext,scriptPromptVersion,customScript, shortenScript, fitNarrationDuration,fitCachedNarration, validateScript,
+  DESCRIPTION_SEGMENTATION_VERSION,LEGACY_DESCRIPTION_SEGMENTATION_VERSION,type DescriptionSegmentationVersion,type ScriptContext, type ScriptProvider, type ScriptReply} from '@bienvu/narration';
 import {googleTts,fishTts,cartesiaTts, measureVoiceWav, voiceCacheKey, voiceSceneTiming,compactVoiceSceneTiming,localitySpeechText,LOCALITY_SPEECH_VERSION} from '@bienvu/voice';
 
 type VoiceReply = Awaited<ReturnType<ReturnType<typeof googleTts>['synthesize']>>|Awaited<ReturnType<ReturnType<typeof fishTts>['synthesize']>>|Awaited<ReturnType<ReturnType<typeof cartesiaTts>['synthesize']>>;
@@ -25,7 +26,7 @@ export async function prepareJobNarration(env: {DB: Database; MEDIA: NarrationBu
   const now = options.now ?? Date.now;
   const job = await narrationJobInput(env.DB, agencyId, jobId);
   const existing = await findNarration(env.DB, agencyId, jobId);
-  const snapshot = existing ? parseJson(existing.snapshot) as {listing: unknown; brand: unknown; contact: ScriptContext['contact']; copyVersion?: ScriptContext['copyVersion'];customNarration?:string[];localitySpeechVersion?:string} : null;
+  const snapshot = existing ? parseJson(existing.snapshot) as {listing: unknown; brand: unknown; contact: ScriptContext['contact']; copyVersion?: ScriptContext['copyVersion'];customNarration?:string[];localitySpeechVersion?:string;descriptionSegmentationVersion?:DescriptionSegmentationVersion} : null;
   const input=job.generationInput?GenerationRequest.parse(JSON.parse(job.generationInput)):undefined;
   const customization=input?.customization,voiceEnabled=input?.voiceEnabled!==false,durationSeconds=input?.durationSeconds;
   const source=customization?.voiceSourceId?await findEditorVoiceSource(env.DB,agencyId,job.listing.id,customization.voiceSourceId):null;
@@ -34,7 +35,8 @@ export async function prepareJobNarration(env: {DB: Database; MEDIA: NarrationBu
   // Les snapshots antérieurs au catalogue oral n'avaient pas de copyVersion.
   // Ils gardent leur texte et leurs clés de cache, y compris après un crash.
   const context = await scriptContext(snapshot?.listing ?? customizedListing(job.listing,customization), snapshot?.brand ?? customizedBrand(AgencyBrand.parse(options.brand??job.brand),customization), snapshot?.contact ?? options.contact,
-    snapshot ? snapshot.copyVersion ?? 'factual-copy/1' : durationSeconds!==undefined?'description-copy/2':undefined,snapshot?snapshot.customNarration:customization?.narration,durationSeconds);
+    snapshot ? snapshot.copyVersion ?? 'factual-copy/1' : durationSeconds!==undefined?'description-copy/2':undefined,snapshot?snapshot.customNarration:customization?.narration,durationSeconds,
+    snapshot?snapshot.descriptionSegmentationVersion??LEGACY_DESCRIPTION_SEGMENTATION_VERSION:DESCRIPTION_SEGMENTATION_VERSION);
   if (context.listing.agencyId !== agencyId || context.listing.id !== job.listing.id) throw new NarrationFailure('NARRATION_CONFLICT');
   if (existing && options.contact && options.contact !== context.contact) throw new NarrationFailure('NARRATION_CONFLICT');
   const config = VoiceConfig.parse(providers.voice.config);
@@ -53,7 +55,8 @@ export async function prepareJobNarration(env: {DB: Database; MEDIA: NarrationBu
   const configHash = await hashJson({voice: config, scriptModel: providers.script.model, promptVersion: scriptPromptVersion(context), mode: providers.mode,...(!voiceEnabled?{voiceEnabled:false}:{}),...(durationSeconds!==undefined?{durationSeconds}:{}),...(reuse?{reusedVoiceHash:await hashJson(source)}:{}),...(localitySpeechVersion?{localitySpeechVersion}:{})});
   const {row, lease} = await startNarration(env.DB, {agencyId, jobId, inputHash: context.inputHash, configHash,
     snapshot: JSON.stringify({listing: {...context.listing, description: context.copyVersion.startsWith('description-copy/')?context.listing.description:null}, brand: context.brand, contact: context.contact, copyVersion: context.copyVersion,
-      ...(context.customNarration?{customNarration:context.customNarration}:{}),...(localitySpeechVersion?{localitySpeechVersion}:{})}),
+      ...(context.customNarration?{customNarration:context.customNarration}:{}),...(localitySpeechVersion?{localitySpeechVersion}:{}),
+      ...(context.descriptionSegmentationVersion?{descriptionSegmentationVersion:context.descriptionSegmentationVersion}:{})}),
     mode: providers.mode, attempt: job.attempt}, now());
   let failure: string | undefined;
   const timingFor=(audio:PreparedNarration['audio'])=>context.copyVersion==='description-copy/2'

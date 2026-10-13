@@ -1,4 +1,4 @@
-import type {VideoDuration, ScriptCopyVersion, ScriptFactRef} from '@bienvu/contracts';
+import {quantityCompletenessCheck,type VideoDuration,type ScriptCopyVersion,type ScriptFactRef} from '@bienvu/contracts';
 import {frenchDecimal, frenchEuros, frenchInteger} from './french';
 
 export const narrationWordLimit = (duration: VideoDuration = 20,version:ScriptCopyVersion='description-copy/2') =>
@@ -6,23 +6,49 @@ export const narrationWordLimit = (duration: VideoDuration = 20,version:ScriptCo
 export const narrationWordTarget = (duration: VideoDuration = 20) => ({20:50,30:77,40:104})[duration];
 export const wordCount = (text: string) => text.trim().split(/\s+/u).filter(Boolean).length;
 export type DescriptionPassage = {text: string; narrationText: string; condition: boolean; score: number};
+export const DESCRIPTION_SEGMENTATION_VERSION = 'description-segmentation/2' as const;
+export const LEGACY_DESCRIPTION_SEGMENTATION_VERSION = 'description-segmentation/1' as const;
+export type DescriptionSegmentationVersion = typeof DESCRIPTION_SEGMENTATION_VERSION | typeof LEGACY_DESCRIPTION_SEGMENTATION_VERSION;
 const administrative = /(?:RSAC|RNE|SIRE[NT]|immatricul|agent commercial|registre|honoraires|géorisques|diagnostic|DPE|copropriété|charges annuelles|consommation énergétique|estimation des coûts|référence annonce|nos agences|nous contacter|contactez|exclusivité chez|en exclusivité)/iu;
 const instructions = /(?:ignore[rz]?|instructions?|prompt|système|system|assistant|invente[rz]?|http[s]?:|www\.|@|clé api|token|<|>)/iu;
 const condition = /(?:rafra[iî]chissement|r[eé]novation|travaux|r[eé]nover|rafra[iî]chir).{0,35}(?:pr[eé]voir|n[eé]cessaire|requi|à faire)|(?:à r[eé]nover|à rafra[iî]chir)/iu;
+const independentNoun = /^(?:un |une |deux |trois |des |[1-9]\d* chambres?\b)/iu;
+const subject = /^(?:le |la |les |l['’]|ce |cet |cette |ces |il |elle |ils |elles |on |vous |nous )/iu;
+const predicate = /\b(?:est|sont|se|offre(?:nt)?|dispose(?:nt)?|bénéficie(?:nt)?|accueille(?:nt)?|développe(?:nt)?|comprend|comprennent|ouvre(?:nt)?|donne(?:nt)?|permet|permettent|présente(?:nt)?|compte(?:nt)?|comporte(?:nt)?|possède(?:nt)?|complète(?:nt)?|profite(?:nt)?|trouverez|proposons)\b/iu;
+const dependentStart = /^(?:situé(?:e)?s?|dédié(?:e)?s?|idéal(?:e)?s?|ouvrant|donnant|comprenant|bénéficiant|disposant|développant|largement ouverte?|chacune?|notamment|tout en|qui|dont|avec|sans|pouvant|en sus|en supplément|non inclus|non compris|sous réserve)(?=\s|[,.:;!?]|$)/iu;
+const independentClause = (text: string) => independentNoun.test(text) || subject.test(text) && predicate.test(text);
+
+function completeDescriptionClauses(sentence: string): string[] {
+  // Decimal punctuation belongs to the number. Other commas only separate
+  // clauses with their own subject; appositions, participles and caveats stay
+  // attached to the assertion they qualify.
+  const fragments = sentence.split(/(?<!\d),(?!\d)\s*/u), clauses: string[] = [];
+  let current = fragments[0].trim();
+  for (const fragment of fragments.slice(1)) {
+    const next = fragment.trim();
+    if (independentClause(next) && independentClause(current)) {clauses.push(current); current = next;}
+    else current += `, ${next}`;
+  }
+  clauses.push(current);
+  return clauses.filter(text => !dependentStart.test(text) || text.split(/(?<!\d),(?!\d)\s*/u).slice(1)
+    .some(part => subject.test(part.trim()) && predicate.test(part)));
+}
 
 // Extractive catalogue: every property assertion retains its complete source
 // clause, including negatives, future tense and supplements. No arbitrary word
 // truncation, and no free assertion authored by the model.
-export function descriptionPassages(description: string,expanded=false): DescriptionPassage[] {
+export function descriptionPassages(description: string,expanded=false,version: DescriptionSegmentationVersion = DESCRIPTION_SEGMENTATION_VERSION): DescriptionPassage[] {
   const source = description.normalize('NFC').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
   const tail = source.search(/(?:Monsieur\s+\p{Lu}|Madame\s+\p{Lu}|exerce l'activité|registre national|registre spécial|RSAC|SIRE[NT])/iu);
   const body = tail >= 0 ? source.slice(0, tail) : source;
   const sentences = body.split(/[!?;]+\s*|\.(?:\s+|(?=[A-ZÀ-Ÿ]))/u);
   const passages: DescriptionPassage[] = [];
   for (const sentence of sentences) {
-    // A comma enumerates independent clauses; an "avec" stays with its noun,
-    // so "garage en sus" and "cuisine pouvant s'ouvrir" cannot lose qualifiers.
-    for (const raw of sentence.split(/,(?!\s*(?:en sus|en supplément|en supplement|non inclus|non compris|à prévoir|sous réserve|mais|sans|avec|pouvant|qui|à rénover)\b)\s*/iu)) {
+    // Frozen runs retain their original catalogue and audio cache keys.
+    const clauses = version === LEGACY_DESCRIPTION_SEGMENTATION_VERSION
+      ? sentence.split(/,(?!\s*(?:en sus|en supplément|en supplement|non inclus|non compris|à prévoir|sous réserve|mais|sans|avec|pouvant|qui|à rénover)\b)\s*/iu)
+      : completeDescriptionClauses(sentence);
+    for (const raw of clauses) {
       let text = raw.trim().replace(/^\.{1,}/, '').replace(/[.!?;]+$/u, '').trim();
       if (!text || administrative.test(text) || instructions.test(text)) continue;
       // Structured price/area/room count take precedence over rounded or stale
@@ -33,6 +59,10 @@ export function descriptionPassages(description: string,expanded=false): Descrip
         if(!suffix||numericFact.test(suffix))continue;
         text=`Le bien est proposé avec ${suffix}`;
       }
+      // A truncated description must not turn an unfinished quantity into a
+      // spoken fact ("une terrasse de 133"). Do not guess its missing unit.
+      if (version !== LEGACY_DESCRIPTION_SEGMENTATION_VERSION
+        && quantityCompletenessCheck(text).status==='fail') continue;
       if (/^(?:appartement\s+T\d|T\d\b)/iu.test(text)) continue;
       const count = wordCount(text);
       if (count < 3 || count > (expanded?50:28) || text.length > (expanded?340:165)) continue;
@@ -40,7 +70,9 @@ export function descriptionPassages(description: string,expanded=false): Descrip
       if (!/(?:séjour|salon|chambre|cuisine|balcon|terrasse|jardin|piscine|cave|garage|box|cellier|placard|rangement|résidence|calme|lumineu|expos|étage|ascenseur|commerces|métro|gare|proche|rafra[iî]ch|r[eé]nov|travaux|vue|bain|douche|parquet|cheminée|pierre|bureau|suite|extérieur|pièce de vie|centre|transport)/iu.test(text)) continue;
       text = text[0].toLocaleUpperCase('fr-FR') + text.slice(1);
       const noun = /^(?:Un |Une |Deux |Trois |Des |[1-9]\d* chambres?\b)/u.test(text)
-        && !/(?:est |sont |se |offre |dispose |à prévoir|nécessaire|requis)/iu.test(text);
+        && !(version===LEGACY_DESCRIPTION_SEGMENTATION_VERSION
+          ? /(?:est |sont |se |offre |dispose |à prévoir|nécessaire|requis)/iu.test(text)
+          : predicate.test(text)||/(?:à prévoir|nécessaire|requis)/iu.test(text));
       const narrationText = noun ? `Vous trouverez ${text[0].toLocaleLowerCase('fr-FR')}${text.slice(1)}.` : `${text}.`;
       const score = (/(?:balcon|terrasse|jardin|séjour|salon)/iu.test(text) ? 8 : 0)
         + (/(?:chambre|cuisine|calme|lumineu|vue|piscine)/iu.test(text) ? 5 : 0)
@@ -56,8 +88,9 @@ export type NarrationPhrase={text:string;refs:ScriptFactRef[];condition?:boolean
 // Whole source clauses only. Longer durations get more clauses, never padded
 // repetitions or invented features. The two middle paragraphs fit the editable
 // and rendered scene contracts and preserve their source references.
-export function expandedNarrationLines(intro:NarrationPhrase,ending:NarrationPhrase,facts:NarrationPhrase[],description:string,maximumWords:number):NarrationPhrase[]{
-  const passages=descriptionPassages(description,true),essential=passages.filter(p=>p.condition),selected:NarrationPhrase[]=[];
+export function expandedNarrationLines(intro:NarrationPhrase,ending:NarrationPhrase,facts:NarrationPhrase[],description:string,maximumWords:number,
+  segmentationVersion: DescriptionSegmentationVersion = DESCRIPTION_SEGMENTATION_VERSION):NarrationPhrase[]{
+  const passages=descriptionPassages(description,true,segmentationVersion),essential=passages.filter(p=>p.condition),selected:NarrationPhrase[]=[];
   const reserve=essential.reduce((n,p)=>n+wordCount(p.narrationText),0);
   const textOf=(items:NarrationPhrase[])=>items.map(p=>p.text).join(' ');
   const pack=(items:NarrationPhrase[]):NarrationPhrase[][]|null=>{
