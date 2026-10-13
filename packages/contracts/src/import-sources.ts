@@ -1,6 +1,6 @@
 // Hôtes et routes explicites, partagés par le contrat, le registre et l'interface.
 // La présence dans ce catalogue n'est pas une promesse de compatibilité.
-export type SourceId = 'espaces-atypiques' | 'orpi' | 'century21' | 'figaro' | 'seloger' | 'leboncoin' | 'bienici' | 'ladresse' | 'cesar-brutus' | 'iad' | 'remax' | 'safti' | 'nestenn' | 'human' | 'citya';
+export type SourceId = 'espaces-atypiques' | 'orpi' | 'century21' | 'figaro' | 'seloger' | 'leboncoin' | 'bienici' | 'ladresse' | 'cesar-brutus' | 'iad' | 'remax' | 'safti' | 'nestenn' | 'human' | 'citya' | 'laforet';
 export type ImportSource = {id: SourceId; name: string; hosts: readonly string[]; paths: readonly RegExp[];
   mediaHosts: readonly string[]; documentTransport?: 'browser'};
 export const importSources: readonly ImportSource[] = [
@@ -36,6 +36,9 @@ export const importSources: readonly ImportSource[] = [
     paths: [/^\/annonce-achat-(?:appartement|maison)-[^/]+_(\d+-\d+)$/], mediaHosts: ['humanimmobilier-images.s3.fr-par.scw.cloud'], documentTransport: 'browser'},
   {id: 'citya', name: 'Citya', hosts: ['www.citya.com', 'citya.com'],
     paths: [/^\/annonces\/vente\/appartement\/[^/]+\/(TAPP\d+-\d+)$/], mediaHosts: []},
+  {id: 'laforet', name: 'Laforêt', hosts: ['www.laforet.com', 'laforet.com'],
+    paths: [/^\/agence-immobiliere\/[^/]+\/(?:acheter|louer)\/[^/]+\/(?:maison|appartement)-\d+-pieces?-(\d+)\/?$/],
+    mediaHosts: ['laforetbusiness.laforet-intranet.com']},
 ];
 export const sourceForHost = (host: string) => importSources.find(source => source.hosts.includes(host));
 export function sourceListingId(source: ImportSource, path: string): string | null {

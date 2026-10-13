@@ -53,8 +53,18 @@ export const sourceCoverageData = {
     ]
   },
   "laforet": {
-    "summary": "La page est récupérée, mais sa lecture et ses ressources ne sont pas encore prises en charge par l’import. Vous pouvez renseigner le bien et ajouter vos photos manuellement.",
+    "summary": "Import automatique confirmé sur la maison de Noisy-le-Grand : prix, surface, pièces, description et 12 photos. Les autres formats du site restent à vérifier.",
     "samples": [
+      {
+        "url": "https://www.laforet.com/agence-immobiliere/noisylegrand/acheter/noisy-le-grand/maison-7-pieces-52874619",
+        "label": "Maison · Noisy-le-Grand",
+        "checkedAt": "2026-10-13",
+        "testedAt": "2026-10-13T21:25:34.812Z",
+        "environment": "cloudflare",
+        "outcome": "complete",
+        "photos": 12,
+        "note": "Fiche importée automatiquement avec 2 700 000 €, 220 m², 7 pièces, la description et 12 photos privées vérifiées. Les essais antérieurs ci-dessous précèdent l’ajout de l’adaptateur Laforêt."
+      },
       {
         "url": "https://www.laforet.com/agence-immobiliere/caluire/acheter/lyon-03/appartement-3-pieces-52297980",
         "label": "Appartement · Lyon 3e",

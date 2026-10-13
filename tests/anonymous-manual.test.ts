@@ -57,6 +57,7 @@ test('l’essai accepte toutes les sources du registre connecté et conserve les
     'https://nestenn.com/appartement-3-pieces-de-65m2-avec-balcon-place-de-stationnement-cave-ref-39584333',
     'https://www.human-immobilier.fr/annonce-achat-appartement-tulle_259-4183',
     'https://www.citya.com/annonces/vente/appartement/toulouse-31555/TAPP176-971928',
+    'https://www.laforet.com/agence-immobiliere/recette/acheter/ville-de-recette/maison-7-pieces-12345678',
   ];
   assert.deepEqual(new Set(urls.map(url=>selectAdapter(url).id)),new Set(importSources.map(source=>source.id)));
   for(const url of [...urls,'https://agence.example/annonce/123']){const parsed=trialInput({url});assert.equal('url' in parsed&&parsed.url,url);}
