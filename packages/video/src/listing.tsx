@@ -1,12 +1,13 @@
 import React, {useEffect, useState} from 'react';
 import {AbsoluteFill, Audio, Img, OffthreadVideo, Freeze, Sequence, cancelRender, continueRender, delayRender, interpolate, useCurrentFrame} from 'remotion';
-import {VideoManifest, mapFrame, type VideoPresentation,type AvatarContentBounds} from '@bienvu/contracts';
+import {VideoManifest, mapFrame, VIDEO_LAYERS, type VideoPresentation,type AvatarContentBounds} from '@bienvu/contracts';
 import {contrastInk, displayArea, displayLocation, displayPrice, displayRooms, fitDisplayFont, fitFont, subtitleGroups, VIDEO_SAFE as safe} from './layout';
 import {cameraMotion} from './camera-motion';
 import {HorizontalPhotoScene} from './horizontal';
 import {EditorFilm} from './editor';
 import {AvatarOverlay} from './avatar';
 import {MapOverlay} from './map';
+import {SceneLayers} from './scene-layers';
 
 // Ces URL sont résolues uniquement par le renderer Node vers son serveur
 // loopback privé. Le manifeste serveur n'accepte jamais d'URL d'asset cliente.
@@ -22,7 +23,7 @@ function PhotoScene({manifest: m, media, index}: {manifest: VideoManifest; media
   const current = groups.find(g => {threshold += g.length / totalChars * voiceFrames; return f < threshold;}) ?? groups.at(-1)!;
   const intro = index === 0;
   const opacity = interpolate(f, [0, 7], [index ? 0 : 1, 1], {extrapolateRight: 'clamp'});
-  return <AbsoluteFill style={{opacity}}>
+  return <SceneLayers manifest={m} index={index} style={{opacity}} audio={m.voiceEnabled!==false&&audio&&<Audio src={media[audio.id]} volume={1}/>} background={<>
     <div style={{position:'absolute',inset:0,overflow:'hidden'}}>
       <Img src={media[photo.id]} style={{width:'100%',height:'100%',objectFit:'cover',filter:'blur(32px)',opacity:.2,transform:'scale(1.08)'}}/>
     </div>
@@ -31,6 +32,7 @@ function PhotoScene({manifest: m, media, index}: {manifest: VideoManifest; media
       <Img src={media[photo.id]} style={{width:'97%',height:'97%',objectFit:'contain',borderRadius:16,
         transform:`scale(${interpolate(f,[0,scene.durationFrames],[1,1.015],{extrapolateRight:'clamp'})})`}}/>
     </div>
+    </>}>
     {!last && <div style={{position:'absolute',left:safe.left,right:safe.right,top:1160,color:dark}}>
       <div style={{fontSize:22,letterSpacing:3,textTransform:'uppercase',fontWeight:600,opacity:.7}}>{intro ? 'Votre prochaine adresse' : scene.kind === 'gallery' ? 'La visite en images' : 'Les repères du bien'}</div>
       <div style={{marginTop:16,fontSize:fitFont(scene.captionText,safe.width,120,66,28),fontWeight:650,lineHeight:1.12,
@@ -45,8 +47,7 @@ function PhotoScene({manifest: m, media, index}: {manifest: VideoManifest; media
     {m.subtitlesEnabled!==false&&<div data-bienvu-subtitle="true" style={{position:'absolute',left:safe.left,right:safe.right,bottom:390,background:dark,color:'#fff',
       padding:'22px 30px',borderRadius:16,fontSize:fitFont(current,safe.width-60,150,40,25),lineHeight:1.28,
       overflowWrap:'anywhere',textAlign:'left'}}>{current}</div>}
-    {m.voiceEnabled!==false&&audio&&<Audio src={media[audio.id]} volume={1}/>}
-  </AbsoluteFill>;
+  </SceneLayers>;
 }
 const propertyName = (type: VideoPresentation['propertyType']) => type==='apartment'?'Appartement':type==='house'?'Maison':'Bien immobilier';
 function posterHeadline(kind: VideoManifest['scenes'][number]['kind'], p: VideoPresentation, contact: boolean) {
@@ -100,9 +101,11 @@ function EditorialPhotoScene({manifest:m,media,index}: {manifest:VideoManifest;m
   const opacity=interpolate(f,[0,7],[index?0:1,1],{extrapolateRight:'clamp'});
   const accent=m.brand.primaryColor,ink=contrastInk(accent),width=safe.width;
   const zoom=m.photoMotion===false?1:interpolate(f,[0,scene.durationFrames],[1.01,1.055],{extrapolateRight:'clamp'});
-  return <AbsoluteFill style={{opacity,background:m.photoTimeline?undefined:'#151b16',color:'#fff',overflow:'hidden'}}>
+  return <SceneLayers manifest={m} index={index} style={{opacity,background:m.photoTimeline?undefined:'#151b16',color:'#fff',overflow:'hidden'}}
+    audio={m.voiceEnabled!==false&&audio&&<Audio src={media[audio.id]} volume={1}/>} background={<>
     {!m.photoTimeline&&<Img src={media[photo.id]} style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:'center',transform:`scale(${zoom})`}}/>}
     <AbsoluteFill style={{background:'linear-gradient(180deg,rgba(8,13,10,.30) 0%,rgba(8,13,10,.06) 36%,rgba(8,13,10,.15) 51%,rgba(8,13,10,.54) 70%,rgba(8,13,10,.78) 100%)'}}/>
+    </>}>
     <div style={{position:'absolute',left:safe.left,top:186,maxWidth:width,background:accent,color:ink,
       padding:'13px 27px 11px',fontSize:38,fontWeight:750,letterSpacing:8,lineHeight:1.1}}>{posterLabel(scene.kind,p,m.contact!=='none')}</div>
     <div style={{position:'absolute',left:safe.left,right:safe.right,top:286,maxHeight:385,
@@ -135,8 +138,7 @@ function EditorialPhotoScene({manifest:m,media,index}: {manifest:VideoManifest;m
       {m.contact!=='none'&&<div style={{marginTop:18,fontSize:fitFont(m.brand[m.contact]!,width-60,125,51,20),
         fontWeight:600,lineHeight:1.16,overflowWrap:'anywhere'}}>{m.brand[m.contact]}</div>}
     </div>}
-    {m.voiceEnabled!==false&&audio&&<Audio src={media[audio.id]} volume={1}/>}
-  </AbsoluteFill>;
+  </SceneLayers>;
 }
 function StyledPhotoScene({manifest:m,media,index}:{manifest:VideoManifest;media:Record<string,string>;index:number}){
   const frame=useCurrentFrame(),scene=m.scenes[index],p=m.presentation!,audio=m.audio.find(a=>a.id===scene.audioAssetId)!;
@@ -146,9 +148,11 @@ function StyledPhotoScene({manifest:m,media,index}:{manifest:VideoManifest;media
   const voiceFrames=Math.ceil((audio?.durationMs??scene.durationFrames*1000/30)*30/1000);let threshold=0;
   const subtitle=groups.find(g=>{threshold+=g.length/length*voiceFrames;return frame<threshold;})??groups.at(-1)!;
   const panel=m.brand.secondaryColor,ink=contrastInk(panel),accent=m.brand.primaryColor;
-  return <AbsoluteFill data-bienvu-style={m.visualStyle} style={{color:'#fff'}}>
+  return <SceneLayers manifest={m} index={index} data-bienvu-style={m.visualStyle} style={{color:'#fff'}}
+    audio={m.voiceEnabled!==false&&audio&&<Audio src={media[audio.id]} volume={1}/>} background={<>
     {!m.photoTimeline&&<Img src={media[scene.photoAssetId]} style={{width:'100%',height:'100%',objectFit:'cover'}}/>}
     <AbsoluteFill style={{background:cinema?'linear-gradient(180deg,#0003 0%,transparent 38%,#000c 100%)':'linear-gradient(180deg,#0002 0%,transparent 50%,#0006 100%)'}}/>
+    </>}>
     <div style={{position:'absolute',top:210,left:safe.left,color:'#fff',fontSize:35,letterSpacing:cinema?5:2,textTransform:'uppercase',textShadow:'0 2px 12px #0008'}}>{p.locality}</div>
     {m.subtitlesEnabled!==false&&<div data-bienvu-subtitle="true" style={{position:'absolute',left:safe.left,right:safe.right,bottom:780,
       background:'#000a',padding:'18px 24px',fontSize:fitFont(subtitle,width-48,150,45,30),textAlign:cinema?'center':'left',lineHeight:1.2}}>{subtitle}</div>}
@@ -160,8 +164,8 @@ function StyledPhotoScene({manifest:m,media,index}:{manifest:VideoManifest;media
       {contact&&m.contact!=='none'?<div style={{fontSize:fitFont(m.brand[m.contact]!,width-76,160,46,23),lineHeight:1.2,marginTop:25,overflowWrap:'anywhere'}}>{m.brand[m.contact]}</div>:
         <><div style={{marginTop:24,fontSize:34}}>{[p.areaM2!==null?displayArea(p.areaM2):'',p.rooms!==null?displayRooms(p.rooms):''].filter(Boolean).join(' · ')}</div>
         {p.priceCents!==null&&<div style={{fontSize:54,fontWeight:650,marginTop:12}}>{displayPrice(p.priceCents)}{p.transaction==='rent'?' / mois':''}</div>}</>}
-    </div>{m.voiceEnabled!==false&&audio&&<Audio src={media[audio.id]} volume={1}/>}
-  </AbsoluteFill>;
+    </div>
+  </SceneLayers>;
 }
 function CinematicPhotoScene({manifest:m,media,index}:{manifest:VideoManifest;media:Record<string,string>;index:number}){
   const frame=useCurrentFrame(),scene=m.scenes[index],p=m.presentation!,contact=scene.kind==='contact';
@@ -171,10 +175,12 @@ function CinematicPhotoScene({manifest:m,media,index}:{manifest:VideoManifest;me
   const ink=contrastInk(m.brand.secondaryColor),width=safe.width;
   const entrance=interpolate(frame,[8,32],[0,1],{extrapolateLeft:'clamp',extrapolateRight:'clamp'});
   const fallbackMotion=cameraMotion(frame,scene.durationFrames,index,m.photoMotion!==false,true);
-  return <AbsoluteFill data-bienvu-style="cinematic">
+  return <SceneLayers manifest={m} index={index} data-bienvu-style="cinematic"
+    audio={m.voiceEnabled!==false&&audio&&<Audio src={media[audio.id]} volume={1}/>} background={<>
     {!m.photoTimeline&&<Img src={media[scene.photoAssetId]} style={{width:'100%',height:'100%',objectFit:'cover',scale:fallbackMotion.scale,translate:`${fallbackMotion.x}px ${fallbackMotion.y}px`}}/>}
     {/* The upper half stays visible, including the last photo in a full gallery. */}
     {contact&&<AbsoluteFill style={{opacity:entrance,background:`linear-gradient(180deg,transparent 30%,${m.brand.secondaryColor}99 48%,${m.brand.secondaryColor}f5 64%)`}}/>}
+    </>}>
     {contact&&<div data-bienvu-cinema-endcard="true" style={{position:'absolute',left:safe.left,right:safe.right,bottom:350,color:ink,
       opacity:entrance,translate:`0 ${interpolate(frame,[8,32],[20,0],{extrapolateLeft:'clamp',extrapolateRight:'clamp'})}px`}}>
       <div style={{fontSize:28,letterSpacing:5,textTransform:'uppercase',marginBottom:18}}>{p.transaction==='sale'?'À vendre':'À louer'}</div>
@@ -188,8 +194,7 @@ function CinematicPhotoScene({manifest:m,media,index}:{manifest:VideoManifest;me
     </div>}
     {m.subtitlesEnabled!==false&&<div data-bienvu-subtitle="true" style={{position:'absolute',left:safe.left,right:safe.right,bottom:contact?1250:520,
       background:'rgba(12,17,14,.72)',color:'#fff',padding:'16px 24px',fontSize:fitFont(subtitle,width-48,145,43,28),lineHeight:1.25,textAlign:'center',overflowWrap:'anywhere'}}>{subtitle}</div>}
-    {m.voiceEnabled!==false&&audio&&<Audio src={media[audio.id]} volume={1}/>}
-  </AbsoluteFill>;
+  </SceneLayers>;
 }
 export function ListingFilm(props: ListingVideoProps) {
   const m = VideoManifest.parse(props.manifest), f = useCurrentFrame();
@@ -213,7 +218,7 @@ export function ListingFilm(props: ListingVideoProps) {
     {scenes.map(({s,index,from}) => <Sequence key={s.id} from={from} durationInFrames={s.durationFrames}>
       {horizontal?<HorizontalPhotoScene manifest={m} media={props.media} logoBackground={props.logoBackground} index={index}/>:editorial?cinematic?<CinematicPhotoScene manifest={m} media={props.media} index={index}/>:m.visualStyle==='minimal'?<StyledPhotoScene manifest={m} media={props.media} index={index}/>:<EditorialPhotoScene manifest={m} media={props.media} index={index}/>:<PhotoScene manifest={m} media={props.media} index={index}/>}
     </Sequence>)}
-    {!horizontal&&<>
+    {!horizontal&&<AbsoluteFill style={{zIndex:VIDEO_LAYERS.content,visibility:mapFrame(m.map?.settings,at,f)===null?'visible':'hidden'}}>
     {!editorial&&<div style={{position:'absolute',left:safe.left,right:safe.right,top:190,minHeight:112,display:'flex',alignItems:'flex-start',gap:24}}>
       {m.logo && <div style={{width:112,height:112,flexShrink:0,borderRadius:18,background:props.logoBackground,padding:14,boxSizing:'border-box'}}>
         <Img src={props.media[m.logo.id]} style={{width:'100%',height:'100%',objectFit:'contain'}}/>
@@ -234,10 +239,10 @@ export function ListingFilm(props: ListingVideoProps) {
     {!cinematic&&<><div style={{position:'absolute',left:safe.left,right:safe.right,top:editorial?118:338,height:4,background:m.brand.primaryColor}}/>
       <div style={{position:'absolute',left:safe.left,right:safe.right,top:editorial?118:338,height:4,background:m.brand.secondaryColor,
         transformOrigin:'left center',transform:`scaleX(${f / Math.max(1,at-1)})`}}/></>}
-    </>}
+    </AbsoluteFill>}
     <MapOverlay manifest={m} media={props.media} moduleUrl={props.maplibreModuleUrl} workerUrl={props.maplibreWorkerUrl}/>
     <AvatarOverlay manifest={m} media={props.media} bounds={props.avatarBounds}/>
-    {m.rights.watermarked && (!horizontal||mapFrame(m.map?.settings,at,f)!==null) && <div style={{position:'absolute',left:editorial?235:262,top:editorial?785:f >= scenes.at(-1)!.from ? 540 : 780,transform:'rotate(-14deg)',
+    {m.rights.watermarked && (!horizontal||mapFrame(m.map?.settings,at,f)!==null) && <div style={{position:'absolute',zIndex:VIDEO_LAYERS.watermark,left:editorial?235:262,top:editorial?785:f >= scenes.at(-1)!.from ? 540 : 780,transform:'rotate(-14deg)',
       background:'#132a23d9',border:'2px solid #ffffffa0',borderRadius:12,padding:'18px 30px',color:'#fff',
       fontWeight:750,fontSize:35,letterSpacing:2}}>BIENVU · VIDÉO D’ESSAI</div>}
   </AbsoluteFill>;

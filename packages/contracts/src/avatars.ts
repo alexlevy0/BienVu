@@ -1,5 +1,6 @@
 import {z} from 'zod';
 import {cartesiaParisianVoices} from './cartesia-voices';
+import {VIDEO_LAYERS} from './video-layers';
 
 export const AvatarId=z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/);
 export const AvatarFavorites=z.object({ids:z.array(AvatarId).max(5000)}).strict();
@@ -81,7 +82,7 @@ export const AvatarPreviewClip=z.object({id:AvatarId,moment:z.enum(['intro','out
 export type AvatarPreviewClip=z.infer<typeof AvatarPreviewClip>;
 export function avatarFrameStyle(settings:AvatarCustomization,width:number,height:number,transparent=false){
   const size=width*settings.width/100,h=settings.appearance==='circle'?size:size*1.3;
-  return {position:'absolute' as const,left:Math.max(0,Math.min(width-size,width*settings.x/100-size/2)),
+  return {position:'absolute' as const,zIndex:VIDEO_LAYERS.avatar,left:Math.max(0,Math.min(width-size,width*settings.x/100-size/2)),
     top:settings.y===85?Math.max(0,height-h):Math.max(0,Math.min(height-h,height*settings.y/100-h/2)),width:size,height:h,
     borderRadius:settings.appearance==='circle'?'50%':settings.appearance==='card'?Math.round(size*.05):0,
     overflow:'hidden' as const,background:transparent?'transparent':'#e6eddf',

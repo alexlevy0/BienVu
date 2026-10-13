@@ -2,6 +2,7 @@ import React from 'react';
 import {AbsoluteFill,Audio,Img,interpolate,useCurrentFrame} from 'remotion';
 import type {VideoManifest} from '@bienvu/contracts';
 import {contrastInk,displayArea,displayLocation,displayPrice,displayRooms,fitDisplayFont,fitFont,subtitleGroups} from './layout';
+import {SceneLayers} from './scene-layers';
 
 // Full-HD landscape has its own safe area. Portrait coordinates are never
 // scaled or cropped: only the original photos/clips fill the new canvas.
@@ -18,10 +19,12 @@ export function HorizontalPhotoScene({manifest:m,media,logoBackground,index}:{ma
   const heading=scene.kind==='area'&&p.areaM2!==null?displayArea(p.areaM2):scene.kind==='rooms'&&p.rooms!==null?displayRooms(p.rooms)
     :scene.kind==='price'&&price?price:scene.kind==='gallery'?'En images':displayLocation(p.locality);
   const entrance=interpolate(frame,[8,28],[0,1],{extrapolateLeft:'clamp',extrapolateRight:'clamp'});
-  return <AbsoluteFill data-bienvu-style={m.visualStyle??'editorial'} data-bienvu-orientation="horizontal" style={{color:'#fff'}}>
+  return <SceneLayers manifest={m} index={index} data-bienvu-style={m.visualStyle??'editorial'} data-bienvu-orientation="horizontal" style={{color:'#fff'}}
+    audio={m.voiceEnabled!==false&&audio&&<Audio src={media[audio.id]} volume={1}/>} background={<>
     {!m.photoTimeline&&<Img src={media[scene.photoAssetId]} style={{width:'100%',height:'100%',objectFit:'cover'}}/>}
     {(!cinematic||contact)&&<AbsoluteFill style={{opacity:cinematic?entrance:1,
       background:cinematic?`linear-gradient(180deg,transparent 28%,${panel}99 52%,${panel}f5 76%)`:'linear-gradient(180deg,#0005 0%,transparent 38%,#000b 100%)'}}/>}
+    </>}>
     {!cinematic&&!minimal&&<>
       <div style={{position:'absolute',top:86,left:96,padding:'12px 24px',background:accent,color:contrastInk(accent),fontSize:30,letterSpacing:6,fontWeight:750,textTransform:'uppercase'}}>{label}</div>
       <div style={{position:'absolute',left:96,top:172,width:1250,fontFamily:'BienVu Display, Impact, sans-serif',
@@ -54,6 +57,5 @@ export function HorizontalPhotoScene({manifest:m,media,logoBackground,index}:{ma
       {m.logo&&<Img src={media[m.logo.id]} style={{width:54,height:54,objectFit:'contain',background:logoBackground}}/>}{m.brand.name}</div>}
     {m.rights.watermarked&&<div style={{position:'absolute',left:600,top:460,transform:'rotate(-9deg)',padding:'20px 32px',background:'#132a23d9',
       border:'2px solid #ffffffa0',borderRadius:12,fontSize:36,fontWeight:750}}>BIENVU · VIDÉO D’ESSAI</div>}
-    {m.voiceEnabled!==false&&audio&&<Audio src={media[audio.id]} volume={1}/>}
-  </AbsoluteFill>;
+  </SceneLayers>;
 }

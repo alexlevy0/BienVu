@@ -1,6 +1,6 @@
 import React from 'react';
-import {Sequence,OffthreadVideo,useCurrentFrame,interpolate} from 'remotion';
-import {avatarFrameStyle,avatarContentStyle,type AvatarContentBounds,type VideoManifest} from '@bienvu/contracts';
+import {AbsoluteFill,Sequence,OffthreadVideo,useCurrentFrame,interpolate} from 'remotion';
+import {avatarFrameStyle,avatarContentStyle,VIDEO_LAYERS,type AvatarContentBounds,type VideoManifest} from '@bienvu/contracts';
 
 function AvatarClip({manifest:m,clip,src,bounds}:{manifest:VideoManifest;clip:NonNullable<VideoManifest['avatar']>['clips'][number];src:string;bounds?:AvatarContentBounds}){
   const frame=useCurrentFrame(),duration=clip.durationFrames;
@@ -13,7 +13,7 @@ function AvatarClip({manifest:m,clip,src,bounds}:{manifest:VideoManifest;clip:No
 }
 export function AvatarOverlay({manifest:m,media,bounds}:{manifest:VideoManifest;media:Record<string,string>;bounds?:Record<string,AvatarContentBounds>}){
   if(!m.avatar||m.avatar.settings.hidden)return null;
-  return <>{m.avatar.clips.map(clip=><Sequence key={clip.id} from={clip.startFrame} durationInFrames={clip.durationFrames} premountFor={30}>
+  return <AbsoluteFill data-bienvu-layer="avatar" style={{zIndex:VIDEO_LAYERS.avatar,pointerEvents:'none'}}>{m.avatar.clips.map(clip=><Sequence key={clip.id} from={clip.startFrame} durationInFrames={clip.durationFrames} premountFor={30}>
     <AvatarClip manifest={m} clip={clip} src={media[clip.asset.id]} bounds={bounds?.[clip.asset.id]}/>
-  </Sequence>)}</>;
+  </Sequence>)}</AbsoluteFill>;
 }

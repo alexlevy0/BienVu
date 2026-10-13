@@ -1,6 +1,7 @@
 import {z} from 'zod';
 import {MUSIC_LIMITS,MusicWaveform} from './music-library';
 import {mapInterval,mapFrame,type VideoMap} from './maps';
+import {VIDEO_LAYERS} from './video-layers';
 
 // Portable, bounded timeline data. No URLs, object keys, HTML or render code
 // supplied by a client: media references resolve through the owning import.
@@ -77,7 +78,7 @@ export function editorFont(font:EditorLayer['font']){return font==='serif'?'"Bie
 export function editorLayerStyle(layer:EditorLayer,at:number){
   const elapsed=at-layer.startFrame,end=layer.durationFrames-elapsed;
   const opacity=layer.animation==='none'?1:Math.max(0,Math.min(1,elapsed/10,end/10));
-  return {position:'absolute' as const,left:`${layer.x}%`,top:`${layer.y}%`,width:`${layer.width}%`,
+  return {position:'absolute' as const,zIndex:VIDEO_LAYERS.content,left:`${layer.x}%`,top:`${layer.y}%`,width:`${layer.width}%`,
     transform:`translate(-50%, -50%)${layer.animation==='rise'?` translateY(${Math.max(0,1-elapsed/12)*28}px)`:''}`,
     opacity,fontSize:layer.fontSize,fontFamily:editorFont(layer.font),fontWeight:layer.bold?700:400,fontStyle:layer.italic?'italic':'normal',
     textAlign:layer.align,color:layer.color,lineHeight:1.15,whiteSpace:'pre-wrap' as const,overflowWrap:'anywhere' as const,
@@ -85,7 +86,7 @@ export function editorLayerStyle(layer:EditorLayer,at:number){
     textShadow:layer.shadow?'0 3px 14px rgba(0,0,0,.55)':'none',boxSizing:'border-box' as const};
 }
 export function editorCaptionStyle(width:number){
-  return {position:'absolute' as const,left:'8%',right:'8%',top:'58%',transform:'translateY(-50%)',
+  return {position:'absolute' as const,zIndex:VIDEO_LAYERS.subtitles,left:'8%',right:'8%',top:'58%',transform:'translateY(-50%)',
     fontFamily:'"BienVu Video", Arial, sans-serif',fontSize:width===1920?42:44,color:'#fff',background:'#111c',
     padding:'15px 24px',textAlign:'center' as const,lineHeight:1.22,whiteSpace:'pre-wrap' as const};
 }

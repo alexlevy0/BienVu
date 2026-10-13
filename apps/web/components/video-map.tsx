@@ -1,6 +1,6 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
-import {MapImageInfo,MapLocation,MapSearchResult,VideoMapDefaults,DEFAULT_VIDEO_MAP,videoMapFromDefaults,automaticMapLocation,mapCredits,mapPublicLocation,mapInk,mapRasterScale,mapRasterOpacity,mapRasterStyle,mapZoomAt,mapZooms,mapDefaultZooms,mapRasterLevels,mapBuildingCamera,mapBuildingStyle,type VideoMap,type MapView} from '@bienvu/contracts';
+import {MapImageInfo,MapLocation,MapSearchResult,VideoMapDefaults,DEFAULT_VIDEO_MAP,videoMapFromDefaults,automaticMapLocation,mapCredits,mapPublicLocation,mapInk,mapRasterScale,mapRasterOpacity,mapRasterStyle,mapZoomAt,mapZooms,mapDefaultZooms,mapRasterLevels,mapBuildingCamera,mapBuildingStyle,VIDEO_LAYERS,type VideoMap,type MapView} from '@bienvu/contracts';
 import {HomeIcon} from './home-icons';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './video-map.css';
@@ -83,9 +83,12 @@ export function MapScenePreview(p:{map:VideoMap;automatic?:boolean;aspectRatio:'
       {p.map.location&&<>
         {p.map.location.precision==='approximate'&&<div className="map-scene-zone" style={{borderColor:ink,background:p.primaryColor}}/>}
         <div className="map-scene-pin" style={{background:ink}}/>
-        <div className="map-scene-card" style={{borderColor:ink,fontSize:width===1080?66:60}}><small>{p.map.position==='end'?'Retrouvons-nous ici':'Découvrez le quartier'}</small><strong>{p.map.location.label}</strong><span>{p.agencyName}</span>{p.contact&&<span>{p.contact}</span>}</div></>}
+      </>}
     </div>
-    {(!p.map.location||state.loading||state.error||imagesLoading||imageError)&&<div className="map-scene-status" role={state.error||imageError?'alert':'status'}>{!p.map.location?p.automatic?'Localisation automatique depuis la ville de l’annonce.':'Confirmez une localisation dans l’onglet Carte.':state.error||imageError?<>{state.error??'L’image de la carte n’a pas pu être chargée.'}<button type="button" onClick={state.retry}>Réessayer</button></>:state.loading?'Préparation de la carte…':'Chargement de l’aperçu…'}</div>}
+    <div className="map-scene-canvas" style={{width,height,transform:`scale(${scale})`,color:ink,zIndex:VIDEO_LAYERS.content}}>
+      {p.map.location&&<div className="map-scene-card" style={{borderColor:ink,fontSize:width===1080?66:60}}><small>{p.map.position==='end'?'Retrouvons-nous ici':'Découvrez le quartier'}</small><strong>{p.map.location.label}</strong><span>{p.agencyName}</span>{p.contact&&<span>{p.contact}</span>}</div>}
+    </div>
+    {(!p.map.location||state.loading||state.error||imagesLoading||imageError)&&<div className="map-scene-status" style={{zIndex:VIDEO_LAYERS.controls}} role={state.error||imageError?'alert':'status'}>{!p.map.location?p.automatic?'Localisation automatique depuis la ville de l’annonce.':'Confirmez une localisation dans l’onglet Carte.':state.error||imageError?<>{state.error??'L’image de la carte n’a pas pu être chargée.'}<button type="button" onClick={state.retry}>Réessayer</button></>:state.loading?'Préparation de la carte…':'Chargement de l’aperçu…'}</div>}
   </div>;
 }
 function MapLocator(p:{location:MapLocation;image:MapImageInfo;settings:VideoMap;color:string;onMove(location:MapLocation):void}){

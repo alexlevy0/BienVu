@@ -1,7 +1,7 @@
 'use client';
 import {trackProductEvent} from '../lib/product-analytics';
 import {useEffect,useRef,useState,type CSSProperties} from 'react';
-import {CustomNarration,videoStyles,frenchVoices,requestedAnimations,generationCreditCost,selectedAnimationIndices,mapFrame,mapInterval,mapInk,videoMapFromDefaults,type VideoCustomization,type VideoDuration,type VideoAspectRatio} from '@bienvu/contracts';
+import {CustomNarration,videoStyles,frenchVoices,requestedAnimations,generationCreditCost,selectedAnimationIndices,mapFrame,mapInterval,mapInk,videoMapFromDefaults,VIDEO_LAYERS,type VideoCustomization,type VideoDuration,type VideoAspectRatio} from '@bienvu/contracts';
 import {suggestedNarration,narrationWordLimit,wordCount} from '@bienvu/narration/suggestion';
 import type {ManualDraftFields} from '../lib/listing-draft';
 import {HomeIcon} from './home-icons';
@@ -110,10 +110,10 @@ export function VideoCustomizer(p:Props){
     </div><aside className={`customizer-preview${p.aspectRatio==='16:9'?' is-horizontal':''}`}><div className="customizer-preview-title"><strong>Aperçu de votre vidéo</strong><span>{p.aspectRatio??'9:16'}</span></div>
       <div ref={preview} className={`customizer-poster poster-${p.settings.style}${playing&&p.settings.photoMotion?' is-playing':''}${time>=duration*.8?' is-ending':''}`} style={{'--preview-accent':p.settings.primaryColor,'--preview-secondary':p.settings.secondaryColor,'--preview-ink':secondaryInk()} as CSSProperties}>
         {photo?<PhotoPreviewImage key={photo.id} src={photo.preview} alt="Aperçu de la photo sélectionnée" fetchPriority="high"/>:<div className="customizer-preview-empty"><HomeIcon name="image" size={40}/></div>}
-        <div className="customizer-poster-location">⌖ {p.fields.locality||'Votre localisation'}</div><button type="button" className="customizer-play" aria-label={playing?'Mettre l’aperçu en pause':'Lire l’aperçu visuel'} disabled={!chosen.length} onClick={()=>{if(time>=duration)setTime(0);setPlaying(!playing);}}>{playing?'Ⅱ':'▶'}</button>
-        {p.subtitlesEnabled&&!p.sourceUrl&&<div className="customizer-preview-subtitle">{narration[line]}</div>}
-        <div className="customizer-poster-copy"><h2>{p.settings.style==='cinematic'?p.fields.title||'Une nouvelle adresse':time>=duration*.8?p.agencyName||'Découvrez le bien':p.fields.title||'Une nouvelle adresse'}</h2><p>{[p.fields.area?`${p.fields.area} m²`:'',p.fields.rooms?`${p.fields.rooms} pièces`:''].filter(Boolean).join(' · ')}</p><strong>{price}</strong></div>
-        <div className="customizer-poster-agency">{p.agencyName||'BienVu'}</div>
+        <div className="customizer-poster-location" style={{zIndex:VIDEO_LAYERS.content,visibility:previewMap&&mapAt!==null?'hidden':undefined}}>⌖ {p.fields.locality||'Votre localisation'}</div><button type="button" className="customizer-play" style={{zIndex:VIDEO_LAYERS.controls}} aria-label={playing?'Mettre l’aperçu en pause':'Lire l’aperçu visuel'} disabled={!chosen.length} onClick={()=>{if(time>=duration)setTime(0);setPlaying(!playing);}}>{playing?'Ⅱ':'▶'}</button>
+        {p.subtitlesEnabled&&!p.sourceUrl&&<div className="customizer-preview-subtitle" style={{zIndex:VIDEO_LAYERS.subtitles}}>{narration[line]}</div>}
+        <div className="customizer-poster-copy" style={{zIndex:VIDEO_LAYERS.content,visibility:previewMap&&mapAt!==null?'hidden':undefined}}><h2>{p.settings.style==='cinematic'?p.fields.title||'Une nouvelle adresse':time>=duration*.8?p.agencyName||'Découvrez le bien':p.fields.title||'Une nouvelle adresse'}</h2><p>{[p.fields.area?`${p.fields.area} m²`:'',p.fields.rooms?`${p.fields.rooms} pièces`:''].filter(Boolean).join(' · ')}</p><strong>{price}</strong></div>
+        <div className="customizer-poster-agency" style={{zIndex:VIDEO_LAYERS.content,visibility:previewMap&&mapAt!==null?'hidden':undefined}}>{p.agencyName||'BienVu'}</div>
         {previewMap&&mapAt!==null&&<MapScenePreview map={previewMap} automatic={automaticMap} aspectRatio={p.aspectRatio??'9:16'} frame={mapAt} primaryColor={p.settings.primaryColor} secondaryColor={p.settings.secondaryColor} agencyName={p.agencyName}/>}
       <AvatarPoster avatar={p.settings.avatar} look={avatarCatalog?.looks.find(a=>a.id===p.settings.avatar?.lookId)} frame={time*30} total={duration*30} width={previewSize.width} height={previewSize.height}/>
       </div><div className="customizer-player-controls"><button type="button" aria-label={playing?'Pause':'Lecture'} disabled={!chosen.length} onClick={()=>{if(time>=duration)setTime(0);setPlaying(!playing);}}>{playing?'Ⅱ':'▶'}</button><span>0:{String(Math.floor(time)).padStart(2,'0')} / 0:{duration}</span>
