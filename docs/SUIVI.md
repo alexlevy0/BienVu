@@ -1,5 +1,17 @@
 # BienVu — suivi des sprints
 
+### 13/10/2026 — Factures et portail Stripe pour les recharges sans abonnement
+
+Le menu du compte « Abonnement et factures » pointe vers `/abonnement#facturation`. Un bloc placé immédiatement après le titre propose « Accéder à mes factures », l’offre et son échéance lorsque l’agence est abonnée, ou l’état sans abonnement/résilié. L’accès repose sur le client Stripe de l’agence dans le mode courant : une recharge suffit, même avec un solde épuisé ou des nouveaux paiements suspendus. Les droits propriétaire/administrateur, l’authentification et le contrôle d’origine restent appliqués. Chargement, absence de premier achat, erreur de lecture avec reprise et erreur d’ouverture sont explicites. Les réponses de facturation/portail utilisent `private, no-store` ; les liens restent limités à HTTPS sur Stripe et le retour vise le bloc de facturation.
+
+Les recharges créent déjà une facture avec `invoice_creation.enabled=true` ; aucun changement de paiement, tarif, report, crédit, abonnement ou migration n’est nécessaire. Le changement de formule conserve son fonctionnement existant. Fichiers : `offers.tsx`, `offers.css`, `studio-sidebar.tsx`, service `billing.ts`, routes billing/portal et tests Stripe. Documentation de fonctionnement mise à jour.
+
+**25/25 tests ciblés** Stripe/recharges, types web et tests, frontières **567 fichiers**, build OpenNext, préparation des sourcemaps privées et dry-run Wrangler réussis. Recette des composants réels avec réponses API simulées dans Chrome, React StrictMode : propriétaire sans abonnement et à zéro crédit, premier achat absent, membre non gestionnaire, abonnement actif/résilié, paiement suspendu, erreur et reprise. Un clic d’ouverture envoie uniquement le POST portail ; le lien du menu rejoint le bloc. Captures finales inspectées à **1397 et 390 px**, sans débordement ni exception JavaScript. Ces scénarios n’effectuent aucun achat.
+
+Web **`5bbd9b00-75e6-429f-ac77-ae29de62df7b`** publié à **100 %** sur `bienvu.online`, release **`10e5496a4a30-1791876944476`**. **60 bindings** conservés hors identifiants de release/sourcemaps. Cinq contrôles HTTP réussis : home/offres 200, routes privées billing et POST portal anonymes 401, sourcemap Worker publique 404. **19 assets JS/CSS** distants identiques au build par SHA-256. Pipeline/importer/renderer et leurs réglages inchangés.
+
+Vérification réelle séparée : le navigateur de recette n’a pas de session BienVu active, donc la fonction serveur est appelée avec les lectures D1 distantes et le compte Stripe **test** déjà associé à l’agence d’Alex. Aucun abonnement associé, portail disponible, une facture de recharge payée avec liens facture/PDF. Session de portail réelle ouverte dans Chrome, historique visible, facture ouverte sur `invoice.stripe.com` et boutons « Télécharger la facture » / « Télécharger le reçu » actifs. Aucun cookie d’authentification synthétique, achat, abonnement ou modification des crédits ; aucun fournisseur de génération payant appelé. L’URL privée de portail n’est pas conservée dans les preuves. Captures, journaux et résultats synthétiques ignorés sous `evidence/local/billing-portal/`. Aucun commit/push à cette étape.
+
 ### 11/10/2026 — espacement avant « À découvrir sur BienVu »
 
 La marge au-dessus de la galerie de la homepage passe de **12 à 48 px** sur ordinateur et de **16 à 32 px** jusqu’à 760 px de largeur. Deux règles existantes de `landing.css` ajustées, limitées à `.home-studio-home`. Alignements horizontaux, dimensions du bloc de création et typographies conservés.

@@ -36,6 +36,8 @@ Les justificatifs et affectations sont immuables. Une correction passe par une a
 
 ## Exploitation
 
+**Factures des recharges — 13/10/2026.** Les achats ponctuels utilisent déjà `invoice_creation.enabled=true` dans Checkout. La consultation passe par « Abonnement et factures » dans le menu du compte, puis « Accéder à mes factures » en haut de `/abonnement`. Elle reste accessible sans abonnement, après résiliation ou lorsque les crédits sont épuisés, et ne consomme aucun crédit. Le portail ouvre uniquement le compte Stripe de l’agence et du mode courant, pour le propriétaire ou un administrateur ; aucun compte de facturation n’est créé par la consultation.
+
 Sauvegarder D1 avant migration, couper brièvement les admissions, attendre zéro job actif, appliquer les deux migrations puis publier les Workers web et génération. Ajouter les trois identifiants de prix au Worker web. Le service de génération doit utiliser le nouveau portefeuille lors de l’admission ; une publication du web seul ne suffit pas. Conserver les variables existantes et l’image du renderer (`--keep-vars`, `--containers-rollout none`). Rétablir les admissions et vérifier les soldes, le budget et les données historiques. Les changements ne nécessitent aucune nouvelle image du renderer et ne modifient pas le montage vidéo.
 
 Un bouton « Rapprocher Stripe » relit au plus 20 paiements de l’environnement courant, en privilégiant les frais encore manquants. Les notifications restent la source principale ; la relecture manuelle ne crée ni paiement ni remboursement. Après passage au réel, mettre à jour ensemble les clés, prix, politiques et événements du webhook ; les crédits et recettes du sandbox restent séparés.

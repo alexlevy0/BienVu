@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import type {Stripe} from '../apps/web/lib/billing';
 import {migrateNarrationProbe,seedNarrationFixture} from '../scripts/narration-fixtures';
-import {billingStatus,createCheckout,processStripeEvent,stripeClient,stripeWebhook} from '../apps/web/lib/billing';
+import {billingStatus,createCheckout,createPortal,processStripeEvent,stripeClient,stripeWebhook} from '../apps/web/lib/billing';
 import {creditBalance,creditHistory,generationRights,admitGeneration,failGeneration} from '../packages/db/src/index';
 import {savePromotion,validatePromotion,checkoutPromotion,reconcilePromotionReservations,promotionReport,promotionValidationAttempt} from '../apps/web/lib/subscription-promotions';
 import {commercialSummary} from '../apps/web/lib/commercial';
@@ -23,6 +23,40 @@ async function fixture(t:{after(fn:()=>Promise<void>):void},label:string){
  const event=(id:string,type:Stripe.Event.Type='invoice.paid',created=Math.floor(Date.now()/1000))=>({id,type,created,livemode:false,data:{object:type.startsWith('invoice')?{id:invoice.id}:{id:sub.id}}}) as Stripe.Event;
  return {env,DB,...seed,client,sub,invoice,event,checkoutSessions};
 }
+test('Portail Stripe : factures sans abonnement, même si les nouveaux paiements sont suspendus',async t=>{
+ const f=await fixture(t,'portal-topup');let params:Stripe.BillingPortal.SessionCreateParams|undefined;
+ f.client.billingPortal.sessions.create=async input=>{params=input;return {url:'https://billing.stripe.com/p/session/fixture'} as Stripe.Response<Stripe.BillingPortal.Session>;};
+ const env={...f.env,STRIPE_WEBHOOK_SECRET:undefined};
+ const status=await billingStatus(env,f.agencyId);assert.equal(status.subscription,null);assert.equal(status.enabled,false);assert.equal(status.portalAvailable,true);
+ const before=await creditBalance(f.DB,f.agencyId);
+ assert.deepEqual(await createPortal(env,f.agencyId,'https://bienvu.online',f.client),{url:'https://billing.stripe.com/p/session/fixture'});
+ assert.equal(params?.customer,'cus_fixture');assert.equal(params?.return_url,'https://bienvu.online/abonnement#facturation');
+ assert.deepEqual(await creditBalance(f.DB,f.agencyId),before,'Consulter les factures ne modifie aucun crédit');
+ assert.equal((await f.DB.prepare('SELECT count(*) n FROM subscriptions').first<{n:number}>())!.n,0);
+});
+test('Portail Stripe : ni compte d’une autre agence, ni client d’un autre mode',async t=>{
+ const f=await fixture(t,'portal-scope'),other=await seedNarrationFixture(f.DB,'portal-other');let calls=0;
+ await f.DB.prepare('DELETE FROM billing_customers WHERE agency_id=?').bind(f.agencyId).run();
+ await f.DB.prepare('INSERT INTO billing_customers VALUES(?,?,?,?)').bind(f.agencyId,'live','cus_live_fixture',new Date().toISOString()).run();
+ await f.DB.prepare('INSERT INTO billing_customers VALUES(?,?,?,?)').bind(other.agencyId,'test','cus_other_fixture',new Date().toISOString()).run();
+ f.client.billingPortal.sessions.create=async()=>{calls++;throw Error('Unexpected Stripe call');};
+ assert.equal((await billingStatus(f.env,f.agencyId)).portalAvailable,false);
+ await assert.rejects(createPortal(f.env,f.agencyId,'https://bienvu.online',f.client),{code:'NOT_FOUND'});
+ await assert.rejects(createPortal({...f.env,BILLING_MODE:'live'},f.agencyId,'https://bienvu.online',f.client),{code:'BILLING_UNAVAILABLE'});
+ assert.equal((await billingStatus({...f.env,BILLING_MODE:'live'},f.agencyId)).portalAvailable,false);
+ assert.equal(calls,0,'Aucun compte Stripe créé ni mauvais portail ouvert');
+});
+test('Portail Stripe : accessible après résiliation, liens limités à HTTPS sur Stripe',async t=>{
+ const f=await fixture(t,'portal-ended');f.sub.status='canceled';
+ await processStripeEvent(f.env,f.event('evt_ended','customer.subscription.deleted'),'b'.repeat(64),f.client);
+ assert.equal((await billingStatus(f.env,f.agencyId)).portalAvailable,true);
+ let url='https://billing.stripe.com/p/session/fixture';
+ f.client.billingPortal.sessions.create=async()=>({url}) as Stripe.Response<Stripe.BillingPortal.Session>;
+ assert.equal((await createPortal(f.env,f.agencyId,'https://bienvu.online',f.client)).url,url);
+ for(const unsafe of ['http://billing.stripe.com/p/session/fixture','https://example.com/p/session/fixture']){
+  url=unsafe;await assert.rejects(createPortal(f.env,f.agencyId,'https://bienvu.online',f.client),{code:'BILLING_UNAVAILABLE'});
+ }
+});
 async function promotionFixture(t:Parameters<typeof fixture>[0],label:string,maxRedemptions:number|null=null){
  const f=await fixture(t,label),at=new Date().toISOString(),actor='promo-admin-'+label;
  await f.DB.prepare('INSERT INTO auth_user(id,name,email,emailVerified,createdAt,updatedAt) VALUES(?,?,?,1,?,?)').bind(actor,'Admin',actor+'@example.com',at,at).run();

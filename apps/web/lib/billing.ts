@@ -17,7 +17,10 @@ export function stripeClient(env:BillingEnv){if(!billingMode(env))throw new Requ
 export async function billingStatus(env:BillingEnv,agencyId:string){
  const subscription=await env.DB.prepare('SELECT plan_code AS plan,status,period_end AS periodEnd,cancel_at_period_end AS cancelAtPeriodEnd,stripe_mode AS mode FROM subscriptions WHERE agency_id=?').bind(agencyId).first();
  const policy=await env.DB.prepare('SELECT topup_valid_days AS validDays FROM credit_payment_policy WHERE id=1').first<{validDays:number}>();
- return {...billingAvailability(env),subscription,topupValidDays:policy?.validDays??0};
+ const mode=billingMode(env),customer=mode?await env.DB.prepare('SELECT 1 FROM billing_customers WHERE agency_id=? AND mode=?').bind(agencyId,mode).first():null;
+ // A credit purchase has the same billing account as a subscription. Keep its
+ // portal accessible even when all credits are spent or the webhook is paused.
+ return {...billingAvailability(env),subscription,topupValidDays:policy?.validDays??0,portalAvailable:Boolean(customer)};
 }
 export async function createCheckout(env:BillingEnv,agencyId:string,email:string,origin:string,input:unknown,key:string,client=stripeClient(env)){
  // Older open tabs may still send this field; it is not a consent record.
@@ -86,8 +89,9 @@ export async function createCheckout(env:BillingEnv,agencyId:string,email:string
  await env.DB.prepare('UPDATE billing_checkouts SET session_id=?,url=? WHERE agency_id=? AND mode=? AND idempotency_key=?').bind(session.id,url,agencyId,mode,key).run();return {url};
 }
 export async function createPortal(env:BillingEnv,agencyId:string,origin:string,client=stripeClient(env)){
- const customer=await env.DB.prepare('SELECT customer_id AS id FROM billing_customers WHERE agency_id=? AND mode=?').bind(agencyId,billingMode(env)).first<{id:string}>();if(!customer)throw new RequestFailure('NOT_FOUND');
- const session=await client.billingPortal.sessions.create({customer:customer.id,return_url:`${origin}/abonnement`,...(env.STRIPE_PORTAL_CONFIGURATION?{configuration:env.STRIPE_PORTAL_CONFIGURATION}:{})});if(new URL(session.url).hostname!=='billing.stripe.com')throw new RequestFailure('BILLING_UNAVAILABLE');return {url:session.url};
+ const mode=billingMode(env);if(!mode)throw new RequestFailure('BILLING_UNAVAILABLE');
+ const customer=await env.DB.prepare('SELECT customer_id AS id FROM billing_customers WHERE agency_id=? AND mode=?').bind(agencyId,mode).first<{id:string}>();if(!customer)throw new RequestFailure('NOT_FOUND');
+ const session=await client.billingPortal.sessions.create({customer:customer.id,return_url:`${origin}/abonnement#facturation`,...(env.STRIPE_PORTAL_CONFIGURATION?{configuration:env.STRIPE_PORTAL_CONFIGURATION}:{})});const url=new URL(session.url);if(url.protocol!=='https:'||url.hostname!=='billing.stripe.com')throw new RequestFailure('BILLING_UNAVAILABLE');return {url:session.url};
 }
 const stripeId=(value:string|{id:string}|null|undefined)=>typeof value==='string'?value:value?.id??null;
 function approvedPlan(env:BillingEnv,price:Stripe.Price){return [...creditPlans,...legacyCreditPlans].find(p=>{

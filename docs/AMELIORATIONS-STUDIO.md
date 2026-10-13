@@ -38,6 +38,8 @@ Le webhook `/api/billing/webhook` lit le corps brut, contrôle la signature et l
 
 Le portail propose factures, moyen de paiement, coordonnées de facturation et résiliation à la fin de la période. Le changement direct de formule reste fermé ; contacter le support. Le mode test est affiché dans l’interface. L’encaissement réel nécessite un compte et un webhook de production, les informations légales et la configuration fiscale adaptées ; il n’est pas activé par cette livraison.
 
+Depuis le 13/10/2026, le portail est aussi accessible après une recharge, sans abonnement actif et même avec un solde de crédits épuisé. Le menu du compte « Abonnement et factures » ouvre le bloc de facturation placé en haut de `/abonnement`. Son bouton « Accéder à mes factures » utilise le client Stripe de l’agence dans le mode courant ; les droits propriétaire/administrateur restent nécessaires. Un compte sans achat dispose d’une explication, et une erreur de chargement peut être réessayée.
+
 Les événements Stripe de recettes réelles et de test sont séparés. La synthèse Super admin présente les cohortes de nouveaux comptes et essais anonymes, les animations réutilisées, les recettes HT et les différentes catégories de coûts. Le solde EUR affiché est partiel, pas une marge nette : frais Stripe, remboursements, coûts non rapprochés et montants USD restent séparés. Aucun taux de change ou nombre de visiteurs uniques n’est inventé.
 
 ## Livraison et vérification
