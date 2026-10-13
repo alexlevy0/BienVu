@@ -1,5 +1,11 @@
 FROM node:24.21.0-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates chromium=154.0.8037.92-1~deb12u1 && rm -rf /var/lib/apt/lists/*
+# Debian replaces old Chromium packages when publishing security updates.
+# Use the current package while enforcing the reviewed minimum version.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates chromium \
+  && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' chromium)" ge '155.0.8059.39-1~deb12u1' \
+  && chromium --version \
+  && rm -rf /var/lib/apt/lists/*
 RUN npm install -g pnpm@10.33.2
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc tsconfig.base.json ./
