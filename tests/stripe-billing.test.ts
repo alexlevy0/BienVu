@@ -131,15 +131,30 @@ test('Codes bonus : remboursement proportionnel, litige et dette sur un bonus d�
  await f.DB.prepare('UPDATE financial_receipts SET disputed=0 WHERE invoice_id=?').bind(f.invoice.id).run();assert.equal((await creditBalance(f.DB,f.agencyId)).available,30);
  await f.DB.prepare("UPDATE allocations SET consumed=6 WHERE period_key LIKE 'promotion:%'").run();assert.equal((await creditBalance(f.DB,f.agencyId)).available,0,'Une dette de bonus bloque aussi les autres sources');
 });
-test('Codes bonus : calendrier, plans, validation limitée et aucune attribution via des métadonnées étrangères',async t=>{
+test('Codes bonus : calendrier, plans et aucune attribution via des métadonnées étrangères',async t=>{
  const f=await promotionFixture(t,'promo-validation');await assert.rejects(validatePromotion(f.DB,'INCONNU','test'),{code:'VALIDATION_ERROR',fields:{promotion:'invalid'}});
  await f.DB.prepare('UPDATE subscription_promotions SET starts_at=?').bind(new Date(Date.now()+3600000).toISOString()).run();await assert.rejects(validatePromotion(f.DB,'BIENVU20','test'),{fields:{promotion:'scheduled'}});
  await f.DB.prepare('UPDATE subscription_promotions SET starts_at=NULL,ends_at=?').bind(new Date(Date.now()-1000).toISOString()).run();await assert.rejects(validatePromotion(f.DB,'BIENVU20','test'),{fields:{promotion:'expired'}});
  await f.DB.prepare('UPDATE subscription_promotions SET ends_at=NULL,plans_json=?').bind('["agence"]').run();await assert.rejects(validatePromotion(f.DB,'BIENVU20','test',f.agencyId,'solo'),{fields:{promotion:'plan'}});
  await f.DB.prepare('UPDATE subscription_promotions SET plans_json=?').bind('["solo"]').run();const {intent,session}=await f.open();session.status='complete';session.subscription='sub_foreign';(f.sub.metadata as Record<string,string>).promotionIntentId=intent.id;
  await assert.rejects(processStripeEvent(f.env,f.event('evt_foreign_promo'),'e'.repeat(64),f.client),{code:'FORBIDDEN'});assert.equal((await creditBalance(f.DB,f.agencyId)).available,0);
- for(let n=0;n<15;n++)await promotionValidationAttempt(f.DB,'private-validation-secret','127.0.0.1');await assert.rejects(promotionValidationAttempt(f.DB,'private-validation-secret','127.0.0.1'),{code:'RATE_LIMITED'});
- assert.doesNotMatch(JSON.stringify((await f.DB.prepare('SELECT bucket FROM promotion_validation_limits').first())),/127\.0\.0\.1|private-validation-secret/);
+});
+test('Codes bonus : 15 validations par minute, changement de minute et confidentialité des compteurs',async t=>{
+ const f=await fixture(t,'promo-rate-limit'),secret='private-validation-secret',ip='127.0.0.1';
+ // Keep every request in its intended window, even if CI crosses a real minute.
+ let now=Date.UTC(2026,9,13,23,59,59,999);t.mock.method(Date,'now',()=>now);
+ const attempt=(address=ip)=>promotionValidationAttempt(f.DB,secret,address);
+ for(let n=0;n<15;n++)await attempt();
+ await assert.rejects(attempt(),{code:'RATE_LIMITED'});
+ assert.deepEqual((await f.DB.prepare('SELECT attempts FROM promotion_validation_limits').all()).results,[{attempts:15}]);
+ now+=1;
+ for(let n=0;n<15;n++)await attempt();
+ await assert.rejects(attempt(),{code:'RATE_LIMITED'});
+ await attempt('127.0.0.2');
+ const rows=(await f.DB.prepare('SELECT bucket,attempts FROM promotion_validation_limits ORDER BY attempts').all<{bucket:string;attempts:number}>()).results;
+ assert.deepEqual(rows.map(row=>row.attempts),[1,15,15]);
+ for(const row of rows)assert.match(row.bucket,/^[a-f0-9]{64}$/);
+ assert.doesNotMatch(JSON.stringify(rows),/127\.0\.0\.[12]|private-validation-secret/);
 });
 test('Codes bonus : places abandonnées libérées seulement si Stripe confirme une expiration',async t=>{
  const f=await promotionFixture(t,'promo-expiration',1),{session}=await f.open();await f.DB.prepare('UPDATE billing_checkouts SET expires_at=?').bind(new Date(Date.now()-1000).toISOString()).run();
