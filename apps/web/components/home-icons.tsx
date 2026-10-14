@@ -36,6 +36,7 @@ const shapes = {
   house: <><path d="m2.5 10 9.5-8 9.5 8v12h-19V10Z"/><path d="M9 22v-8h6v8"/></>,
   building: <><path d="M3 22V8h8v14M11 22V2h10v20M2 22h20M6 11h2m-2 4h2m-2 4h2m7-13h2m-2 4h2m-2 4h2m-2 4h2"/></>,
   folder: <path d="M20 20H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4l2 3h10a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2Z"/>,
+  collapse: <><path d="m13 6-6 6 6 6m5-12-6 6 6 6"/></>,
   pencil: <><path d="m3 21 4.5-1 12-12a2.5 2.5 0 0 0-3.5-3.5l-12 12L3 21Zm11-15 4 4"/></>,
   document: <><path d="M13 2H5a1 1 0 0 0-1 1v18a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9l-7-7Z"/><path d="M13 2v7h7"/></>,
   coins: <><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v7c0 4 16 4 16 0V5M4 12v7c0 4 16 4 16 0v-7"/></>,

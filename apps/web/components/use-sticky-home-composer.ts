@@ -70,9 +70,12 @@ export function useStickyHomeComposer(dockRef:RefObject<HTMLDivElement|null>,ena
     const motionChanged=()=>{cancel();if(!floating&&dock.dataset.floating)release();schedule();};
     const observer=new ResizeObserver(()=>{
       if(!dock.dataset.floating)normalHeight=dock.getBoundingClientRect().height;
+      // The sidebar can change the workspace while the centered hero keeps
+      // its maximum width. Keep the floating form aligned during that motion.
+      if(floating&&desktop.matches)place();
       schedule();
     });
-    observer.observe(slot);observer.observe(dock);
+    observer.observe(slot);observer.observe(dock);observer.observe(workspace);
     window.addEventListener('scroll',schedule,{passive:true});window.addEventListener('resize',resize,{passive:true});
     window.visualViewport?.addEventListener('resize',resize,{passive:true});
     window.visualViewport?.addEventListener('scroll',resize,{passive:true});
