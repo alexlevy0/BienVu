@@ -65,6 +65,7 @@ export function LandingPage() {
   const focusComposer = () => {
     const input = document.getElementById('home-listing-url');
     input?.focus({preventScroll: true});
+    if(input?.closest('[data-floating]'))return;
     input?.scrollIntoView({block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
   };
   return <div className="home-studio home-studio-home">

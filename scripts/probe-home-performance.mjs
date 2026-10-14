@@ -12,7 +12,7 @@ const defaultVoice=cartesiaParisianVoices.find(voice=>voice.id!==DEFAULT_VIDEO_V
 const catalog=VoiceCatalog.parse({revision:1,defaultVoice,voices:frenchVoices.map(voice=>({id:voice.id,name:voice.name,gender:voiceGender(voice.id),provider:voice.id.startsWith('cartesia-')?'cartesia':voice.id.startsWith('fish-')?'fish':'google',model:'Fixture',accent:'Français',available:true}))});
 const browser=await chromium.launch({channel:'chrome',headless:true});
 try{
- for(const width of [1365,390]){
+ for(const width of [1365,1024,390,320]){
   const context=await browser.newContext({viewport:{width,height:900},hasTouch:width<760,isMobile:width<760}),errors=[],unexpected=[];
   const counts=new Map();let releaseVoice,voiceResolved=false;
   const heldVoice=new Promise(resolve=>{releaseVoice=resolve;});
@@ -51,8 +51,58 @@ try{
    await page.evaluate(()=>scrollTo(0,0));
   }else assert.equal(await page.locator('.home-hero-demo>video').evaluate(video=>video.paused),true,'Pas de lecture automatique sur mobile');
   await page.screenshot({path:`${output}/home-${width}.png`});
+  const original=await page.evaluate(()=>{
+   window.__composerInput=document.querySelector('#home-listing-url');
+   return {height:document.documentElement.scrollHeight,discover:document.querySelector('.home-discover').getBoundingClientRect().top+scrollY};
+  });
+  await page.locator('#home-listing-url').fill('Une maison lumineuse à Lyon');
+  await page.evaluate(()=>scrollTo(0,document.querySelector('.home-composer-slot').getBoundingClientRect().top+scrollY+300));
+  if(width>900)await page.waitForFunction(()=>document.querySelector('.home-composer-dock')?.dataset.floating==='true'&&!document.querySelector('.home-composer-dock').getAnimations().length);
+  else await page.waitForFunction(()=>document.querySelector('.home-composer-dock')?.getBoundingClientRect().top<0);
+  const floating=await page.evaluate(()=>{
+   const dock=document.querySelector('.home-composer-dock'),rect=dock.getBoundingClientRect(),workspace=document.querySelector('.home-workspace').getBoundingClientRect();
+   return {floating:dock.dataset.floating??null,top:rect.top,left:rect.left,width:rect.width,targetLeft:workspace.left,targetWidth:workspace.width,height:rect.height,
+    pageHeight:document.documentElement.scrollHeight,discover:document.querySelector('.home-discover').getBoundingClientRect().top+scrollY,
+    inputCount:document.querySelectorAll('#home-listing-url').length,sameInput:document.querySelector('#home-listing-url')===window.__composerInput,
+    focused:document.activeElement===window.__composerInput,overflow:document.documentElement.scrollWidth>innerWidth+1};
+  });
+  if(width>900){
+   assert.ok(Math.abs(floating.top)<1);assert.ok(Math.abs(floating.left-floating.targetLeft)<1);assert.ok(Math.abs(floating.width-floating.targetWidth)<1);
+   assert.ok(floating.height<140,'La barre compacte laisse la page visible');
+  }else assert.equal(floating.floating,null,'Aucune barre sticky sur mobile');
+  assert.ok(Math.abs(floating.discover-original.discover)<1,'Le contenu sous le formulaire ne saute pas');
+  assert.ok(Math.abs(floating.pageHeight-original.height)<1);assert.equal(floating.inputCount,1);assert.equal(floating.sameInput,true);assert.equal(floating.focused,true);assert.equal(floating.overflow,false);
+  assert.equal(await page.locator('#home-listing-url').inputValue(),'Une maison lumineuse à Lyon');
+  if(width>900){
+   await page.screenshot({path:`${output}/sticky-${width}.png`});
+   await page.getByRole('button',{name:'Réglages de création',exact:true}).click();
+   await page.getByRole('combobox',{name:'Durée de la vidéo',exact:true}).selectOption('30');
+   await page.waitForFunction(()=>!document.querySelector('.home-composer-options').getAnimations().length);
+   await page.screenshot({path:`${output}/sticky-settings-${width}.png`});
+   await page.keyboard.press('Escape');
+   assert.equal(await page.getByRole('button',{name:'Réglages de création',exact:true}).getAttribute('aria-expanded'),'false');
+   await page.locator('#home-listing-url').focus();
+  }
+  await page.evaluate(()=>scrollTo(0,0));
+  await page.waitForFunction(()=>!document.querySelector('.home-composer-dock')?.dataset.floating);
+  assert.equal(await page.getByRole('combobox',{name:'Durée de la vidéo',exact:true}).inputValue(),width>900?'30':'20');
+  assert.equal(await page.locator('#home-listing-url').evaluate(input=>input===window.__composerInput&&document.activeElement===input),true);
+  await page.locator('#home-listing-url').fill('');
+  if(width>900){
+   await page.emulateMedia({reducedMotion:'reduce'});
+   await page.evaluate(()=>scrollTo(0,document.querySelector('.home-composer-slot').getBoundingClientRect().top+scrollY+300));
+   await page.waitForFunction(()=>document.querySelector('.home-composer-dock')?.dataset.floating==='true');
+   assert.equal(await page.locator('.home-composer-dock').evaluate(dock=>dock.getAnimations().length),0,'Respect du mouvement réduit');
+   await page.setViewportSize({width:900,height:900});
+   await page.waitForFunction(()=>!document.querySelector('.home-composer-dock')?.dataset.floating);
+   await page.setViewportSize({width,height:900});
+   await page.waitForFunction(()=>document.querySelector('.home-composer-dock')?.dataset.floating==='true');
+   await page.emulateMedia({reducedMotion:'no-preference'});
+   await page.getByRole('button',{name:'Réglages de création',exact:true}).click();
+  }
   await page.getByRole('button',{name:'Saisie manuelle',exact:true}).click();
   await page.locator('#manual-guided-form').waitFor({state:'visible'});
+  assert.equal(await page.locator('.home-composer-dock').getAttribute('data-floating'),null,'La saisie manuelle conserve son agencement');
   assert.equal(counts.get('/api/avatars')??0,0,'Ouvrir la saisie manuelle ne télécharge pas les outils avatar');
   await page.locator('.home-manual-settings summary').click();
   await page.getByRole('button',{name:'Personnaliser la vidéo',exact:true}).click();
@@ -64,7 +114,7 @@ try{
   await page.locator('#manual-guided-form').waitFor({state:'visible'});
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true);
   assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);
-  results.push({width,consentBeforeVoices:true,singleTrialHistory:true,defaultVoicePreserved:true,manualAndCustomizer:true,heroPausedOffscreen:width>760,providerCalls:0,errors});
+  results.push({width,consentBeforeVoices:true,singleTrialHistory:true,defaultVoicePreserved:true,manualAndCustomizer:true,stickyComposer:{...floating,noLayoutShift:true,settingsPreserved:true},heroPausedOffscreen:width>760,providerCalls:0,errors});
   await context.close();
  }
  await writeFile(output+'/browser.json',JSON.stringify({results,realProviders:false},null,2));console.log(JSON.stringify({passed:true,results}));

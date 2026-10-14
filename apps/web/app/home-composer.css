@@ -1,4 +1,7 @@
 .home-studio .home-composer-dock {container-type:inline-size}
+.home-composer-slot {position:relative;flex:none;min-width:0;width:100%}
+.home-composer-options {display:contents}
+.home-composer-tools-toggle {display:none}
 .home-studio .home-composer-modern {min-height:0;padding:20px;gap:22px;border:1px solid #d3ddce;border-radius:16px;background:#fffefa;box-shadow:0 10px 30px #2936200c,0 1px 4px #29362008}
 .home-studio .home-composer-modern:focus-within {border-color:#c5d2bc;box-shadow:0 10px 30px #29362012,0 1px 5px #2936200c}
 .home-studio .home-composer-modern.home-composer-invalid {border-color:#ad6953}
@@ -99,9 +102,30 @@
  .home-studio .home-composer-modern .home-toggle-track::after {width:18px;height:18px}
  .home-studio .home-composer-modern .home-setting-toggle[aria-pressed=true] .home-toggle-track::after {transform:translateX(14px)}
 }
+/* Lift the same form out of the hero while retaining its original space. The
+   floating bar spans the workspace, leaving the sidebar and dialogs accessible. */
+.home-hero-dashboard:has(.home-composer-dock[data-floating]) {z-index:20}
+.home-hero-dashboard>.home-create:has(.home-composer-dock[data-floating]) {z-index:21}
+.home-studio .home-composer-dock[data-floating=true] {position:fixed;top:var(--home-composer-top,0px);left:var(--home-composer-left,0px);width:var(--home-composer-width,100%);z-index:20}
+.home-studio .home-composer-dock[data-floating] {max-height:calc(100dvh - 12px);overflow-y:auto;overscroll-behavior:contain;background:#fffefa;box-shadow:0 12px 34px #2936201a,0 1px 0 #cbd7c4;border-radius:0 0 16px 16px}
+.home-studio .home-composer-dock[data-floating] .home-composer-modern {padding:max(12px,env(safe-area-inset-top)) 20px 10px;gap:10px;border:0;border-radius:0;background:transparent;box-shadow:none}
+.home-studio .home-composer-dock[data-floating] .home-composer-main {grid-template-columns:minmax(0,1fr) auto auto;gap:12px;align-items:start}
+.home-studio .home-composer-dock[data-floating] .home-url-row {min-height:50px}
+.home-studio .home-composer-dock[data-floating] .home-primary-button {min-height:50px;min-width:190px;padding:10px 18px}
+.home-studio .home-composer-dock[data-floating] .home-composer-actions {gap:4px}
+.home-studio .home-composer-dock[data-floating] .home-credit-cost {font-size:11px;min-height:16px}
+.home-studio .home-composer-dock[data-floating] .home-composer-tools-toggle {display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:50px;padding:10px;border:1px solid #d6dfce;border-radius:10px;background:#f1f5ec;color:#395036;font-size:13px;cursor:pointer}
+.home-studio .home-composer-dock[data-floating] .home-composer-tools-toggle:hover,.home-studio .home-composer-dock[data-floating] .home-composer-tools-toggle[aria-expanded=true] {background:#e1e9da}
+.home-studio .home-composer-dock[data-floating] .home-composer-options,.home-studio .home-composer-dock[data-floating]>.home-mode-pill {display:none}
+.home-studio .home-composer-dock[data-floating][data-expanded=true] .home-composer-options {display:flex;flex-direction:column;gap:12px;padding-top:10px;border-top:1px solid #e4e9de;animation:home-composer-settings-in .2s ease-out}
+.home-studio .home-composer-dock[data-floating][data-expanded=true]>.home-mode-pill {display:inline-flex;margin:0 20px 12px;padding:7px}
+.home-studio .home-composer-dock[data-floating]>.home-create-note {display:none}
+.home-studio .home-composer-dock[data-floating]>.home-form-feedback,.home-studio .home-composer-dock[data-floating]>.home-form-note {margin:0;padding:0 20px 12px;font-size:12px}
+@keyframes home-composer-settings-in {from {opacity:0;transform:translateY(-4px)}to {opacity:1;transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce) {
  .home-toggle-track,.home-toggle-track::after,.home-studio .home-composer-modern .home-url-row {transition:none}
  .home-url-input input:placeholder-shown+.home-url-placeholder {animation:none;background:none;color:#71777a}
+ .home-studio .home-composer-dock[data-floating][data-expanded=true] .home-composer-options {animation:none}
 }
 @media(forced-colors:active) {
  .home-url-input input:placeholder-shown+.home-url-placeholder {display:none}

@@ -17,6 +17,7 @@ import {clearListingDraft, readListingDraft, saveListingDraft} from '../lib/list
 import {inspectManualPhotos} from '../lib/manual-photos';
 import {useSubtitlePreference} from './video-settings';
 import {useUrlImportEstimate,urlImportPhotoSlots,type PreparedUrlImport} from './url-import-estimate';
+import {useStickyHomeComposer} from './use-sticky-home-composer';
 
 const loadingTool=()=> <p className="home-tool-loading" role="status">Ouverture de votre studio…</p>;
 const ManualListingForm=dynamic(()=>import('./manual-listing-form').then(module=>module.ManualListingForm),{loading:loadingTool});
@@ -103,6 +104,9 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   const estimatePending=Boolean(me&&estimate.source&&!manual&&!composerPhotos.length&&estimate.phase==='loading');
   const estimateFailed=Boolean(me&&estimate.source&&!manual&&!composerPhotos.length&&estimate.phase==='error');
   const inConversation = screen.kind !== 'landing' && screen.kind !== 'error';
+  const {slotRef:composerSlot,sticky:composerSticky}=useStickyHomeComposer(composerDock,!inConversation);
+  const [composerExpanded,setComposerExpanded]=useState(false);
+  useEffect(()=>{if(!composerSticky)setComposerExpanded(false);},[composerSticky]);
   const canDropPhotos=!loading&&!busy&&!incomingPhotos&&!photoChecking&&
     !activeGuestJob;
   function clearComposerPhotos(){
@@ -191,6 +195,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   useLayoutEffect(() => {onLayoutChange(inConversation);}, [inConversation, onLayoutChange]);
   useLayoutEffect(()=>{
     const dock=composerDock.current;if(!dock)return;
+    if(dock.dataset.floating)return;
     // Wait for the parent layout commit. The final position is measured before
     // paint, then animated from the previous position without a height collapse.
     if(Boolean(dock.closest('.home-content-conversation'))!==inConversation)return;
@@ -486,7 +491,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     {screen.kind==='extracting'&&<div className="home-conversation-manual"><div className="home-request-bubble"><HomeIcon name="pencil" size={21}/><strong>{screen.text}</strong></div>
       <p className="home-conversation-lead" role="status">Nous préparons les informations de votre bien…</p></div>}
     </div>
-    <div ref={composerDock} className="home-composer-dock">{manual?<form className="home-manual-toolbar" onSubmit={submit} aria-label={editingProperty?"Enregistrer les informations du bien":"Créer la vidéo de votre bien"}>
+    <div ref={composerSlot} className="home-composer-slot"><div ref={composerDock} className="home-composer-dock" data-expanded={composerExpanded} onKeyDown={event=>{if(event.key==='Escape'&&composerSticky&&composerExpanded){setComposerExpanded(false);event.currentTarget.querySelector<HTMLButtonElement>('.home-composer-tools-toggle')?.focus();}}}>{manual?<form className="home-manual-toolbar" onSubmit={submit} aria-label={editingProperty?"Enregistrer les informations du bien":"Créer la vidéo de votre bien"}>
       <div className="home-manual-settings"><details><summary aria-disabled={busy||loading} onClick={event=>{if(busy||loading)event.preventDefault();}}><HomeIcon name="settings" size={22}/>Réglages</summary>
         <fieldset className="home-manual-settings-panel" disabled={busy||loading}><legend>Réglages de la vidéo</legend>
           <label>Format<select aria-label="Format de la vidéo" value={aspectRatio} onChange={event=>setAspectRatio(event.target.value==='16:9'?'16:9':'9:16')}><option value="9:16">Vertical 9:16</option><option value="16:9">Horizontal 16:9</option></select></label>
@@ -516,7 +521,9 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
           <span className="home-credit-cost" aria-live="polite">{estimatePending?'Estimation en cours…':estimateFailed?'Estimation indisponible':`${creditCost} crédit${creditCost>1?'s':''}${me&&estimate.value?' estimés':''}`}
             {me&&estimate.value&&<small className="home-credit-estimate-detail">{urlImportPhotoSlots(estimate.value).length} photos · Animations IA activées</small>}
           </span></div>
+        <button type="button" className="home-composer-tools-toggle" title="Réglages de création" aria-label="Réglages de création" aria-expanded={composerExpanded} aria-controls="home-composer-options" onClick={()=>setComposerExpanded(current=>!current)}><HomeIcon name="settings" size={20}/><span>Réglages</span></button>
       </div>
+      <div id="home-composer-options" className="home-composer-options">
       {me&&estimate.phase==='ready'&&estimate.value&&!busy&&<PhotoDurationAdvice photoCount={urlImportPhotoSlots(estimate.value).length} durationSeconds={durationSeconds} onDuration={setDurationSeconds} disabled={loading||activeOtherJob}/>}
       {composerPhotos.length>0&&<div className="home-composer-attachments"><ol aria-label="Photos à ajouter à votre annonce">{composerPhotos.map((photo,index)=><li key={photo.id}>
         <img src={photo.preview} alt={`Photo ${index+1} : ${photo.file.name}`}/><button type="button" disabled={photoChecking||Boolean(incomingPhotos)} aria-label={`Retirer ${photo.file.name}`} onClick={()=>removeComposerPhoto(photo.id)}><HomeIcon name="close" size={14}/></button>
@@ -534,6 +541,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
           title={voiceEnabled?"Afficher ou masquer les sous-titres de la voix off":"Activez la voix off pour ajouter des sous-titres"} disabled={!voiceEnabled||loading||busy||activeGuestJob}
           onClick={()=>setSubtitlesEnabled(!subtitlesEnabled)}><span className="home-option-label">Sous-titres</span><span className="home-toggle-track" aria-hidden="true"/></button>
         </div><button type="button" className="home-customize-button" aria-pressed={customizing||screen.kind==='guest-customizing'} disabled={loading||busy||photoChecking||activeOtherJob||activeGuestJob} onClick={()=>void personalize()}><HomeIcon name="settings" size={21}/>Personnaliser</button>
+      </div>
       </div>
     </form>
     <button type="button" className={manual?'home-mode-pill is-active':'home-mode-pill'} aria-pressed={manual} disabled={busy || photoChecking || Boolean(incomingPhotos) || activeGuestJob} onClick={()=>{if(manual)void manualForm.current?.cancel();else if(composerPhotos.length)openWithPhotos();else openManual();}}><HomeIcon name="pencil" size={20}/>Saisie manuelle</button>
@@ -556,6 +564,6 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     {importPaused&&!manual && <p className="home-form-note" role="status">La limite des imports par lien est atteinte jusqu’au {new Date(me!.rights.importRetryAt!).toLocaleString('fr-FR')}. Vous pouvez ajouter vos informations et photos en saisie manuelle.</p>}
     {activeOtherJob && <p className="home-form-note">Une vidéo est déjà en cours de création. <Link href="/biens">Suivez-la dans Mes biens</Link>.</p>}
     <p className="home-create-note" id="home-create-note" hidden={manual?Boolean(me):!(screen.kind==='job'&&generationActive(selectedJob))&&!contextNote}>{manual ? '1 crédit offert pour créer votre vidéo sans compte. Connectez-vous pour la télécharger sans filigrane.' : screen.kind === 'job' && generationActive(selectedJob) ? me?'Votre création sera enregistrée dans Mes biens.':'Votre aperçu avec filigrane sera disponible dans ce navigateur.' : contextNote}</p>
-    </div>
+    </div></div>
   </div>;
 }
