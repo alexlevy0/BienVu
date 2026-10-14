@@ -461,9 +461,6 @@ export function ManualListingForm(props: Props) {
     const issue=input.error.issues.find(i=>i.path[0]===name);
     if(issue)setErrors(current=>({...current,[name]:fieldMessage(name,issue.code,issue.message)}));
   }
-  const previewPhoto=orderedPhotos.find(p=>(!customization?.photoOrder||customization.photoOrder.includes(p.slot))&&!p.removing);
-  const previewNumber=(value:string)=>{const raw=value.replace(/\s/g,'');return /^\d+(?:[.,]\d{1,2})?$/.test(raw)&&Number(raw.replace(',','.'))>0?Number(raw.replace(',','.')):null;};
-  const price=previewNumber(fields.priceCents),area=previewNumber(fields.area),rooms=previewNumber(fields.rooms),numberFormat=new Intl.NumberFormat('fr-FR');
   const canAdd=hydrated&&!busy&&!photoChecking&&!props.incomingPhotos&&photos.length<MANUAL_PHOTO_LIMITS.maximum;
   const pendingConfirmation=unresolved();
   return <>{props.customizing&&hydrated&&voiceLoading&&<p className="home-tool-loading" role="status">Chargement des voix disponibles…</p>}
@@ -550,15 +547,6 @@ export function ManualListingForm(props: Props) {
           {feedback&&<div className="form-feedback error" role="alert"><p>{feedback}</p></div>}
           {progress&&<p role="status" className="field-help">{progress}</p>}
         </fieldset>
-        <aside className={`manual-sheet-preview${props.aspectRatio==='16:9'?' is-horizontal':''}`} aria-labelledby="manual-preview-title"><h3 id="manual-preview-title">Aperçu de la mise en page</h3>
-          <div className={`manual-sheet-poster${previewPhoto?'':' is-empty'}`}>
-            {previewPhoto?<PhotoPreviewImage src={previewPhoto.preview} alt="Aperçu de la photo de couverture" loading={props.customizing?'lazy':'eager'}/>:<div className="manual-sheet-preview-empty"><HomeIcon name="image" size={38}/><p>Vos photos prennent place ici.</p></div>}
-            <div className="manual-sheet-poster-copy"><h4>{fields.locality.trim()||'Votre bien'}</h4>
-              {(area||rooms)&&<p>{[area?`${numberFormat.format(area)} m²`:'',rooms?`${numberFormat.format(rooms)} pièce${rooms>1?'s':''}`:''].filter(Boolean).join(' · ')}</p>}
-              {price&&<strong>{numberFormat.format(price)} €{transaction==='rent'&&<small> / mois</small>}</strong>}
-            </div>
-          </div><p className="manual-sheet-preview-caption">Le rendu s’adapte à vos informations.</p>
-        </aside>
       </div>
       {!props.guided&&<button className="button primary" type="submit" disabled={busy||photoChecking||!hydrated}>{progress?'Préparation en cours…':props.prepareGuest?'Continuer avec mon annonce':generate?'Créer la vidéo de mon annonce':'Enregistrer mon annonce'}</button>}
     </form>

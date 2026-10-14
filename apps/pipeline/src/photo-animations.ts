@@ -2,7 +2,7 @@ import {GenerationRequest,PreparedNarration,PhotoAnimation,requestedAnimations,s
 import {findNarration,findGeneration,findDefaultGenerationMap,type Database} from '@bienvu/db';
 import {scriptContext} from '@bienvu/narration';
 import type {NarrationBucket} from './narration';
-import {runwayProvider,runwayError,runwayClipCost,type AnimationProvider} from './runway';
+import {runwayProvider,runwayError,runwayClipCost,runwayMotionForSlot,type AnimationProvider} from './runway';
 import {videoBytesHash} from './video-manifest';
 import {prepareAnimationTiming,plannedAnimationSeconds} from './animation-timing';
 
@@ -61,7 +61,7 @@ export async function prepareJobAnimations(env:AnimationEnv,agencyId:string,jobI
       const bytes=row.taskId?await adapter.resume(row.taskId,signal):await adapter.generate(await sourceBytes(env,photo,agencyId,job.listingId!,jobId),photo.mime,async taskId=>{
         const saved=await env.DB.prepare("UPDATE photo_animations SET state='submitted',task_id=?,updated_at=? WHERE id=? AND state='submitting' RETURNING id")
           .bind(taskId,new Date().toISOString(),row!.id).first();if(!saved)throw Error('RUNWAY_CHECKPOINT_FAILED');
-      },signal,slot===0?'dolly':'slide',input.aspectRatio,row.durationSeconds);
+      },signal,runwayMotionForSlot(slot),input.aspectRatio,row.durationSeconds);
       await guard();if(bytes.length>10*1024*1024||bytes.length<16)throw Error('RUNWAY_OUTPUT_INVALID');
       const hash=await videoBytesHash(bytes),objectKey=`agencies/${agencyId}/jobs/${jobId}/animations/${hash}.mp4`;
       const animation=PhotoAnimation.parse({photoAssetId:photo.id,sourceSha256:photo.contentHash,provider:'runway',model:'gen4_turbo',
