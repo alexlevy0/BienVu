@@ -1,0 +1,8 @@
+.tawk-chat-launcher {position:fixed;right:20px;bottom:20px;z-index:40;display:grid;place-items:center;width:60px;height:60px;border:0;border-radius:50%;background:#e1e9da;color:#30362e;box-shadow:0 3px 14px #1d322217;cursor:pointer;transition:transform .18s,box-shadow .18s}
+.tawk-chat-launcher:hover {transform:translateY(-2px);box-shadow:0 5px 20px #1d322224}
+.tawk-chat-launcher:focus-visible {outline:2px solid #56724b;outline-offset:4px}
+.tawk-chat-launcher:disabled {cursor:progress}
+.tawk-chat-loading {width:24px;height:24px;border:2px solid #52654b44;border-top-color:#52654b;border-radius:50%;animation:tawk-chat-spin .8s linear infinite}
+@keyframes tawk-chat-spin {to {transform:rotate(360deg)}}
+@media (max-width:540px) {.tawk-chat-launcher {right:16px;bottom:16px;width:56px;height:56px}}
+@media (prefers-reduced-motion:reduce) {.tawk-chat-launcher {transition:none}.tawk-chat-loading {animation:none}}

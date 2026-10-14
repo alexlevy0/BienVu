@@ -36,9 +36,9 @@ function ExampleCard({example, onPlay}: {example: Example; onPlay(example: Examp
   const visual=useHomepageMedia(`discover.${example.id}.visual`), movie=useHomepageMedia(`discover.${example.id}.video`);
   const custom=visual.custom||movie.custom, title=custom?(movie.title??visual.title):example.title;
   return <article className="home-example"><button type="button" className="home-example-cover" onClick={() => onPlay(example)} aria-label={`Lire l’aperçu : ${title}`} aria-haspopup="dialog">
-    <HomeVisual media={visual} alt={custom?title??'Vidéo immobilière':example.alt}/>
+    <HomeVisual media={visual} alt={custom?title??'Vidéo immobilière':example.alt} sizes="(max-width: 900px) calc((100vw - 64px) / 2), (max-width: 1250px) calc((100vw - 312px) / 4), (max-width: 1916px) calc((100vw - 349px) / 4), 392px"/>
     <span className="home-example-shade"/><span className="home-duration">{homeClock(movie.duration??example.duration)}</span><span className="home-play"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 11 7-11 7V5Z"/></svg></span><h3>{title}</h3>
-  </button><div className="home-example-agency">{custom?<HomeIcon name="house" size={24}/>:<AgencySeal kind={example.id}/>}<span>{custom?(movie.agency??visual.agency??'BienVu'):example.agency}</span></div><Link className="home-example-detail-link" href={`/exemples/${example.id}`}>Voir la présentation →</Link></article>;
+  </button><div className="home-example-agency">{custom?<HomeIcon name="house" size={24}/>:<AgencySeal kind={example.id}/>}<span>{custom?(movie.agency??visual.agency??'BienVu'):example.agency}</span></div><Link className="home-example-detail-link" href={`/exemples/${example.id}`} prefetch={false}>Voir la présentation →</Link></article>;
 }
 
 export function LandingPage() {
@@ -87,7 +87,7 @@ export function LandingPage() {
         {!conversationActive && <HomeSharing onPlay={context => playSlot(`share.${context}.video`)} onCreate={focusComposer}/>}
         {!conversationActive && <HomeVitrineShowcase/>}
         {!conversationActive && <HomeEditorShowcase paused={modalOpen || heroPlaying} onCreate={focusComposer}/>}
-        {!conversationActive && <section className="home-resource-links" aria-labelledby="home-resources-title"><h2 id="home-resources-title">Le marketing immobilier IA, de l’annonce à la publication.</h2><p>Créez une vidéo à partir de vos annonces et photos, personnalisez-la avec l’identité de votre agence et programmez sa publication sur Instagram et Facebook.</p><nav aria-label="Découvrir les fonctionnalités">{featurePages.map(page=><Link key={page.slug} href={`/${page.slug}`}>{page.heading}</Link>)}<Link href="/guides">Conseils et guides</Link><Link href="/blog">Le blog BienVu</Link><Link href="/sources">Sources d’import testées</Link></nav></section>}
+        {!conversationActive && <section className="home-resource-links" aria-labelledby="home-resources-title"><h2 id="home-resources-title">Le marketing immobilier IA, de l’annonce à la publication.</h2><p>Créez une vidéo à partir de vos annonces et photos, personnalisez-la avec l’identité de votre agence et programmez sa publication sur Instagram et Facebook.</p><nav aria-label="Découvrir les fonctionnalités">{featurePages.map(page=><Link key={page.slug} href={`/${page.slug}`} prefetch={false}>{page.heading}</Link>)}<Link href="/guides" prefetch={false}>Conseils et guides</Link><Link href="/blog" prefetch={false}>Le blog BienVu</Link><Link href="/sources" prefetch={false}>Sources d’import testées</Link></nav></section>}
       </main>
       <HomeFooter onCreate={focusComposer}/>
     </div>

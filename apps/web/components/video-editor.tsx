@@ -45,7 +45,7 @@ function initialModel(draft:CreationDraftView,agency:AgencyProfile,defaultVoice?
   return {fields:draft.data.fields,settings:normalizeSettings({...settings,editor})};
 }
 export function VideoEditor(){
-  const params=useSearchParams(),{me,loading}=useAccount(),store=useGenerationStore(),
+  const params=useSearchParams(),{me,loading:accountLoading,voiceLoading}=useAccount(),loading=accountLoading||voiceLoading,store=useGenerationStore(),
     [draft,setDraft]=useState<CreationDraftView|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[retry,setRetry]=useState(0),
     [choosing,setChoosing]=useState(false),creating=useRef(false),creationKey=useRef<string|null>(null),demoRecord=useRef<GuestEditorRecord|null>(null);
   const draftId=params.get('draft'),videoId=params.get('video');

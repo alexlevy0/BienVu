@@ -1,5 +1,6 @@
 'use client';
 import {analyticsFetch as fetch} from '../lib/product-analytics';
+import dynamic from 'next/dynamic';
 import {useEffect, useImperativeHandle, useRef, useState, type ChangeEvent, type FormEvent, type Ref} from 'react';
 import {generationCreditCost,selectedAnimationIndices,defaultVideoCustomization,createEditorDocument,CreationFields,VideoCustomization,GenerationCustomization,DESCRIPTION_MAX_CHARACTERS, ManualListingInput, PropertyListingInput,MANUAL_PHOTO_LIMITS, publicErrors, type PublicErrorCode,
   type CreationDraftData, type CreationDraftView, type NormalizedListing,type VideoDuration,type VideoAspectRatio} from '@bienvu/contracts';
@@ -9,9 +10,13 @@ import type {ImportView} from './generation-form';
 import {manualDraftFields, readManualListingDraft, saveManualListingDraft, type ManualDraftFields} from '../lib/listing-draft';
 import {inspectManualPhotos} from '../lib/manual-photos';
 import {photoUploadError} from '../lib/photo-upload-error';
-import {VideoCustomizer} from './video-customizer';
 import {PhotoPreviewImage} from './photo-preview-image';
 import {useAccount} from './account';
+import '../app/manual-listing.css';
+
+const VideoCustomizer=dynamic(()=>import('./video-customizer').then(module=>module.VideoCustomizer),{
+  loading:()=> <p className="home-tool-loading" role="status">Ouverture de la personnalisation…</p>,
+});
 
 type SelectedPhoto = {id: string; file: File|null; preview: string; sourceHash?:string;remote?:NormalizedListing['photos'][number]; state:'ready'|'sending'|'error'; slot:number; error?:string; removing?:boolean};
 type Guided={description:string;setDescription(value:string):void;onCancel():void;
@@ -53,7 +58,7 @@ type Props = {busy: boolean; generate?: boolean; setBusy(value: boolean): void;g
 );
 export function ManualListingForm(props: Props) {
   const {busy, setBusy, generate = false} = props;
-  const {me,defaultVoice,voiceLoading}=useAccount();
+  const {me,defaultVoice,voiceLoading,resolveDefaultVoice}=useAccount();
   const [transaction, setTransaction] = useState('sale'), [photos, setPhotos] = useState<SelectedPhoto[]>([]);
   const [propertyType,setPropertyType]=useState('apartment'),[hydrated,setHydrated]=useState(false),[photoChecking,setPhotoChecking]=useState(false);
   const [fields,setFields]=useState<ManualDraftFields>(emptyFields),[detailsOpen,setDetailsOpen]=useState(false),[draggedPhoto,setDraggedPhoto]=useState<string|null>(null),[photoDrop,setPhotoDrop]=useState(false);
@@ -96,17 +101,17 @@ export function ManualListingForm(props: Props) {
   useEffect(()=>{if(!props.guided)return;
     const validated=finalInput(),fieldsValid=validated?.success===true;
     const issue=validated&&!validated.success?validated.error.issues.find(i=>i.path[0]!=='photos'):null;
-    const selectionValid=props.saveOnly||!customization||GenerationCustomization.safeParse(customization).success&&
-      (!customization.photoOrder||customization.photoOrder.every(slot=>photos.some(photo=>photo.slot===slot&&photo.state==='ready')));
+    const selectionValid=props.saveOnly||(!props.customizing||!voiceLoading)&&(!customization||GenerationCustomization.safeParse(customization).success&&
+      (!customization.photoOrder||customization.photoOrder.every(slot=>photos.some(photo=>photo.slot===slot&&photo.state==='ready'))));
     const ready=(completed||hydrated&&fieldsValid&&unresolved().length===0&&(props.saveOnly||photos.filter(photo=>photo.state==='ready').length>=3)&&
       !photos.some(photo=>photo.state!=='ready'||photo.removing)&&(!props.guided.agencyId||Boolean(serverDraft)));
-    const reason=customization?.map&&!customization.map.location&&!customization.mapAutomatic?'Confirmez la localisation dans Personnaliser → Carte.':!selectionValid?'Vérifiez la narration et sélectionnez au moins trois photos.':completed?'':!hydrated?'Chargement du brouillon en cours.':
+    const reason=props.customizing&&voiceLoading?'Chargement des voix disponibles…':customization?.map&&!customization.map.location&&!customization.mapAutomatic?'Confirmez la localisation dans Personnaliser → Carte.':!selectionValid?'Vérifiez la narration et sélectionnez au moins trois photos.':completed?'':!hydrated?'Chargement du brouillon en cours.':
       unresolved().length?'Confirmez les informations signalées avant la création.':
       photos.some(photo=>photo.removing)?'Retrait des photos en cours.':photos.some(photo=>photo.state==='sending')?'Envoi des photos en cours.':photos.some(photo=>photo.state==='error')?
       'Réessayez ou retirez les photos en erreur.':issue?fieldMessage(String(issue.path[0]),issue.code,issue.message):!props.saveOnly&&photos.length<3?'Ajoutez au moins trois photos.':!serverDraft&&props.guided.agencyId?
       'Préparation du brouillon privé en cours.':!fieldsValid?'Vérifiez les informations du bien.':'';
     props.guided.onReadyChange?.(Boolean(ready&&selectionValid),reason);
-  },[props.guided?.agencyId,props.guided?.description,hydrated,photos,serverDraft,revision,propertyType,transaction,completed,guestConfirmed,customization,props.customizing,props.saveOnly]);
+  },[props.guided?.agencyId,props.guided?.description,hydrated,photos,serverDraft,revision,propertyType,transaction,completed,guestConfirmed,customization,props.customizing,props.saveOnly,voiceLoading]);
   async function confirmField(name:string){
     await settingsWrite.current;const draft=serverRef.current;if(!draft){setGuestConfirmed(current=>new Set([...current,name]));return;}
     try{const response=await fetch(`/api/imports/${draft.id}/draft`,{method:'PATCH',headers:{'Content-Type':'application/json'},
@@ -414,7 +419,7 @@ export function ManualListingForm(props: Props) {
     try{await settingsWrite.current;const current=await ensureServerDraft(),raw=draftFields(),number=(value:string)=>value.trim()?Number(value.replace(/\s/g,'').replace(',','.')):null;
       const fields=CreationFields.parse({title:listingTitle(raw.title,raw.locality,propertyType,transaction),locality:raw.locality.trim()||null,propertyType:raw.propertyType||null,transaction:raw.transaction||null,
         description:raw.description.trim()||null,priceCents:number(raw.priceCents)===null?null:Math.round(number(raw.priceCents)!*100),charges:raw.charges||null,area:number(raw.area),rooms:number(raw.rooms)});
-      const rawSettings={...defaultVideoCustomization(props.brand,defaultVoice),...customizationRef.current},
+      const rawSettings={...defaultVideoCustomization(props.brand,await resolveDefaultVoice()),...customizationRef.current},
         settings={...rawSettings,...(rawSettings.mapAutomatic?{map:undefined,mapAutomatic:undefined}:{})},order=settings.photoOrder??current.photos.map(p=>p.sourceOrder),
         editor=settings.editor??createEditorDocument(order.flatMap(slot=>current.photos.filter(p=>p.sourceOrder===slot)),fields,{agencyName:props.brand?.name,durationSeconds:props.durationSeconds,aspectRatio:props.aspectRatio,
           voiceEnabled:props.voiceEnabled,subtitlesEnabled:props.subtitlesEnabled});
@@ -434,7 +439,7 @@ export function ManualListingForm(props: Props) {
   }):photos;
   const animatedPhotos=new Set(photoAnimations(customization,customization?.photoOrder??photos.map(photo=>photo.slot)));
   function movePhoto(id:string,to:number){
-    if(busy||photoChecking)return;
+    if(busy||photoChecking||voiceLoading)return;
     const photo=orderedPhotos.find(p=>p.id===id);if(!photo||photo.state!=='ready'||photo.removing)return;
     const next=orderedPhotos.filter(p=>p.id!==id);next.splice(Math.max(0,Math.min(next.length,to)),0,photo);
     selected.current=next;setPhotos(next);settingsVersion.current++;setSettingsSaved(false);
@@ -443,7 +448,7 @@ export function ManualListingForm(props: Props) {
       runwayClips:undefined,runwayPhotos:photoAnimations(current,current?.photoOrder??orderedPhotos.map(p=>p.slot))}));
   }
   function toggleAnimation(photo:SelectedPhoto){
-    if(!me||me.role==='viewer'||busy||photoChecking||photo.state!=='ready'||photo.removing)return;
+    if(!me||me.role==='viewer'||busy||photoChecking||voiceLoading||photo.state!=='ready'||photo.removing)return;
     settingsVersion.current++;setSettingsSaved(false);
     setCustomization(current=>{
       const order=current?.photoOrder??selected.current.map(p=>p.slot),animated=photoAnimations(current,order);
@@ -461,7 +466,8 @@ export function ManualListingForm(props: Props) {
   const price=previewNumber(fields.priceCents),area=previewNumber(fields.area),rooms=previewNumber(fields.rooms),numberFormat=new Intl.NumberFormat('fr-FR');
   const canAdd=hydrated&&!busy&&!photoChecking&&!props.incomingPhotos&&photos.length<MANUAL_PHOTO_LIMITS.maximum;
   const pendingConfirmation=unresolved();
-  return <>{props.customizing&&hydrated&&<VideoCustomizer settings={customization??defaultVideoCustomization(props.brand,defaultVoice)}
+  return <>{props.customizing&&hydrated&&voiceLoading&&<p className="home-tool-loading" role="status">Chargement des voix disponibles…</p>}
+    {props.customizing&&hydrated&&!voiceLoading&&<VideoCustomizer settings={customization??defaultVideoCustomization(props.brand,defaultVoice)}
     onChange={value=>{settingsVersion.current++;setSettingsSaved(false);setCustomization(value);}} photos={photos} fields={draftFields()}
     agencyName={props.brand?.name??''} durationSeconds={props.durationSeconds} onDuration={props.onDuration} aspectRatio={props.aspectRatio} voiceEnabled={props.voiceEnabled} onVoice={props.onVoice} subtitlesEnabled={props.subtitlesEnabled!==false} onSubtitles={value=>props.onSubtitles?.(value)}
     onBack={()=>props.onCloseCustomizer?.()} onAdd={files=>void addPhotos(files)}

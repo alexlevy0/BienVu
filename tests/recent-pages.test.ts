@@ -18,6 +18,12 @@ test('récentes : pages complètes, dédoublonnage, curseurs et changement de pr
   let current=true,requests=0;
   const switched=(async()=>{requests++;current=false;return Response.json({jobs:[{id:'former-owner'}],nextCursor:'more'});}) as typeof fetch;
   assert.equal(await readRecentPages('/api/generations','jobs',parse,()=>current,switched),null);assert.equal(requests,1);
+  const credits:number[]=[],trial=(async()=>Response.json({jobs:[{id:'trial'}],creditsRemaining:0,nextCursor:null})) as typeof fetch;
+  assert.deepEqual(await readRecentPages('/api/trial/history','jobs',parse,()=>true,trial,data=>credits.push(Number(data.creditsRemaining))),[{id:'trial'}]);
+  assert.deepEqual(credits,[0],'La même réponse fournit les essais et les crédits, sans seconde requête');
+  current=true;
+  await readRecentPages('/api/trial/history','jobs',parse,()=>current,switched,data=>credits.push(Number(data.creditsRemaining)));
+  assert.deepEqual(credits,[0],'Les métadonnées d’un ancien compte ne sont pas appliquées');
   const repeated=(async()=>Response.json({jobs:[],nextCursor:'loop'})) as typeof fetch;
   await assert.rejects(readRecentPages('/api/generations','jobs',parse,()=>true,repeated),/RECENTS_CURSOR_INVALID/);
   const failed=(async()=>new Response('',{status:503})) as typeof fetch;

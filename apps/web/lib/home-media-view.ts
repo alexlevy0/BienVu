@@ -15,7 +15,7 @@ export function imageWidthUrl(src: string, width: number) {
   if (/^\/images\/studio-home\/(paris|sud|lyon|bordeaux)\.webp$/.test(src)) return src.replace('.webp', `-${width}.webp`);
   return src;
 }
-export function previewVideoUrl(src: string) {
+export function previewVideoUrl(src: string,width:540|720=720) {
   if (!src.startsWith('/api/homepage/media/')) return src;
-  const url = new URL(src, 'https://bienvu.online'); url.searchParams.set('preview', '1'); return `${url.pathname}${url.search}`;
+  const url = new URL(src, 'https://bienvu.online'); url.searchParams.set('preview', width===540?'540':'1'); return `${url.pathname}${url.search}`;
 }

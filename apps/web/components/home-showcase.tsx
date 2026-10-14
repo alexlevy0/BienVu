@@ -7,13 +7,14 @@ import {voicePreviews} from '../lib/voice-previews';
 import {HomeIcon} from './home-icons';
 import {HomeVisual,useHomepageMedia} from './homepage-media';
 import {VideoBacklight} from './video-backlight';
-import {imageWidthUrl} from '../lib/home-media-view';
+import {imageWidthUrl,previewVideoUrl} from '../lib/home-media-view';
 
 const voices = cartesiaParisianVoices.map(voice => voice.id);
 const peaks = [4, 5, 8, 12, 19, 26, 35, 23, 15, 12, 18, 26, 20, 15, 26, 33, 21, 13, 6, 9, 21, 34, 43, 30, 20, 15, 24, 28, 22, 13, 9, 14, 22, 32, 38, 29, 21, 15, 21, 30, 25, 18, 13, 17, 24, 20, 11, 7, 11, 20, 30, 23, 17, 9, 14, 18, 12, 9, 6, 5];
+const waveformPath=peaks.map((height,i)=>`M${i*5+2} ${23-height/2}v${height}`).join(' ');
 function Waveform({active = false}: {active?: boolean}) {
   return <svg className={`home-life-waveform${active ? ' is-playing' : ''}`} viewBox="0 0 300 46" preserveAspectRatio="none" aria-hidden="true">
-    {peaks.map((height, i) => <line key={i} x1={i * 5 + 2} x2={i * 5 + 2} y1={23 - height / 2} y2={23 + height / 2} style={{animationDelay: `${i * 25}ms`}}/>)}
+    {active?peaks.map((height, i) => <line key={i} x1={i * 5 + 2} x2={i * 5 + 2} y1={23 - height / 2} y2={23 + height / 2} style={{animationDelay: `${i * 25}ms`}}/>):<path d={waveformPath} fill="none"/>}
   </svg>;
 }
 const features = [
@@ -79,7 +80,7 @@ export function HomeShowcase({paused, onCreate}: {paused: boolean; onCreate(): v
         <figcaption className="home-life-badge home-life-video-badge"><HomeIcon name="play" size={17}/>Votre vidéo BienVu</figcaption>
         <VideoBacklight video={video} active={!paused} poster={poster?imageWidthUrl(poster,640):null} posterLoading="lazy" className="home-life-backlight"/>
         <div className="home-life-video-frame">
-        <video ref={video} src={movie.src} poster={poster??undefined} controls={videoStarted} playsInline preload={visual.kind==='image'||movie.poster?'none':'metadata'} aria-label={movie.custom?movie.title??'Vidéo BienVu':'Exemple de vidéo BienVu : un appartement à Paris'}
+        <video ref={video} src={previewVideoUrl(movie.src)} poster={poster?imageWidthUrl(poster,640):undefined} controls={videoStarted} playsInline preload={visual.kind==='image'||movie.poster?'none':'metadata'} aria-label={movie.custom?movie.title??'Vidéo BienVu':'Exemple de vidéo BienVu : un appartement à Paris'}
           onPlay={() => {attempt.current++; audio.current?.pause(); setAudioState('idle'); setVideoError(false); setVideoStarted(true); setVideoPlaying(true);}}
           onPause={() => setVideoPlaying(false)} onEnded={() => setVideoPlaying(false)} onError={() => {setVideoPlaying(false); setVideoError(true);}}/>
         {!movie.custom&&!visual.custom&&<div className="home-life-video-facts" aria-hidden="true"><strong>Paris</strong><span>65 m² · 3 pièces</span><b>385 000 €</b></div>}

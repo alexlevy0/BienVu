@@ -9,10 +9,11 @@ type TawkApi={
   shutdown?:()=>void;
   showWidget?:()=>void;
   hideWidget?:()=>void;
+  maximize?:()=>void;
 };
 declare global {interface Window {Tawk_API?:TawkApi;Tawk_LoadStart?:Date;}}
 
-let initialized=false,ready=false,running=false;
+let initialized=false,ready=false,running=false,requested=false,pendingOpen=false;
 
 export function tawkChatAllowed(value:string):boolean {
   try {
@@ -26,7 +27,7 @@ export function tawkChatAllowed(value:string):boolean {
   }catch{return false;}
 }
 
-export function prepareTawkChat(){
+export function prepareTawkChat(onReady?:()=>void){
   if(typeof window==='undefined'||initialized)return;
   initialized=true;
   const api=window.Tawk_API??={};
@@ -37,23 +38,30 @@ export function prepareTawkChat(){
   // With autoStart disabled, Tawk reports availability before onLoad.
   // That first status supplies the API needed to start the widget explicitly.
   api.onStatusChange=()=>{if(!ready){ready=true;resumeTawkChat();}};
-  api.onLoad=()=>{ready=true;resumeTawkChat();};
+  api.onLoad=()=>{ready=true;resumeTawkChat();onReady?.();};
   window.Tawk_LoadStart=new Date();
 }
 
 export function resumeTawkChat(){
-  if(typeof window==='undefined'||!ready)return;
+  if(typeof window==='undefined'||!requested||!ready)return;
   if(!tawkChatAllowed(window.location.href)){suspendTawkChat();return;}
   try {
     if(!running){window.Tawk_API?.start?.({showWidget:true});running=true;}
     else window.Tawk_API?.showWidget?.();
+    if(pendingOpen&&window.Tawk_API?.maximize){window.Tawk_API.maximize();pendingOpen=false;}
   }catch{/* Support must not interrupt the studio. */}
+}
+
+export function openTawkChat(){
+  if(typeof window==='undefined'||!tawkChatAllowed(window.location.href))return;
+  requested=true;pendingOpen=true;resumeTawkChat();
 }
 
 export function suspendTawkChat(){
   if(typeof window==='undefined'||!ready)return;
   try{window.Tawk_API?.hideWidget?.();window.Tawk_API?.shutdown?.();}catch{/* Third-party availability is independent of navigation. */}
   running=false;
+  pendingOpen=false;
 }
 
 export function tawkNavigationStart(destination:string){

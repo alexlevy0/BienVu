@@ -30,18 +30,18 @@ export function HomeFooter({onCreate}:{onCreate:()=>void}) {
       <nav className="home-premium-footer-column" aria-labelledby="home-footer-product-title">
         <h3 id="home-footer-product-title">Produit</h3>
         <button type="button" onClick={onCreate}>Créer une vidéo</button>
-        <Link href="/explorer">Explorer</Link>
-        <Link href="/editeur">Éditeur</Link>
-        <Link href="/abonnement">Tarifs</Link>
+        <Link href="/explorer" prefetch={false}>Explorer</Link>
+        <Link href="/editeur" prefetch={false}>Éditeur</Link>
+        <Link href="/abonnement" prefetch={false}>Tarifs</Link>
       </nav>
       <nav className="home-premium-footer-column" aria-labelledby="home-footer-resources-title">
         <h3 id="home-footer-resources-title">Ressources</h3>
-        <Link href="/blog">Blog</Link>
-        <Link href="/partenaires">Programme partenaires</Link>
-        <Link href="/comment-ca-marche">Comment ça marche</Link>
-        <Link href="/modeles-video-immobilier">Modèles de vidéos</Link>
-        <Link href="/guides">Guides immobiliers</Link>
-        <Link href="/sources">Sources d’import</Link>
+        <Link href="/blog" prefetch={false}>Blog</Link>
+        <Link href="/partenaires" prefetch={false}>Programme partenaires</Link>
+        <Link href="/comment-ca-marche" prefetch={false}>Comment ça marche</Link>
+        <Link href="/modeles-video-immobilier" prefetch={false}>Modèles de vidéos</Link>
+        <Link href="/guides" prefetch={false}>Guides immobiliers</Link>
+        <Link href="/sources" prefetch={false}>Sources d’import</Link>
         <a href="#home-life-faq-title">Questions fréquentes</a>
       </nav>
       <div className="home-premium-footer-column home-premium-footer-contact">
@@ -58,10 +58,10 @@ export function HomeFooter({onCreate}:{onCreate:()=>void}) {
     <div className="home-premium-footer-bottom">
       <small>© {new Date().getUTCFullYear()} BienVu</small>
       <nav aria-label="Informations légales">
-        <Link href="/conditions#service">Mentions légales</Link>
-        <Link href="/confidentialite">Confidentialité</Link>
-        <Link href="/conditions">CGU</Link>
-        <Link href="/conditions#offres">CGV</Link>
+        <Link href="/conditions#service" prefetch={false}>Mentions légales</Link>
+        <Link href="/confidentialite" prefetch={false}>Confidentialité</Link>
+        <Link href="/conditions" prefetch={false}>CGU</Link>
+        <Link href="/conditions#offres" prefetch={false}>CGV</Link>
         <CookiePreferencesButton/>
       </nav>
       <button type="button" className="home-premium-footer-back-top" onClick={backToTop} aria-label="Retour en haut de page"><HomeIcon name="arrow" size={20}/></button>

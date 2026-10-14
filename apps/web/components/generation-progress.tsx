@@ -2,21 +2,14 @@
 import Link from 'next/link';
 import {useState} from 'react';
 import {publicErrors,type GenerationView,type PublicErrorCode} from '@bienvu/contracts';
-import {useGenerationStore} from './generation-store';
+import {generationActive} from './generation-progress-state';
+export {generationActive,useGenerationProgress} from './generation-progress-state';
 import {generationSteps,generationProgressText,generationMapOmissionText} from '../lib/generation-steps';
 import {ProgressiveVideo} from './progressive-video';
 import {GenerationRenderProgress} from './generation-estimate';
 import {GenerationMapConfirmation} from './generation-map-confirmation';
 import {GenerationQueueNotice} from './generation-queue-notice';
 import {GenerationCelebration} from './generation-celebration';
-export const generationActive=(job:GenerationView|null)=>Boolean(job&&!['ready','failed'].includes(job.status));
-export function useGenerationProgress(agencyId?:string){
-  const store=useGenerationStore();
-  return {job:agencyId?store.jobs[0]??null:null,jobs:agencyId?store.jobs:[],setJob:(job:GenerationView)=>{
-    if(agencyId)store.setJob(job,agencyId);
-  },unavailable:store.unavailable,
-    refreshDrafts:store.refreshDrafts};
-}
 export function GenerationProgress({job,unavailable=false}:{job:GenerationView;unavailable?:boolean}){
   const [retrying,setRetrying]=useState(false),[feedback,setFeedback]=useState('');
   const mapOmission=generationMapOmissionText(job);

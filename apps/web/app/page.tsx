@@ -4,7 +4,7 @@ import {getCloudflareContext} from '@opennextjs/cloudflare';
 import {headers} from 'next/headers';
 import {notFound} from 'next/navigation';
 import {requireAdmin} from '../lib/admin-access';
-import {readHomepageConfig} from '../lib/homepage-media';
+import {readHomepageConfig,homepageEdgeCache} from '../lib/homepage-media';
 import {StructuredData} from '../components/structured-data';
 import {seoMetadata,siteSchema} from '../lib/seo';
 import './landing.css';
@@ -16,9 +16,6 @@ import './home-vitrine.css';
 import './home-editor-showcase.css';
 import './home-footer.css';
 import './home-composer.css';
-import './manual-listing.css';
-import './customizer.css';
-import './marketing.css';
 import './home-noise.css';
 import './home-typography.css';
 
@@ -28,9 +25,9 @@ export async function generateMetadata({searchParams}:{searchParams:Promise<Reco
 }
 export const dynamic='force-dynamic';
 export default async function Page({searchParams}:{searchParams:Promise<{homePreview?:string}>}) {
-  const env=(await getCloudflareContext({async:true})).env,preview=(await searchParams).homePreview==='1';
+  const {env,ctx}=await getCloudflareContext({async:true}),preview=(await searchParams).homePreview==='1';
   if(preview){try{await requireAdmin(new Request(env.BETTER_AUTH_URL,{headers:await headers()}),env);}catch{notFound();}}
-  const config=await readHomepageConfig(env.DB,preview);
+  const config=await readHomepageConfig(env.DB,preview,await homepageEdgeCache(env.BETTER_AUTH_URL,task=>ctx.waitUntil(task)));
   return <HomepageMediaProvider config={config}>
     <link rel="preload" href="/fonts/newsreader.woff2" as="font" type="font/woff2" crossOrigin="anonymous"/>
     <link rel="preload" href="/fonts/newsreader-italic.woff2" as="font" type="font/woff2" crossOrigin="anonymous"/>

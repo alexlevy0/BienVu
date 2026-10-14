@@ -91,6 +91,7 @@
 .home-topbar {height:49px;margin:0 15px;padding:0 12px;border-bottom:1px solid var(--home-line);display:flex;align-items:center;justify-content:space-between;font-size:15px;color:#34363b}
 .home-topbar button {font-size:15px;background:none;border:0;padding:8px 0 8px 20px}
 .home-content {padding:0 27px;outline:none;max-width:1660px;margin:0 auto}
+.home-tool-loading {padding:24px;color:var(--home-muted);min-height:100px}
 .home-hero {max-width:1098px;margin:auto;padding:29px 0 0;text-align:center}
 .home-hero h1 {font-family:'Times New Roman',Times,serif;font-weight:600;font-size:62px;line-height:.92;letter-spacing:-2.8px;margin:0 0 21px;color:#080907}
 .home-hero h1 em {font-family:'Times New Roman',Times,serif;font-weight:500;font-style:italic;letter-spacing:-3px;color:inherit;white-space:nowrap;position:relative;z-index:0}

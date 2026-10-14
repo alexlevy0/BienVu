@@ -2,6 +2,7 @@
 import {analyticsFetch as fetch,trackProductEvent} from '../lib/product-analytics';
 
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import {useEffect, useLayoutEffect, useRef, useState, type DragEvent, type FormEvent} from 'react';
 import {VideoDuration,ImportUrl, GenerationView, defaultVideoCustomization,GenerationCustomization,generationCreditCost, type VideoCustomization, type CreationDraftData, type CreationDraftView, type GenerationRequest} from '@bienvu/contracts';
 import {useAnonymousTrial, TrialChallenge} from './anonymous-trial';
@@ -9,15 +10,18 @@ import {useAccount} from './account';
 import {HomeIcon} from './home-icons';
 import {HomeCreateButton} from './home-create-button';
 import {PhotoDurationAdvice} from './photo-duration-advice';
-import {ManualListingForm, type ManualListingFormHandle,type PreparedManualListing} from './manual-listing-form';
-import {generationActive, useGenerationProgress} from './generation-progress';
-import {ConversationGeneration} from './conversation-generation';
+import type {ManualListingFormHandle,PreparedManualListing} from './manual-listing-form';
+import {generationActive, useGenerationProgress} from './generation-progress-state';
 import {requestGeneration} from '../lib/generation-client';
 import {clearListingDraft, readListingDraft, saveListingDraft} from '../lib/listing-draft';
 import {inspectManualPhotos} from '../lib/manual-photos';
 import {useSubtitlePreference} from './video-settings';
-import {VideoCustomizer} from './video-customizer';
 import {useUrlImportEstimate,urlImportPhotoSlots,type PreparedUrlImport} from './url-import-estimate';
+
+const loadingTool=()=> <p className="home-tool-loading" role="status">Ouverture de votre studio…</p>;
+const ManualListingForm=dynamic(()=>import('./manual-listing-form').then(module=>module.ManualListingForm),{loading:loadingTool});
+const VideoCustomizer=dynamic(()=>import('./video-customizer').then(module=>module.VideoCustomizer),{loading:loadingTool});
+const ConversationGeneration=dynamic(()=>import('./conversation-generation').then(module=>module.ConversationGeneration),{loading:loadingTool});
 
 type RequestMessage = {kind: 'url' | 'manual'; text: string};
 type ComposerPhoto={id:string;file:File;preview:string};
@@ -41,7 +45,7 @@ function requestFor(job: GenerationView, url: string): RequestMessage {
 }
 
 export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): void}) {
-  const {me, loading,defaultVoice} = useAccount();
+  const {me, loading,defaultVoice,resolveDefaultVoice} = useAccount();
   const {subtitlesEnabled,setSubtitlesEnabled,voiceEnabled,setVoiceEnabled,durationSeconds,setDurationSeconds,aspectRatio,setAspectRatio}=useSubtitlePreference();
   const [screen, setScreen] = useState<Screen>({kind: 'landing'});
   const [manualCredits,setManualCredits]=useState(1);
@@ -89,9 +93,9 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   },[confettiKeyword]);
   const estimate=useUrlImportEstimate(url,me?.agency.id,!loading&&!busy&&!manual&&!composerPhotos.length&&
     screen.kind!=='guest-customizing'&&!importPaused&&!activeGuestJob);
-  function settingsForImport(imported:PreparedUrlImport):VideoCustomization{
+  function settingsForImport(imported:PreparedUrlImport,voice=defaultVoice):VideoCustomization{
     const slots=urlImportPhotoSlots(imported);
-    return {...guestSettings??defaultVideoCustomization(me?.agency,defaultVoice),photoOrder:slots,runwayPhotos:slots,runwayClips:undefined};
+    return {...guestSettings??defaultVideoCustomization(me?.agency,voice),photoOrder:slots,runwayPhotos:slots,runwayClips:undefined};
   }
   const estimatedSettings=me&&estimate.value?settingsForImport(estimate.value):guestSettings;
   const creditCost=manual?manualCredits:generationCreditCost(estimatedSettings,durationSeconds);
@@ -346,11 +350,13 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
       finally{if(interactionVersion.current===version)lock.current=false;}
       return;
     }
-    if(!me){setGuestSettings(current=>current??defaultVideoCustomization(undefined,defaultVoice));setScreen({kind:'guest-customizing',url:parsed.data});return;}
+    if(!me){const version=++interactionVersion.current;setScreen({kind:'extracting',text:parsed.data});
+      const voice=await resolveDefaultVoice();if(interactionVersion.current!==version||currentOwner.current)return;
+      setGuestSettings(current=>current??defaultVideoCustomization(undefined,voice));setScreen({kind:'guest-customizing',url:parsed.data});return;}
     const owner=me.agency.id,version=interactionVersion.current;
     lock.current=true;setFeedback('');startFresh.current=true;forget();setScreen({kind:'extracting',text:parsed.data});
     try{
-      const imported=await estimate.prepare(parsed.data,true);
+      const [imported,voice]=await Promise.all([estimate.prepare(parsed.data,true),resolveDefaultVoice()]);
       let draft=imported.draft;
       if(imported.status==='ready'&&imported.id){
         if(pendingCustomization.current?.id!==imported.id){
@@ -364,7 +370,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
       }
       if(!draft)throw new Error('Ce site ne permet pas de préparer cette annonce. Vous pouvez saisir ses informations et ajouter vos photos manuellement.');
       if(interactionVersion.current!==version||currentOwner.current!==owner)return;
-      setImportDraft({...draft,data:{...draft.data,videoCustomization:draft.data.videoCustomization??settingsForImport(imported)}});
+      setImportDraft({...draft,data:{...draft.data,videoCustomization:draft.data.videoCustomization??settingsForImport(imported,voice)}});
       setGuestExtraction(null);setDescription(draft.data.fields.description??'');setScreen({kind:'manual'});setCustomizing(true);
       void refreshDrafts();
     }catch(error){if(interactionVersion.current===version&&currentOwner.current===owner)
@@ -428,10 +434,10 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     }
     setScreen({kind: 'sending', request});
     try {
-      const imported=await estimate.prepare(parsed.data,true);
+      const [imported,voice]=await Promise.all([estimate.prepare(parsed.data,true),resolveDefaultVoice()]);
       if(interactionVersion.current!==version||currentOwner.current!==owner)return;
       if(imported.status==='needs_input'&&imported.draft){
-        startFresh.current=true;forget();setImportDraft({...imported.draft,data:{...imported.draft.data,videoCustomization:imported.draft.data.videoCustomization??settingsForImport(imported)}});setDescription(imported.draft.data.fields.description??'');
+        startFresh.current=true;forget();setImportDraft({...imported.draft,data:{...imported.draft.data,videoCustomization:imported.draft.data.videoCustomization??settingsForImport(imported,voice)}});setDescription(imported.draft.data.fields.description??'');
         setScreen({kind:'manual'});
         void refreshDrafts();
         setFeedback(imported.draft.photos.length<3?'Les informations du bien ont été récupérées. Ajoutez vos photos pour continuer.':
@@ -440,7 +446,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
       }
       if(imported.status!=='ready')throw new Error('Complétez les informations de cette annonce avant de créer la vidéo.');
       if(!canGenerate){setFeedback('Votre annonce est enregistrée. La création vidéo sera disponible dans votre espace.');setScreen({kind:'landing'});return;}
-      await create({listingId:imported.id,customization:settingsForImport(imported)},request);
+      await create({listingId:imported.id,customization:settingsForImport(imported,voice)},request);
     }
     catch (error) {if(interactionVersion.current===version&&currentOwner.current===owner)
       setScreen({kind: 'error', request, message: error instanceof Error ? error.message : 'La connexion a été interrompue. Réessayez pour retrouver votre demande.'});}

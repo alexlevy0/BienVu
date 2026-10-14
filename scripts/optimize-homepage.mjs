@@ -12,7 +12,7 @@ const root=fileURLToPath(new URL('../',import.meta.url)),require=createRequire(n
 const rendererRequire=createRequire(require.resolve('@remotion/renderer'));
 const binaries=dirname(rendererRequire.resolve(`@remotion/compositor-${process.platform==='darwin'?'darwin':'linux'}-${process.arch}/package.json`));
 const ffmpeg=join(binaries,'ffmpeg');
-const apply=process.argv.includes('--upload'),work=await mkdtemp(join(tmpdir(),'bienvu-home-seo-')),report=[];
+const apply=process.argv.includes('--upload'),heroOnly=process.argv.includes('--hero-preview'),work=await mkdtemp(join(tmpdir(),'bienvu-home-seo-')),report=[];
 const run=(command,args)=>new Promise((resolve,reject)=>{const child=spawn(command,args,{cwd:root,env:command===ffmpeg?{...process.env,DYLD_LIBRARY_PATH:binaries}:process.env,stdio:['ignore','ignore','pipe']});let error='';child.stderr.on('data',chunk=>{error+=chunk;});child.on('error',reject);child.on('exit',code=>code===0?resolve():reject(new Error(`OPTIMIZATION_COMMAND_FAILED_${code}: ${error.slice(-500)}`)));});
 // Same R2 endpoint as Wrangler, without starting a CLI for every derivative.
 async function upload(key,bytes,type){
@@ -30,19 +30,20 @@ async function upload(key,bytes,type){
 }
 try{
  const rows=await remoteSql(`SELECT a.id,a.object_key,a.metadata_json,a.poster_json FROM homepage_assets a JOIN homepage_settings s ON s.id=1
-   WHERE a.state='active' AND a.id IN (SELECT value FROM json_each(s.published_json)) ORDER BY a.id`);
+   WHERE a.state='active' AND a.id IN (SELECT value FROM json_each(s.published_json)) ${heroOnly?`AND a.id IN (json_extract(s.published_json,'$."hero.video"'),json_extract(s.published_json,'$."hero.visual"'))`:''} ORDER BY a.id`);
  const settings=await cloudflare(`/accounts/${accountId}/workers/scripts/bienvu-web-probe-staging/settings`);
  if(!settings.bindings.some(binding=>binding.type==='r2_bucket'&&binding.name==='MEDIA'&&binding.bucket_name==='bienvu-s00-private'))throw Error('HOMEPAGE_BUCKET_MISMATCH');
  const files=new Map(),outputs=new Map();
  for(const row of rows){if(!/^[a-f0-9-]{36}$/.test(row.id))throw Error('PUBLIC_ASSET_ID_INVALID');const media=JSON.parse(row.metadata_json),poster=row.poster_json?JSON.parse(row.poster_json):null;
   for(const item of [{...media,url:`https://bienvu.online/api/homepage/media/${row.id}`},...(poster?[{...poster,url:`https://bienvu.online/api/homepage/media/${row.id}?poster=1`}]:[])]){
+   if(heroOnly&&item.mime!=='video/mp4')continue;
    let bytes=files.get(item.sha256);if(!bytes){const response=await fetch(item.url,{redirect:'error',signal:AbortSignal.timeout(60000)});
     const length=response.headers.get('content-length');if(!response.ok||length!==null&&Number(length)!==item.sizeBytes)throw Error(`PUBLIC_SNAPSHOT_UNAVAILABLE_${response.status}`);bytes=Buffer.from(await response.arrayBuffer());
     if(bytes.length!==item.sizeBytes||createHash('sha256').update(bytes).digest('hex')!==item.sha256)throw Error('PUBLIC_SNAPSHOT_HASH_MISMATCH');files.set(item.sha256,bytes);}
-   const widths=item.mime==='video/mp4'?[720]:[320,640,960];
+   const widths=item.mime==='video/mp4'?heroOnly?[540]:[540,720]:[320,640,960];
    for(const width of widths){const key=`homepage/${row.id}/seo/${item.sha256}-${width}.${item.mime==='video/mp4'?'mp4':'webp'}`,cacheKey=`${item.sha256}-${width}`,file=join(work,`${cacheKey}.${item.mime==='video/mp4'?'mp4':'webp'}`);
     if(!outputs.has(cacheKey)&&item.mime==='video/mp4'){const source=join(work,`${item.sha256}.mp4`);await writeFile(source,bytes);
-     await run(ffmpeg,['-hide_banner','-loglevel','error','-y','-i',source,'-vf',"scale='min(720,iw)':-2",'-c:v','libx264','-preset','slow','-crf','28','-pix_fmt','yuv420p','-c:a','aac','-b:a','96k','-movflags','+faststart',file]);
+     await run(ffmpeg,['-hide_banner','-loglevel','error','-y','-i',source,'-vf',`scale='min(${width},iw)':-2`,'-c:v','libx264','-preset','slow','-crf','28','-pix_fmt','yuv420p','-c:a','aac','-b:a','96k','-movflags','+faststart',file]);
     }else if(!outputs.has(cacheKey))await sharp(bytes).rotate().resize({width,withoutEnlargement:true}).webp({quality:72}).toFile(file);
     const output=outputs.get(cacheKey)??await readFile(file);outputs.set(cacheKey,output);if(output.length>=bytes.length){report.push({id:row.id,width,original:bytes.length,skipped:'not_smaller'});continue;}
     if(apply){ // Re-check revocation before each remote write.

@@ -1,5 +1,5 @@
 import {HomepageAsset,HomepageCommand,HomepageQuery,HomepageSelections,HomepageSource,homepageSlots,PhotoAsset,VideoAsset,VideoReport,
-  type HomepageAdmin,type HomepageCandidate,type HomepageConfig,type HomepageLibrary} from '@bienvu/contracts';
+  type HomepageAdmin,type HomepageCandidate,type HomepageConfig,type HomepageLibrary,type HomepageSlot} from '@bienvu/contracts';
 import {homepageAsset,homepageSettings,homepageSource,homepageSources,homepageSelectedAssets,homepageStoredMetadata,
   type HomepageAssetRow,type HomepageSourceRow,type Database} from '@bienvu/db';
 import type {AuthEnvironment} from './auth';
@@ -10,6 +10,15 @@ import {contentHash} from './manual-listings';
 type Env={DB:D1Database;MEDIA:Pick<R2Bucket,'get'|'head'|'put'|'delete'>};
 type AdminEnv=Env&AuthEnvironment&{SUPER_ADMIN_EMAIL?:string};
 type Media={key:string;sha256:string;sizeBytes:number;mime:HomepageAsset['mime'];width:number|null;height:number|null;durationMs:number|null};
+export type HomepageCache={cache:Pick<Cache,'match'|'put'>;origin:string;waitUntil(task:Promise<unknown>):void};
+export async function homepageEdgeCache(origin:string,waitUntil:HomepageCache['waitUntil']):Promise<HomepageCache|undefined>{
+ if(typeof caches==='undefined')return undefined;
+ try{return {cache:await caches.open('bienvu-homepage-v2'),origin,waitUntil};}catch{return undefined;}
+}
+function cacheKey(context:HomepageCache,path:string,headers?:Headers){return new Request(new URL('/__bienvu_cache__/homepage-v2/'+path,context.origin),{headers});}
+function writeCache(context:HomepageCache,key:Request,response:Response){
+ try{context.waitUntil(context.cache.put(key,response).catch(()=>{}));}catch{/* Cache availability never prevents a public page from loading. */}
+}
 function photoMedia(raw:string,agency:string):Media {
  const data=JSON.parse(raw) as unknown,photo=PhotoAsset.safeParse(data);
  if(photo.success){if(photo.data.agencyId!==agency)throw new RequestFailure('NOT_FOUND');return {key:photo.data.objectKey,sha256:photo.data.contentHash,sizeBytes:photo.data.sizeBytes,mime:photo.data.mime,width:photo.data.width,height:photo.data.height,durationMs:null};}
@@ -32,8 +41,16 @@ function assetView(row:HomepageAssetRow,admin=false):HomepageAsset {
  const data=homepageStoredMetadata(row),root=admin?'/api/admin/homepage/assets/':'/api/homepage/media/';
  return HomepageAsset.parse({...data,url:root+row.id,posterUrl:row.poster_json?root+row.id+'?poster=1':null});
 }
-export async function readHomepageConfig(db:Database,preview=false):Promise<HomepageConfig>{
- const state=await homepageSettings(db),selections=HomepageSelections.parse(JSON.parse(preview?state.draft_json:state.published_json)),rows=await homepageSelectedAssets(db,selections);
+export async function readHomepageConfig(db:Database,preview=false,context?:HomepageCache):Promise<HomepageConfig>{
+ const state=await homepageSettings(db),selections=HomepageSelections.parse(JSON.parse(preview?state.draft_json:state.published_json));
+ // Read the live publication version first. Publishing or withdrawing a choice
+ // invalidates entries at every edge without relying on a per-datacenter purge.
+ const key=!preview&&context?cacheKey(context,`config/${state.published_version}`):null;
+ if(key&&context){try{const hit=await context.cache.match(key);if(hit){const config=await hit.json() as HomepageConfig;
+  if(config.version===state.published_version&&Object.entries(config.slots).every(([slot,asset])=>
+   selections[slot as HomepageSlot]===asset.id&&HomepageAsset.safeParse(asset).success&&asset.url.startsWith('/api/homepage/media/')))return config;
+ }}catch{/* An absent or obsolete entry falls back to the database. */}}
+ const rows=await homepageSelectedAssets(db,selections);
  rows.sort((a,b)=>a.id.localeCompare(b.id));
  const views=rows.map(row=>assetView(row,preview));
  // Reuse one public URL for identical bytes, including posters also used as photos.
@@ -45,7 +62,9 @@ export async function readHomepageConfig(db:Database,preview=false):Promise<Home
  }
  const assets=new Map(views.map(asset=>[asset.id,asset]));
  const slots:HomepageConfig['slots']={};for(const slot of homepageSlots){const id=selections[slot.id],asset=id?assets.get(id):null;if(asset)slots[slot.id]=asset;}
- return {version:preview?state.revision:state.published_version,slots};
+ const config={version:preview?state.revision:state.published_version,slots};
+ if(key&&context)writeCache(context,key,Response.json(config,{headers:{'Cache-Control':'public, max-age=3600'}}));
+ return config;
 }
 export async function readHomepageAdmin(db:Database):Promise<HomepageAdmin>{
  const state=await homepageSettings(db),draft=HomepageSelections.parse(JSON.parse(state.draft_json)),published=HomepageSelections.parse(JSON.parse(state.published_json));
@@ -122,13 +141,19 @@ export async function changeHomepage(env:Env,actor:string,body:unknown){
  ]);}catch(cause){if(cause instanceof Error&&cause.message.includes('HOMEPAGE_CONFLICT'))throw new RequestFailure('CONFLICT');throw cause;}
  return readHomepageAdmin(env.DB);
 }
-async function serveMedia(request:Request,env:Env,media:Media,publicAccess=false){
- const head=await env.MEDIA.head(media.key);
+function mediaRange(range:string|null,size:number){
+ let start=0,end=size-1;
+ if(range){const match=/^bytes=(\d*)-(\d*)$/.exec(range);if(!match||!match[1]&&!match[2])return null;
+  if(match[1]){start=Number(match[1]);if(match[2])end=Math.min(end,Number(match[2]));}else start=Math.max(0,size-Number(match[2]));
+  if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start<0||start>=size||end<start)return null;}
+ return {start,end};
+}
+async function serveMedia(request:Request,env:Env,media:Media,publicAccess=false,knownHead?:R2Object){
+ const head=knownHead??await env.MEDIA.head(media.key);
  if(!head||head.size!==media.sizeBytes||head.customMetadata?.sha256&&head.customMetadata.sha256!==media.sha256)throw new RequestFailure('NOT_FOUND');
- let start=0,end=head.size-1;const range=request.headers.get('range');
- if(range){const match=/^bytes=(\d*)-(\d*)$/.exec(range);if(!match||!match[1]&&!match[2])return new Response(null,{status:416,headers:{'Content-Range':`bytes */${head.size}`}});
-  if(match[1]){start=Number(match[1]);if(match[2])end=Math.min(end,Number(match[2]));}else start=Math.max(0,head.size-Number(match[2]));
-  if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start<0||start>=head.size||end<start)return new Response(null,{status:416,headers:{'Content-Range':`bytes */${head.size}`}});}
+ const range=request.headers.get('range'),interval=mediaRange(range,head.size);
+ if(!interval)return new Response(null,{status:416,headers:{'Content-Range':`bytes */${head.size}`}});
+ const {start,end}=interval;
  const headers={'Content-Type':media.mime,'Content-Length':String(end-start+1),'Accept-Ranges':'bytes','ETag':head.httpEtag,
   'Cache-Control':publicAccess?'public, max-age=60, must-revalidate':'private, no-store',...(range?{'Content-Range':`bytes ${start}-${end}/${head.size}`}:{})};
  if(!range&&request.headers.get('if-none-match')===head.httpEtag)return new Response(null,{status:304,headers});
@@ -144,7 +169,7 @@ export async function adminHomepageRequest(request:Request,env:AdminEnv){return 
  params.delete('section');const input=HomepageQuery.safeParse(Object.fromEntries(params));if(!input.success)throw new RequestFailure('VALIDATION_ERROR');
  try{return Response.json(await readHomepageLibrary(env,input.data));}catch(cause){if(cause instanceof Error&&cause.message==='HOMEPAGE_INVALID_CURSOR')throw new RequestFailure('VALIDATION_ERROR');throw cause;}
 });}
-export async function homepageMediaRequest(request:Request,env:Env,id:string,admin?:AdminEnv){
+export async function homepageMediaRequest(request:Request,env:Env,id:string,admin?:AdminEnv,context?:HomepageCache){
  const response=await respond(async()=>{
   if(admin)await requireAdmin(request,admin);
   const row=await homepageAsset(env.DB,id);if(!row||row.state!=='active')throw new RequestFailure('NOT_FOUND');
@@ -157,10 +182,34 @@ export async function homepageMediaRequest(request:Request,env:Env,id:string,adm
   const params=new URL(request.url).searchParams,width=params.get('w'),preview=params.get('preview');
   if(!admin&&(width||preview)){
    if(!await mediaPresent(env,media))throw new RequestFailure('NOT_FOUND');
-   if(width&&(!['320','640','960'].includes(width)||media.mime==='video/mp4')||preview&&(preview!=='1'||media.mime!=='video/mp4'))throw new RequestFailure('VALIDATION_ERROR');
-   const key=`homepage/${row.id}/seo/${media.sha256}-${width??'720'}.${width?'webp':'mp4'}`,head=await env.MEDIA.head(key);
-   if(head&&head.size>0&&head.size<=media.sizeBytes&&head.httpMetadata?.contentType===(width?'image/webp':'video/mp4')){
-    return serveMedia(request,env,{...media,key,sizeBytes:head.size,mime:width?'image/webp':'video/mp4'},true);
+   if(width&&(!['320','640','960'].includes(width)||media.mime==='video/mp4')||preview&&(!['1','540'].includes(preview)||media.mime!=='video/mp4'))throw new RequestFailure('VALIDATION_ERROR');
+   const headers=new Headers();for(const name of ['range','if-none-match']){const value=request.headers.get(name);if(value)headers.set(name,value);}
+   const entry=context?cacheKey(context,`media/${state.published_version}/${row.id}/${poster?'poster':'main'}/${media.sha256}/${width??preview}`,headers):null;
+   if(entry&&context){try{const hit=await context.cache.match(entry);
+    const length=Number(hit?.headers.get('X-Homepage-Media-Length')),range=headers.get('range'),interval=mediaRange(range,length);
+    if(hit&&Number.isSafeInteger(length)&&length>0&&length<=Math.min(media.sizeBytes,4*1024*1024)){
+     if(!interval){await hit.body?.cancel();return new Response(null,{status:416,headers:{'Content-Range':`bytes */${length}`}});}
+     if(!range&&[200,304].includes(hit.status)||range&&hit.status===206&&hit.headers.get('Content-Range')===`bytes ${interval.start}-${interval.end}/${length}`){
+      const publicHeaders=new Headers(hit.headers);publicHeaders.delete('X-Homepage-Media-Length');publicHeaders.set('Content-Length',String(interval.end-interval.start+1));
+      const result=new Response(request.method==='HEAD'?null:hit.body,{status:hit.status,headers:publicHeaders});
+      if(request.method==='HEAD')await hit.body?.cancel();return result;
+     }
+    }
+    await hit?.body?.cancel();
+   }catch{/* A cache miss or outage uses the public snapshot. */}}
+   const sizes=width?[width]:preview==='540'?['540','720']:['720'];
+   for(const size of sizes){const key=`homepage/${row.id}/seo/${media.sha256}-${size}.${width?'webp':'mp4'}`,head=await env.MEDIA.head(key);
+    if(head&&head.size>0&&head.size<=media.sizeBytes&&head.httpMetadata?.contentType===(width?'image/webp':'video/mp4')){
+     const result=await serveMedia(request,env,{...media,key,sizeBytes:head.size,mime:width?'image/webp':'video/mp4'},true,head);
+     // Only complete, bounded derivatives enter the shared cache. A full-file
+     // bytes=0- request can populate it; partial ranges and originals cannot.
+     if(entry&&context&&request.method==='GET'&&head.size<=4*1024*1024&&
+      (result.status===200||result.status===206&&result.headers.get('Content-Range')===`bytes 0-${head.size-1}/${head.size}`)){
+      const stored=result.clone(),cacheHeaders=new Headers(stored.headers);cacheHeaders.delete('Content-Range');cacheHeaders.set('Cache-Control','public, max-age=3600');cacheHeaders.set('X-Homepage-Media-Length',String(head.size));
+      writeCache(context,new Request(entry.url),new Response(stored.body,{headers:cacheHeaders}));
+     }
+     return result;
+    }
    }
   }
   return serveMedia(request,env,media,!admin);
@@ -180,7 +229,7 @@ export async function cleanupHomepageAssets(env:Env,now=Date.now()){
  let removed=0;for(const row of candidates){
   const claim=await env.DB.prepare(`UPDATE homepage_assets AS a SET state='deleting' WHERE id=? AND ${refs} RETURNING id`).bind(row.id).first();if(!claim)continue;
   const media:Media={...homepageStoredMetadata(row),key:row.object_key},poster=row.poster_json?JSON.parse(row.poster_json) as Media:null;
-  const variants=(item:Media)=>item.mime==='video/mp4'?[`homepage/${row.id}/seo/${item.sha256}-720.mp4`]:[320,640,960].map(width=>`homepage/${row.id}/seo/${item.sha256}-${width}.webp`);
+  const variants=(item:Media)=>item.mime==='video/mp4'?[540,720].map(width=>`homepage/${row.id}/seo/${item.sha256}-${width}.mp4`):[320,640,960].map(width=>`homepage/${row.id}/seo/${item.sha256}-${width}.webp`);
   const keys=[row.object_key,...variants(media),...(poster?[poster.key,...variants(poster)]:[])];
   if(keys.some(key=>!key.startsWith(`homepage/${row.id}/`)))throw Error('HOMEPAGE_SCOPE_INVALID');
   await env.MEDIA.delete(keys);await env.DB.prepare("DELETE FROM homepage_assets WHERE id=? AND state='deleting'").bind(row.id).run();removed++;

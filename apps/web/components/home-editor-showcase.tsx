@@ -16,6 +16,7 @@ type Demo = {order: PhotoId[]; durations: Record<PhotoId, number>; text: string;
 const initial: Demo = {order: photos.map(p => p.id), durations: {salon: 7, interieur: 7, loft: 6, terrasse: 8}, text: '65 m² · 3 pièces', font: 'Instrument Serif', size: 72, color: '#ffffff', align: 'center', x: 50, y: 70};
 const colors = [{value: '#ffffff', name: 'blanc'}, {value: '#191c18', name: 'noir'}, {value: '#a9bca0', name: 'vert sauge'}, {value: '#d7c7b2', name: 'beige'}, {value: '#8d8e86', name: 'gris'}];
 const peaks = Array.from({length: 160}, (_, i) => 5 + Math.round(Math.abs(Math.sin(i * 2.3) * Math.sin(i * .16)) * 30));
+const waveformPath=peaks.map((height,i)=>`M${i*5+2} ${21-height/2}v${height}`).join(' ');
 const dragType = 'application/x-bienvu-demo-photo';
 function clock(seconds: number) {return `0:${String(Math.floor(seconds)).padStart(2, '0')}`;}
 
@@ -121,7 +122,7 @@ export function HomeEditorShowcase({paused, onCreate}: {paused: boolean; onCreat
         <div className="home-editor-demo-transport"><button type="button" onClick={togglePlayback} aria-label={playbackLabel} aria-pressed={playing}><HomeIcon name={playing ? 'pause' : 'play'} size={25}/></button><span>{clock(time)} / {clock(total)}</span></div>
         <div className="home-editor-demo-clips" role="group" aria-label="Plans de la démonstration">{clips.map(photo => <button key={photo.id} type="button" aria-pressed={selected.id === photo.id} aria-label={`Aller au plan ${photo.name}, ${photo.duration} secondes`} onClick={() => select(photo.id)} style={{flex: photo.duration}}><HomeVisual media={media[photo.id]}/><span>{photo.name}</span><small>{photo.duration} s</small></button>)}</div>
         <div className="home-editor-demo-voice"><HomeIcon name="microphone" size={20}/><span>Voix off</span></div>
-        <div className="home-editor-demo-wave" aria-hidden="true"><svg viewBox="0 0 800 42" preserveAspectRatio="none">{peaks.map((peak, i) => <line key={i} x1={i * 5 + 2} x2={i * 5 + 2} y1={21 - peak / 2} y2={21 + peak / 2}/>)}</svg><span style={{left: `${time / total * 100}%`}}/></div>
+        <div className="home-editor-demo-wave" aria-hidden="true"><svg viewBox="0 0 800 42" preserveAspectRatio="none"><path d={waveformPath} fill="none"/></svg><span style={{left: `${time / total * 100}%`}}/></div>
         <label className="home-editor-demo-seek"><span className="sr-only">Position de lecture de la démonstration</span><input type="range" min={0} max={total} step={.1} value={time} onChange={event => {setPlaying(false); setTime(Number(event.target.value));}}/></label>
       </div>
     </div>

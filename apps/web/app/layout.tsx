@@ -1,5 +1,4 @@
 import './style.css';
-import './avatars.css';
 import './privacy-choice.css';
 import './dialog-backdrop.css';
 import {Suspense} from 'react';

@@ -18,6 +18,7 @@ const fixture=`(()=>{
  api.start=()=>{window.fixtureTawkCalls.push('start');frame.hidden=false};
  api.showWidget=()=>{frame.hidden=false};api.hideWidget=()=>{frame.hidden=true};
  api.shutdown=()=>{window.fixtureTawkCalls.push('shutdown')};
+ api.maximize=()=>{window.fixtureTawkCalls.push('maximize')};
  api.onStatusChange('online');api.onLoad();
 })();`;
 const browser=await chromium.launch({channel:'chrome',headless:true}),results=[];
@@ -30,9 +31,13 @@ try{
   await context.route('**/api/me',route=>route.fulfill({status:401,json:{error:{code:'UNAUTHENTICATED'}}}));
   const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
   await page.goto(base,{waitUntil:'domcontentloaded'});
+  await page.getByRole('button',{name:'Discuter avec BienVu',exact:true}).waitFor({state:'visible'});
+  assert.equal(loads,0,'support does not download its SDK before a request');
+  await page.getByRole('button',{name:'Discuter avec BienVu',exact:true}).click();
   await page.locator('#fixture-tawk-widget').waitFor({state:'visible',timeout:30000});
   assert.equal(await page.locator('#bienvu-tawk-chat').count(),1);
-  assert.equal(loads,1);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true);
+  assert.equal(loads,1);assert.ok((await page.evaluate(()=>window.fixtureTawkCalls)).includes('maximize'));
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true);
   await page.screenshot({path:`${output}/home-${width}-fixture.png`});
   await page.evaluate(()=>{window.fixtureDocument=true;const a=document.createElement('a');a.href='/confidentialite';a.innerText='Test navigation';a.id='fixture-link';document.body.appendChild(a);});
   // Use an existing Next Link to preserve the document and test script deduplication.

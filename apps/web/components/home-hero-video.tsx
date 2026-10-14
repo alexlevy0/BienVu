@@ -14,7 +14,7 @@ export function HomeHeroVideo(props: PlaybackProps) {
 }
 
 function HeroPlayer({visual, movie, paused, onPlayingChange}: PlaybackProps & {visual: HomeMediaView; movie: HomeMediaView}) {
-  const video = useRef<HTMLVideoElement>(null), attempt = useRef(0);
+  const video = useRef<HTMLVideoElement>(null),frame=useRef<HTMLDivElement>(null), attempt = useRef(0);
   const [started, setStarted] = useState(false), [error, setError] = useState(false);
   const [muted, setMuted] = useState(true);
   const [aspectRatio, setAspectRatio] = useState(movie.width && movie.height ? `${movie.width} / ${movie.height}` : '9 / 16');
@@ -32,8 +32,10 @@ function HeroPlayer({visual, movie, paused, onPlayingChange}: PlaybackProps & {v
     // A wide phone in landscape still has a touch pointer: it must keep
     // click-to-play. No autoplay attribute is sent in the server HTML.
     const desktop = matchMedia('(min-width: 761px) and (hover: hover) and (pointer: fine)');
+    const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
+    let visible=false,idle:number|undefined,disposed=false;
     const start = () => {
-      if (!player || !desktop.matches || document.hidden || blocked.current || autoplayAttempted.current || !player.paused) return;
+      if (disposed || !visible || !player || !desktop.matches || reducedMotion.matches || document.hidden || blocked.current || autoplayAttempted.current || !player.paused) return;
       const current = ++attempt.current;
       player.muted = true; setMuted(true);
       void player.play().catch(cause => {
@@ -42,16 +44,30 @@ function HeroPlayer({visual, movie, paused, onPlayingChange}: PlaybackProps & {v
         if (!(cause instanceof DOMException && cause.name === 'NotAllowedError')) setError(true);
       });
     };
+    // Let the poster and the initial interface paint before fetching the movie.
+    // User-triggered playback remains immediate.
+    const schedule=()=>{
+      if(document.readyState!=='complete'||idle!==undefined)return;
+      if(typeof window.requestIdleCallback==='function')idle=window.requestIdleCallback(()=>{idle=undefined;start();},{timeout:1200});
+      else idle=window.setTimeout(()=>{idle=undefined;start();},80);
+    };
     const resize = () => {
       if (!desktop.matches) {attempt.current++; player?.pause();}
-      else start();
+      else schedule();
     };
-    start();
+    const observer=typeof IntersectionObserver==='undefined'?null:new IntersectionObserver(entries=>{
+      visible=entries.some(entry=>entry.isIntersecting&&entry.intersectionRatio>.1);
+      if(visible)schedule();else{attempt.current++;player?.pause();}
+    },{threshold:.1});
+    if(observer&&frame.current)observer.observe(frame.current);else{visible=true;schedule();}
+    window.addEventListener('load',schedule);
     desktop.addEventListener('change', resize);
-    document.addEventListener('visibilitychange', start);
+    document.addEventListener('visibilitychange', schedule);
     return () => {
+      disposed=true;observer?.disconnect();window.removeEventListener('load',schedule);
+      if(idle!==undefined){if(typeof window.cancelIdleCallback==='function')window.cancelIdleCallback(idle);else clearTimeout(idle);}
       desktop.removeEventListener('change', resize);
-      document.removeEventListener('visibilitychange', start);
+      document.removeEventListener('visibilitychange', schedule);
     };
   }, [paused, onPlayingChange]);
 
@@ -89,11 +105,11 @@ function HeroPlayer({visual, movie, paused, onPlayingChange}: PlaybackProps & {v
   }
 
   return <>
-    <div className="home-hero-video-frame">
+    <div ref={frame} className="home-hero-video-frame">
     <HeroBacklight key={poster??movie.src} video={video} active={started&&!paused&&!error}
       poster={poster?(visual.kind==='image'?visual:{...visual,kind:'image',src:poster}):null}/>
     <div className={`home-hero-demo${started ? ' is-started' : ''}`} style={{aspectRatio}}>
-      <video ref={video} src={previewVideoUrl(movie.src)} poster={poster ? imageWidthUrl(poster,640) : undefined} controls={started} muted={muted} playsInline loop
+      <video ref={video} src={previewVideoUrl(movie.src,540)} poster={poster ? imageWidthUrl(poster,640) : undefined} controls={started} muted={muted} playsInline loop
         preload={poster ? 'none' : 'metadata'} tabIndex={started ? 0 : -1} aria-hidden={!started}
         aria-label={movie.title ? `Vidéo de présentation : ${movie.title}` : 'Vidéo de présentation BienVu'}
         onLoadedMetadata={event => {const player = event.currentTarget; if (player.videoWidth && player.videoHeight) setAspectRatio(`${player.videoWidth} / ${player.videoHeight}`);}}
@@ -104,7 +120,7 @@ function HeroPlayer({visual, movie, paused, onPlayingChange}: PlaybackProps & {v
       {!started && <button type="button" className="home-hero-demo-cover" onClick={() => void play()}
         aria-label={error ? 'Réessayer la lecture de la vidéo de présentation' : 'Lire la vidéo de présentation'}>
         {poster && <HomeVisual media={visual.kind === 'image' ? visual : {...visual, kind: 'image', src: poster}}
-          alt={custom ? visual.title ?? 'Vidéo immobilière' : 'Salon lumineux avec moulures et grandes fenêtres ouvertes sur la ville'} loading="eager" fetchPriority="high"/>}
+          alt={custom ? visual.title ?? 'Vidéo immobilière' : 'Salon lumineux avec moulures et grandes fenêtres ouvertes sur la ville'} sizes="(max-width: 760px) 310px, (max-width: 1250px) 250px, (max-width: 1600px) 330px, 440px" loading="eager" fetchPriority="high"/>}
         <span className="home-hero-demo-shade"/>
         <span className="home-duration">{homeClock(movie.duration ?? 28)}</span>
         {!custom && <span className="home-hero-demo-heading"><strong>Paris</strong><span>Un nouveau regard<br/>sur votre bien</span></span>}

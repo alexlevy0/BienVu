@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import {useEffect,useState} from 'react';
 import {publicErrors,type GenerationView,type PublicErrorCode,type VideoAspectRatio} from '@bienvu/contracts';
-import {generationActive} from './generation-progress';
+import {generationActive} from './generation-progress-state';
 import {HomeIcon} from './home-icons';
 import {ProblemReport} from './problem-report';
 import {generationSteps,generationProgressText,generationMapOmissionText} from '../lib/generation-steps';

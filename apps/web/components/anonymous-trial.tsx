@@ -4,7 +4,7 @@ import type {VideoCustomization,VideoDuration,VideoAspectRatio} from '@bienvu/co
 import {useCallback,useEffect,useRef,useState} from 'react';
 import Link from 'next/link';
 import {GenerationView,publicErrors,requestedAnimations,type PublicErrorCode} from '@bienvu/contracts';
-import {generationActive} from './generation-progress';
+import {generationActive} from './generation-progress-state';
 import {generationSteps,generationMapOmissionText} from '../lib/generation-steps';
 import {GenerationMapConfirmation} from './generation-map-confirmation';
 import {GenerationQueueNotice} from './generation-queue-notice';

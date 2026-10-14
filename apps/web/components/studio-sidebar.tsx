@@ -11,13 +11,7 @@ export function StudioSidebar({active}: {active: 'create' | 'videos' | 'explore'
   const {me, loading} = useAccount();
   const [menuOpen, setMenuOpen] = useState(false);
   const store=useGenerationStore();
-  const [guestCredits,setGuestCredits]=useState(1);
-  useEffect(()=>{if(me||loading)return;const controller=new AbortController();
-    void fetch('/api/trial/history',{cache:'no-store',signal:controller.signal}).then(async response=>{
-      if(!response.ok)return;const data=await response.json() as {creditsRemaining?:number};
-      if(Number.isInteger(data.creditsRemaining))setGuestCredits(data.creditsRemaining!);
-    }).catch(()=>{});return()=>controller.abort();
-  },[me?.agency.id,loading,store.jobs.map(job=>`${job.id}:${job.status}`).join(',')]);
+  const guestCredits=store.guestCredits;
   const recent=[...store.jobs.map(job=>({kind:'job' as const,createdAt:job.createdAt,job})),
     ...store.drafts.map(draft=>({kind:'draft' as const,createdAt:draft.createdAt,draft}))]
     .sort((a,b)=>b.createdAt.localeCompare(a.createdAt));

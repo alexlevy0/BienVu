@@ -1,4 +1,5 @@
 'use client';
+import '../app/avatars.css';
 import {useCallback,useEffect,useRef,useState,type RefObject} from 'react';
 import type {AvatarLook} from '@bienvu/contracts';
 import {HomeIcon} from './home-icons';

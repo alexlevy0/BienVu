@@ -1,4 +1,5 @@
 'use client';
+import '../app/customizer.css';
 import {trackProductEvent} from '../lib/product-analytics';
 import {useEffect,useRef,useState,type CSSProperties} from 'react';
 import {CustomNarration,videoStyles,frenchVoices,requestedAnimations,generationCreditCost,selectedAnimationIndices,mapFrame,mapInterval,mapInk,videoMapFromDefaults,VIDEO_LAYERS,type VideoCustomization,type VideoDuration,type VideoAspectRatio} from '@bienvu/contracts';

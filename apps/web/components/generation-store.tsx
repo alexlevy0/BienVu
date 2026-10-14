@@ -9,7 +9,7 @@ import {trackGenerationOutcome} from '../lib/product-analytics';
 export type RecentDraft={id:string;sourceKind:'url'|'manual';title:string|null;locality:string|null;previewPhotoId:string|null;
   createdAt:string;status:'needs_input'};
 export const anonymousGenerationScope='anonymous';
-type State={jobs:GenerationView[];drafts:RecentDraft[];properties:PropertySummary[];unavailable:boolean;loading:boolean;setJob(job:GenerationView,owner:string):void;
+type State={jobs:GenerationView[];drafts:RecentDraft[];properties:PropertySummary[];guestCredits:number;unavailable:boolean;loading:boolean;setJob(job:GenerationView,owner:string):void;
   refresh():Promise<void>;refreshDrafts():Promise<void>;forgetDraft(id:string,owner:string):void};
 const Context=createContext<State|null>(null);
 const active=(job:GenerationView)=>!['ready','failed'].includes(job.status);
@@ -17,7 +17,7 @@ export function GenerationStoreProvider({children}:{children:React.ReactNode}){
   const {me,loading:accountLoading,refreshRights}=useAccount(),owner=accountLoading?undefined:me?.agency.id??anonymousGenerationScope;
   const [jobs,setJobs]=useState<GenerationView[]>([]),[drafts,setDrafts]=useState<RecentDraft[]>([]),
     [properties,setProperties]=useState<PropertySummary[]>([]),
-    [unavailable,setUnavailable]=useState(false),[loading,setLoading]=useState(true),[notification,setNotification]=useState<GenerationView|null>(null);
+    [unavailable,setUnavailable]=useState(false),[loading,setLoading]=useState(true),[guestCredits,setGuestCredits]=useState(1),[notification,setNotification]=useState<GenerationView|null>(null);
   const ownerRef=useRef<string|undefined>(owner),seen=useRef<Set<string>>(new Set()),initialized=useRef(false),jobsRef=useRef(jobs),
     lastDraftRead=useRef(0),deletedDrafts=useRef(new Set<string>()),readingJobs=useRef<string|null>(null),readingDrafts=useRef<string|null>(null),queuedDraftRead=useRef<string|null>(null),readingProperties=useRef<string|null>(null);
   jobsRef.current=jobs;
@@ -49,7 +49,9 @@ export function GenerationStoreProvider({children}:{children:React.ReactNode}){
   },[]);
   const refresh=useCallback(async()=>{
     if(!owner||readingJobs.current===owner)return;readingJobs.current=owner;
-    try{const next=await readRecentPages(owner===anonymousGenerationScope?'/api/trial/history':'/api/generations','jobs',value=>GenerationView.parse(value),()=>ownerRef.current===owner);
+    try{const next=await readRecentPages(owner===anonymousGenerationScope?'/api/trial/history':'/api/generations','jobs',value=>GenerationView.parse(value),()=>ownerRef.current===owner,fetch,data=>{
+      if(owner===anonymousGenerationScope&&Number.isInteger(data.creditsRemaining)&&Number(data.creditsRemaining)>=0)setGuestCredits(Number(data.creditsRemaining));
+    });
       if(!next||ownerRef.current!==owner)return;
       const wasInitialized=initialized.current;
       if(wasInitialized&&owner!==anonymousGenerationScope&&next.some(fresh=>{
@@ -71,7 +73,7 @@ export function GenerationStoreProvider({children}:{children:React.ReactNode}){
     finally{if(readingJobs.current===owner)readingJobs.current=null;if(ownerRef.current===owner)setLoading(false);}
   },[owner,refreshDrafts,refreshRights,refreshProperties]);
   useEffect(()=>{
-    ownerRef.current=owner;setJobs([]);setDrafts([]);setProperties([]);setNotification(null);setUnavailable(false);setLoading(true);
+    ownerRef.current=owner;setJobs([]);setDrafts([]);setProperties([]);setGuestCredits(1);setNotification(null);setUnavailable(false);setLoading(true);
     seen.current=new Set();deletedDrafts.current=new Set();initialized.current=false;lastDraftRead.current=0;
     if(owner)void refresh();
   },[owner,refresh]);
@@ -82,7 +84,7 @@ export function GenerationStoreProvider({children}:{children:React.ReactNode}){
     return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',tick);window.removeEventListener('focus',tick);};
   },[owner,refresh,refreshDrafts]);
   const sameOwner=ownerRef.current===owner;
-  return <Context.Provider value={{jobs:sameOwner?jobs:[],drafts:sameOwner?drafts:[],properties:sameOwner?properties:[],unavailable:sameOwner&&unavailable,loading:!sameOwner||loading,setJob:put,refresh,refreshDrafts,forgetDraft}}>{children}
+  return <Context.Provider value={{jobs:sameOwner?jobs:[],drafts:sameOwner?drafts:[],properties:sameOwner?properties:[],guestCredits:sameOwner?guestCredits:1,unavailable:sameOwner&&unavailable,loading:!sameOwner||loading,setJob:put,refresh,refreshDrafts,forgetDraft}}>{children}
     {sameOwner&&notification&&<div className="studio-notification" role="status"><span>Votre vidéo « {notification.title} » est prête.</span>
       <Link href={owner===anonymousGenerationScope?`/historique/${notification.id}`:`/biens/${encodeURIComponent(`job:${notification.id}`)}#video-${notification.id}`} onClick={()=>setNotification(null)}>Voir la vidéo</Link>
       <button type="button" aria-label="Fermer la notification" onClick={()=>setNotification(null)}>×</button></div>}

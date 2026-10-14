@@ -1,19 +1,32 @@
 'use client';
-import {createContext, useCallback, useContext, useEffect, useState} from 'react';
+import {createContext, useCallback, useContext, useEffect, useRef, useState} from 'react';
 import {Me,VoiceCatalog,DEFAULT_VIDEO_VOICE,type VideoCustomization, type AgencyProfile} from '@bienvu/contracts';
 import {clearListingDraft} from '../lib/listing-draft';
 import {clearAgencyDraft} from '../lib/agency-draft';
 import {trackProductEvent,suspendProductAnalytics} from '../lib/product-analytics';
 
 type AccountState = {me: Me | null; loading: boolean; error: string; refresh: () => Promise<void>; refreshRights: () => Promise<void>; setAgency: (agency: AgencyProfile) => void;
-  defaultVoice:VideoCustomization['voice'];voiceLoading:boolean;voiceCatalog:VoiceCatalog|null;refreshVoices:()=>Promise<void>};
+  defaultVoice:VideoCustomization['voice'];voiceLoading:boolean;voiceCatalog:VoiceCatalog|null;refreshVoices:()=>Promise<void>;resolveDefaultVoice:()=>Promise<VideoCustomization['voice']>};
 const AccountContext = createContext<AccountState | null>(null);
 export function AccountProvider({children}: {children: React.ReactNode}) {
   const [me, setMe] = useState<Me | null>(null), [loading, setLoading] = useState(true), [error, setError] = useState('');
   const [voiceCatalog,setVoiceCatalog]=useState<VoiceCatalog|null>(null),[voiceLoading,setVoiceLoading]=useState(true);
-  const refreshVoices=useCallback(async()=>{const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),5000);
-    try{const response=await fetch('/api/voices',{cache:'no-store',signal:controller.signal});
-    if(response.ok)setVoiceCatalog(VoiceCatalog.parse(await response.json()));}catch{/* Existing voice selections remain available. */}finally{clearTimeout(timer);setVoiceLoading(false);}},[]);
+  const catalogRef=useRef<VoiceCatalog|null>(null),voiceRequest=useRef<Promise<VoiceCatalog|null>|null>(null);
+  const readVoices=useCallback(()=>{
+    if(voiceRequest.current)return voiceRequest.current;
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),5000);
+    const pending=(async()=>{
+      try{const response=await fetch('/api/voices',{cache:'no-store',signal:controller.signal});
+        if(response.ok){const catalog=VoiceCatalog.parse(await response.json());catalogRef.current=catalog;setVoiceCatalog(catalog);}
+      }catch{/* Existing voice selections remain available. */}
+      finally{clearTimeout(timer);setVoiceLoading(false);voiceRequest.current=null;}
+      return catalogRef.current;
+    })();
+    voiceRequest.current=pending;return pending;
+  },[]);
+  const refreshVoices=useCallback(async()=>{await readVoices();},[readVoices]);
+  const resolveDefaultVoice=useCallback(async()=>
+    catalogRef.current?.defaultVoice??(await readVoices())?.defaultVoice??DEFAULT_VIDEO_VOICE,[readVoices]);
   useEffect(()=>{void refreshVoices();},[refreshVoices]);
   const refresh = useCallback(async () => {
     setLoading(true); setError('');
@@ -34,8 +47,8 @@ export function AccountProvider({children}: {children: React.ReactNode}) {
     }catch{/* Keep the last known quota; admission is always checked by the server. */}
   },[]);
   useEffect(() => {void refresh();}, [refresh]);
-  return <AccountContext.Provider value={{me, loading:loading||voiceLoading, error, refresh,refreshRights,
-    defaultVoice:voiceCatalog?.defaultVoice??DEFAULT_VIDEO_VOICE,voiceCatalog,voiceLoading,refreshVoices,
+  return <AccountContext.Provider value={{me, loading, error, refresh,refreshRights,
+    defaultVoice:voiceCatalog?.defaultVoice??DEFAULT_VIDEO_VOICE,voiceCatalog,voiceLoading,refreshVoices,resolveDefaultVoice,
     setAgency: agency => setMe(current => current ? {...current, agency} : current)}}>{children}</AccountContext.Provider>;
 }
 export function useAccount() {
