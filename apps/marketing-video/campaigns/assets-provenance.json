@@ -1,0 +1,81 @@
+{
+  "sourceVideoId": "5641e717-c133-4852-9153-06c206d5919f",
+  "privateMedia": true,
+  "assets": [
+    {
+      "name": "example.mp4",
+      "bytes": 34482346,
+      "sha256": "2be8479f45e3f0b2ccd0a643101a64d4144093a141ce207b2cfb181cf52b4e17"
+    },
+    {
+      "name": "photo-1.jpg",
+      "bytes": 614466,
+      "sha256": "4f27f0b0661c99cdac1488ec1d5c3782799cc9773d1284d19277b3a13043bd4d"
+    },
+    {
+      "name": "photo-2.jpg",
+      "bytes": 642152,
+      "sha256": "37fc7b11fa1e083b33b908b41eb5c76a1d785fc6e961e1c16fb02243e6320768"
+    },
+    {
+      "name": "photo-3.jpg",
+      "bytes": 738075,
+      "sha256": "46bb872c49f024d986f759f713623fb3773f53180f9949338eb7acbb456d891e"
+    },
+    {
+      "name": "photo-4.jpg",
+      "bytes": 517750,
+      "sha256": "f7a33aab84b1310b8ab80ace4802d63038ecfd2308f67aad093ca90598d98591"
+    },
+    {
+      "name": "photo-5.jpg",
+      "bytes": 183462,
+      "sha256": "711b4071c682ecdfa020ee8a717d65ca739fa7dd37f85e86b78030b14bfd6b83"
+    },
+    {
+      "name": "photo-6.jpg",
+      "bytes": 247265,
+      "sha256": "2342cc1aab734a2c4aaefe0eae891fc903cd0c9722f40bda6bdffa2526ab6abb"
+    },
+    {
+      "name": "animation-1.mp4",
+      "bytes": 2354301,
+      "sha256": "9f8e66e1c95d559c1a2ccaa6b218ea88e9b365c9938b5497535fd353b5e3c4fe"
+    },
+    {
+      "name": "animation-2.mp4",
+      "bytes": 2394559,
+      "sha256": "7e0d0f36430829532547f8d6297173d12abf05766e3f6daf3062315c7ad9cfee"
+    },
+    {
+      "name": "animation-3.mp4",
+      "bytes": 2667311,
+      "sha256": "253d8f37ed54fd91ccae4999911f68b0d7ad18a6763e9df71ad344be31e5b70a"
+    },
+    {
+      "name": "avatar.webm",
+      "bytes": 11379300,
+      "sha256": "424405975f4e4a85184f86f8d1f8e132e49a3cf582524041809f9a218cf1dd05"
+    },
+    {
+      "name": "voice-1.wav",
+      "bytes": 103758,
+      "sha256": "1c25b168234186ac802e757b466afbea15bb9b139eef64326b58679ae24463b1"
+    },
+    {
+      "name": "voice-2.wav",
+      "bytes": 894798,
+      "sha256": "05dcdcbf7219f7e6f8a5c1561bed55a525313d63a3f56177f277bcabef49ad19"
+    },
+    {
+      "name": "voice-3.wav",
+      "bytes": 729678,
+      "sha256": "ba2b194e4fe412a9b838e506b81b0a0a3610b7b903dc4c6730e8ac5915f08bbb"
+    },
+    {
+      "name": "voice-4.wav",
+      "bytes": 69198,
+      "sha256": "434ee83d7c2a6bb85afaf3e18cb8c25bf099a6c09b1f0dc98d4508105bc8a475"
+    }
+  ]
+}

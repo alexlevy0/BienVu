@@ -21,3 +21,5 @@ overrides:
   'sharp@0.35.4': 0.35.5
   # PostCSS in Next.js and the Remotion bundler still resolves this version.
   'source-map-js@1.2.1': 1.2.2
+  # Remotion Studio's Cosmiconfig currently resolves the vulnerable YAML parser.
+  'js-yaml@4.2.0': 4.3.2

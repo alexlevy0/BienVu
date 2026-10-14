@@ -1,0 +1,10 @@
+{
+  "title": "BienVu Momentum",
+  "bpm": 120,
+  "durationSeconds": 36,
+  "sampleRate": 48000,
+  "seed": 20261014,
+  "source": "Original local procedural synthesis",
+  "thirdPartySamples": false,
+  "paidApiCalls": 0
+}
