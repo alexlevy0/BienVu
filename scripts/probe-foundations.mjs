@@ -14,7 +14,7 @@ const pages = new Map([
   ['/agence', /Votre identité, sur chaque vidéo\./],
   ['/historique', /id="property-library-title"/],
   ['/biens', /id="property-library-title"/],
-  ['/abonnement', [/id="offers-calculator-heading"/, /id="offers-solo"/, /id="offers-agence"/, /id="offers-equipe"/, /class="offers-network"/, /id="recharges"/]],
+  ['/abonnement', [/id="offers-calculator-heading"/, /id="offers-solo"/, /id="offers-agence"/, /id="offers-equipe"/, /class="offers-network"/]],
   ['/connexion', [/id="login-studio-title"/, /class="login-box(?:\s[^"]*)?"/]],
 ]);
 for (const [path, expectedContent] of pages) {
@@ -26,6 +26,9 @@ for (const [path, expectedContent] of pages) {
   assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
   for (const content of Array.isArray(expectedContent) ? expectedContent : [expectedContent]) {
     assert.ok(content.test(html), `Contenu attendu absent sur ${path}: ${content}`);
+  }
+  if(path==='/abonnement'){
+    assert.doesNotMatch(html, /id="recharges"|class="offers-discovery"|class="offers-topup-pay"/, 'Les achats à l’unité sont réservés au superadmin connecté.');
   }
   report.checks.push({path, status: response.status, french: true, securityHeaders: true});
 }
@@ -41,6 +44,12 @@ for (const body of [{url: 'https://example.com/listing'}, {url: 'https://127.0.0
 }
 assert.equal(ids.size, 2);
 report.checks.push({path: '/api/generations', status: 401, requestIdsGenerated: true, paidWorkRefused: true});
+for(const method of ['GET','POST']){
+  const response=await fetch(new URL('/api/billing/topups',base),{method,headers:method==='POST'?{'Content-Type':'application/json',Origin:origin.origin,'Idempotency-Key':'foundations-private-topups-check'}:undefined,...(method==='POST'?{body:JSON.stringify({pack:'pack20v2'})}:{})});
+  const payload=await response.json();assert.equal(response.status,401);assert.equal(payload.error.code,'UNAUTHORIZED');
+  assert.equal(response.headers.get('cache-control'),'private, no-store');
+  report.checks.push({path:'/api/billing/topups',method,status:401,private:true});
+}
 const history = await fetch(new URL('/api/generations', base)); assert.equal(history.status, 401);
 for(const path of ['/api/properties','/api/properties/listing%3Amissing']){
   const response=await fetch(new URL(path,base));assert.equal(response.status,401);
