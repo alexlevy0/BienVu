@@ -53,7 +53,7 @@ export type AdminPerformanceTimeline={at:string;from:string;until:string;days:7|
 export type AdminTraffic={at:string;days:number;enabled:boolean;firstDay:string|null;total:number;
   daily:{day:string;views:number}[];countries:{country:string;views:number}[];pages:{page:string;views:number}[]};
 export type AdminVideoDetail = {
-  video:AdminRow;events:AdminRow[];reports:AdminRow[];calls:AdminNarrationCall[];animations?:AdminRow[];
+  video:AdminRow;events:AdminRow[];reports:AdminRow[];calls:AdminNarrationCall[];animations?:AdminRow[];animationIssue?:string;
 };
 export type AdminNarrationCall = {
   id:string;provider:'openai'|'google'|'fish'|'cartesia';mode:'real'|'mock';state:'pending'|'done'|'failed';error:string|null;reservedCents:number;at:string;step:string;

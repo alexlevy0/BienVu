@@ -13,7 +13,7 @@ import {editorMediaSourcesKey} from './editor-client';
 type Env={DB:Database;MEDIA:Pick<R2Bucket,'put'|'head'|'get'|'delete'>};
 export async function editorResources(db:Database,agencyId:string,id:string){
   const draft=await findCreationDraft(db,agencyId,id);if(!draft)throw new RequestFailure('NOT_FOUND');
-  const settings=draft.data.videoCustomization,order=settings?.photoOrder??draft.photos.map(p=>p.sourceOrder),
+  const settings=draft.data.videoCustomization,order=settings?.photoOrder??draft.photos.slice(0,12).map(p=>p.sourceOrder),
     selected=new Set(selectedAnimationIndices(order,settings).map(index=>order[index]));
   // Discover the retained files even if an older editor copy lost its selection.
   // Only selected animations count towards reuse pricing and the current preview.
@@ -79,7 +79,7 @@ async function copyPhoto(env:Env,agencyId:string,draft:CreationDraftView,photo:V
   const object=await env.MEDIA.get(photo.objectKey);if(!object||object.size!==photo.sizeBytes)throw new RequestFailure('INSUFFICIENT_PHOTOS');
   const bytes=new Uint8Array(await object.arrayBuffer());if(await contentHash(bytes)!==photo.sha256)throw new RequestFailure('INSUFFICIENT_PHOTOS');
   const uploadId=(await contentHash(new TextEncoder().encode(`${draft.id}:${photo.id}`))).slice(0,32);
-  await uploadCreationPhoto(env,agencyId,draft.id,slot,uploadId,bytes,photo.mime,async()=>({bytes,width:photo.width!,height:photo.height!,mime:photo.mime as 'image/jpeg'|'image/png'|'image/webp'}),signal);
+  await uploadCreationPhoto(env,agencyId,draft.id,slot,uploadId,bytes,photo.mime,async()=>({bytes,width:photo.width!,height:photo.height!,mime:photo.mime as 'image/jpeg'|'image/png'|'image/webp'}),signal,{galleryCopy:true});
 }
 async function copyMusic(env:Env,agencyId:string,draftId:string,asset:VideoAsset,sourcePrefix:string){
   if(!asset.objectKey.startsWith(sourcePrefix))throw new RequestFailure('NOT_FOUND');
@@ -190,7 +190,7 @@ export async function snapshotEditorExport(env:Env,agencyId:string,id:string,ver
   await startCreationDraft(env.DB,agencyId,started.row.id,blankCreationDraft());
   let draft=(await findCreationDraft(env.DB,agencyId,started.row.id))!;
   if(!draft)throw new RequestFailure('CONFLICT');
-  for(const photo of source.photos)await copyPhoto(env,agencyId,draft,VideoAsset.parse({id:photo.id,objectKey:photo.objectKey,sha256:photo.contentHash,
+  for(const photo of source.photos.filter(p=>settings.photoOrder?.includes(p.sourceOrder)))await copyPhoto(env,agencyId,draft,VideoAsset.parse({id:photo.id,objectKey:photo.objectKey,sha256:photo.contentHash,
     sizeBytes:photo.sizeBytes,mime:photo.mime,width:photo.width,height:photo.height}),photo.sourceOrder,`agencies/${agencyId}/imports/${id}/`,signal);
   let music=settings.editor.music;
   if(music){const stored=await env.DB.prepare('SELECT asset_json AS asset FROM editor_music_assets WHERE agency_id=? AND import_id=? AND id=?')

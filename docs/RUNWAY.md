@@ -71,6 +71,17 @@ Les sorties sont copiées immédiatement dans **R2 privé**, sous le préfixe ex
 
 ## Budget et Super admin
 
+**Depuis le 15/10 — migration 0075 :** le solde réel renvoyé par `organization.retrieve()` du SDK officiel remplace le plafond du premier prépaiement. Lecture gratuite avant la file puis à son acquisition, rafraîchie si nécessaire avant chaque nouvelle photo (cache de 60 s, validité SQL maximale de 5 min). Les recharges sont détectées automatiquement ; aucun achat ou rechargement automatique n’est effectué. Le solde, sa date et le disponible après réservations sont visibles dans **Super admin → Vidéos → File et générations simultanées**.
+
+Le snapshot capture les réservations locales **avant** la lecture réseau et réserve aussi les tâches encore en cours, dont le débit fournisseur peut ne pas être visible. Chaque insertion contrôle atomiquement le disponible ; une lecture plus ancienne ne remplace pas un snapshot récent. Une erreur ou un snapshot périmé interdit l’utilisation de ce solde. Les anciennes limites restent uniquement un repli pour les fixtures/instances n’ayant jamais de lecture réelle, jamais après une lecture échouée.
+
+Le budget global mensuel, sa suspension et une éventuelle suspension Runway restent bloquants. Les provisions prudentes qui dépassent le prépaiement historique sont ajoutées au budget global une seule fois, sans compter à nouveau les premières dépenses déjà couvertes. Les réservations échouées/incertaines restent conservées. Les journaux et crédits clients historiques ne sont pas réécrits. Une nouvelle période exige toujours l’ouverture du **budget global**, mais plus un second plafond manuel Runway.
+
+Les interruptions faute de budget/solde ou de lecture sont enregistrées et expliquées pendant/après la préparation et dans le détail Super admin, y compris quand aucune tâche n’a été créée. Les animations non créées restent non facturées.
+
+### Historique du prépaiement initial
+
+
 Tarif consulté le 01/10 : **5 crédits/seconde** pour Gen-4 Turbo, **25 crédits / clip**, **0,25 USD avant taxes**. Deux clips = 50 crédits / 0,50 USD. [Tarifs officiels](https://docs.dev.runwayml.com/guides/pricing/) · [Modèles](https://docs.dev.runwayml.com/guides/models/).
 
 Migration additive **`0026_runway_animations.sql`** :

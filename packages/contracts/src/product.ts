@@ -1,6 +1,7 @@
 import {z} from 'zod';
 import {GenerationCustomization} from './customization';
 import {sameSourceHost, sourceForHost, sourceListingId} from './import-sources';
+import {IMPORT_PHOTO_MAXIMUM} from './photo-limits';
 
 export const EntityId = z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/);
 export const Sha256 = z.string().regex(/^[a-f0-9]{64}$/);
@@ -78,7 +79,7 @@ export const PhotoAsset = z.object({
   id: EntityId, agencyId: EntityId, listingId: EntityId, sourceUrl: ListingUrl.nullable(),
   objectKey: ObjectKey, contentHash: Sha256, width: z.number().int().min(640).max(12000),
   height: z.number().int().min(360).max(12000), mime: z.enum(['image/jpeg', 'image/png', 'image/webp']),
-  sizeBytes: z.number().int().positive().max(10 * 1024 * 1024), sourceOrder: z.number().int().min(0).max(11),
+  sizeBytes: z.number().int().positive().max(10 * 1024 * 1024), sourceOrder: z.number().int().min(0).max(IMPORT_PHOTO_MAXIMUM-1),
 }).strict().refine(asset => asset.objectKey.startsWith(`agencies/${asset.agencyId}/jobs/`)
   || asset.objectKey.startsWith(`agencies/${asset.agencyId}/imports/${asset.listingId}/`), 'Le fichier doit appartenir à cette agence et à cet import.');
 export type PhotoAsset=z.infer<typeof PhotoAsset>;
@@ -90,7 +91,7 @@ export const NormalizedListing = z.object({
   fetchedAt: Timestamp, adapterVersion: boundedText(64), transaction: z.enum(['sale', 'rent']),
   description: ListingDescription.nullable().default(null),
   facts: z.object({title: TextFact, propertyType: PropertyTypeFact, locality: TextFact, price: PriceFact, area: AreaFact, rooms: RoomsFact.optional()}).strict(),
-  photos: z.array(PhotoAsset).max(12), warnings: z.array(boundedText(300)).max(12),
+  photos: z.array(PhotoAsset).max(IMPORT_PHOTO_MAXIMUM), warnings: z.array(boundedText(300)).max(12),
 }).strict().superRefine((listing, context) => {
   try {
     if (listing.sourceKind === 'url' && (!listing.sourceUrl || !listing.canonicalUrl || !listing.sourceHost

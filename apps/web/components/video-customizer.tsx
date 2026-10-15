@@ -2,7 +2,7 @@
 import '../app/customizer.css';
 import {trackProductEvent} from '../lib/product-analytics';
 import {useEffect,useRef,useState,type CSSProperties} from 'react';
-import {CustomNarration,videoStyles,frenchVoices,requestedAnimations,generationCreditCost,selectedAnimationIndices,mapFrame,mapInterval,mapInk,videoMapFromDefaults,VIDEO_LAYERS,type VideoCustomization,type VideoDuration,type VideoAspectRatio} from '@bienvu/contracts';
+import {VIDEO_PHOTO_MAXIMUM,CustomNarration,videoStyles,frenchVoices,requestedAnimations,generationCreditCost,selectedAnimationIndices,mapFrame,mapInterval,mapInk,videoMapFromDefaults,VIDEO_LAYERS,type VideoCustomization,type VideoDuration,type VideoAspectRatio} from '@bienvu/contracts';
 import {suggestedNarration,narrationWordLimit,wordCount} from '@bienvu/narration/suggestion';
 import type {ManualDraftFields} from '../lib/listing-draft';
 import {HomeIcon} from './home-icons';
@@ -30,14 +30,19 @@ export function VideoCustomizer(p:Props){
   const upload=useRef<HTMLInputElement>(null),preview=useRef<HTMLDivElement>(null);
   const [previewSize,setPreviewSize]=useState({width:300,height:533});
   useEffect(()=>{const element=preview.current;if(!element)return;const measure=()=>setPreviewSize({width:element.clientWidth,height:element.clientHeight});measure();const observer=new ResizeObserver(measure);observer.observe(element);return()=>observer.disconnect();},[]);
-  const order=p.settings.photoOrder??p.photos.map(photo=>photo.slot);
+  const order=p.settings.photoOrder??p.photos.slice(0,VIDEO_PHOTO_MAXIMUM).map(photo=>photo.slot);
   const ordered=[...order.map(slot=>p.photos.find(photo=>photo.slot===slot)).filter((photo):photo is CustomizerPhoto=>!!photo),
     ...p.photos.filter(photo=>!order.includes(photo.slot))];
   const chosen=ordered.filter(photo=>order.includes(photo.slot));
   const animated=p.settings.runwayPhotos??selectedAnimationIndices(order,p.settings).map(index=>order[index]);
   const narration=p.settings.narration??(p.sourceUrl?['','','','']:suggestedNarration(p.fields,p.agencyName,duration)),validNarration=CustomNarration.safeParse(narration);
   const patch=(next:Partial<VideoCustomization>)=>p.onChange({...p.settings,...next});
-  function toggle(slot:number){patch({photoOrder:order.includes(slot)?order.filter(s=>s!==slot):[...order,slot],runwayClips:undefined,runwayPhotos:animated.filter(s=>s!==slot)});}
+  function toggle(slot:number){
+    const selected=order.includes(slot);if(!selected&&order.length>=VIDEO_PHOTO_MAXIMUM)return;
+    const keepAllAnimated=order.length>0&&order.every(s=>animated.includes(s));
+    patch({photoOrder:selected?order.filter(s=>s!==slot):[...order,slot],runwayClips:undefined,
+      runwayPhotos:selected?animated.filter(s=>s!==slot):keepAllAnimated?[...animated,slot]:animated});
+  }
   function animate(slot:number){trackProductEvent('editor_action',{action:'animation_toggled'});patch({runwayClips:undefined,runwayPhotos:animated.includes(slot)?animated.filter(s=>s!==slot):[...animated,slot]});}
   function move(slot:number,target:number){trackProductEvent('editor_action',{action:'photo_reordered'});const next=order.filter(s=>s!==slot);next.splice(Math.max(0,Math.min(next.length,target)),0,slot);patch({photoOrder:next});}
   useEffect(()=>{setPlaying(false);setTime(0);},[duration]);
@@ -60,14 +65,15 @@ export function VideoCustomizer(p:Props){
           onClick={()=>setTab(id)}><HomeIcon name={icon} size={21}/>{label}</button>)}</div>
       <AvatarWarning avatar={p.settings.avatar} voice={p.settings.voice??voiceCatalog?.defaultVoice??frenchVoices[0].id} catalog={avatarCatalog}/>
       <div role="tabpanel" id={`customizer-panel-${tab}`} aria-labelledby={`customizer-tab-${tab}`}>
-      {tab==='photos'&&<><div className="customizer-section-title"><strong>{p.sourceUrl?'Photos de votre annonce':`${chosen.length} photo${chosen.length>1?'s':''} sélectionnée${chosen.length>1?'s':''}`}</strong><p>{p.sourceUrl?'Les photos seront récupérées avec l’annonce à la génération. Connectez-vous pour les choisir et les réordonner avant génération.':'Glissez les photos pour changer leur ordre. Gardez au moins 3 photos.'}</p></div>
+      {tab==='photos'&&<><div className="customizer-section-title"><strong aria-live="polite">{p.sourceUrl&&!p.photos.length?'Photos de votre annonce':`${chosen.length} / ${VIDEO_PHOTO_MAXIMUM} photos sélectionnées`}</strong><p>{p.sourceUrl&&!p.photos.length?'Les photos seront récupérées avec l’annonce à la génération. Connectez-vous pour les choisir et les réordonner avant génération.':`${p.photos.length} photo${p.photos.length>1?'s':''} disponible${p.photos.length>1?'s':''}. Choisissez de 3 à 12 photos et glissez-les pour changer leur ordre.`}</p>
+        {p.photos.length>VIDEO_PHOTO_MAXIMUM&&<p className="customizer-selection-help" role="status">{order.length>=VIDEO_PHOTO_MAXIMUM?'Désélectionnez une photo pour en choisir une autre dans la galerie.':`Vous pouvez encore sélectionner ${VIDEO_PHOTO_MAXIMUM-order.length} photo${VIDEO_PHOTO_MAXIMUM-order.length>1?'s':''}.`}</p>}</div>
         <PhotoDurationAdvice photoCount={chosen.length} durationSeconds={duration} onDuration={p.onDuration} disabled={p.busy}/>
         {p.photos.length?<div className="customizer-photos">{ordered.map((photo,index)=>{const at=order.indexOf(photo.slot),selected=at>=0;return <div key={photo.id} className={`customizer-photo${selected?' is-selected':''}${drag===photo.slot?' is-dragging':''}`}
           draggable={selected&&!p.busy&&!photo.removing&&photo.state==='ready'} onDragStart={event=>{event.dataTransfer.setData('text/plain',String(photo.slot));event.dataTransfer.effectAllowed='move';setDrag(photo.slot);}}
           onDragEnd={()=>setDrag(null)} onDragOver={event=>{if(drag!==null&&selected){event.preventDefault();event.dataTransfer.dropEffect='move';}}}
           onDrop={event=>{if(drag!==null&&selected){event.preventDefault();move(drag,at);setDrag(null);}}}>
           <div className="customizer-photo-visual"><PhotoPreviewImage src={photo.preview} alt={`Photo ${photo.slot+1}`} draggable={false} loading={index<3?'eager':'lazy'} fetchPriority={at===0?'high':'auto'}/></div>{selected&&<span className="customizer-photo-number">{at+1}</span>}
-          <button type="button" className="customizer-photo-check" aria-pressed={selected} aria-label={`${selected?'Désélectionner':'Sélectionner'} la photo ${photo.slot+1}`} onClick={()=>toggle(photo.slot)} disabled={p.busy||photo.removing||photo.state!=='ready'}>{selected?'✓':'+'}</button>
+          <button type="button" className="customizer-photo-check" aria-pressed={selected} aria-label={`${selected?'Désélectionner':'Sélectionner'} la photo ${photo.slot+1}`} title={!selected&&order.length>=VIDEO_PHOTO_MAXIMUM?'Désélectionnez une photo pour faire de la place':undefined} onClick={()=>toggle(photo.slot)} disabled={p.busy||photo.removing||photo.state!=='ready'||!selected&&order.length>=VIDEO_PHOTO_MAXIMUM}>{selected?'✓':'+'}</button>
           {selected&&<button type="button" className={`customizer-photo-animate${animated.includes(photo.slot)?' is-active':''}`} aria-pressed={animated.includes(photo.slot)} aria-label={`Animer la photo ${photo.slot+1} avec l’IA`} disabled={!me||p.busy||photo.removing||photo.state!=='ready'} title={!me?'Connectez-vous pour animer vos photos':'1 crédit supplémentaire'} onClick={()=>animate(photo.slot)}>{animated.includes(photo.slot)?'✓ Animée':'Animer'} · 1 crédit</button>}
           {at===0&&<span className="customizer-first-photo">Première image</span>}{photo.state!=='ready'&&<span className="customizer-photo-state">{photo.state==='error'?'Envoi interrompu':'Envoi…'}</span>}
           {photo.error&&<p className="customizer-photo-error" role="alert">{photo.error}</p>}

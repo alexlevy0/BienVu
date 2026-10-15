@@ -1,5 +1,16 @@
 # Imports d’annonces — sprints 03 et 04
 
+## Galerie importée et sélection vidéo — 15/10/2026
+
+Les imports conservent désormais jusqu’à **40 photos distinctes**, au lieu de douze, sous les limites existantes de **50 Mio**, de durée, de sécurité réseau et de budget. Quarante-quatre ressources au maximum dans le pipeline d’import, quarante-huit candidats ; le plafond financier hébergé de quarante-huit ressources reste inchangé et couvre aussi la lecture navigateur. Les photos sont téléchargées par paires puis vérifiées et stockées dans l’ordre source ; les échecs, doublons, annulations et tentatives restent comptés. Les limites peuvent conduire à une galerie partielle signalée dans les avertissements.
+
+« Personnaliser » conserve toute cette galerie privée, avec les douze premières cochées par défaut. De **3 à 12 photos** peuvent entrer dans la vidéo. À douze, les autres choix sont désactivés avec une consigne de désélection. Le nombre de photos disponibles, le nombre choisi, l’ordre et le coût restent distincts. Remplacer une photo lorsque toute la sélection est animée conserve ce choix d’animation pour sa remplaçante. Les aperçus WebP privés et le chargement différé existants sont réutilisés.
+
+Les indices source peuvent aller jusqu’à 39, mais `photoOrder` et `runwayPhotos` restent limités à douze éléments distincts. Le pipeline sélectionne les douze premières en l’absence de réglages explicites ; seuls les médias choisis arrivent à la narration, aux animations, au montage et au calcul des crédits. L’éditeur conserve les références aux photos choisies plus loin dans la galerie, limite la timeline à douze photos différentes et copie uniquement les photos sélectionnées dans son export. Les slots sont renumérotés avant le renderer, dont les limites ne changent pas.
+
+La migration **0074** élargit le journal des copies de galeries importées. Les uploads manuels publics restent limités à douze et aux mêmes tailles ; seules les copies privées vérifiées par le serveur peuvent employer les indices plus grands. Les contrôles de propriété, empreinte, version et annulation sont conservés. Les imports antérieurs gardent leurs médias : une annonce précédemment tronquée à douze doit être réimportée pour lire ses autres photos.
+
+
 **Maintenance du 13/10 — Laforêt :** l’adaptateur `laforet-dom/1.0` lit les sections publiques de l’annonce, dont le JSON-LD ne fournit que le fil d’Ariane. Il recoupe la référence, la transaction, la ville, le prix, la surface habitable et les pièces, puis isole la galerie du bien. Les originaux observés sur `laforetbusiness.laforet-intranet.com` remplacent les doublons recadrés ; cet hôte exact est autorisé pour les photos, avec les contrôles réseau habituels. Le lien de Noisy-le-Grand fourni par Alex produit un import réel Cloudflare **`ready`, 2 700 000 €, 220 m², 7 pièces, description et 12 photos**, en 16,2 secondes, sans navigateur ni appel IA. Les JPEG persistés ont été relus et leurs empreintes vérifiées. Le plafond reste de 12 photos par import, sur 18 détectées. `/sources` conserve les anciens échecs datés et ajoute ce succès vérifié ; les autres formats restent à confirmer. La recette privée est conservée hors Git dans `evidence/remote/laforet-20261013/`.
 
 **Maintenance du 10/10 :** estimation automatique sur la home connectée : lecture des photos, proposition de toutes les animations IA et calcul des crédits avant génération. La préparation cachée utilise les quotas habituels et est réutilisée lors de l’action explicite. L’essai anonyme reste classique. [Comportement et recette](preuves/maintenance/ESTIMATION-IMPORT-10-10.md).
@@ -87,7 +98,7 @@ Le diagnostic navigateur et l’import complet restent distincts : Le Figaro fou
 | HTML / image source / total de corps source | 2 Mio / 10 Mio / 50 Mio |
 | Description normalisée | 20 000 caractères ; troncature indiquée dans le résultat et l’interface |
 | Redirections par ressource | 3, contrôlées à chaque étape |
-| Ressources / candidats / photos conservées | 20 / 24 / 12 ; minimum 3 distinctes |
+| Ressources / candidats / photos conservées | 44 / 48 / 40 ; sélection vidéo de 3 à 12 |
 | Image décodée | 16 millions de pixels maximum ; minimum 640×360 |
 | JPEG stocké | 2 048×2 048 maximum, ratio préservé |
 | Imports URL actifs / dossiers stockés par agence | 1 / 30, tous modes pour le stockage |

@@ -1,7 +1,19 @@
 import type {GenerationView} from '@bienvu/contracts';
 
 type StepKey='importing'|'photos'|'map'|'narration'|'avatar'|'animations'|'rendering';
-export type GenerationStep={key:StepKey;state:'future'|'current'|'done'|'skipped';label:string;detail?:string};
+export type GenerationStep={key:StepKey;state:'future'|'current'|'done'|'skipped';label:string;detail?:string;progress?:{completed:number;total:number}};
+
+export function generationAnimationOmissionText(job:GenerationView|null):string|undefined{
+  if(!job?.animationProgress?.skipped)return;
+  const reason=job.animationOmissionReason;
+  const message=reason==='RUNWAY_BUDGET_LIMIT'?'Le budget du service a empêché la création de certaines animations.':
+    reason==='RUNWAY_CREDITS_EXHAUSTED'?'Le solde disponible chez Runway ne suffisait pas pour toutes les animations.':
+    reason==='RUNWAY_ACCOUNT_UNAVAILABLE'?'Le solde du service d’animation n’a pas pu être vérifié.':
+    reason==='RUNWAY_DISABLED'?'Le service d’animation était désactivé.':
+    reason==='RUNWAY_TIMEOUT'?'Certaines animations n’ont pas été disponibles dans le délai prévu.':
+    'Certaines animations n’ont pas pu être créées.';
+  return `${message} Les photos concernées gardent leurs mouvements classiques. ${['ready','failed'].includes(job.status)?'Les animations non réalisées ne sont pas facturées.':'Seules les animations réalisées seront facturées.'}`;
+}
 
 export function generationMapOmissionText(job:GenerationView|null):string|undefined{
   if(job?.preparation?.map!=='skipped')return;
@@ -45,6 +57,18 @@ export function generationSteps(job:GenerationView|null,manual=false):Generation
     job?.stage==='scripting'||job?.syntheticVoice===false?'Préparation du texte':'Création de la voix off',job?.syntheticVoice===false?'Texte prêt':'Voix off prête'));
   optional('avatar','Avatar IA','Génération de l’avatar','Avatar prêt','Avatar non ajouté');
   optional('animations','Animations IA','Animation des photos','Photos animées','Photos sans animation');
+  const animationStep=steps.find(s=>s.key==='animations'),progress=job?.animationProgress;
+  if(animationStep&&progress){
+    animationStep.progress={completed:progress.ready+progress.skipped,total:progress.total};
+    const notes:string[]=[];
+    if(progress.reused)notes.push(`${progress.reused} animation${progress.reused>1?'s':''} réutilisée${progress.reused>1?'s':''}`);
+    if(progress.skipped){
+      animationStep.label=animationStep.state==='done'?'Animations terminées':animationStep.label;
+      notes.push(`${progress.skipped} photo${progress.skipped>1?'s':''} avec mouvements classiques`);
+    }
+    const omission=generationAnimationOmissionText(job);
+    if(notes.length||omission)animationStep.detail=[notes.length?notes.join(' · ')+'.':null,omission].filter(Boolean).join(' ');
+  }
   steps.push(step('rendering',job?.status==='ready'?'done':'future','Assemblage de la vidéo','Assemblage de la vidéo','Vidéo prête'));
   return steps;
 }

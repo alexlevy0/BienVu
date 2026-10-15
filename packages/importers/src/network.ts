@@ -1,8 +1,8 @@
-import {ImportFailure, ListingUrl, importResourceDiagnostic, sourceForHost, type ImportResourceDiagnostic} from '@bienvu/contracts';
+import {IMPORT_PHOTO_MAXIMUM,ImportFailure, ListingUrl, importResourceDiagnostic, sourceForHost, type ImportResourceDiagnostic} from '@bienvu/contracts';
 import {isPublicIp} from './safety';
 
 export const IMPORT_LIMITS = {htmlBytes: 2 * 1024 * 1024, imageBytes: 10 * 1024 * 1024,
-  totalBytes: 50 * 1024 * 1024, photos: 12, candidates: 24, redirects: 3, requests: 20, durationMs: 60_000,
+  totalBytes: 50 * 1024 * 1024, photos: IMPORT_PHOTO_MAXIMUM, candidates: 48, redirects: 3, requests: 44, durationMs: 60_000,
   photoDurationMs: 50_000,imageDurationMs:8_000} as const;
 
 type ResourceContext = Pick<ImportResourceDiagnostic, 'stage' | 'resourceType'>;

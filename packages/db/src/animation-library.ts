@@ -5,7 +5,7 @@ export type AnimationReuse={libraryId:string;photoId:string;sha256:string;index:
 export async function retainedAnimations(db:Database,agencyId:string,listing:Pick<NormalizedListing,'agencyId'|'photos'>,settings?:VideoCustomization,aspectRatio='9:16',now=Date.now()){
   EntityId.parse(agencyId);if(listing.agencyId!==agencyId)throw Error('ANIMATION_SCOPE_INVALID');
   const found:AnimationReuse[]=[];
-  const order=settings?.photoOrder??listing.photos.map(p=>p.sourceOrder);
+  const order=settings?.photoOrder??listing.photos.slice(0,12).map(p=>p.sourceOrder);
   for(const position of selectedAnimationIndices(order,settings)){
     const index=listing.photos.findIndex(p=>p.sourceOrder===order[position]);
     if(index<0)throw Error('INVALID_ANIMATION_SELECTION');

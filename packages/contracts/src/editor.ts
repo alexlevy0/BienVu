@@ -2,6 +2,7 @@ import {z} from 'zod';
 import {MUSIC_LIMITS,MusicWaveform} from './music-library';
 import {mapInterval,mapFrame,type VideoMap} from './maps';
 import {VIDEO_LAYERS} from './video-layers';
+import {IMPORT_PHOTO_MAXIMUM} from './photo-limits';
 
 // Portable, bounded timeline data. No URLs, object keys, HTML or render code
 // supplied by a client: media references resolve through the owning import.
@@ -12,7 +13,7 @@ export const EditorCamera=z.object({motion:z.enum(['still','zoom-in','zoom-out',
   intensity:z.enum(['subtle','normal','dynamic']),start:z.object({x:z.number().min(0).max(100),y:z.number().min(0).max(100),scale:z.number().min(1).max(1.4)}).strict(),
   end:z.object({x:z.number().min(0).max(100),y:z.number().min(0).max(100),scale:z.number().min(1).max(1.4)}).strict()}).strict();
 export type EditorCamera=z.infer<typeof EditorCamera>;
-export const EditorClip=z.object({id,photoSlot:z.number().int().min(0).max(11),durationFrames:duration,camera:EditorCamera.optional()}).strict();
+export const EditorClip=z.object({id,photoSlot:z.number().int().min(0).max(IMPORT_PHOTO_MAXIMUM-1),durationFrames:duration,camera:EditorCamera.optional()}).strict();
 export type EditorClip=z.infer<typeof EditorClip>;
 export const EditorLayer=z.object({id,kind:z.enum(['text','logo']),text:z.string().max(240),
   startFrame:frame,durationFrames:duration,x:z.number().min(2).max(98),y:z.number().min(2).max(98),

@@ -86,8 +86,8 @@ test('agences : chemins précis, redirections et CDN limités à la source, aucu
     [iadFixture().replace(iadPhotos[0], 'https://127.0.0.1/private.jpg'), iadUrl]])
     assert.throws(() => extractListingHtml(html, url), fails('UNSAFE_URL'));
 });
-test('agences : import de JPEG distincts, ordre et plafond de 12 photos, sans navigateur', async () => {
-  for (const [html, url, count] of [[cesarHtml, cesarUrl, 12], [iadFixture(), iadUrl, 8], [remaxFixture(), remaxUrl, 12]] as const) {
+test('agences : import des galeries JPEG complètes et ordonnées, sans navigateur', async () => {
+  for (const [html, url, count] of [[cesarHtml, cesarUrl, 14], [iadFixture(), iadUrl, 8], [remaxFixture(), remaxUrl, 15]] as const) {
     const calls: string[] = [], stored: string[] = []; let browsers = 0;
     const result = await importListing(url, {agencyId: 'agency-fixture', importId: 'listing-fixture'}, {
       transport: {async load(value, kind, hosts) {

@@ -5,7 +5,8 @@ import {useCallback,useEffect,useRef,useState} from 'react';
 import Link from 'next/link';
 import {GenerationView,publicErrors,requestedAnimations,type PublicErrorCode} from '@bienvu/contracts';
 import {generationActive} from './generation-progress-state';
-import {generationSteps,generationMapOmissionText} from '../lib/generation-steps';
+import {generationSteps,generationMapOmissionText,generationAnimationOmissionText} from '../lib/generation-steps';
+import {GenerationAnimationCounter} from './generation-animation-counter';
 import {GenerationMapConfirmation} from './generation-map-confirmation';
 import {GenerationQueueNotice} from './generation-queue-notice';
 import {GenerationCelebration} from './generation-celebration';
@@ -92,8 +93,9 @@ export function AnonymousTrialResult({job}:{job:GenerationView}) {
     <GenerationCelebration job={unavailable?null:job}/>
     {!unavailable&&<GenerationQueueNotice job={job}/>}
     {unavailable?<p>Votre aperçu n’est plus disponible. Aucun nouveau traitement n’a été lancé.</p>:job.ownership==='owned'?<p>Cette vidéo a été enregistrée dans un compte. <Link href="/essai/recuperer">Retrouver ma vidéo</Link></p>:<>
-      {generationActive(job)&&<><ol className="generation-steps" aria-label="Étapes de création">{generationSteps(job,job.sourceKind==='manual').map(({key,state,label,detail})=><li key={key} className={`step-${state}`} aria-current={state==='current'?'step':undefined}>{state==='done'?'✓ ':state==='skipped'?'– ':''}{label}{detail&&<small className="generation-step-detail">{detail}</small>}{key==='map'&&job.mapConfirmation&&<GenerationMapConfirmation key={job.id} job={job}/>}</li>)}</ol><p>Vous pouvez revenir sur cette page depuis ce navigateur. Votre vidéo y sera conservée.</p><button type="button" className="text-button" disabled={busy} onClick={()=>void connect()}>Me connecter pendant la création</button></>}
+      {generationActive(job)&&<><ol className="generation-steps" aria-label="Étapes de création">{generationSteps(job,job.sourceKind==='manual').map(({key,state,label,detail,progress})=><li key={key} className={`step-${state}`} aria-current={state==='current'?'step':undefined}>{state==='done'?'✓ ':state==='skipped'?'– ':''}{label}<GenerationAnimationCounter progress={progress}/>{detail&&<small className="generation-step-detail">{detail}</small>}{key==='map'&&job.mapConfirmation&&<GenerationMapConfirmation key={job.id} job={job}/>}</li>)}</ol><p>Vous pouvez revenir sur cette page depuis ce navigateur. Votre vidéo y sera conservée.</p><button type="button" className="text-button" disabled={busy} onClick={()=>void connect()}>Me connecter pendant la création</button></>}
       {!generationActive(job)&&generationMapOmissionText(job)&&<p className="field-help"><strong>Carte non ajoutée.</strong> {generationMapOmissionText(job)}</p>}
+      {!generationActive(job)&&generationAnimationOmissionText(job)&&<p className="field-help" role="status">{generationAnimationOmissionText(job)}</p>}
       {job.status==='failed'&&<p role="alert">{publicErrors[job.errorCode as PublicErrorCode]?.[1]??publicErrors.GENERATION_FAILED[1]}</p>}
       {job.videoUrl&&<><video className={`generated-video${job.aspectRatio==='16:9'?' is-horizontal':''}`} src={job.videoUrl} controls playsInline preload="metadata" controlsList="nodownload" aria-label="Aperçu complet de votre vidéo avec filigrane"/>
         <button className="home-primary-button" type="button" disabled={busy} onClick={()=>void connect()}>{busy?'Ouverture…':'Télécharger sans filigrane'}</button><p>Créez votre compte gratuitement pour récupérer votre vidéo.</p></>}

@@ -8,6 +8,7 @@ import {fixturePlan,fixtureScriptMetrics} from './narration';
 import {findGeneration,generationView,type GenerationRow} from '../packages/db/src/index';
 import {prepareGenerationMap} from '../apps/pipeline/src/default-video-map';
 import {productRenderBudget} from '../apps/pipeline/src/product-render-budget';
+import {prepareJobAnimations,type AnimationAttempt} from '../apps/pipeline/src/photo-animations';
 export class FixtureGenerationWorkflow extends GenerationWorkflow {
   // The workflow fixture must never contact the real map service.
   protected override async defaultMap(_row:GenerationRow):Promise<ConfirmedVideoMap|null>{return null;}
@@ -40,6 +41,14 @@ export class FixtureInvalidScriptWorkflow extends FixtureGenerationWorkflow {
       const plan=fixturePlan(context);plan.scenes[1].copyId='gallery/foreign';
       return {plan,metrics:fixtureScriptMetrics()};
     }}};
+  }
+}
+export class FixtureSlowAnimationWorkflow extends FixtureGenerationWorkflow {
+  protected override animations(agencyId:string,jobId:string,attempt:AnimationAttempt){
+    return prepareJobAnimations(this.env,agencyId,jobId,{mode:'mock',generate:async(_bytes,_mime,checkpoint)=>{
+      await checkpoint('11111111-1111-4111-8111-111111111111');if(attempt.slot===1)throw Error('RUNWAY_TIMEOUT');
+      const clip=new Uint8Array(512);clip.set(new TextEncoder().encode('ftyp'),4);return clip;
+    },resume:async()=>{const clip=new Uint8Array(512);clip.set(new TextEncoder().encode('ftyp'),4);return clip;}},attempt);
   }
 }
 export class FixtureGenerationRenderer extends DurableObject<GenerationEnv>{

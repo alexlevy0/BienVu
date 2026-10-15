@@ -5,13 +5,14 @@ import {publicErrors,type GenerationView,type PublicErrorCode,type VideoAspectRa
 import {generationActive} from './generation-progress-state';
 import {HomeIcon} from './home-icons';
 import {ProblemReport} from './problem-report';
-import {generationSteps,generationProgressText,generationMapOmissionText} from '../lib/generation-steps';
+import {generationSteps,generationProgressText,generationMapOmissionText,generationAnimationOmissionText} from '../lib/generation-steps';
 import {ProgressiveVideo} from './progressive-video';
 import {VideoBacklight} from './video-backlight';
 import {GenerationRenderProgress} from './generation-estimate';
 import {GenerationMapConfirmation} from './generation-map-confirmation';
 import {GenerationQueueNotice} from './generation-queue-notice';
 import {GenerationCelebration} from './generation-celebration';
+import {GenerationAnimationCounter} from './generation-animation-counter';
 
 type RequestMessage={kind:'url'|'manual';text:string};
 
@@ -51,15 +52,17 @@ export function ConversationGeneration({job,request,sending,anonymous,unavailabl
             <small>{horizontal?'Horizontal 16:9':'Vertical 9:16'} · {job?.syntheticVoice===false?'Sans voix off':'Voix française'}</small></div></div>}
       </div><div className="home-conversation-status">
         <GenerationQueueNotice job={job}/>
-        {active||sending?<ol className="home-conversation-steps" aria-label="Étapes de création">{stages.map(({key,state,label,detail})=>{
+        {active||sending?<ol className="home-conversation-steps" aria-label="Étapes de création">{stages.map(({key,state,label,detail,progress})=>{
           const confirmMap=key==='map'&&job?.mapConfirmation;
-          return <li className={`step-${state}${detail||confirmMap?' step-with-detail':''}${confirmMap?' step-needs-confirmation':''}`} key={key} data-rendering={assembling&&key==='rendering'||undefined} aria-current={state==='current'?'step':undefined}>
+          return <li className={`step-${state}${detail||confirmMap?' step-with-detail':''}${confirmMap?' step-needs-confirmation':''}`} key={key} data-animations={key==='animations'&&progress?true:undefined} data-rendering={assembling&&key==='rendering'||undefined} aria-current={state==='current'?'step':undefined}>
             <span className="home-step-symbol" aria-hidden="true">{state==='done'?'✓':state==='current'?'◌':state==='skipped'?'–':'·'}</span><div className="home-step-label">{label}{detail&&<small className="home-step-detail">{detail}</small>}{confirmMap&&<GenerationMapConfirmation key={job.id} job={job} onRefresh={onRefresh}/>}</div>
+            <GenerationAnimationCounter progress={progress}/>
             {assembling&&key==='rendering'&&<GenerationRenderProgress job={job} unavailable={unavailable} className="home-render-percent"/>}</li>;
         })}</ol>:null}
         {(active||sending)&&<div className={`home-stage-track${assembling?' is-measured':''}`} role="progressbar" aria-label="Traitement de la vidéo" aria-valuenow={assembling?percent:undefined} aria-valuemin={assembling?0:undefined} aria-valuemax={assembling?100:undefined} aria-valuetext={sending||!job?'Envoi en cours':assembling?`Assemblage de la vidéo : ${percent} %`:generationProgressText(job)}><span style={assembling?{width:`${percent}%`}:undefined}/></div>}
         {unavailable&&<p role="status" className="home-stage-note">Connexion momentanément interrompue. L’état sera actualisé à votre retour.</p>}
         {job&&['ready','failed'].includes(job.status)&&mapOmission&&<p className="home-stage-note"><strong>Carte non ajoutée.</strong> {mapOmission}</p>}
+        {job&&['ready','failed'].includes(job.status)&&generationAnimationOmissionText(job)&&<p className="home-stage-note" role="status">{generationAnimationOmissionText(job)}</p>}
         {job?.status==='failed'&&<p role="alert" className="home-stage-error">{publicErrors[job.errorCode as PublicErrorCode]?.[1]??publicErrors.GENERATION_FAILED[1]}</p>}
         {job?.retryAllowed&&<button type="button" className="text-button" disabled={busy} onClick={()=>void act(`/api/generations/${job.id}/retry`)}>Relancer le démarrage</button>}
         {ready&&job?.ownership==='owned'&&job.downloadUrl&&<a className="home-primary-button" href={job.downloadUrl} download>Télécharger la vidéo <span aria-hidden="true">↗</span></a>}

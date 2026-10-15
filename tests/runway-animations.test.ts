@@ -16,7 +16,9 @@ import {DEFAULT_SCRIPT_MODEL} from '../packages/narration/src/index';
 import {prepareJobNarration} from '../apps/pipeline/src/narration';
 import {prepareJobVideo} from '../apps/pipeline/src/video-manifest';
 import {prepareJobAnimations,animationIndices} from '../apps/pipeline/src/photo-animations';
-import {allowedRunwayOutput,downloadRunwayOutput,runwayProvider,runwayPrompt,runwayMotionForSlot,runwayClipCost,type AnimationProvider,type RunwayMotion} from '../apps/pipeline/src/runway';
+import {animateWorkflowPhotos} from '../apps/pipeline/src/animation-workflow';
+import {syncRunwayAccount} from '../apps/pipeline/src/runway-account';
+import {allowedRunwayOutput,downloadRunwayOutput,runwayProvider,runwayError,runwayPrompt,runwayMotionForSlot,runwayClipCost,type AnimationProvider,type RunwayMotion} from '../apps/pipeline/src/runway';
 import {plannedAnimationSeconds,findAnimationTiming} from '../apps/pipeline/src/animation-timing';
 import {cameraMotion} from '../packages/video/src/camera-motion';
 import {editExistingVideo,editorResources,snapshotEditorExport} from '../apps/web/lib/video-editor';
@@ -55,6 +57,7 @@ async function setup(t:{after(fn:()=>Promise<void>):void},label:string,clips:num
     for(const file of ['0061_full_length_avatars.sql','0062_generation_preparation_steps.sql','0063_offers_and_credit_rollover.sql','0069_generation_map_confirmation.sql','0072_generation_queue.sql','0073_legacy_job_serialization.sql'])
       await env.DB.exec((await readFile(new URL('../packages/db/migrations/'+file,import.meta.url),'utf8')).replace(/^--.*$/gm,'').replace(/\n/g,' '));
     await env.DB.exec((await readFile(new URL('../packages/db/migrations/0064_automatic_import_estimates.sql',import.meta.url),'utf8')).replace(/^--.*$/gm,'').replace(/\n/g,' '));
+    await env.DB.exec('ALTER TABLE generation_preparation_steps ADD COLUMN error_code TEXT');
   }else await migrateNarrationProbe(env.DB);
   const seed=await seedNarrationFixture(env.DB,label,true);await env.DB.prepare("UPDATE jobs SET status='failed',error_code='FIXTURE',lease_until=NULL WHERE id=?").bind(seed.jobId).run();
   const month=new Date().toISOString().slice(0,7),at=new Date().toISOString();
@@ -157,6 +160,43 @@ test('Durée prévue conservée si plusieurs animations échouent : les clips r�
   assert.equal((await prepareJobAnimations(env,job.agencyId,job.jobId,provider)).ready,2);
   const frozen=await prepareJobVideo(env,job.agencyId,job.jobId);
   assert.equal(frozen.manifest.photoAnimations!.length,2);assert.deepEqual(frozen.manifest.photoTimeline!.map(p=>p.durationFrames),Array(10).fill(60));
+});
+
+test('Douze photos : timeout de la huitième, reprise de la même tâche et suite complète sans double débit',async t=>{
+  const slots=Array.from({length:12},(_,i)=>i),{env,job,month,at}=await setup(t,'runway-late-eighth',slots,slots,{photoCount:12});
+  await env.DB.prepare('INSERT INTO runway_budget(month,prepaid_cents,api_credits,paused,created_at) VALUES(?,1000,1000,0,?)').bind(month,at).run();
+  let creates=0,resumes=0;const steps:string[]=[],waits:string[]=[];
+  const provider:AnimationProvider={mode:'real',generate:async(_bytes,_mime,checkpoint)=>{
+    creates++;await checkpoint(taskId);if(creates===8)throw Error('RUNWAY_TIMEOUT');return clip;
+  },resume:async id=>{assert.equal(id,taskId);resumes++;return clip;}};
+  await animateWorkflowPhotos({do:async(name,config,perform)=>{
+    assert.equal(config.timeout,'3 minutes');steps.push(name);return perform();
+  },sleep:async(name,duration)=>{waits.push(name);assert.equal(duration,'10 seconds');
+    const rows=(await env.DB.prepare('SELECT state,task_id,error_code FROM photo_animations ORDER BY slot').all()).results;
+    assert.equal(rows.length,8);assert.equal(rows[7].state,'submitted');assert.equal(rows[7].error_code,'RUNWAY_TIMEOUT');
+    assert.equal((await findGeneration(env.DB,job.agencyId,job.jobId))!.animationsActive,1);
+  }},12,attempt=>prepareJobAnimations(env,job.agencyId,job.jobId,provider,attempt));
+  assert.equal(creates,12);assert.equal(resumes,1);assert.equal(steps.length,13);assert.equal(new Set(steps).size,13);assert.equal(waits.length,1);
+  const row=(await findGeneration(env.DB,job.agencyId,job.jobId))!;assert.equal(row.animationsReady,12);assert.equal(row.animationsFailed,0);
+  assert.equal((await env.DB.prepare('SELECT count(*) n FROM photo_animations WHERE error_code IS NOT NULL').first<{n:number}>())!.n,0);
+  assert.equal((await env.DB.prepare('SELECT count(*) n FROM animation_library').first<{n:number}>())!.n,12);
+  const frozen=await prepareJobVideo(env,job.agencyId,job.jobId);assert.equal(frozen.manifest.photoAnimations!.length,12);
+  await env.DB.batch([env.DB.prepare('INSERT INTO generation_artifacts VALUES(?,?,?,?)').bind(job.jobId,`agencies/${job.agencyId}/jobs/${job.jobId}/video/output.mp4`,JSON.stringify(videoReport(frozen.hash,frozen.manifest)),at),
+    env.DB.prepare("UPDATE jobs SET status='ready',lease_until=NULL WHERE id=?").bind(job.jobId)]);
+  assert.equal((await findGeneration(env.DB,job.agencyId,job.jobId))!.creditsUsed,13);
+  assert.deepEqual(await env.DB.prepare('SELECT reserved,consumed FROM allocations WHERE agency_id=?').bind(job.agencyId).first(),{reserved:0,consumed:13});
+});
+
+test('Runway reste lent : reprises bornées sans nouvelle soumission, crédits animation libérés',async t=>{
+  const {env,job}=await setup(t,'runway-pending-limit',[0,1,2]);let creates=0,resumes=0,steps=0,sleeps=0;
+  const provider:AnimationProvider={mode:'mock',generate:async(_bytes,_mime,checkpoint)=>{creates++;await checkpoint(taskId);throw Error('RUNWAY_TIMEOUT');},
+    resume:async()=>{resumes++;throw Error('RUNWAY_TIMEOUT');}};
+  await animateWorkflowPhotos({do:async(_name,_config,perform)=>{steps++;return perform();},sleep:async()=>{sleeps++;}},3,
+    attempt=>prepareJobAnimations(env,job.agencyId,job.jobId,provider,attempt));
+  assert.equal(creates,1);assert.equal(resumes,3);assert.equal(steps,4);assert.equal(sleeps,3);
+  assert.deepEqual(await env.DB.prepare('SELECT state,error_code FROM photo_animations').first(),{state:'failed',error_code:'RUNWAY_TIMEOUT'});
+  await failGeneration(env.DB,job,'GENERATION_FAILED');
+  assert.deepEqual(await env.DB.prepare('SELECT reserved,consumed FROM allocations WHERE agency_id=?').bind(job.agencyId).first(),{reserved:0,consumed:0});
 });
 
 test('Durées de l’éditeur : après réordonnancement la bonne photo conserve son plan personnalisé',async t=>{
@@ -302,6 +342,72 @@ test('Runway : une recette isolée consomme la même enveloppe prépayée',async
   await assert.rejects(env.DB.prepare("UPDATE runway_external_verifications SET reserved_cents=0 WHERE id='isolated-recipe'").run(),/IMMUTABLE/);
   await assert.rejects(env.DB.prepare("INSERT INTO runway_external_verifications(id,month,credits,reserved_cents,state,created_at,updated_at) VALUES('another-recipe',?,25,35,'reserved',?,?)").bind(month,at,at).run(),/BUDGET_LIMIT/);
 });
+
+const accountFixture=(creditBalance:number)=>({creditBalance,tier:{maxMonthlyCreditSpend:100000,
+  models:{gen4_turbo:{maxConcurrentGenerations:3,maxDailyGenerations:500}}},usage:{models:{gen4_turbo:{dailyGenerations:0}}}});
+test('Solde réel Runway : recharge détectée, douze animations au-delà du premier prépaiement et coût global exact',async t=>{
+  const slots=Array.from({length:12},(_,i)=>i),{env,job,month,at}=await setup(t,'runway-live-recharge',slots,slots,{photoCount:12,durationSeconds:40});
+  await env.DB.prepare('INSERT INTO runway_budget(month,prepaid_cents,api_credits,paused,created_at) VALUES(?,35,25,0,?)').bind(month,at).run();
+  const configured={...env,RUNWAY_ENABLED:'true',RUNWAYML_API_SECRET:'fixture-never-networked'};
+  let reads=0;await syncRunwayAccount(configured,true,async()=>{reads++;return accountFixture(1565);});
+  await syncRunwayAccount(configured,false,async()=>{throw Error('NO_SECOND_READ');});assert.equal(reads,1);
+  let creates=0;const provider:AnimationProvider={mode:'real',generate:async(_b,_m,checkpoint)=>{creates++;await checkpoint(taskId);return clip;},resume:async()=>{throw Error('NO_RESUBMIT');}};
+  assert.deepEqual(await prepareJobAnimations(env,job.agencyId,job.jobId,provider),{requested:12,ready:12});assert.equal(creates,12);
+  const cost=(await env.DB.prepare("SELECT sum(reserved_cents) AS cents,sum(credits) AS credits FROM photo_animations WHERE mode='real'").first<{cents:number;credits:number}>())!;
+  assert.equal((await env.DB.prepare('SELECT baseline_cents AS cents FROM hosted_import_budget').first<{cents:number}>())!.cents,120+Math.max(35,cost.cents),'Le prépaiement initial n’est pas compté deux fois');
+  assert.equal((await env.DB.prepare('SELECT available_credits AS n FROM runway_available_balance').first<{n:number}>())!.n,1565-cost.credits);
+  await prepareJobAnimations(env,job.agencyId,job.jobId,provider);assert.equal(creates,12);
+  await syncRunwayAccount(configured,true,async()=>accountFixture(2000));
+  assert.equal((await env.DB.prepare('SELECT available_credits AS n FROM runway_available_balance').first<{n:number}>())!.n,2000,'Une autre recharge n’exige aucune hausse manuelle de plafond');
+  assert.deepEqual((await env.DB.prepare('PRAGMA foreign_key_check').all()).results,[]);
+});
+test('Solde Runway : réservation atomique simultanée, lecture en vol et tâches non encore débitées',async t=>{
+  const {env,job}=await setup(t,'runway-live-race'),configured={...env,RUNWAY_ENABLED:'true',RUNWAYML_API_SECRET:'fixture-never-networked'};
+  await syncRunwayAccount(configured,true,async()=>accountFixture(30));
+  let creates=0;const provider:AnimationProvider={mode:'real',generate:async(_b,_m,checkpoint)=>{creates++;await checkpoint(taskId);return clip;},resume:async()=>clip};
+  await Promise.all([0,1].map(slot=>prepareJobAnimations(env,job.agencyId,job.jobId,provider,{slot,finalAttempt:false})));
+  assert.equal(creates,1,'Deux invocations ne peuvent pas dépenser les mêmes crédits');
+  const row=(await env.DB.prepare('SELECT slot FROM photo_animations').first<{slot:number}>())!;
+  await env.DB.prepare("UPDATE photo_animations SET state='submitted',animation_json=NULL").run();
+  await syncRunwayAccount(configured,true,async()=>accountFixture(100));
+  assert.equal((await env.DB.prepare('SELECT available_credits AS n FROM runway_available_balance').first<{n:number}>())!.n,75,'Les tâches soumises restent réservées, même si le fournisseur ne les a pas encore débitées');
+  await prepareJobAnimations(env,job.agencyId,job.jobId,provider,{slot:row.slot,finalAttempt:false});
+  const other=1-row.slot;
+  await syncRunwayAccount(configured,true,async()=>{
+    await prepareJobAnimations(env,job.agencyId,job.jobId,provider,{slot:other,finalAttempt:false});return accountFixture(100);
+  });
+  assert.equal(creates,2);assert.equal((await env.DB.prepare('SELECT available_credits AS n FROM runway_available_balance').first<{n:number}>())!.n,75,'Une soumission pendant la lecture est déduite du snapshot');
+});
+test('Solde Runway : zéro, indisponibilité, snapshot périmé et budget global fermé ne déclenchent aucun achat',async t=>{
+  const {env,job,month,at}=await setup(t,'runway-live-gates',1),configured={...env,RUNWAY_ENABLED:'true',RUNWAYML_API_SECRET:'fixture-never-networked'};
+  await env.DB.prepare('INSERT INTO runway_budget(month,prepaid_cents,api_credits,paused,created_at) VALUES(?,1000,1000,0,?)').bind(month,at).run();
+  let creates=0;const provider:AnimationProvider={mode:'real',generate:async()=>{creates++;throw Error('NO_PAID_CALL');},resume:async()=>clip};
+  await syncRunwayAccount(configured,true,async()=>accountFixture(0));
+  assert.equal((await prepareJobAnimations(env,job.agencyId,job.jobId,provider)).reason,'RUNWAY_CREDITS_EXHAUSTED');
+  await syncRunwayAccount(configured,true,async()=>accountFixture(1565));
+  await syncRunwayAccount(configured,true,async()=>{throw Error('PRIVATE_PROVIDER_ERROR');});
+  assert.equal((await prepareJobAnimations(env,job.agencyId,job.jobId,provider)).reason,'RUNWAY_ACCOUNT_UNAVAILABLE');
+  await syncRunwayAccount(configured,true,async()=>accountFixture(1565));
+  await env.DB.exec("UPDATE generation_provider_limits SET balance_checked_at='2020-01-01T00:00:00.000Z'");
+  assert.equal((await prepareJobAnimations(env,job.agencyId,job.jobId,provider)).reason,'RUNWAY_ACCOUNT_UNAVAILABLE');
+  await syncRunwayAccount(configured,true,async()=>accountFixture(1565));
+  await env.DB.exec('UPDATE hosted_import_budget SET paused=1');
+  assert.equal((await prepareJobAnimations(env,job.agencyId,job.jobId,provider)).reason,'RUNWAY_BUDGET_LIMIT');
+  assert.equal(creates,0);assert.equal((await env.DB.prepare('SELECT count(*) AS n FROM photo_animations').first<{n:number}>())!.n,0);
+});
+test('Runway réel : budget mensuel global toujours bloquant, coût réservé une seule fois sans prépaiement local',async t=>{
+  const {env,job}=await setup(t,'runway-global-only',1),configured={...env,RUNWAY_ENABLED:'true',RUNWAYML_API_SECRET:'fixture-never-networked'};
+  await syncRunwayAccount(configured,true,async()=>accountFixture(1565));
+  const before=(await env.DB.prepare('SELECT baseline_cents AS n FROM hosted_import_budget').first<{n:number}>())!.n;
+  await env.DB.prepare('UPDATE hosted_import_budget SET ceiling_cents=?').bind(before).run();
+  let creates=0;const provider:AnimationProvider={mode:'real',generate:async(_b,_m,checkpoint)=>{creates++;await checkpoint(taskId);return clip;},resume:async()=>clip};
+  assert.equal((await prepareJobAnimations(env,job.agencyId,job.jobId,provider)).reason,'RUNWAY_BUDGET_LIMIT');assert.equal(creates,0);
+  await env.DB.exec('UPDATE hosted_import_budget SET ceiling_cents=9000');
+  assert.equal((await prepareJobAnimations(env,job.agencyId,job.jobId,provider)).ready,1);assert.equal(creates,1);
+  await prepareJobAnimations(env,job.agencyId,job.jobId,provider);assert.equal(creates,1);
+  assert.equal((await env.DB.prepare('SELECT baseline_cents AS n FROM hosted_import_budget').first<{n:number}>())!.n,before+35);
+  assert.equal((await env.DB.prepare('SELECT count(*) AS n FROM runway_budget').first<{n:number}>())!.n,0,'Un nouveau mois n’exige pas un second plafond Runway manuel');
+});
 test('SDK Runway : un HTTP 500 à la création ne déclenche aucun nouvel envoi',async()=>{
   let creates=0;
   const provider=runwayProvider('fixture-secret-never-networked',async(input)=>{
@@ -313,6 +419,26 @@ test('SDK Runway : un HTTP 500 à la création ne déclenche aucun nouvel envoi'
   });
   await assert.rejects(provider.generate(new Uint8Array(1024),'image/jpeg',async()=>{throw Error('NO_SUCCESS_CHECKPOINT');},AbortSignal.timeout(20_000)));
   assert.equal(creates,1);
+});
+test('SDK Runway : expiration du helper puis récupération du résultat existant, une seule création',async t=>{
+  let creates=0,reads=0,checkpoint:string|null=null,clock=Date.now();
+  t.mock.method(Date,'now',()=>clock);
+  const provider=runwayProvider('fixture-secret-never-networked',async(input)=>{
+    const url=new URL(typeof input==='string'?input:input instanceof URL?input.href:input.url);
+    if(url.pathname==='/v1/uploads')return Response.json({runwayUri:'runway://fixture',uploadUrl:'https://upload.runwayml.com/fixture',fields:{}});
+    if(url.pathname==='/fixture')return new Response(null,{status:204});
+    if(url.pathname==='/v1/image_to_video'){creates++;return Response.json({id:taskId});}
+    if(url.pathname.startsWith('/v1/tasks/')){
+      assert.equal(checkpoint,taskId);
+      if(++reads===1){clock+=121_000;return Response.json({id:taskId,status:'RUNNING',createdAt:new Date().toISOString()});}
+      return Response.json({id:taskId,status:'SUCCEEDED',createdAt:new Date().toISOString(),output:['https://cdn.cloudfront.net/video.mp4']});
+    }
+    if(url.pathname==='/video.mp4')return new Response(clip);throw Error('UNEXPECTED_NETWORK');
+  });
+  await assert.rejects(provider.generate(new Uint8Array(1024),'image/jpeg',async id=>{checkpoint=id;},AbortSignal.timeout(25_000)),
+    error=>runwayError(error)==='RUNWAY_TIMEOUT');
+  assert.deepEqual(await provider.resume(taskId,AbortSignal.timeout(10_000)),clip);
+  assert.equal(creates,1);assert.ok(reads>=2);
 });
 test('SDK Runway réel, transport fixture : cinq mouvements, upload privé, contrat exact, tâche persistée avant lecture',async()=>{
   for(const [motion,durationSeconds,aspectRatio] of [['dolly',2,'9:16'],['slideLeft',2,'16:9'],['pullback',3,'9:16'],['pan',4,'16:9'],['slide',5,'9:16']] as const){

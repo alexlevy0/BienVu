@@ -38,7 +38,7 @@ function normalizeSettings(settings:VideoCustomization&{editor:EditorDocument}){
   return {...settings,photoOrder,runwayClips:undefined,runwayPhotos:runwayPhotos.filter(slot=>photoOrder.includes(slot))};
 }
 function initialModel(draft:CreationDraftView,agency:AgencyProfile,defaultVoice?:VideoCustomization['voice']):Model{
-  const settings=draft.data.videoCustomization??defaultVideoCustomization(agency,defaultVoice),order=settings.photoOrder??draft.photos.map(p=>p.sourceOrder),
+  const settings=draft.data.videoCustomization??defaultVideoCustomization(agency,defaultVoice),order=settings.photoOrder??draft.photos.slice(0,12).map(p=>p.sourceOrder),
     photos=order.flatMap(slot=>draft.photos.filter(p=>p.sourceOrder===slot));
   const editor=settings.editor?distributeEditorClips(settings.editor,settings.editor.clips.filter(c=>draft.photos.some(p=>p.sourceOrder===c.photoSlot))):
     createEditorDocument(photos,draft.data.fields,{agencyName:agency.name,logo:Boolean(agency.logoAssetId)});
@@ -211,6 +211,7 @@ function EditorProject({initial,agency,guest}:{initial:CreationDraftView;agency:
     changeDoc({...doc,layers:[...doc.layers,layer]});setSelection({kind:'text',id:layer.id});setPlaying(false);setFrame(Math.min(total-1,layer.startFrame+12));
   }
   function addClip(slot:number,index=doc.clips.length){if(doc.clips.length>=24){setError('La timeline peut contenir jusqu’à 24 plans.');return;}
+    if(!doc.clips.some(c=>c.photoSlot===slot)&&new Set(doc.clips.map(c=>c.photoSlot)).size>=12){setError('La vidéo peut contenir jusqu’à 12 photos différentes. Retirez un plan pour choisir une autre photo.');return;}
     const clip={id:crypto.randomUUID(),photoSlot:slot,durationFrames:Math.floor(total/Math.max(1,doc.clips.length+1))},clips=[...doc.clips];
     clips.splice(index,0,clip);const next=distributeEditorClips(doc,clips);changeDoc(next);setSelection({kind:'photo',id:clip.id});seek(editorClipStarts(next,model.settings.map).find(c=>c.id===clip.id)!.startFrame);
   }
@@ -307,7 +308,7 @@ function EditorProject({initial,agency,guest}:{initial:CreationDraftView;agency:
             {pending.map(photo=><div className="editor-media-photo editor-photo-pending" key={photo.id}><img src={photo.preview} alt="Photo en cours d’import"/><span role="status">{photo.state==='uploading'?'Envoi…':'Envoi interrompu'}</span>
               <button className="editor-media-remove" type="button" aria-label="Retirer cette photo" onClick={()=>void removePhoto(photo.id,photo.slot)}><HomeIcon name="close" size={13}/></button>
               {photo.error&&<p>{photo.error}<button type="button" onClick={()=>void uploadPhoto(photo)}>Réessayer</button></p>}</div>)}
-          </div><p className="editor-media-hint">Glissez vos photos dans la timeline.<br/>{draft.photos.length} / 12 photos importées.</p>
+          </div><p className="editor-media-hint">Glissez vos photos dans la timeline.<br/>{draft.photos.length} photo{draft.photos.length>1?'s':''} disponible{draft.photos.length>1?'s':''} · 12 maximum par vidéo.</p>
           {resourcesError&&<p className="editor-error" role="alert">{resourcesError} <button type="button" onClick={()=>setResourcesAttempt(n=>n+1)}>Réessayer</button></p>}
           {recoverableAnimations.length>0&&<div className="editor-restored-voice"><p>{recoverableAnimations.length} animation{recoverableAnimations.length>1?'s':''} déjà créée{recoverableAnimations.length>1?'s':''} disponible{recoverableAnimations.length>1?'s':''} pour ces photos, sans supplément de crédits.</p>
             <button type="button" onClick={()=>change(m=>({...m,settings:{...m.settings,runwayPhotos:[...new Set([...(m.settings.runwayPhotos??[]),...recoverableAnimations.map(a=>a.slot)])]}}))}>Réutiliser les animations conservées</button></div>}

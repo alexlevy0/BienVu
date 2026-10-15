@@ -20,7 +20,8 @@ export const DEFAULT_GENERATION_QUEUE:GenerationQueueSettings={preparationConcur
 export const GenerationQueueView=z.object({resource:GenerationQueueResource,position:z.number().int().positive(),since:Timestamp}).strict();
 export const AdminGenerationQueue=z.object({settings:GenerationQueueSettings,revision:z.number().int().positive(),updatedAt:Timestamp.nullable(),
   usage:z.array(z.object({resource:GenerationQueueResource,active:z.number().int().nonnegative(),waiting:z.number().int().nonnegative(),concurrency:z.number().int().nonnegative()})),
-  runway:z.object({concurrency:z.number().int().positive(),dailyLimit:z.number().int().positive(),checkedAt:Timestamp.nullable(),error:z.string().nullable()}),
+  runway:z.object({concurrency:z.number().int().positive(),dailyLimit:z.number().int().positive(),checkedAt:Timestamp.nullable(),error:z.string().nullable(),
+    balance:z.object({credits:z.number().nonnegative().nullable(),available:z.number().nonnegative().nullable(),checkedAt:Timestamp.nullable(),error:z.string().nullable()}).optional()}),
 });
 export type AdminGenerationQueue=z.infer<typeof AdminGenerationQueue>;
 export const UpdateGenerationQueue=z.object({settings:GenerationQueueSettings,revision:z.number().int().positive()}).strict();

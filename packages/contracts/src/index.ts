@@ -1,4 +1,5 @@
 import {z} from 'zod';
+export * from './photo-limits';
 import type {ImportResourceDiagnostic} from './import-diagnostics';
 
 export * from './product';

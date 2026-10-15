@@ -15,7 +15,7 @@ import {CartesiaVoiceConfig,CARTESIA_DEFAULT_VOICE,DEFAULT_AVATAR_SETTINGS,defau
 import {hashJson,DEFAULT_SCRIPT_MODEL} from '../packages/narration/src/index';
 import {LOCALITY_SPEECH_VERSION} from '../packages/voice/src/index';
 
-for(const {voiceEnabled,invalidScript,avatarFallback} of [{voiceEnabled:true,invalidScript:false,avatarFallback:false},{voiceEnabled:false,invalidScript:false,avatarFallback:false},{voiceEnabled:true,invalidScript:true,avatarFallback:false},{voiceEnabled:true,invalidScript:false,avatarFallback:true}])test(`Workflow workerd réel ${avatarFallback?'avatar indisponible et supplément rendu':invalidScript?'narration invalide et crédit libéré':voiceEnabled?'avec voix':'sans voix ni sous-titres'}, fournisseurs simulés : reprise et erreur publique`,async t=>{
+for(const {voiceEnabled,invalidScript,avatarFallback,animationRecovery=false} of [{voiceEnabled:true,invalidScript:false,avatarFallback:false},{voiceEnabled:false,invalidScript:false,avatarFallback:false},{voiceEnabled:true,invalidScript:true,avatarFallback:false},{voiceEnabled:true,invalidScript:false,avatarFallback:true},{voiceEnabled:true,invalidScript:false,avatarFallback:false,animationRecovery:true}])test(`Workflow workerd réel ${animationRecovery?'animation lente récupérée':avatarFallback?'avatar indisponible et supplément rendu':invalidScript?'narration invalide et crédit libéré':voiceEnabled?'avec voix':'sans voix ni sous-titres'}, fournisseurs simulés : reprise et erreur publique`,async t=>{
   const directory=await mkdtemp(path.join(tmpdir(),'bienvu-generation-'));t.after(()=>rm(directory,{recursive:true,force:true}));
   const require=createRequire(import.meta.url),wrangler=createRequire(require.resolve('wrangler/package.json'));
   const esbuild=await import(pathToFileURL(wrangler.resolve('esbuild')).href) as {build:(o:unknown)=>Promise<unknown>};
@@ -23,7 +23,7 @@ for(const {voiceEnabled,invalidScript,avatarFallback} of [{voiceEnabled:true,inv
   const options={...convertV4MiniflareOptions({modules:true,script:await readFile(file,'utf8'),compatibilityDate:'2026-09-27',compatibilityFlags:['nodejs_compat'],
     bindings:{GENERATION_TOKEN:'fixture-generation-token-1234567890',GENERATIONS_ENABLED:'true'},d1Databases:['DB'],r2Buckets:['MEDIA'],
     durableObjects:{RENDERER:{className:'FixtureGenerationRenderer',useSQLite:true}},
-    workflows:{GENERATION_WORKFLOW:{name:'fixture-generation',className:invalidScript?'FixtureInvalidScriptWorkflow':'FixtureGenerationWorkflow'}}}),resourcePersistencePath:path.join(directory,'storage')};
+    workflows:{GENERATION_WORKFLOW:{name:'fixture-generation',className:animationRecovery?'FixtureSlowAnimationWorkflow':invalidScript?'FixtureInvalidScriptWorkflow':'FixtureGenerationWorkflow'}}}),resourcePersistencePath:path.join(directory,'storage')};
   let mf=new Miniflare(options);t.after(()=>mf.dispose());let env=await mf.getBindings<{DB:D1Database;MEDIA:R2Bucket}>();await migrateNarrationProbe(env.DB);
   const scope=await seedNarrationFixture(env.DB,'workflow',true),fixture=await videoFixture();
   await env.DB.prepare("UPDATE jobs SET status='failed',error_code='FIXTURE' WHERE id=?").bind(scope.jobId).run();
@@ -33,6 +33,7 @@ for(const {voiceEnabled,invalidScript,avatarFallback} of [{voiceEnabled:true,inv
   await env.DB.prepare('UPDATE listing_imports SET result_json=? WHERE id=?').bind(JSON.stringify(listing),listing.id).run();
   await env.DB.prepare('INSERT INTO generation_access VALUES(?,?,1)').bind(scope.agencyId,'allocation-workflow').run();
   await env.DB.prepare('INSERT INTO hosted_import_budget VALUES(?,0,3500,0)').bind(new Date().toISOString().slice(0,7)).run();await env.DB.exec('UPDATE generation_control SET enabled=1');
+  if(animationRecovery)await env.DB.exec("UPDATE allocations SET kind='paid',quota_limit=4");
   if(avatarFallback){
     await env.DB.exec("UPDATE allocations SET kind='paid',quota_limit=3");
     await saveAvatarLook(env.DB,'fixture-admin',{id:'fixture-avatar',name:'Présentatrice fixture',gender:'female',type:'studio_avatar',engines:['avatar_iii'],enabled:true,thumbnail:null,preview:null,transparentVerified:false,ownership:'public',updatedAt:new Date().toISOString()},{image:null,video:null});
@@ -41,6 +42,7 @@ for(const {voiceEnabled,invalidScript,avatarFallback} of [{voiceEnabled:true,inv
   const headers={'Content-Type':'application/json',Authorization:'Bearer fixture-generation-token-1234567890','X-Agency-ID':scope.agencyId,'Idempotency-Key':'fixture-workflow-idempotency'};
   assert.equal((await mf.dispatchFetch('https://test/generations',{method:'POST',body:'{}'})).status,401);
   const input={listingId:listing.id,durationSeconds:40 as const,subtitlesEnabled:!voiceEnabled,...(!voiceEnabled?{voiceEnabled:false}:{}),
+    ...(animationRecovery?{customization:{...defaultVideoCustomization(),voice:CARTESIA_DEFAULT_VOICE,runwayPhotos:[0,1,2]}}:{}),
     ...(avatarFallback?{customization:{...defaultVideoCustomization(),voice:CARTESIA_DEFAULT_VOICE,avatar:defaultAvatarCustomization('fixture-avatar')}}:{})};
   const create=()=>mf.dispatchFetch('https://test/generations',{method:'POST',headers,body:JSON.stringify(input)});
   const missing=listing.photos[0];await env.MEDIA.delete(missing.objectKey);
@@ -55,7 +57,7 @@ for(const {voiceEnabled,invalidScript,avatarFallback} of [{voiceEnabled:true,inv
   const first=await create();assert.equal(first.status,202);const job=await first.json() as {id:string};
   assert.equal((await (await create()).json() as {id:string}).id,job.id);
   let row:{status:string}|null=null;
-  for(let i=0;i<70;i++){row=await env.DB.prepare('SELECT status FROM jobs WHERE id=?').bind(job.id).first();if(['rendering','ready','failed'].includes(row!.status))break;await new Promise(r=>setTimeout(r,200));}
+  for(let i=0;i<150;i++){row=await env.DB.prepare('SELECT status FROM jobs WHERE id=?').bind(job.id).first();if(['rendering','ready','failed'].includes(row!.status))break;await new Promise(r=>setTimeout(r,200));}
   if(invalidScript){
     assert.equal(row!.status,'failed');
     const failed=(await findGeneration(env.DB,scope.agencyId,job.id))!;
@@ -73,6 +75,12 @@ for(const {voiceEnabled,invalidScript,avatarFallback} of [{voiceEnabled:true,inv
     return;
   }
   assert.equal(row!.status,'rendering');
+  if(animationRecovery){
+    const view=generationView((await findGeneration(env.DB,scope.agencyId,job.id))!);
+    assert.equal(view.preparation?.animations,'ready');assert.equal(view.animationProgress?.ready,3);assert.equal(view.animationProgress?.skipped,0);
+    assert.equal((await getJobVideo(env.DB,scope.agencyId,job.id))!.manifest.photoAnimations!.length,3);
+    assert.equal((await env.DB.prepare('SELECT count(*) n FROM photo_animations WHERE error_code IS NOT NULL').first<{n:number}>())!.n,0);
+  }
   const narration=(await findNarration(env.DB,scope.agencyId,job.id))!;
   assert.equal(narration.configHash,await hashJson({voice:CartesiaVoiceConfig.parse({voice:CARTESIA_DEFAULT_VOICE}),
     scriptModel:DEFAULT_SCRIPT_MODEL,promptVersion:JSON.parse(narration.script!).promptVersion,mode:'mock',...(!voiceEnabled?{voiceEnabled:false}:{}),durationSeconds:40,...(voiceEnabled?{localitySpeechVersion:LOCALITY_SPEECH_VERSION}:{})}));
@@ -101,7 +109,7 @@ for(const {voiceEnabled,invalidScript,avatarFallback} of [{voiceEnabled:true,inv
   assert.equal(row!.status,'ready');
   assert.equal(generationView((await findGeneration(env.DB,scope.agencyId,job.id))!).preparation?.map,'skipped');
   assert.equal((await env.DB.prepare('SELECT progress_percent AS percent FROM jobs WHERE id=?').bind(job.id).first<{percent:number}>())!.percent,100);
-  assert.deepEqual(await env.DB.prepare('SELECT reserved,consumed FROM allocations WHERE agency_id=?').bind(scope.agencyId).first(),{reserved:0,consumed:1});
+  assert.deepEqual(await env.DB.prepare('SELECT reserved,consumed FROM allocations WHERE agency_id=?').bind(scope.agencyId).first(),{reserved:0,consumed:animationRecovery?4:1});
   if(avatarFallback){const view=generationView((await findGeneration(env.DB,scope.agencyId,job.id))!);assert.equal(view.creditsReserved,2);assert.equal(view.creditsUsed,1);assert.equal(view.creditsRefunded,1);assert.equal(view.avatar?.failed,2);assert.equal((await getJobVideo(env.DB,scope.agencyId,job.id))!.manifest.avatar,undefined);}
   assert.equal((await env.DB.prepare('SELECT count(*) AS n FROM generation_artifacts').first<{n:number}>())!.n,1);
   assert.equal((await env.DB.prepare('SELECT count(*) AS n FROM narration_calls').first<{n:number}>())!.n,beforeCalls);

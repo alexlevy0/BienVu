@@ -14,9 +14,12 @@ export async function adminGenerationQueue(db:Database){
       'active',(SELECT count(*) FROM generation_queue q WHERE q.resource=c.resource AND q.state='active'),
       'waiting',(SELECT count(*) FROM generation_queue q WHERE q.resource=c.resource AND q.state='waiting')) AS record FROM generation_queue_capacity c)`)
       .first<{data:string}>(),
-    db.prepare("SELECT concurrency,daily_limit AS dailyLimit,checked_at AS checkedAt,last_error AS error FROM generation_provider_limits WHERE provider='runway'").first(),
+    db.prepare(`SELECT concurrency,daily_limit AS dailyLimit,checked_at AS checkedAt,last_error AS error,
+      json_object('credits',credit_balance,'available',(SELECT available_credits FROM runway_available_balance),
+        'checkedAt',balance_checked_at,'error',balance_error) AS balance
+      FROM generation_provider_limits WHERE provider='runway'`).first<{concurrency:number;dailyLimit:number;checkedAt:string|null;error:string|null;balance:string}>(),
   ]);
-  return AdminGenerationQueue.parse({...settings,usage:JSON.parse(usage?.data??'[]'),runway});
+  return AdminGenerationQueue.parse({...settings,usage:JSON.parse(usage?.data??'[]'),runway:runway?{...runway,balance:JSON.parse(runway.balance)}:null});
 }
 export async function setGenerationQueueSettings(db:Database,actorId:string,settings:unknown,revision:number,now=Date.now()){
   EntityId.parse(actorId);

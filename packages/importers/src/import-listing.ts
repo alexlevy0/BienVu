@@ -88,41 +88,54 @@ export async function importListing(url: string, context: {agencyId: string; imp
     const photoTimeout = AbortSignal.timeout(Math.max(1, Math.min(IMPORT_LIMITS.photoDurationMs,
       IMPORT_LIMITS.durationMs - (Date.now() - start) - 2_000)));
     const photoSignal = AbortSignal.any([signal, photoTimeout]);
-    for (const {order, value: candidate} of candidates) {
+    for (let offset=0;offset<candidates.length;) {
+      // The transport admits two resources at a time. Download a bounded pair,
+      // await both outcomes, then validate/store in source order. Slow images
+      // cannot reorder the gallery or leave untracked background writes.
+      const batch=candidates.slice(offset,offset+Math.min(2,maxPhotos-photos.length,IMPORT_LIMITS.requests-diagnostics.resources));
+      if(!batch.length)break;
+      offset+=batch.length;
       if (photos.length >= maxPhotos) break;
       if (diagnostics.resources >= IMPORT_LIMITS.requests) break;
       if (byteBudgetUsed >= IMPORT_LIMITS.totalBytes) {extracted.warnings.push('Galerie limitée au plafond de téléchargement de cet import.'); break;}
       signal.throwIfAborted();
       if (photoTimeout.aborted) {extracted.warnings.push('Téléchargement des photos interrompu : les informations déjà récupérées sont conservées.'); break;}
-      let resource;
-      const imageSignal=AbortSignal.any([photoSignal,AbortSignal.timeout(IMPORT_LIMITS.imageDurationMs)]);
-      try {resource = await load(candidate, 'image', imageSignal);} catch (error) {
-        if (signal.aborted || error instanceof ImportFailure && error.code === 'UNSAFE_URL') throw error;
-        if (photoTimeout.aborted) {
-          diagnostics.rejected.push({order, reason: 'IMPORT_TIMEOUT'});
-          extracted.warnings.push('Téléchargement des photos interrompu : les informations déjà récupérées sont conservées.'); break;
+      const results=await Promise.allSettled(batch.map(async({value})=>{
+        const imageSignal=AbortSignal.any([photoSignal,AbortSignal.timeout(IMPORT_LIMITS.imageDurationMs)]);
+        try{return await load(value,'image',imageSignal);}catch(error){
+          if(imageSignal.aborted&&!(error instanceof ImportFailure))throw new ImportFailure('IMPORT_TIMEOUT','Délai photo dépassé.');
+          throw error;
         }
-        if(imageSignal.aborted){diagnostics.rejected.push({order,reason:'IMPORT_TIMEOUT'});continue;}
-        if (!(error instanceof ImportFailure)) throw error;
-        diagnostics.rejected.push({order, reason: error.code}); continue;
+      }));
+      signal.throwIfAborted();
+      for(const [position,result] of results.entries()){
+        const {order,value:candidate}=batch[position];
+        if(result.status==='rejected'){
+          const error=result.reason;
+          if(error instanceof ImportFailure&&error.code==='UNSAFE_URL')throw error;
+          if(!(error instanceof ImportFailure))throw error;
+          diagnostics.rejected.push({order,reason:error.code});continue;
+        }
+        const resource=result.value;
+        if (resource.mime !== 'image/jpeg' || !resource.width || !resource.height || resource.width < 640 || resource.height < 360
+          || resource.width > 2048 || resource.height > 2048 || resource.bytes.length > IMPORT_LIMITS.imageBytes || resource.bytes.length < 4
+          || resource.bytes[0] !== 255 || resource.bytes[1] !== 216 || resource.bytes.at(-2) !== 255 || resource.bytes.at(-1) !== 217) {
+          diagnostics.rejected.push({order, reason: 'INVALID_PHOTO'}); continue;
+        }
+        const digest = await crypto.subtle.digest('SHA-256', resource.bytes);
+        const hash = Array.from(new Uint8Array(digest), n => n.toString(16).padStart(2, '0')).join('');
+        if (hashes.has(hash)) {diagnostics.duplicatePhotos++; continue;}
+        hashes.add(hash);
+        const photo = {id: crypto.randomUUID(), agencyId, listingId: id, sourceUrl: candidate,
+          objectKey: `agencies/${agencyId}/imports/${id}/${hash}.jpg`, contentHash: hash,
+          width: resource.width, height: resource.height, mime: 'image/jpeg' as const, sizeBytes: resource.bytes.length, sourceOrder: photos.length};
+        stage = 'storage';
+        await abortable(ports.store(photo, resource.bytes, signal), signal);
+        signal.throwIfAborted(); photos.push(photo); diagnostics.storedBytes += resource.bytes.length;
+        stage = 'photo';
       }
-      if (resource.mime !== 'image/jpeg' || !resource.width || !resource.height || resource.width < 640 || resource.height < 360
-        || resource.width > 2048 || resource.height > 2048 || resource.bytes.length > IMPORT_LIMITS.imageBytes || resource.bytes.length < 4
-        || resource.bytes[0] !== 255 || resource.bytes[1] !== 216 || resource.bytes.at(-2) !== 255 || resource.bytes.at(-1) !== 217) {
-        diagnostics.rejected.push({order, reason: 'INVALID_PHOTO'}); continue;
-      }
-      const digest = await crypto.subtle.digest('SHA-256', resource.bytes);
-      const hash = Array.from(new Uint8Array(digest), n => n.toString(16).padStart(2, '0')).join('');
-      if (hashes.has(hash)) {diagnostics.duplicatePhotos++; continue;}
-      hashes.add(hash);
-      const photo = {id: crypto.randomUUID(), agencyId, listingId: id, sourceUrl: candidate,
-        objectKey: `agencies/${agencyId}/imports/${id}/${hash}.jpg`, contentHash: hash,
-        width: resource.width, height: resource.height, mime: 'image/jpeg' as const, sizeBytes: resource.bytes.length, sourceOrder: photos.length};
-      stage = 'storage';
-      await abortable(ports.store(photo, resource.bytes, signal), signal);
-      signal.throwIfAborted(); photos.push(photo); diagnostics.storedBytes += resource.bytes.length;
-      stage = 'photo';
     }
+    if(photos.length>=maxPhotos&&candidates.length>photos.length)extracted.warnings.push(`La galerie est limitée à ${maxPhotos} photos pour cet import.`);
     signal.throwIfAborted();
     const unavailable=diagnostics.rejected.filter(p=>p.reason!=='MEDIA_HOST_UNSUPPORTED').length;
     if(unavailable)extracted.warnings.push(`${unavailable} photo(s) n’ont pas pu être récupérées. Les autres photos et les informations du bien sont conservées.`);

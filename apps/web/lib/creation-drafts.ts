@@ -1,4 +1,4 @@
-import {VideoCustomization,CreationDraftData, CreationFields, GeneratableListing, ManualListingInput, NormalizedListing, PhotoAsset,
+import {IMPORT_PHOTO_MAXIMUM,VIDEO_PHOTO_MAXIMUM,VideoCustomization,CreationDraftData, CreationFields, GeneratableListing, ManualListingInput, NormalizedListing, PhotoAsset,
   type CreationFieldName, type CreationDraftView, type NormalizedListing as Listing} from '@bienvu/contracts';
 import {beginManualImport, completeImport, findImport, findCreationDraft, startCreationDraft, blankCreationDraft,markCreationDraftDeleting,importObjectKeys,
   draftFromListing,updateCreationDraft, ImportStateFailure, type ImportRow, type Database} from '@bienvu/db';
@@ -73,7 +73,7 @@ export async function customizeImportedListing(env:Env&{MEDIA:Env['MEDIA']&Pick<
     if(await contentHash(bytes)!==photo.contentHash)throw new RequestFailure('INSUFFICIENT_PHOTOS');
     const uploadId=(await contentHash(new TextEncoder().encode(`${row.id}:${photo.id}`))).slice(0,32);
     await uploadCreationPhoto(env,agencyId,row.id,photo.sourceOrder,uploadId,bytes,photo.mime,
-      async()=>({bytes,width:photo.width,height:photo.height,mime:photo.mime}),signal);
+      async()=>({bytes,width:photo.width,height:photo.height,mime:photo.mime}),signal,{galleryCopy:true});
   };
   // Two independent, journaled photos at a time. Await both even when one
   // fails, so a cancelled request cannot leave untracked background writes.
@@ -100,15 +100,18 @@ export async function deleteCreationDraft(env:Omit<Env,'DB'>&{DB:Pick<D1Database
 }
 function photoList(row:ImportRow){return PhotoAsset.array().parse(JSON.parse(row.draftPhotos??'[]')).sort((a,b)=>a.sourceOrder-b.sourceOrder);}
 export async function uploadCreationPhoto(env:Env,agencyId:string,id:string,index:number,uploadId:string,
-  bytes:Uint8Array<ArrayBuffer>,mime:string,normalize:PhotoNormalizer,signal:AbortSignal){
-  if(!Number.isInteger(index)||index<0||index>11||!/^[-a-zA-Z0-9_]{16,64}$/.test(uploadId)||
+  bytes:Uint8Array<ArrayBuffer>,mime:string,normalize:PhotoNormalizer,signal:AbortSignal,options:{galleryCopy?:boolean}={}){
+  // Only trusted server-side copies expand a source gallery. Public uploads
+  // retain the manual-photo limit and cannot bypass it by choosing a high slot.
+  const maximum=options.galleryCopy?IMPORT_PHOTO_MAXIMUM:VIDEO_PHOTO_MAXIMUM;
+  if(!Number.isInteger(index)||index<0||index>=maximum||!/^[-a-zA-Z0-9_]{16,64}$/.test(uploadId)||
     !['image/jpeg','image/png','image/webp'].includes(mime)||!bytes.length||bytes.length>10*1024*1024)throw new RequestFailure('INVALID_PHOTO');
   const row=await findImport(env.DB,agencyId,id);required(row);
   if(await env.DB.prepare('SELECT id FROM creation_upload_cancellations WHERE id=? AND agency_id=? AND import_id=?')
     .bind(uploadId,agencyId,id).first())throw new RequestFailure('CONFLICT');
   const saved=photoList(row!);const existing=saved.find(photo=>photo.id===uploadId);
   if(existing){const head=await env.MEDIA.head(existing.objectKey);if(head?.size===existing.sizeBytes&&head.customMetadata?.sha256===existing.contentHash)return existing;}
-  if(saved.some(photo=>photo.sourceOrder===index&&photo.id!==uploadId)||saved.length>=12&&!existing)throw new RequestFailure('CONFLICT');
+  if(saved.some(photo=>photo.sourceOrder===index&&photo.id!==uploadId)||saved.length>=maximum&&!existing)throw new RequestFailure('CONFLICT');
   const normalized=await normalize(bytes,mime,signal);
   if(normalized.mime!=='image/jpeg'||normalized.width<640||normalized.height<360||normalized.width>2048||normalized.height>2048||
     normalized.bytes.length>10*1024*1024||normalized.bytes[0]!==255||normalized.bytes[1]!==216||normalized.bytes.at(-2)!==255||normalized.bytes.at(-1)!==217)
@@ -157,7 +160,10 @@ export async function finishCreationDraft(env:Env,agencyId:string,id:string,expe
   if(draft.version!==expectedVersion)throw new RequestFailure('CONFLICT');
   if(Object.entries(data.provenance).some(([key,value])=>value?.confirm&&fields[key as CreationFieldName]!==null))throw new RequestFailure('VALIDATION_ERROR');
   const photos=draft.photos.sort((a,b)=>a.sourceOrder-b.sourceOrder);
-  const manifest=photos.map(p=>({hash:p.contentHash,size:p.sizeBytes,mime:p.mime}));
+  const order=data.videoCustomization?.photoOrder??photos.slice(0,VIDEO_PHOTO_MAXIMUM).map(p=>p.sourceOrder),
+    chosen=order.map(slot=>photos.find(photo=>photo.sourceOrder===slot));
+  if(chosen.some(photo=>!photo))throw new RequestFailure('VALIDATION_ERROR');
+  const manifest=chosen.map(p=>({hash:p!.contentHash,size:p!.sizeBytes,mime:p!.mime}));
   const input=ManualListingInput.safeParse({...fields,description:fields.description??'',photos:manifest});
   if(!input.success)throw new RequestFailure('VALIDATION_ERROR',Object.fromEntries(input.error.issues.map(issue=>[String(issue.path[0]),issue.message])));
   for(const [index,photo] of photos.entries()){const head=await env.MEDIA.head(photo.objectKey);

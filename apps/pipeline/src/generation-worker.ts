@@ -1,5 +1,5 @@
 import {WorkflowEntrypoint,type WorkflowEvent,type WorkflowStep} from 'cloudflare:workers';
-import {EntityId,GenerationRequest,VideoReport,publicErrors,videoObjectKey,videoPreviewKey,DEFAULT_VIDEO_VOICE,MAX_RENDER_SERVERS} from '@bienvu/contracts';
+import {EntityId,GenerationRequest,GenerationAnimationOmissionReason,VideoReport,publicErrors,videoObjectKey,videoPreviewKey,DEFAULT_VIDEO_VOICE,MAX_RENDER_SERVERS} from '@bienvu/contracts';
 import {admitGeneration,findGeneration,generationView,GenerationFailure,failGeneration,setGenerationStage,setGenerationProgress,setGenerationPreparation,releaseGenerationResource,adminGenerationQueue,type GenerationRow} from '@bienvu/db';
 import {authorized,json} from './auth';
 import {VideoRenderer} from './video-worker';
@@ -10,7 +10,8 @@ import {cleanupAnimations} from './animation-cleanup';
 import {cleanupAnonymousTrials} from './trial-cleanup';
 import {extractDescription,EXTRACTION_TEXT_MAX} from '@bienvu/narration';
 import {loadGenerationListing} from './generation-import';
-import {prepareJobAnimations} from './photo-animations';
+import {prepareJobAnimations,type AnimationAttempt} from './photo-animations';
+import {animateWorkflowPhotos} from './animation-workflow';
 import {prepareGenerationMap,MapConfirmationRequired} from './default-video-map';
 import {safeAiEvent} from '@bienvu/observability';
 import {submitJobAvatars,pollJobAvatars,timeoutJobAvatars,reconcileAvatarTasks} from './avatars';
@@ -82,7 +83,7 @@ export async function reconcileGeneration(env:GenerationEnv,row:GenerationRow,co
 export class GenerationWorkflow extends WorkflowEntrypoint<GenerationEnv,{agencyId:string;jobId:string}>{
   protected diagnostic(_error:unknown){}
   protected providers(voiceName?:string,voiceEnabled=true){return realProviders(this.env,voiceName,voiceEnabled);}
-  protected animations(agencyId:string,jobId:string){return prepareJobAnimations(this.env,agencyId,jobId);}
+  protected animations(agencyId:string,jobId:string,attempt:AnimationAttempt){return prepareJobAnimations(this.env,agencyId,jobId,undefined,attempt);}
   protected defaultMap(row:GenerationRow){return prepareGenerationMap(this.env,row);}
   protected avatars(agency:string,job:string){return submitJobAvatars(this.env,agency,job);}
   protected pollAvatars(agency:string,job:string){return pollJobAvatars(this.env,agency,job);}
@@ -147,13 +148,24 @@ export class GenerationWorkflow extends WorkflowEntrypoint<GenerationEnv,{agency
       if(needsRunway.required){
         await step.do('read-runway-limits',{...once,timeout:'30 seconds'},()=>syncRunwayLimits(this.env));
         await waitForGenerationResource(this.env,step,agencyId,jobId,'runway');
+        await step.do('read-runway-balance',{...once,timeout:'30 seconds'},()=>syncRunwayLimits(this.env,true));
       }
-      await step.do('animate-selected-photos',{...once,timeout:'10 minutes'},async()=>{
+      const animationCount=await step.do('begin-photo-animations',once,async()=>{
         const row=await active(this.env,agencyId,jobId);
         if(row.animationsRequested)await setGenerationPreparation(this.env.DB,row,'animations','working');
-        const result=await this.animations(agencyId,jobId);
-        if(row.animationsRequested)await setGenerationPreparation(this.env.DB,row,'animations',result.ready+(row.animationsReused??0)>0?'ready':'skipped');
+        return {requested:row.animationsRequested??0};
+      });
+      await animateWorkflowPhotos(step,animationCount.requested,async attempt=>{
+        const row=await active(this.env,agencyId,jobId),result=await this.animations(agencyId,jobId,attempt);
+        const reason=GenerationAnimationOmissionReason.safeParse(result.reason);
+        if(reason.success)await setGenerationPreparation(this.env.DB,row,'animations','working',reason.data);
         return result;
+      });
+      await step.do('finish-photo-animations',once,async()=>{
+        const row=await active(this.env,agencyId,jobId);
+        if(row.animationsRequested)await setGenerationPreparation(this.env.DB,row,'animations',
+          (row.animationsReady??0)+(row.animationsReused??0)>0?'ready':'skipped');
+        return {finished:true};
       });
       await step.do('release-preparation-slots',once,async()=>{
         await releaseGenerationResource(this.env.DB,agencyId,jobId,'runway');

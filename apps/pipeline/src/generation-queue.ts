@@ -1,4 +1,4 @@
-import RunwayML from '@runwayml/sdk';
+import {syncRunwayAccount} from './runway-account';
 import {generationRendererName,type GenerationQueueResource} from '@bienvu/contracts';
 import {findGeneration,claimGenerationResource,generationQueueWaitLimit,type GenerationRow} from '@bienvu/db';
 import type {WorkflowStep} from 'cloudflare:workers';
@@ -31,19 +31,5 @@ export async function waitForGenerationResource(env:GenerationEnv,step:WorkflowS
 // Account metadata is free to read. A stale/unavailable snapshot falls back to
 // one concurrent Runway task; raising the operator ceiling cannot exceed it.
 export async function syncRunwayLimits(env:Pick<GenerationEnv,'DB'|'RUNWAYML_API_SECRET'|'RUNWAY_ENABLED'>,force=false){
-  if(env.RUNWAY_ENABLED!=='true'||!env.RUNWAYML_API_SECRET)return {checked:false};
-  const previous=await env.DB.prepare("SELECT checked_at AS checkedAt FROM generation_provider_limits WHERE provider='runway'").first<{checkedAt:string|null}>();
-  if(!force&&previous?.checkedAt&&Date.now()-Date.parse(previous.checkedAt)<30*60_000)return {checked:false};
-  try{
-    const details=await new RunwayML({apiKey:env.RUNWAYML_API_SECRET,maxRetries:0,timeout:15_000}).organization.retrieve();
-    const model=details.tier.models.gen4_turbo;
-    if(!model||typeof model.maxConcurrentGenerations!=='number'||!Number.isInteger(model.maxConcurrentGenerations)||model.maxConcurrentGenerations<1||model.maxConcurrentGenerations>100
-      ||typeof model.maxDailyGenerations!=='number'||!Number.isInteger(model.maxDailyGenerations)||model.maxDailyGenerations<1)throw Error('RUNWAY_LIMITS_INVALID');
-    await env.DB.prepare("UPDATE generation_provider_limits SET concurrency=?,daily_limit=?,checked_at=?,last_error=NULL WHERE provider='runway'")
-      .bind(model.maxConcurrentGenerations,model.maxDailyGenerations,new Date().toISOString()).run();
-    return {checked:true};
-  }catch{
-    await env.DB.prepare("UPDATE generation_provider_limits SET last_error='RUNWAY_LIMITS_UNAVAILABLE' WHERE provider='runway'").run();
-    return {checked:false};
-  }
+  return syncRunwayAccount(env,force);
 }

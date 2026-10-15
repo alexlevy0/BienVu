@@ -1,6 +1,7 @@
 import {z} from 'zod';
 import {DESCRIPTION_MAX_CHARACTERS, PhotoAsset} from './product';
 import {VideoCustomization} from './customization';
+import {IMPORT_PHOTO_MAXIMUM} from './photo-limits';
 
 export const creationFieldNames = ['title','propertyType','transaction','locality','description','priceCents','charges','area','rooms'] as const;
 export type CreationFieldName = typeof creationFieldNames[number];
@@ -23,7 +24,7 @@ export const CreationDraftData=z.object({fields:CreationFields,provenance:z.part
 export type CreationDraftData=z.infer<typeof CreationDraftData>;
 export const CreationDraftView=z.object({id:z.string(),version:z.number().int().positive(),status:z.literal('needs_input'),
   sourceKind:z.enum(['url','manual']),sourceUrl:z.string().nullable(),expiresAt:z.iso.datetime(),data:CreationDraftData,
-  photos:z.array(PhotoAsset).max(12)}).strict();
+  photos:z.array(PhotoAsset).max(IMPORT_PHOTO_MAXIMUM)}).strict();
 export type CreationDraftView=z.infer<typeof CreationDraftView>;
 export const emptyCreationFields=():CreationFields=>({title:null,propertyType:null,transaction:null,locality:null,
   description:null,priceCents:null,charges:null,area:null,rooms:null});

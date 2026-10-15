@@ -87,7 +87,7 @@ export function ManualListingForm(props: Props) {
     return (props.saveOnly?PropertyListingInput:ManualListingInput).safeParse({title:listingTitle(value('title'),value('locality'),propertyType,transaction),propertyType,transaction,
       locality:value('locality'),description:props.guided?props.guided.description:value('description'),
       priceCents:price===null?null:Math.round(price*100),charges:transaction==='rent'?value('charges')||null:null,
-      area:number('area'),rooms:number('rooms'),photos:photos.map((photo,index)=>({hash:photo.remote?.contentHash??photo.sourceHash??index.toString(16).padStart(64,'0'),
+      area:number('area'),rooms:number('rooms'),photos:(props.guided?.agencyId?(customization?.photoOrder?customization.photoOrder.flatMap(slot=>photos.filter(p=>p.slot===slot)):photos.slice(0,12)):photos).map((photo,index)=>({hash:photo.remote?.contentHash??photo.sourceHash??index.toString(16).padStart(64,'0'),
         size:photo.remote?.sizeBytes??photo.file?.size??0,mime:photo.remote?.mime??photo.file?.type??'image/jpeg'}))});
   }
   const provenanceData=serverDraft?.data??props.guided?.initialData;
@@ -210,7 +210,7 @@ export function ManualListingForm(props: Props) {
   useEffect(()=>{
     if(!props.customizing||!hydrated||voiceLoading||!formRef.current||customInitialized.current)return;
     customInitialized.current=true;
-    setCustomization(current=>({...defaultVideoCustomization(props.brand,defaultVoice),...current,photoOrder:current?.photoOrder??photos.map(p=>p.slot)}));
+    setCustomization(current=>({...defaultVideoCustomization(props.brand,defaultVoice),...current,photoOrder:current?.photoOrder??photos.slice(0,12).map(p=>p.slot)}));
   },[props.customizing,hydrated,voiceLoading,defaultVoice]);
   useEffect(()=>{
     if(!hydrated||!customization||!serverDraft||busy||!VideoCustomization.safeParse(customization).success)return;
@@ -420,7 +420,7 @@ export function ManualListingForm(props: Props) {
       const fields=CreationFields.parse({title:listingTitle(raw.title,raw.locality,propertyType,transaction),locality:raw.locality.trim()||null,propertyType:raw.propertyType||null,transaction:raw.transaction||null,
         description:raw.description.trim()||null,priceCents:number(raw.priceCents)===null?null:Math.round(number(raw.priceCents)!*100),charges:raw.charges||null,area:number(raw.area),rooms:number(raw.rooms)});
       const rawSettings={...defaultVideoCustomization(props.brand,await resolveDefaultVoice()),...customizationRef.current},
-        settings={...rawSettings,...(rawSettings.mapAutomatic?{map:undefined,mapAutomatic:undefined}:{})},order=settings.photoOrder??current.photos.map(p=>p.sourceOrder),
+        settings={...rawSettings,...(rawSettings.mapAutomatic?{map:undefined,mapAutomatic:undefined}:{})},order=settings.photoOrder??current.photos.slice(0,12).map(p=>p.sourceOrder),
         editor=settings.editor??createEditorDocument(order.flatMap(slot=>current.photos.filter(p=>p.sourceOrder===slot)),fields,{agencyName:props.brand?.name,durationSeconds:props.durationSeconds,aspectRatio:props.aspectRatio,
           voiceEnabled:props.voiceEnabled,subtitlesEnabled:props.subtitlesEnabled});
       const response=await fetch(`/api/imports/${current.id}/draft`,{method:'PATCH',headers:{'Content-Type':'application/json'},
@@ -437,21 +437,25 @@ export function ManualListingForm(props: Props) {
     const first=customization.photoOrder!.indexOf(a.slot),second=customization.photoOrder!.indexOf(b.slot);
     return (first<0?99:first)-(second<0?99:second);
   }):photos;
-  const animatedPhotos=new Set(photoAnimations(customization,customization?.photoOrder??photos.map(photo=>photo.slot)));
+  const animatedPhotos=new Set(photoAnimations(customization,customization?.photoOrder??photos.slice(0,12).map(photo=>photo.slot)));
   function movePhoto(id:string,to:number){
     if(busy||photoChecking||voiceLoading)return;
     const photo=orderedPhotos.find(p=>p.id===id);if(!photo||photo.state!=='ready'||photo.removing)return;
+    const order=customization?.photoOrder??orderedPhotos.slice(0,12).map(p=>p.slot);
+    if(!order.includes(photo.slot)){setFeedback('Choisissez les photos de la vidéo dans Personnaliser.');return;}
     const next=orderedPhotos.filter(p=>p.id!==id);next.splice(Math.max(0,Math.min(next.length,to)),0,photo);
     selected.current=next;setPhotos(next);settingsVersion.current++;setSettingsSaved(false);
     setCustomization(current=>({...defaultVideoCustomization(props.brand,defaultVoice),...current,
-      photoOrder:next.filter(p=>!current?.photoOrder||current.photoOrder.includes(p.slot)).map(p=>p.slot),
-      runwayClips:undefined,runwayPhotos:photoAnimations(current,current?.photoOrder??orderedPhotos.map(p=>p.slot))}));
+      photoOrder:next.filter(p=>(current?.photoOrder??order).includes(p.slot)).map(p=>p.slot),
+      runwayClips:undefined,runwayPhotos:photoAnimations(current,current?.photoOrder??order)}));
   }
   function toggleAnimation(photo:SelectedPhoto){
     if(!me||me.role==='viewer'||busy||photoChecking||voiceLoading||photo.state!=='ready'||photo.removing)return;
+    const chosen=customization?.photoOrder??selected.current.slice(0,12).map(p=>p.slot);
+    if(!chosen.includes(photo.slot)&&chosen.length>=12){setFeedback('Désélectionnez une photo dans Personnaliser pour en choisir une autre.');return;}
     settingsVersion.current++;setSettingsSaved(false);
     setCustomization(current=>{
-      const order=current?.photoOrder??selected.current.map(p=>p.slot),animated=photoAnimations(current,order);
+      const order=current?.photoOrder??selected.current.slice(0,12).map(p=>p.slot),animated=photoAnimations(current,order);
       return {...defaultVideoCustomization(props.brand,defaultVoice),...current,photoOrder:order.includes(photo.slot)?order:[...order,photo.slot],runwayClips:undefined,
         runwayPhotos:animated.includes(photo.slot)?animated.filter(slot=>slot!==photo.slot):[...animated,photo.slot]};
     });
@@ -505,7 +509,7 @@ export function ManualListingForm(props: Props) {
             onDragOver={event=>{if(Array.from(event.dataTransfer.types).includes('Files')){event.preventDefault();event.dataTransfer.dropEffect=canAdd?'copy':'none';if(canAdd)setPhotoDrop(true);}}}
             onDragLeave={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node|null))setPhotoDrop(false);}}
             onDrop={event=>{if(Array.from(event.dataTransfer.types).includes('Files')){event.preventDefault();setPhotoDrop(false);if(canAdd)void addPhotos(event.dataTransfer.files);}}}>
-            <div className="manual-sheet-gallery-title"><h4 id="manual-photos-title">Photos du bien</h4>{photos.length>0&&<span>{photos.length} / 12</span>}</div>
+            <div className="manual-sheet-gallery-title"><h4 id="manual-photos-title">Photos du bien</h4>{photos.length>0&&<span>{photos.length>12?`${photos.length} disponibles · 12 max. par vidéo`:`${photos.length} / 12`}</span>}</div>
             <ol className={`manual-sheet-photos${photos.length?'':' is-empty'}`}>
               {orderedPhotos.map((photo,index)=><li key={photo.id} className={`manual-sheet-photo${draggedPhoto===photo.id?' is-dragging':''}${photo.state==='error'?' has-error':''}`}
                 draggable={!busy&&!photoChecking&&photo.state==='ready'&&!photo.removing} onDragStart={event=>{event.dataTransfer.setData('application/x-bienvu-manual-photo',photo.id);event.dataTransfer.effectAllowed='move';setDraggedPhoto(photo.id);}}

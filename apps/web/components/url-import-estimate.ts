@@ -1,14 +1,14 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
-import {GeneratableListing,CreationDraftView,ImportUrl,publicErrors,type NormalizedListing} from '@bienvu/contracts';
+import {VIDEO_PHOTO_MAXIMUM,GeneratableListing,CreationDraftView,ImportUrl,publicErrors,type NormalizedListing} from '@bienvu/contracts';
 import {analyticsFetch as fetch} from '../lib/product-analytics';
 
 export type PreparedUrlImport={id:string;status:'importing'|'ready'|'needs_input';listing:NormalizedListing|null;draft:CreationDraftView|null};
 type Entry={owner:string;url:string;key:string;createdAt:number;controller:AbortController;promise:Promise<PreparedUrlImport>};
 type State={owner:string;url:string;phase:'loading'|'ready'|'error';value?:PreparedUrlImport;message?:string};
-const lifetime=10*60_000;
+const lifetime=10*60_000,preparationVersion=2;
 const wait=(ms:number)=>new Promise<void>(resolve=>setTimeout(resolve,ms));
-export function urlImportPhotoSlots(value?:PreparedUrlImport){return (value?.listing?.photos??value?.draft?.photos??[]).map(p=>p.sourceOrder);}
+export function urlImportPhotoSlots(value?:PreparedUrlImport){return (value?.listing?.photos??value?.draft?.photos??[]).slice(0,VIDEO_PHOTO_MAXIMUM).map(p=>p.sourceOrder);}
 
 // Debounce only the preparation. Explicit actions await and reuse its promise and
 // idempotency key; they never start a second source read while it is in flight.
@@ -16,8 +16,8 @@ export function useUrlImportEstimate(url:string,owner:string|undefined,enabled:b
  const [state,setState]=useState<State|null>(null),[revision,setRevision]=useState(0),entries=useRef(new Map<string,Entry>()),scope=useRef(owner);scope.current=owner;
  const parsed=ImportUrl.safeParse(url.trim()),source=parsed.success?parsed.data:'';
  function keyFor(value:string,agency:string){
-  try{const prior=JSON.parse(sessionStorage.getItem('bienvu:url-import-request')??'null');if(prior?.url===value&&typeof prior.key==='string'&&/^[a-zA-Z0-9_-]{16,128}$/.test(prior.key)&&(!prior.owner||prior.owner===agency)&&(!prior.expires||prior.expires>Date.now()))return prior.key as string;}catch{}
-  const key=crypto.randomUUID();try{sessionStorage.setItem('bienvu:url-import-request',JSON.stringify({url:value,key,owner:agency,expires:Date.now()+lifetime}));}catch{}return key;
+  try{const prior=JSON.parse(sessionStorage.getItem('bienvu:url-import-request')??'null');if(prior?.version===preparationVersion&&prior.url===value&&typeof prior.key==='string'&&/^[a-zA-Z0-9_-]{16,128}$/.test(prior.key)&&(!prior.owner||prior.owner===agency)&&(!prior.expires||prior.expires>Date.now()))return prior.key as string;}catch{}
+  const key=crypto.randomUUID();try{sessionStorage.setItem('bienvu:url-import-request',JSON.stringify({version:preparationVersion,url:value,key,owner:agency,expires:Date.now()+lifetime}));}catch{}return key;
  }
  async function request(value:string,agency:string,key:string,estimate:boolean,signal:AbortSignal){
   if(scope.current!==agency)throw new DOMException('Agence changée','AbortError');

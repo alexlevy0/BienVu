@@ -10,6 +10,22 @@ La migration 0014 ne donne aucun droit par défaut. `generation_access` référe
 
 Le budget de 1,20 € couvre au maximum 0,70 € de texte/voix (14 appels de 0,05 €) et 0,50 € de rendu. L'import URL réserve séparément 0,50 € avant le réseau. Ces provisions restent comptées après échec : libérer un crédit vidéo ne rembourse pas les fournisseurs. Les plafonds D1, narration et renderer se cumulent ; aucune gratuité supposée ne crée un crédit.
 
+## Reprise des animations lentes — 15/10/2026
+
+Un `RUNWAY_TIMEOUT` après deux minutes correspond au délai de lecture du SDK, pas à un échec confirmé du fournisseur. Une tâche dont l’identifiant a été enregistré reste `submitted` pendant les reprises. Les erreurs transitoires de lecture et de téléchargement suivent le même mécanisme ; aucun nouvel upload ni POST de génération n’est effectué pour cette photo. Le succès efface le diagnostic temporaire et conserve le clip dans la bibliothèque réutilisable.
+
+Chaque photo sélectionnée dispose désormais de ses propres étapes Workflow : une fenêtre SDK de deux minutes dans une étape de trois minutes, jusqu’à quatre fenêtres au total, séparées par des pauses durables de dix secondes. La limite de dix minutes ne s’applique plus à l’ensemble des douze photos. L’ordre est séquentiel, le slot Runway reste détenu pendant les reprises et le nombre de générations payantes reste inchangé. Les créations dont le résultat est inconnu sans identifiant ne sont jamais resoumises ; un checkpoint `submitting` récent conserve sa fenêtre de protection de trois minutes. Authentification invalide, résultat incertain non récupérable ou épuisement des reprises arrêtent les nouvelles soumissions. Un échec explicite d’une tâche autorise la suite des autres photos.
+
+Les garde-fous de budget et l’échéance globale du job restent actifs. Une animation réellement indisponible garde le repli classique et son crédit client est libéré selon les règles existantes ; les réserves fournisseur ne sont pas annulées artificiellement. Les vidéos terminées et leur facturation historique ne sont pas modifiées automatiquement.
+
+Diagnostic du job `27007942-967c-47f1-9557-df91c2944c17` : 12 animations demandées, 7 copiées, 8e tâche arrêtée localement après environ 132 s, 4 photos jamais soumises. Lecture SDK du task ID existant : `SUCCEEDED`, 15 crédits fournisseur. Facturation D1 : 13 crédits BienVu réservés, 8 consommés (vidéo + 7 animations), 5 libérés. Aucun nouvel appel de génération fournisseur pendant l’investigation.
+
+## Compteur des animations de photos — 15/10/2026
+
+Le suivi de l’accueil et de l’historique affiche un compteur à droite de l’étape d’animation, par exemple **2 / 12**. Il compte les photos **traitées** : animations prêtes, réutilisations et replis confirmés vers les mouvements classiques. Le détail distingue les réutilisations et photos sans animation IA ; un résultat partiel est intitulé « Animations terminées », sans annoncer que toutes les photos ont été animées.
+
+`GenerationView.animationProgress`, facultatif pour les anciens consommateurs, expose uniquement `total`, `ready` (réutilisations comprises), `reused`, `skipped` et `active`. Les compteurs sont lus dans D1 pour le job et l’agence autorisés. Les erreurs et résultats incertains deviennent des replis ; une photo non soumise n’est comptée en repli qu’après la fin durable de l’étape. Aucun compteur n’est estimé depuis le temps écoulé ou les crédits réservés. Le rafraîchissement existant du suivi les actualise ; aucun nouvel appel Runway, débit ou migration SQL. Les anciennes réponses sans compteur et les vidéos classiques restent lisibles.
+
 ## Exécution et reprise
 
 `GenerationWorkflow` utilise un identifiant `generation-<jobId>`. L'intention D1 est créée avant `createBatch`, idempotent côté Cloudflare ; le cron de cinq minutes réconcilie au plus dix candidats. Une perte de réponse au lancement ne recrée ni le job ni son allocation.
@@ -42,3 +58,7 @@ Depuis la migration 0043 (03/10/2026), les vidéos réussies encore conservées 
 - Les configurations distantes, identifiants, comptes de recette et vidéos sont ignorés par Git. Les migrations et rapports expurgés sont versionnables. Les sprints 08/09 doivent encore gérer abonnement et exploitation commerciale ; la recette distante et l’activation de l’essai anonyme restent à réaliser.
 
 Sources officielles consultées le 28/09 : [règles de Workflows](https://developers.cloudflare.com/workflows/build/rules-of-workflows/), [API Workers](https://developers.cloudflare.com/workflows/build/workers-api/), [limites](https://developers.cloudflare.com/workflows/reference/limits/), [tarification](https://developers.cloudflare.com/workflows/reference/pricing/). Workflows n'est pas supposé gratuit : requêtes, CPU et stockage sont inclus dans les provisions de la campagne.
+
+### Solde Runway — 15/10/2026
+
+La préparation vérifie gratuitement le solde réel du compte API et déduit les réservations concurrentes. Une recharge est découverte automatiquement ; le premier prépaiement de 10 € ne constitue plus un plafond permanent. La coupure du budget mensuel global reste appliquée. Les dépenses dépassant le prépaiement historique sont provisionnées une seule fois dans ce budget. Une lecture trop ancienne/indisponible ou un solde épuisé donne un motif durable, visible au client et au Super admin, sans nouvelle soumission payante. Les animations non réalisées gardent les mouvements classiques et leurs crédits sont libérés. Voir [Runway](RUNWAY.md#budget-et-super-admin).

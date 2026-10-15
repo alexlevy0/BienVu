@@ -13,14 +13,23 @@ export const GenerationPreparation = z.object({
 export type GenerationPreparation = z.infer<typeof GenerationPreparation>;
 export const GenerationMapOmissionReason=z.enum(['location_missing','ambiguous_location','map_unavailable','confirmation_skipped','confirmation_timeout']);
 export type GenerationMapOmissionReason=z.infer<typeof GenerationMapOmissionReason>;
+export const GenerationAnimationOmissionReason=z.enum(['RUNWAY_BUDGET_LIMIT','RUNWAY_CREDITS_EXHAUSTED','RUNWAY_ACCOUNT_UNAVAILABLE','RUNWAY_DISABLED',
+  'RUNWAY_TIMEOUT','RUNWAY_AUTH_FAILED','RUNWAY_RATE_LIMIT','RUNWAY_UNCERTAIN','RUNWAY_TASK_FAILED','RUNWAY_OUTPUT_MISSING','RUNWAY_INPUT_INVALID','RUNWAY_OUTPUT_INVALID']);
+export type GenerationAnimationOmissionReason=z.infer<typeof GenerationAnimationOmissionReason>;
 const mapOption={id:z.string().regex(/^city-[0-4]$/),label:z.string().min(2).max(240).refine(v=>!/[<>\u0000-\u001f\u007f]/.test(v))};
 export const GenerationMapCandidate=z.object({...mapOption,location:MapLocation.refine(v=>v.sourceType==='municipality'&&v.precision==='approximate')}).strict();
 export type GenerationMapCandidate=z.infer<typeof GenerationMapCandidate>;
 export const GenerationMapCandidates=z.array(GenerationMapCandidate).min(1).max(5).refine(v=>new Set(v.map(c=>c.id)).size===v.length);
 export const GenerationMapConfirmation=z.object({expiresAt:Timestamp,options:z.array(z.object(mapOption).strict()).min(1).max(5)}).strict();
 export const ConfirmGenerationMap=z.object({candidateId:mapOption.id.nullable()}).strict();
+export const GenerationAnimationProgress=z.object({total:z.number().int().min(1).max(12),ready:z.number().int().min(0).max(12),
+  reused:z.number().int().min(0).max(12),skipped:z.number().int().min(0).max(12),active:z.number().int().min(0).max(12)}).strict()
+  .refine(value=>value.reused<=value.ready&&value.ready+value.skipped+value.active<=value.total,'Compteurs d’animations incohérents.');
+export type GenerationAnimationProgress=z.infer<typeof GenerationAnimationProgress>;
 export const GenerationView = z.object({avatar:z.object({requested:z.number().int().min(1).max(1),ready:z.number().int().min(0).max(2),failed:z.number().int().min(0).max(2),active:z.number().int().min(0).max(2),creditsUsed:z.number().int().min(0).max(MAX_AVATAR_CREDITS)}).optional(),id:EntityId,status:Job.shape.status,stage:Job.shape.stage,attempt:Job.shape.attempt,errorCode:Job.shape.errorCode,createdAt:Timestamp,updatedAt:Timestamp,
   preparation:GenerationPreparation.optional(),narrationReady:z.boolean().optional(),
+  animationProgress:GenerationAnimationProgress.optional(),
+  animationOmissionReason:GenerationAnimationOmissionReason.optional(),
   mapOmissionReason:GenerationMapOmissionReason.optional(),
   mapConfirmation:GenerationMapConfirmation.optional(),
   queue:GenerationQueueView.optional(),

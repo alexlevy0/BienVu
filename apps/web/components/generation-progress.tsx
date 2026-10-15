@@ -4,12 +4,13 @@ import {useState} from 'react';
 import {publicErrors,type GenerationView,type PublicErrorCode} from '@bienvu/contracts';
 import {generationActive} from './generation-progress-state';
 export {generationActive,useGenerationProgress} from './generation-progress-state';
-import {generationSteps,generationProgressText,generationMapOmissionText} from '../lib/generation-steps';
+import {generationSteps,generationProgressText,generationMapOmissionText,generationAnimationOmissionText} from '../lib/generation-steps';
 import {ProgressiveVideo} from './progressive-video';
 import {GenerationRenderProgress} from './generation-estimate';
 import {GenerationMapConfirmation} from './generation-map-confirmation';
 import {GenerationQueueNotice} from './generation-queue-notice';
 import {GenerationCelebration} from './generation-celebration';
+import {GenerationAnimationCounter} from './generation-animation-counter';
 export function GenerationProgress({job,unavailable=false}:{job:GenerationView;unavailable?:boolean}){
   const [retrying,setRetrying]=useState(false),[feedback,setFeedback]=useState('');
   const mapOmission=generationMapOmissionText(job);
@@ -19,8 +20,9 @@ export function GenerationProgress({job,unavailable=false}:{job:GenerationView;u
     <GenerationCelebration job={job}/>
     <span className="section-kicker">{job.title}</span><h3 aria-live="polite">{generationProgressText(job)}</h3>
     <GenerationQueueNotice job={job}/>
-    {generationActive(job)&&<><ol className="generation-steps" aria-label="Étapes de création">{generationSteps(job,job.sourceKind==='manual').map(({key,state,label,detail})=><li key={key} className={`step-${state}`} aria-current={state==='current'?'step':undefined}>{state==='done'?'✓ ':state==='skipped'?'– ':''}{label}{detail&&<small className="generation-step-detail">{detail}</small>}{key==='map'&&job.mapConfirmation&&<GenerationMapConfirmation key={job.id} job={job}/>} {key==='rendering'&&<GenerationRenderProgress job={job} unavailable={unavailable}/>}</li>)}</ol><p>Vous pouvez fermer cette page. Retrouvez la vidéo dans <Link href="/biens">Mes biens</Link>.</p></>}
+    {generationActive(job)&&<><ol className="generation-steps" aria-label="Étapes de création">{generationSteps(job,job.sourceKind==='manual').map(({key,state,label,detail,progress})=><li key={key} className={`step-${state}`} aria-current={state==='current'?'step':undefined}>{state==='done'?'✓ ':state==='skipped'?'– ':''}{label}<GenerationAnimationCounter progress={progress}/>{detail&&<small className="generation-step-detail">{detail}</small>}{key==='map'&&job.mapConfirmation&&<GenerationMapConfirmation key={job.id} job={job}/>} {key==='rendering'&&<GenerationRenderProgress job={job} unavailable={unavailable}/>}</li>)}</ol><p>Vous pouvez fermer cette page. Retrouvez la vidéo dans <Link href="/biens">Mes biens</Link>.</p></>}
     {['ready','failed'].includes(job.status)&&mapOmission&&<p className="field-help"><strong>Carte non ajoutée.</strong> {mapOmission}</p>}
+    {['ready','failed'].includes(job.status)&&generationAnimationOmissionText(job)&&<p className="field-help" role="status">{generationAnimationOmissionText(job)}</p>}
     {unavailable&&<p role="status">La connexion est interrompue. Le traitement continue ; son état sera actualisé à votre retour.</p>}
     {job.status==='failed'&&<p className="form-feedback error" role="alert">{publicErrors[job.errorCode as PublicErrorCode]?.[1]??publicErrors.GENERATION_FAILED[1]}</p>}
     {job.retryAllowed&&<button className="text-button" disabled={retrying} onClick={()=>void retry()}>Relancer le démarrage</button>}

@@ -39,6 +39,10 @@ export function AdminGenerationQueueSettings(){
       <p className="admin-muted">Compte Runway : {data.runway.concurrency} animation(s) simultanée(s), {data.runway.dailyLimit} sur 24 heures glissantes.
         {data.runway.checkedAt?` Dernière lecture : ${new Date(data.runway.checkedAt).toLocaleString('fr-FR')}.`:' En attente de vérification ; limite effective de 1.'}
         {' '}La limite effective est le minimum entre votre plafond et celui du compte. HeyGen utilise la limite définie dans Avatars IA.</p>
+      {data.runway.balance&&<div className="admin-summary-lines" aria-label="Solde API Runway"><p><span>Dernier solde lu chez Runway</span><strong>{data.runway.balance.credits===null?'Non vérifié':`${data.runway.balance.credits.toLocaleString('fr-FR')} crédits API`}</strong></p>
+        <p><span>Disponibles après réservations locales</span><strong>{data.runway.balance.available===null?'À actualiser':`${data.runway.balance.available.toLocaleString('fr-FR')} crédits API`}</strong></p>
+        <p className="admin-muted">Les recharges API sont détectées automatiquement avant les animations. Le budget mensuel global reste appliqué. Une lecture de plus de cinq minutes doit être actualisée ; cette vérification ne génère aucun média et ne recharge pas le compte.</p>
+        {data.runway.balance.error&&<p className="admin-error" role="status">Le solde Runway n’a pas pu être vérifié. Actualisez la lecture avant une nouvelle génération.</p>}</div>}
       <form className="admin-video-map-form" onSubmit={(e:FormEvent)=>{e.preventDefault();void submit();}}>
         <fieldset className="admin-video-map-fields" disabled={busy}><legend className="sr-only">Capacité des générations</legend>
           {fields.map(([key,label,min,max])=><label className="admin-field" key={key}>{label}<input type="number" min={min} max={max} step="1" required
@@ -46,7 +50,7 @@ export function AdminGenerationQueueSettings(){
         </fieldset>
         {!valid&&<p className="admin-error">Vérifiez les bornes : la concurrence par agence doit rester dans les limites globales et dans son nombre de demandes.</p>}
         <div className="admin-budget-actions"><button className="admin-button admin-button-dark" type="submit" disabled={busy||!valid||!changed}>{busy?'Enregistrement…':'Enregistrer les limites'}</button>
-          <button className="admin-button" type="button" disabled={busy} onClick={()=>void submit(true)}>Relire les limites Runway</button></div>
+          <button className="admin-button" type="button" disabled={busy} onClick={()=>void submit(true)}>Relire le solde et les limites Runway</button></div>
       </form>
     </>}
     {error&&<p className="admin-error" role="alert">{error}</p>}{message&&<p className="admin-notice" role="status">{message}</p>}

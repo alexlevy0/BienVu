@@ -102,7 +102,7 @@ test('Laforêt : appartements et loyers mensuels seulement quand les charges son
     assert.equal(extractListingHtml(rent.replace('975 000 € / mois CC', label), rentUrl).facts.price.status, 'missing');
 });
 
-test('Laforêt : import complet des JPEG, limite de 12, aucune exécution de script ou seconde lecture navigateur', async () => {
+test('Laforêt : galerie complète des JPEG, aucune exécution de script ou seconde lecture navigateur', async () => {
   const calls: string[] = [], stored: string[] = []; let browsers = 0;
   const result = await importListing(url, {agencyId: 'laforet-fixture', importId: 'laforet-listing'}, {
     transport: {async load(value, kind, hosts) {
@@ -115,7 +115,7 @@ test('Laforêt : import complet des JPEG, limite de 12, aucune exécution de scr
   });
   assert.ok(GeneratableListing.safeParse(result.listing).success);
   assert.equal(browsers, 0); assert.equal(result.diagnostics.browserUsed, false);
-  assert.equal(result.listing.photos.length, 12); assert.equal(calls.length, 13);
-  assert.deepEqual(stored, letters.slice(0, 12).map(letter => image(letter)));
-  assert.equal(new Set(result.listing.photos.map(photo => photo.contentHash)).size, 12);
+  assert.equal(result.listing.photos.length, letters.length); assert.equal(calls.length, letters.length+1);
+  assert.deepEqual(stored, letters.map(letter => image(letter)));
+  assert.equal(new Set(result.listing.photos.map(photo => photo.contentHash)).size, letters.length);
 });
