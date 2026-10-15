@@ -1,7 +1,7 @@
-import {AvatarAdmission,GenerationRequest,AvatarAudio,PreparedNarration,VideoAsset,AvatarVideoAsset,AVATAR_AUDIO_BYTES,AVATAR_VIDEO_BYTES,avatarMoments,type VideoManifest} from '@bienvu/contracts';
+import {AvatarAdmission,GenerationRequest,AvatarAudio,PreparedNarration,VideoAsset,AvatarVideoAsset,AVATAR_AUDIO_BYTES,AVATAR_VIDEO_BYTES,avatarMoments,type VideoManifest,type AvatarLook} from '@bienvu/contracts';
 import {assembleNarrationWavs} from '@bienvu/voice';
 import {avatarHash,heygenClient,downloadHeygenMedia,AvatarFailure,type HeygenEnvironment} from '@bienvu/avatars';
-import {findGeneration,findNarration,jobAvatarTasks,findAvatarTask,avatarSettings,type Database,type AvatarTask} from '@bienvu/db';
+import {findGeneration,findNarration,jobAvatarTasks,findAvatarTask,avatarSettings,findAvatarLook,recordAvatarTransparency,type Database,type AvatarTask} from '@bienvu/db';
 import {safeAiEvent} from '@bienvu/observability';
 import type {NarrationBucket} from './narration';
 
@@ -18,6 +18,9 @@ async function record(env:AvatarEnv,task:AvatarTask,error?:string){
     $ai_is_error:Boolean(error),...(error?{$ai_error:error}:{}),$ai_output_state:task.state});
 }
 const errorCode=(error:unknown)=>error instanceof AvatarFailure?error.code:/AVATAR_[A-Z_]+/.exec(String(error))?.[0]??'AVATAR_UNAVAILABLE';
+async function rememberTransparency(env:AvatarEnv,look:AvatarLook,status:'supported'|'unsupported'){
+  try{await recordAvatarTransparency(env.DB,look,status);}catch{console.warn(JSON.stringify({event:'avatar_transparency_update_failed',lookId:look.id}));}
+}
 async function failTask(env:AvatarEnv,task:AvatarTask,code:string,uncertain=false,beforeCall=false){
   await env.DB.prepare(`UPDATE avatar_tasks SET state=?,error_code=?,reserved_micros=IIF(?,0,reserved_micros),updated_at=? WHERE id=? AND state!='ready'`)
     .bind(uncertain?'uncertain':'failed',code,beforeCall?1:0,new Date().toISOString(),task.id).run();await record(env,{...task,state:uncertain?'uncertain':'failed'},code);
@@ -57,20 +60,23 @@ async function submit(env:AvatarEnv,task:AvatarTask){
   // creates a replacement task for an uncertain result.
   const claimed=await env.DB.prepare("UPDATE avatar_tasks SET state='submitting',updated_at=? WHERE id=? AND state='claimed' RETURNING id")
     .bind(new Date().toISOString(),task.id).first();if(!claimed)return;
-  let called=false;
+  let called=false,observedLook:AvatarLook|undefined;
   try{
     const current=await findGeneration(env.DB,task.agencyId,task.jobId);if(!current||current.deadline<=new Date().toISOString()||['failed','ready'].includes(current.status))throw new AvatarFailure('AVATAR_JOB_INACTIVE');
     const {settings}=await avatarSettings(env.DB);if(!settings.enabled||env.HEYGEN_ENABLED!=='true'||!env.HEYGEN_API_KEY)throw new AvatarFailure('AVATAR_UNAVAILABLE');
+    const config=AvatarAdmission.parse(JSON.parse(current.avatarConfig!)),input=GenerationRequest.parse(JSON.parse(current.input));
+    observedLook=(await findAvatarLook(env.DB,config.look.id))?.look??config.look;
+    if(input.customization!.avatar!.appearance==='cutout'&&observedLook.transparency==='unsupported')throw new AvatarFailure('AVATAR_TRANSPARENCY_UNSUPPORTED');
     const client=heygenClient(env.HEYGEN_API_KEY),wallet=await client.wallet();
     if(wallet.currency!=='USD'||wallet.balance===null||wallet.balance<task.reservedMicros/1e6)throw new AvatarFailure('AVATAR_BALANCE_LOW');
-    const config=AvatarAdmission.parse(JSON.parse(current.avatarConfig!)),input=GenerationRequest.parse(JSON.parse(current.input));
     const audioId=await client.upload(await readAudio(env,task),task.id);
     await env.DB.prepare('UPDATE avatar_tasks SET audio_asset_id=?,updated_at=? WHERE id=?').bind(audioId,new Date().toISOString(),task.id).run();
     called=true;const providerId=await client.create({id:task.id,lookId:config.look.id,engine:task.engine,audioId,transparent:input.customization!.avatar!.appearance==='cutout'});
     await env.DB.prepare("UPDATE avatar_tasks SET provider_id=?,state='submitted',error_code=NULL,poll_after=?,updated_at=? WHERE id=? AND state IN ('submitting','uncertain')")
       .bind(providerId,new Date(Date.now()+10000).toISOString(),new Date().toISOString(),task.id).run();
     await record(env,{...task,state:'submitted'});
-  }catch(error){await failTask(env,task,errorCode(error),called&&(!(error instanceof AvatarFailure)||error.uncertain),!called||error instanceof AvatarFailure&&!error.uncertain);}
+  }catch(error){const code=errorCode(error);if(called&&observedLook&&code==='AVATAR_TRANSPARENCY_UNSUPPORTED')await rememberTransparency(env,observedLook,'unsupported');
+    await failTask(env,task,code,called&&(!(error instanceof AvatarFailure)||error.uncertain),!called||error instanceof AvatarFailure&&!error.uncertain);}
 }
 export async function submitJobAvatars(env:AvatarEnv,agency:string,job:string){
   const run=await findGeneration(env.DB,agency,job);if(!run?.avatarCredits)return {requested:false};
@@ -108,7 +114,11 @@ export async function submitJobAvatars(env:AvatarEnv,agency:string,job:string){
 async function complete(env:AvatarEnv,task:AvatarTask){
   const client=heygenClient(env.HEYGEN_API_KEY!),video=await client.video(task.providerId!);
   if(video.id!==task.providerId)throw new AvatarFailure('AVATAR_RESPONSE_INVALID');
-  if(video.status==='failed'){await failTask(env,task,'AVATAR_PROVIDER_FAILED');return;}
+  if(video.status==='failed'){
+    const code=video.error==='AVATAR_TRANSPARENCY_UNSUPPORTED'?video.error:'AVATAR_PROVIDER_FAILED';
+    if(code==='AVATAR_TRANSPARENCY_UNSUPPORTED'){const run=await findGeneration(env.DB,task.agencyId,task.jobId);if(run?.avatarConfig)await rememberTransparency(env,AvatarAdmission.parse(JSON.parse(run.avatarConfig)).look,'unsupported');}
+    await failTask(env,task,code);return;
+  }
   if(video.status!=='completed'){await env.DB.prepare('UPDATE avatar_tasks SET poll_after=?,updated_at=? WHERE id=?').bind(new Date(Date.now()+30000).toISOString(),new Date().toISOString(),task.id).run();return;}
   const run=await findGeneration(env.DB,task.agencyId,task.jobId);if(!run||run.retention!=='available')return;
   const config=AvatarAdmission.parse(JSON.parse(run.avatarConfig!)),settings=GenerationRequest.parse(JSON.parse(run.input)).customization!.avatar!;
@@ -126,6 +136,7 @@ async function complete(env:AvatarEnv,task:AvatarTask){
   await env.DB.prepare(`INSERT INTO avatar_library(agency_id,cache_key,origin_job_id,clip_json,created_at,expires_at) VALUES(?,?,?,?,?,?)
     ON CONFLICT(agency_id,cache_key) DO UPDATE SET origin_job_id=excluded.origin_job_id,clip_json=excluded.clip_json,created_at=excluded.created_at,expires_at=excluded.expires_at`)
     .bind(task.agencyId,task.cacheKey,task.jobId,JSON.stringify(clip),new Date().toISOString(),new Date(Date.now()+90*86400000).toISOString()).run();await record(env,{...task,state:'ready'});
+  if(transparent)await rememberTransparency(env,config.look,'supported');
 }
 export async function pollJobAvatars(env:AvatarEnv,agency:string,job:string){
   const tasks=await jobAvatarTasks(env.DB,agency,job);

@@ -1,6 +1,6 @@
 'use client';
 import {useEffect,useRef,useState,type CSSProperties} from 'react';
-import {AvatarCatalog,defaultAvatarCustomization,avatarVoiceWarning,avatarFrameStyle,avatarContentStyle,avatarCreditCost,AVATAR_SECONDS_PER_CREDIT,type AvatarCustomization,type AvatarLook,type AvatarPreviewClip} from '@bienvu/contracts';
+import {AvatarCatalog,defaultAvatarCustomization,avatarVoiceWarning,avatarFrameStyle,avatarContentStyle,avatarCreditCost,avatarSupportsCutout,avatarCutoutStatus,AVATAR_SECONDS_PER_CREDIT,type AvatarCustomization,type AvatarLook,type AvatarPreviewClip} from '@bienvu/contracts';
 import {measureAvatarElement} from '../lib/avatar-placement';
 import {HomeIcon} from './home-icons';
 import {trackProductEvent} from '../lib/product-analytics';
@@ -28,6 +28,7 @@ export function AvatarControls(p:{avatar?:AvatarCustomization;onChange(value:Ava
   onEnableVoice?():void;authenticated:boolean;durationSeconds:number;busy?:boolean;catalog?:AvatarCatalog|null}){
   const loaded=useAvatarCatalog(p.catalog===undefined),catalog=p.catalog??loaded.catalog;
   const look=catalog?.looks.find(a=>a.id===p.avatar?.lookId),active=Boolean(p.avatar&&!p.avatar.hidden),patch=(next:Partial<AvatarCustomization>)=>p.avatar&&p.onChange({...p.avatar,...next});
+  useEffect(()=>{if(active&&look&&p.avatar?.appearance==='cutout'&&!avatarSupportsCutout(look,p.avatar.engine))p.onChange({...p.avatar,appearance:'circle'});},[active,look,p.avatar,p.onChange]);
   const credits=avatarCreditCost(p.avatar?{...p.avatar,hidden:false}:undefined,p.durationSeconds)||1;
   function enable(){if(active){patch({hidden:true});return;}const id=p.avatar?.lookId??catalog?.defaultLookId??catalog?.looks[0]?.id;if(!id)return;
     const selected=catalog?.looks.find(a=>a.id===id);if(!selected)return;
@@ -45,14 +46,16 @@ export function AvatarControls(p:{avatar?:AvatarCustomization;onChange(value:Ava
       {!p.voiceEnabled&&<p className="avatar-warning" role="status">Activez la voix off pour synchroniser le présentateur.</p>}
       <AvatarPicker looks={catalog?.looks??[]} selected={p.avatar.lookId} busy={p.busy} onSelect={item=>patch({lookId:item.id,
         engine:item.engines.includes(p.avatar!.engine)&&(p.avatar!.engine==='avatar_iii'||catalog?.allowPremium)?p.avatar!.engine:item.engines.includes('avatar_iii')?'avatar_iii':'avatar_iv',
-        appearance:p.avatar!.appearance==='cutout'&&!item.transparentVerified?'circle':p.avatar!.appearance})}/>
+        appearance:p.avatar!.appearance==='cutout'&&!avatarSupportsCutout(item)?'circle':p.avatar!.appearance})}/>
       <div className="avatar-fields">
         <label>Apparition<select value={p.avatar.moments} disabled={p.busy} onChange={e=>patch({moments:e.target.value as AvatarCustomization['moments']})}><option value="full">Pendant toute la vidéo</option><option value="both">Au début et à la fin</option><option value="intro">Au début</option><option value="outro">À la fin</option></select></label>
-        <label>Présentation<select value={p.avatar.appearance} disabled={p.busy} onChange={e=>patch({appearance:e.target.value as AvatarCustomization['appearance']})}><option value="circle">Médaillon rond</option><option value="card">Cadre portrait</option>{look?.transparentVerified&&<option value="cutout">Silhouette sans fond</option>}</select></label>
+        <label>Présentation<select value={p.avatar.appearance} disabled={p.busy} onChange={e=>patch({appearance:e.target.value as AvatarCustomization['appearance']})}><option value="circle">Médaillon rond</option><option value="card">Cadre portrait</option>{avatarSupportsCutout(look,p.avatar.engine)&&<option value="cutout">Silhouette sans fond</option>}</select></label>
         <label>Qualité<select value={p.avatar.engine} disabled={p.busy} onChange={e=>patch({engine:e.target.value as AvatarCustomization['engine']})}>{look?.engines.includes('avatar_iii')&&<option value="avatar_iii">Standard</option>}{catalog?.allowPremium&&look?.engines.includes('avatar_iv')&&<option value="avatar_iv">Avancée</option>}</select></label>
         {p.avatar.moments!=='full'&&<label>Durée maximale par passage<select value={p.avatar.maxSeconds} disabled={p.busy} onChange={e=>patch({maxSeconds:Number(e.target.value)})}>{[3,4,5,6,7,8].filter(n=>n<=(catalog?.maxSeconds??6)).map(n=><option key={n} value={n}>{n} secondes</option>)}</select></label>}
         {([['x','Position horizontale',10,90],['y','Position verticale',15,85],['width','Taille',15,100]] as const).map(([key,label,min,max])=><label key={key}>{label} · {p.avatar![key]} %<input type="range" min={min} max={max} disabled={p.busy} value={p.avatar![key]} onChange={e=>patch({[key]:Number(e.target.value)})}/></label>)}
       </div>
+      {look&&avatarCutoutStatus(look)==='unsupported'&&<p className="customizer-hint">Ce présentateur ne permet pas la silhouette sans fond. Le médaillon et le cadre portrait restent disponibles.</p>}
+      {p.avatar.appearance==='cutout'&&look&&avatarCutoutStatus(look)==='unknown'&&<p className="customizer-hint">La transparence n’a pas encore été confirmée pour ce présentateur. Si aucun passage d’avatar n’est ajouté, le supplément est restitué.</p>}
       <p className="customizer-hint">{p.avatar.moments==='full'?`Le présentateur reste visible pendant les ${p.durationSeconds} secondes de la vidéo et suit toute la voix off, avec ses pauses. Supplément : 1 crédit par tranche de ${AVATAR_SECONDS_PER_CREDIT} secondes.`:'L’avatar suit les phrases d’ouverture et de conclusion, sans rallonger la vidéo. Une phrase trop longue laisse le passage sans avatar ; elle est conservée intégralement en voix off.'} Les clips compatibles déjà générés avec le même texte, la même voix et le même rythme sont réutilisés ; leur supplément est restitué.</p>
     </>}
   </section>;

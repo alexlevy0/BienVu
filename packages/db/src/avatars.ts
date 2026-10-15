@@ -1,4 +1,4 @@
-import {AvatarSettings,AvatarLook,AvatarAdmission,AvatarCatalog,AvatarGallery,AvatarGalleryQuery,AvatarFavorites,AvatarFavoriteUpdate,DEFAULT_AVATAR_SETTINGS,avatarCreditCost,type AvatarCustomization} from '@bienvu/contracts';
+import {AvatarSettings,AvatarLook,AvatarAdmission,AvatarCatalog,AvatarGallery,AvatarGalleryQuery,AvatarFavorites,AvatarFavoriteUpdate,DEFAULT_AVATAR_SETTINGS,avatarCreditCost,avatarSupportsCutout,type AvatarCustomization} from '@bienvu/contracts';
 import type {Database} from './index';
 
 export async function avatarSettings(db:Database){
@@ -60,7 +60,16 @@ export async function saveAvatarLook(db:Database,actor:string,look:AvatarLook,so
   await db.prepare(`INSERT INTO avatar_looks(id,look_json,source_json,enabled,updated_at) VALUES(?,?,?,?,?)
     ON CONFLICT(id) DO UPDATE SET look_json=excluded.look_json,source_json=excluded.source_json,enabled=excluded.enabled,revision=revision+1,updated_at=excluded.updated_at`)
     .bind(selected.id,JSON.stringify(selected),JSON.stringify(source),selected.enabled?1:0,at).run();
-  await db.prepare('INSERT INTO avatar_audit VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),actor,'look_updated',selected.id,JSON.stringify({enabled:selected.enabled,gender:selected.gender,transparentVerified:selected.transparentVerified}),at).run();
+  await db.prepare('INSERT INTO avatar_audit VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),actor,'look_updated',selected.id,JSON.stringify({enabled:selected.enabled,gender:selected.gender,transparentVerified:selected.transparentVerified,transparency:selected.transparency??null}),at).run();
+}
+// Compare the observed look before learning a result: an older generation must
+// not overwrite a later manual decision or a more recent provider response.
+export async function recordAvatarTransparency(db:Database,look:AvatarLook,status:'supported'|'unsupported'){
+  const at=new Date().toISOString(),where="id=? AND json_extract(look_json,'$.updatedAt')=? AND json_extract(look_json,'$.transparency') IS ? AND json_extract(look_json,'$.transparency') IS NOT ?";
+  const changed=await db.prepare(`UPDATE avatar_looks SET look_json=json_set(look_json,'$.transparency',?,'$.updatedAt',?${status==='unsupported'?",'$.transparentVerified',json('false')":''}),revision=revision+1,updated_at=? WHERE ${where} RETURNING id`)
+    .bind(status,at,at,look.id,look.updatedAt,look.transparency??null,status).first<{id:string}>();
+  if(changed)await db.prepare("INSERT INTO avatar_audit VALUES(?,?,'transparency_observed',?,?,?)")
+    .bind(crypto.randomUUID(),'system:heygen',look.id,JSON.stringify({transparency:status}),at).run();
 }
 export async function setAvatarSettings(db:Database,actor:string,input:unknown,revision:number){
   const settings=AvatarSettings.parse(input),at=new Date().toISOString();
@@ -74,7 +83,8 @@ export async function admitAvatar(db:Database,avatar:AvatarCustomization|undefin
   const {settings}=await avatarSettings(db),stored=await findAvatarLook(db,avatar!.lookId);
   if(!settings.enabled||!stored?.look.enabled||stored.look.ownership!=='public'||!stored.look.engines.includes(avatar!.engine)
     ||avatar!.engine==='avatar_iv'&&!settings.allowPremium||avatar!.moments!=='full'&&avatar!.maxSeconds>settings.maxSeconds
-    ||avatar!.appearance==='cutout'&&!stored.look.transparentVerified||!voiceEnabled)throw Error('AVATAR_UNAVAILABLE');
+    ||!voiceEnabled)throw Error('AVATAR_UNAVAILABLE');
+  if(avatar!.appearance==='cutout'&&!avatarSupportsCutout(stored.look,avatar!.engine))throw Error('AVATAR_TRANSPARENCY_UNSUPPORTED');
   return JSON.stringify(AvatarAdmission.parse({settings,look:stored.look,voice}));
 }
 export type AvatarTask={id:string;agencyId:string;jobId:string;moment:'intro'|'outro'|'full';cacheKey:string;audio:string;startFrame:number;

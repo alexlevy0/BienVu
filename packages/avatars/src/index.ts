@@ -24,6 +24,9 @@ export async function downloadHeygenMedia(url:string,max=10*1024*1024,fetcher:ty
   }throw new AvatarFailure('AVATAR_MEDIA_UNAVAILABLE');
 }
 type JsonRecord=Record<string,unknown>;
+function mattingRefused(error:JsonRecord){
+  return typeof error.message==='string'&&/does not support webm output|must be trained with matting enabled|(?:matting|transparent(?: background)?|webm) (?:is |are )?(?:not supported|not enabled)/i.test(error.message);
+}
 export function heygenClient(key:string,fetcher:typeof fetch=fetch){
   if(!key||key.length>1024||/[\r\n]/.test(key))throw new AvatarFailure('AVATAR_CONFIG_INVALID');
   async function request(path:string,init:RequestInit={},billable=false):Promise<JsonRecord>{
@@ -31,9 +34,9 @@ export function heygenClient(key:string,fetcher:typeof fetch=fetch){
     catch{throw new AvatarFailure(billable?'AVATAR_UNCERTAIN':'AVATAR_UNAVAILABLE',billable);}
     let body:JsonRecord;try{body=JSON.parse(new TextDecoder().decode(await boundedBytes(response,1024*1024))) as JsonRecord;}
     catch{throw new AvatarFailure(billable?'AVATAR_UNCERTAIN':'AVATAR_RESPONSE_INVALID',billable);}
-    if(!response.ok){const raw=(body.error as JsonRecord|undefined)?.code;
+    if(!response.ok){const error=body.error as JsonRecord|undefined,raw=error?.code;
       const code=response.status===401||response.status===403?'AVATAR_AUTH_FAILED':response.status===402?'AVATAR_BALANCE_LOW':response.status===429?'AVATAR_RATE_LIMIT':
-        response.status>=500?(billable?'AVATAR_UNCERTAIN':'AVATAR_UNAVAILABLE'):raw==='request_in_progress'?'AVATAR_UNCERTAIN':'AVATAR_REQUEST_REJECTED';
+        response.status>=500?(billable?'AVATAR_UNCERTAIN':'AVATAR_UNAVAILABLE'):billable&&[400,422].includes(response.status)&&error&&mattingRefused(error)?'AVATAR_TRANSPARENCY_UNSUPPORTED':raw==='request_in_progress'?'AVATAR_UNCERTAIN':'AVATAR_REQUEST_REJECTED';
       throw new AvatarFailure(code,billable&&(response.status>=500||raw==='request_in_progress'));}
     if(!body.data||typeof body.data!=='object')throw new AvatarFailure(billable?'AVATAR_UNCERTAIN':'AVATAR_RESPONSE_INVALID',billable);
     return body;
@@ -65,7 +68,7 @@ export function heygenClient(key:string,fetcher:typeof fetch=fetch){
     async video(id:string){const body=await request('/v3/videos/'+AvatarId.parse(id)),data=body.data as JsonRecord;
       const status=String(data.status);if(!['waiting','pending','processing','completed','failed'].includes(status))throw new AvatarFailure('AVATAR_RESPONSE_INVALID');
       return {id:String(data.id??id),status,duration:typeof data.duration==='number'?data.duration:null,
-        url:typeof data.video_url==='string'?heygenMediaUrl(data.video_url):null,error:typeof data.failure_code==='string'?data.failure_code:null};
+        url:typeof data.video_url==='string'?heygenMediaUrl(data.video_url):null,error:mattingRefused({message:data.failure_message})?'AVATAR_TRANSPARENCY_UNSUPPORTED':typeof data.failure_code==='string'?data.failure_code:null};
     },
   };
 }

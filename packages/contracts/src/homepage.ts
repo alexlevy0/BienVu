@@ -17,6 +17,8 @@ export const homepageSlots=[
   {id:'avatars.circle.video',group:'Vos annonces prennent la parole',label:'Présence discrète · vidéo avec avatar',kind:'video',src:'/videos/studio-home/avatar-circle.mp4'},
   {id:'avatars.integrated.visual',group:'Vos annonces prennent la parole',label:'Présence intégrée · couverture',kind:'visual',src:'/images/studio-home/avatar-integrated.webp'},
   {id:'avatars.integrated.video',group:'Vos annonces prennent la parole',label:'Présence intégrée · vidéo avec avatar',kind:'video',src:'/videos/studio-home/avatar-integrated.mp4'},
+  {id:'comparison.classic.video',group:'Avec et sans animations IA',label:'Version sans animation IA',kind:'video',src:'/videos/studio-home/comparison-classic.mp4'},
+  {id:'comparison.ai.video',group:'Avec et sans animations IA',label:'Version avec animation IA',kind:'video',src:'/videos/studio-home/comparison-ai.mp4'},
   {id:'life.photo',group:'Vos photos prennent vie',label:'Photo de départ',kind:'image',src:photo},
   {id:'life.visual',group:'Vos photos prennent vie',label:'Couverture de la vidéo',kind:'visual',src:photo},
   {id:'life.video',group:'Vos photos prennent vie',label:'Vidéo de démonstration',kind:'video',src:movie},

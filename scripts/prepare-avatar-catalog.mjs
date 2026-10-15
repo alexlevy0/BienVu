@@ -58,7 +58,7 @@ try {await Promise.all(Array.from({length:6},async()=>{while(cursor<selected.len
     await writeFile(input,source);await run(ffmpeg,['-hide_banner','-loglevel','error','-y','-i',input,'-t','8','-vf',"scale='min(320,iw)':-2",'-c:v','libx264','-preset','veryfast','-crf','29','-pix_fmt','yuv420p','-an','-movflags','+faststart',output],{timeout:60000,env:{...process.env,DYLD_LIBRARY_PATH:binaries}});
     const bytes=await readFile(output);await upload(avatarCatalogKey(id,'preview',videoVersion),bytes,'video/mp4');row.previewBytes=bytes.length;row.previewReady=true;
    }catch{row.previewError='DEMO_OPTIMIZATION_UNAVAILABLE';}}
-  const look={...entry.look,enabled:true,transparentVerified:prior?.look.transparentVerified??false,
+  const look={...entry.look,enabled:true,transparentVerified:prior?.look.transparentVerified??false,transparency:prior?.look.transparency,
     thumbnail:`/api/avatars/${id}/media?kind=thumbnail&v=${version}`,
     preview:entry.source.video?`/api/avatars/${id}/media?kind=preview&v=${await avatarMediaVersion(entry.source.video)}`:null};
   if(apply){await saveAvatarLook(db,actor.id,look,entry.source);row.activated=true;}else{prepared.push({look,source:entry.source});row.prepared=true;}

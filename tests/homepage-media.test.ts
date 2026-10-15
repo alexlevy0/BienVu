@@ -110,7 +110,7 @@ test('Home : banque globale privée, copie indépendante, publication atomique e
   await assert.rejects(db.prepare("UPDATE homepage_audit SET action='discard'").run(),/HOMEPAGE_AUDIT_IMMUTABLE/);
   await assert.rejects(db.prepare('DELETE FROM homepage_audit').run(),/HOMEPAGE_AUDIT_IMMUTABLE/);
   await assign('hero.video',null);await publish();assert.equal((await homepageMediaRequest(req(live.url,''),env,live.id)).status,404,'Une sélection retirée n’est plus lisible publiquement');
-  assert.equal(homepageSlots.length,38);
+  assert.equal(homepageSlots.length,40);
  });
  await t.test('kit du mandat : les dix nouveaux emplacements acceptent et publient les médias de la banque',async()=>{
   const slots=homepageSlots.filter(slot=>slot.group==='Un mandat, sept contenus');
@@ -138,6 +138,18 @@ test('Home : banque globale privée, copie indépendante, publication atomique e
   await publish();const after=await readHomepageConfig(db);
   const selections=JSON.parse((await homepageSettings(db)).published_json);for(const [slot,id] of Object.entries(previousSelections))assert.equal(selections[slot],id);
   for(const slot of slots){const asset=after.slots[slot.id]!;assert.equal(asset.kind,slot.kind==='video'?'video':'image');assert.equal((await homepageMediaRequest(req(asset.url,''),env,asset.id)).status,200);}
+ });
+ await t.test('comparateur : deux vidéos configurables, aperçu privé et publication conservant les autres emplacements',async()=>{
+  const slots=homepageSlots.filter(slot=>slot.group==='Avec et sans animations IA'),before=await readHomepageConfig(db);
+  assert.equal(slots.length,2);assert.ok(slots.every(slot=>slot.kind==='video'));
+  for(const [index,slot] of slots.entries()){
+   await assert.rejects(assign(slot.id,{kind:'photo',id:second.listing.photos[1].id}),/VALIDATION_ERROR/);
+   selected=await assign(slot.id,{kind:'library',id:index?second.library.id:first.library.id});
+   const id=selected.draft[slot.id]!;assert.equal((await homepageMediaRequest(req('/api/homepage/media/'+id,''),env,id)).status,404);
+  }
+  assert.deepEqual(await readHomepageConfig(db),before);await publish();const after=await readHomepageConfig(db);
+  for(const slot of slots){assert.equal(after.slots[slot.id]?.kind,'video');assert.ok(after.slots[slot.id]?.url.startsWith('/api/homepage/media/'));}
+  for(const [slot,asset] of Object.entries(before.slots))assert.equal(after.slots[slot as keyof typeof after.slots]?.id,asset.id);
  });
  await t.test('SEO : déduplication publique, aperçu allégé, repli et révocation des variantes',async()=>{
   const config=await readHomepageConfig(db),groups=new Map<string,Set<string>>();for(const asset of Object.values(config.slots)){const group=groups.get(asset.sha256)??new Set<string>();group.add(asset.url);groups.set(asset.sha256,group);}for(const group of groups.values())assert.equal(group.size,1);

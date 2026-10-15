@@ -7,7 +7,7 @@ import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import {AvatarLook,DEFAULT_AVATAR_SETTINGS,defaultAvatarCustomization,avatarCreditCost,generationCreditCost,defaultVideoCustomization,
   avatarVoiceWarning,voiceGender,VideoManifest,GenerationRequest,cartesiaParisianVoices,editorCanReuseVoice} from '../packages/contracts/src/index';
 import {heygenClient,AvatarFailure,verifyHeygenSignature,downloadHeygenMedia} from '../packages/avatars/src/index';
-import {admitGeneration,findGeneration,generationView,failGeneration,avatarSettings,setAvatarSettings,saveAvatarLook,jobAvatarTasks,creditBalance,creditHistory,trialInput} from '../packages/db/src/index';
+import {admitGeneration,findGeneration,generationView,failGeneration,avatarSettings,setAvatarSettings,saveAvatarLook,findAvatarLook,jobAvatarTasks,creditBalance,creditHistory,trialInput} from '../packages/db/src/index';
 import {migrateNarrationProbe,seedNarrationFixture} from '../scripts/narration-fixtures';
 import {videoFixture,videoReport} from '../fixtures/video';
 import {toneFixture} from '../fixtures/voice';
@@ -82,22 +82,24 @@ test('D1 et pipeline avatars simulés : réservations, reprise sans double dépe
   await saveAvatarLook(env.DB,'fixture-admin',look,{image:null,video:null});
   await setAvatarSettings(env.DB,'fixture-admin',{...DEFAULT_AVATAR_SETTINGS,enabled:true,defaultLookId:look.id,concurrent:1},1);
   await assert.rejects(setAvatarSettings(env.DB,'fixture-admin',DEFAULT_AVATAR_SETTINGS,1),/CONFLICT/);
-  await assert.rejects(admitGeneration(env.DB,scope.agencyId,'avatar-key-unreviewed-cutout',{...input,customization:{...customization,avatar:{...avatar,appearance:'cutout'}}},'true'),/AVATAR_UNAVAILABLE/);
+  await saveAvatarLook(env.DB,'fixture-admin',{...look,transparency:'unsupported'},{image:null,video:null});
+  await assert.rejects(admitGeneration(env.DB,scope.agencyId,'avatar-key-incompatible-cutout',{...input,customization:{...customization,avatar:{...avatar,appearance:'cutout'}}},'true'),/AVATAR_TRANSPARENCY_UNSUPPORTED/);
+  await saveAvatarLook(env.DB,'fixture-admin',look,{image:null,video:null});
   const config=frenchVoiceConfig(customization.voice,'fixture'),tts=googleTts(config as Parameters<typeof googleTts>[0],async()=>'fixture-token-never-networked',{fetch:async(_url,init)=>{
     const bytes=toneFixture(1500);bytes[100]=createHash('sha256').update(init!.body as string).digest()[0];
     return Response.json({audioContent:Buffer.from(bytes).toString('base64')});
   }});
   const providers={mode:'mock' as const,script:{model:'gpt-5.4-mini',plan:async():Promise<never>=>{throw Error('NO_OPENAI_CALL');}},voice:{config,synthesize:tts.synthesize}};
-  let creates=0,done=false;const fetchBefore=globalThis.fetch;t.after(()=>{globalThis.fetch=fetchBefore;});
+  let creates=0,done=false,rejectMatting=false,mattingRequests=0;const fetchBefore=globalThis.fetch;t.after(()=>{globalThis.fetch=fetchBefore;});
   globalThis.fetch=async(url)=>{const path=new URL(String(url)).pathname;
     if(path==='/v3/users/me')return Response.json({data:{billing_type:'wallet',wallet:{remaining_balance:5,currency:'usd',auto_reload:{enabled:false}}}});
     if(path==='/v3/assets')return Response.json({data:{asset_id:'a_fixture'}});
-    if(path==='/v3/videos'){creates++;return Response.json({data:{video_id:'v_fixture_'+creates}});}
+    if(path==='/v3/videos'){if(rejectMatting){mattingRequests++;return Response.json({error:{code:'invalid_parameter',message:'This video avatar does not support webm output. The avatar must be trained with matting enabled.'}},{status:400});}creates++;return Response.json({data:{video_id:'v_fixture_'+creates}});}
     if(path.startsWith('/v3/videos/'))return Response.json({data:{id:path.split('/').at(-1),status:done?'completed':'processing',duration:1.5,video_url:'https://files.heygen.ai/fixture.mp4'}});
     if(String(url)==='https://files.heygen.ai/fixture.mp4')return new Response(new Uint8Array([0,0,0,24,102,116,121,112,1,2,3,4]));
     throw Error('UNEXPECTED_EXTERNAL_CALL');};
   const runtime={...env,HEYGEN_ENABLED:'true',HEYGEN_API_KEY:'fixture-key'};
-  async function create(key:string){const row=await admitGeneration(env.DB,scope.agencyId,key,input,'true');await env.DB.prepare("UPDATE jobs SET status='scripting',stage='scripting' WHERE id=?").bind(row.jobId).run();await prepareJobNarration(env,scope.agencyId,row.jobId,providers);return row;}
+  async function create(key:string,request=input){const row=await admitGeneration(env.DB,scope.agencyId,key,request,'true');await env.DB.prepare("UPDATE jobs SET status='scripting',stage='scripting' WHERE id=?").bind(row.jobId).run();await prepareJobNarration(env,scope.agencyId,row.jobId,providers);return row;}
   const row=await create('avatar-idempotency-fixture-1');assert.equal(generationView(row).creditsReserved,2);assert.equal((await creditBalance(env.DB,scope.agencyId)).reserved,2);
   assert.equal((await admitGeneration(env.DB,scope.agencyId,'avatar-idempotency-fixture-1',input,'true')).jobId,row.jobId);
   await submitJobAvatars(runtime,scope.agencyId,row.jobId);await submitJobAvatars(runtime,scope.agencyId,row.jobId);assert.equal(creates,1);
@@ -137,6 +139,14 @@ test('D1 et pipeline avatars simulés : réservations, reprise sans double dépe
   await env.DB.prepare("UPDATE jobs SET stage='rendering' WHERE id=?").bind(reuse.jobId).run();
   await env.DB.prepare("UPDATE generation_runs SET expires_at=? WHERE job_id=?").bind(new Date(Date.now()-1000).toISOString(),reuse.jobId).run();
   await assert.rejects(editExistingVideo(env,scope.agencyId,reuse.jobId,'recover-avatar-expired',AbortSignal.timeout(20000)),/NOT_FOUND/);
+  const cutoutInput={...input,customization:{...customization,avatar:{...avatar,appearance:'cutout' as const}}},cutout=await create('avatar-unverified-cutout',cutoutInput);
+  rejectMatting=true;await submitJobAvatars(runtime,scope.agencyId,cutout.jobId);rejectMatting=false;
+  assert.equal(mattingRequests,1,'Le refus est appris avant le second passage, sans nouvelle tentative payante');
+  assert.equal((await findAvatarLook(env.DB,look.id))!.look.transparency,'unsupported');assert.equal((await jobAvatarTasks(env.DB,scope.agencyId,cutout.jobId)).every(task=>task.state==='failed'&&task.errorCode==='AVATAR_TRANSPARENCY_UNSUPPORTED'&&task.reservedMicros===0),true);
+  const withoutAvatar=await prepareJobVideo(env,scope.agencyId,cutout.jobId);assert.equal(withoutAvatar.manifest.avatar?.clips.length??0,0);
+  await env.DB.prepare('INSERT INTO generation_artifacts VALUES(?,?,?,?)').bind(cutout.jobId,`agencies/${scope.agencyId}/jobs/${cutout.jobId}/master.mp4`,JSON.stringify(videoReport(withoutAvatar.hash,withoutAvatar.manifest)),new Date().toISOString()).run();
+  await env.DB.prepare("UPDATE jobs SET status='ready',stage='rendering',lease_until=NULL WHERE id=?").bind(cutout.jobId).run();
+  assert.equal(generationView((await findGeneration(env.DB,scope.agencyId,cutout.jobId))!).avatar!.creditsUsed,0,'Le supplément est restitué si aucun avatar n’a été ajouté');
   const policy=await avatarSettings(env.DB);await setAvatarSettings(env.DB,'fixture-admin',{...policy.settings,monthlyUsd:0},policy.revision);
   const capped=await create('avatar-idempotency-fixture-3');
   // Force a different audio hash so the budget test cannot reuse a library file.

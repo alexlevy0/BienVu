@@ -147,7 +147,7 @@ export async function admitGeneration(db:Database,agencyId:string,key:string,inp
   if(saved)try{selectedAnimationIndices((parsed.data.customization?.photoOrder??saved.photos.map(p=>p.sourceOrder)),parsed.data.customization);}catch{throw new GenerationFailure('VALIDATION_ERROR');}
   if(saved&&verifyPhotos)await verifyPhotos(saved);
   const id=crypto.randomUUID(),at=new Date(now).toISOString(),selectedVoice=parsed.data.customization?.voice??(await voiceSettings(db)).voice;
-  let avatarConfig:string|null;try{avatarConfig=await admitAvatar(db,parsed.data.customization?.avatar,selectedVoice,parsed.data.voiceEnabled!==false);}catch{throw new GenerationFailure('AVATAR_UNAVAILABLE');}
+  let avatarConfig:string|null;try{avatarConfig=await admitAvatar(db,parsed.data.customization?.avatar,selectedVoice,parsed.data.voiceEnabled!==false);}catch(error){throw new GenerationFailure(error instanceof Error&&error.message==='AVATAR_TRANSPARENCY_UNSUPPORTED'?'AVATAR_TRANSPARENCY_UNSUPPORTED':'AVATAR_UNAVAILABLE');}
   try {await db.prepare(`INSERT INTO generation_runs(job_id,agency_id,allocation_id,reservation_id,idempotency_key,input_hash,input_json,brand_json,
     created_at,deadline,expires_at,month,credit_version,credits_total,animations_requested,reuse_pricing,animations_reused,animation_reuses_json,funding_version,financial_mode,selected_voice,default_map_json,avatar_credits,avatar_config_json,avatar_extra_credits) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,1,(SELECT mode FROM credit_payment_policy WHERE id=1),?,?,?,?,?)`)
     .bind(id,agencyId,grant.id,crypto.randomUUID(),key,hash,body,JSON.stringify(brand.data),at,new Date(now+7200_000).toISOString(),

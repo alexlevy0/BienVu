@@ -10,7 +10,7 @@ import {streamAvatarCatalogue} from './avatar-media-stream';
 type Env=AuthEnvironment&HeygenEnvironment&{MEDIA:R2Bucket;SUPER_ADMIN_EMAIL?:string;GENERATION_SERVICE?:Fetcher;GENERATION_TOKEN?:string};
 const update=z.union([z.object({settings:AvatarSettings,revision:z.number().int().positive()}).strict(),
   z.object({enableLooks:z.array(AvatarId).min(1).max(100)}).strict(),
-  z.object({lookId:AvatarId,enabled:z.boolean(),transparentVerified:z.boolean()}).strict()]);
+  z.object({lookId:AvatarId,enabled:z.boolean(),transparentVerified:z.boolean(),transparency:z.enum(['supported','unsupported']).nullable().optional()}).strict()]);
 export async function publicAvatarRequest(env:Env){return respond(async()=>Response.json(await avatarCatalog(env.DB)));}
 export async function publicAvatarGalleryRequest(request:Request,env:Pick<Env,'DB'>){return respond(async()=>{
   const input=AvatarGalleryQuery.safeParse(Object.fromEntries(new URL(request.url).searchParams));
@@ -30,7 +30,9 @@ export async function adminAvatarRequest(request:Request,env:Env){return respond
         for(const value of stored)if(value&&!value.look.enabled)await saveAvatarLook(env.DB,actor.id,{...value.look,enabled:true,updatedAt:new Date().toISOString()},value.source);
       }
       else {const stored=await findAvatarLook(env.DB,input.data.lookId);if(!stored)throw new RequestFailure('NOT_FOUND');
-        await saveAvatarLook(env.DB,actor.id,{...stored.look,enabled:input.data.enabled,transparentVerified:input.data.transparentVerified,updatedAt:new Date().toISOString()},stored.source);}
+        if(input.data.transparency==='unsupported'&&input.data.transparentVerified)throw new RequestFailure('VALIDATION_ERROR');
+        const transparency=input.data.transparency===null?undefined:input.data.transparency??(input.data.transparentVerified!==stored.look.transparentVerified?(input.data.transparentVerified?'supported':'unsupported'):stored.look.transparency);
+        await saveAvatarLook(env.DB,actor.id,{...stored.look,enabled:input.data.enabled,transparentVerified:input.data.transparentVerified,transparency,updatedAt:new Date().toISOString()},stored.source);}
     }else if(request.method==='POST'){
       const input=z.union([z.object({action:z.literal('sync'),type:z.enum(['studio_avatar','photo_avatar','digital_twin']),token:z.string().max(512).optional()}).strict(),z.object({action:z.literal('reconcile')}).strict()]).safeParse(await boundedJson(request,2048));
       if(!input.success)throw new RequestFailure('VALIDATION_ERROR');if(!env.HEYGEN_API_KEY)throw new RequestFailure('AVATAR_UNAVAILABLE');
@@ -41,7 +43,7 @@ export async function adminAvatarRequest(request:Request,env:Env){return respond
       }
       const page=await heygenClient(env.HEYGEN_API_KEY).looks(input.data.type,input.data.token);
       for(const entry of page.looks){const current=await findAvatarLook(env.DB,entry.look.id);
-        const look:AvatarLook={...entry.look,enabled:current?.look.enabled??false,transparentVerified:current?.look.transparentVerified??false,
+        const look:AvatarLook={...entry.look,enabled:current?.look.enabled??false,transparentVerified:current?.look.transparentVerified??false,transparency:current?.look.transparency,
           thumbnail:entry.source.image?`/api/avatars/${entry.look.id}/media?kind=thumbnail&v=${await avatarMediaVersion(entry.source.image)}`:null,
           preview:entry.source.video?`/api/avatars/${entry.look.id}/media?kind=preview&v=${await avatarMediaVersion(entry.source.video)}`:null};
         await saveAvatarLook(env.DB,actor.id,look,entry.source);}

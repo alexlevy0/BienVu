@@ -39,8 +39,16 @@ export const avatarPriceUsdPerMinute=(engine:AvatarCustomization['engine'],type:
 export const AvatarLook=z.object({id:AvatarId,name:z.string().min(1).max(160),gender:AvatarGender,
   type:z.enum(['studio_avatar','photo_avatar','digital_twin']),engines:z.array(AvatarEngine).min(1).max(2),
   enabled:z.boolean(),thumbnail:z.string().nullable(),preview:z.string().nullable(),transparentVerified:z.boolean(),
-  ownership:z.enum(['public','private']),updatedAt:z.string()}).strict();
+  ownership:z.enum(['public','private']),updatedAt:z.string(),transparency:z.enum(['supported','unsupported']).optional()}).strict();
 export type AvatarLook=z.infer<typeof AvatarLook>;
+// The v3 catalogue does not expose matting support. A legacy false verification
+// flag means untested, not incompatible. Only a confirmed refusal blocks WebM.
+export function avatarCutoutStatus(look:AvatarLook):'supported'|'unsupported'|'unknown'{
+  return look.transparency??(look.transparentVerified?'supported':'unknown');
+}
+export function avatarSupportsCutout(look:AvatarLook|undefined,engine?:z.infer<typeof AvatarEngine>){
+  return Boolean(look&&(!engine||look.engines.includes(engine))&&avatarCutoutStatus(look)!=='unsupported');
+}
 export const AvatarSettings=z.object({enabled:z.boolean(),allowPremium:z.boolean(),defaultLookId:AvatarId.nullable(),
   maxSeconds:z.number().int().min(3).max(8),monthlyUsd:z.number().min(0).max(10000),perVideoUsd:z.number().min(.05).max(10),
   concurrent:z.number().int().min(1).max(10),priceIII:z.number().min(.01).max(100),priceIVPhoto:z.number().min(.01).max(100),

@@ -1,6 +1,6 @@
 # Avatars IA facultatifs
 
-L’option est dans **Personnaliser → Avatar IA**, et dans les réglages audio de l’Éditeur. Elle est désactivée dans les nouveaux projets et réservée aux comptes connectés. L’utilisateur choisit le présentateur, l’ouverture, la conclusion, les deux ou **Pendant toute la vidéo**, le médaillon, le cadre ou une silhouette vérifiée sans fond, la taille et la position. Le présentateur reprend la voix off existante. Un choix de voix féminine avec un avatar masculin, ou l’inverse, affiche un avertissement non bloquant. Aucun genre n’est déduit d’une photo ou d’un nom : une métadonnée inconnue n’entraîne pas d’alerte.
+L’option est dans **Personnaliser → Avatar IA**, et dans les réglages audio de l’Éditeur. Elle est désactivée dans les nouveaux projets et réservée aux comptes connectés. L’utilisateur choisit le présentateur, l’ouverture, la conclusion, les deux ou **Pendant toute la vidéo**, le médaillon, le cadre ou une silhouette sans fond si elle est éligible, la taille et la position. Le présentateur reprend la voix off existante. Un choix de voix féminine avec un avatar masculin, ou l’inverse, affiche un avertissement non bloquant. Aucun genre n’est déduit d’une photo ou d’un nom : une métadonnée inconnue n’entraîne pas d’alerte.
 
 La taille est réglable de **15 à 100 % de la largeur de la vidéo**, avec une valeur initiale de 25 %. Le même réglage sert à l’aperçu et à l’export. Augmenter la taille ne nécessite pas de nouvelle génération HeyGen : le clip est redimensionné au montage. Les Workers web/génération et l’image du renderer doivent tous accepter cette plage.
 
@@ -43,7 +43,17 @@ Les fichiers sont conservés dans le R2 privé, sous le job, avant le rendu. Le 
 - Notification facultative : `HEYGEN_WEBHOOK_SECRET` sur le Worker web, endpoint `https://bienvu.online/api/heygen/webhook`, événements `avatar_video.success` et `avatar_video.fail`. Signature HMAC-SHA256 du corps brut, en-tête `signature`. Les URLs du webhook ne sont jamais utilisées ; le statut et le fichier sont relus auprès de HeyGen.
 - L’image Linux du renderer doit inclure `AvatarOverlay` et la validation WebM/VP9 avec alpha. Une simple mise à jour web ne suffit pas.
 
-Le superadmin synchronise le catalogue par lots de 50, choisit les présentateurs proposés, leur défaut et la transparence réellement vérifiée. Les aperçus du fournisseur illustrent le présentateur ; ils ne sont pas une synthèse de la voix française sélectionnée. Les avatars personnels et leur création ne font pas partie de cette version.
+Le superadmin synchronise le catalogue par lots de 50, choisit les présentateurs proposés, leur défaut et la disponibilité de la silhouette sans fond. Les aperçus du fournisseur illustrent le présentateur ; ils ne sont pas une synthèse de la voix française sélectionnée. Les avatars personnels et leur création ne font pas partie de cette version.
+
+### Silhouette sans fond
+
+La sortie v3 `output_format: webm` demande le détourage natif à HeyGen, avec le même WAV et le moteur choisi. Le [catalogue HeyGen](https://developers.heygen.com/docs/avatar-looks) n’expose pas la compatibilité avec le détourage : les avatars anciens peuvent nécessiter un entraînement avec matting, même si les différents moteurs et types d’avatars acceptent le format. Voir [Transparent Background Videos](https://developers.heygen.com/transparent-background-videos).
+
+Le booléen historique `transparentVerified: false` signifie **non vérifié**, pas incompatible. Tous les avatars proposés peuvent donc demander une silhouette, sauf incompatibilité connue. Le champ JSON facultatif `transparency` distingue `supported`, `unsupported` et l’absence de résultat. Le superadmin propose les choix « Automatique · à confirmer », « Compatibilité confirmée » et « Incompatible ». Le changement de présentateur conserve la silhouette quand elle reste éligible ; un avatar incompatible conserve ses présentations en médaillon et cadre portrait.
+
+Une génération WebM réussie confirme la compatibilité. Un refus explicite de HeyGen concernant le matting marque le présentateur incompatible et évite les demandes suivantes, y compris le second passage court. Une panne ou une erreur générale ne change pas cette donnée. L’apprentissage compare l’état observé et sa date avant d’écrire : un résultat ancien ne remplace pas une décision plus récente du superadmin. Les synchronisations et préparations de médias conservent cet état. Les choix sont contrôlés de nouveau côté serveur avant toute réservation et avant l’appel de création. Si aucun avatar n’est ajouté au montage, le supplément suit le remboursement existant. Aucun appel payant de détection n’est effectué ; les résultats sont appris uniquement à partir des générations demandées par les clients.
+
+Le champ est stocké dans le catalogue JSON existant, sans migration SQL. Déployer le Worker de génération avant le web, car les nouveaux instantanés d’admission peuvent contenir ce champ facultatif. Les anciens instantanés restent valides.
 
 Les suivis PostHog ajoutent les étapes, les coûts estimés et des contrôles déterministes de complétude. Les coûts réels restent inconnus jusqu’au rapprochement. Aucun juge LLM payant n’est ajouté.
 

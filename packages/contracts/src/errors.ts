@@ -3,6 +3,7 @@ import {z} from 'zod';
 export const publicErrors = {
   AVATAR_LOGIN_REQUIRED: [401, 'Connectez-vous pour ajouter un avatar IA à votre vidéo.'],
   AVATAR_UNAVAILABLE: [503, 'Ce présentateur ou ses réglages sont momentanément indisponibles. Choisissez un autre avatar ou désactivez cette option.'],
+  AVATAR_TRANSPARENCY_UNSUPPORTED: [422, 'Ce présentateur ne permet pas la silhouette sans fond. Choisissez un médaillon, un cadre portrait ou un autre avatar.'],
   AVATAR_BUDGET_LIMIT: [429, 'Le budget des avatars IA est atteint. Vous pouvez créer votre vidéo sans avatar.'],
   AVATAR_BUSY: [429, 'Les présentateurs sont en cours de préparation. Réessayez dans quelques instants.'],
   MAP_UNAVAILABLE: [503, 'La carte est momentanément indisponible. Réessayez ou désactivez la séquence de carte.'],

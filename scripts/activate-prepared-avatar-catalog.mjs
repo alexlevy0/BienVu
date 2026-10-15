@@ -17,7 +17,7 @@ let cursor=0,changed=0;
 await Promise.all(Array.from({length:6},async()=>{while(cursor<prepared.length){const item=prepared[cursor++],look=AvatarLook.parse(item.look);
  if(look.ownership!=='public'||!look.enabled||!look.engines.includes('avatar_iii'))throw Error('PUBLIC_STANDARD_ONLY');
  const old=await findAvatarLook(db,look.id);if(old?.look.enabled&&old.source.image===item.source.image&&old.source.video===item.source.video)continue;
- await saveAvatarLook(db,actor.id,{...look,transparentVerified:old?.look.transparentVerified??false},item.source);changed++;
+ await saveAvatarLook(db,actor.id,{...look,transparentVerified:old?.look.transparentVerified??false,transparency:old?.look.transparency??look.transparency},item.source);changed++;
  if(changed%100===0)console.log(JSON.stringify({activated:changed}));
 }}));
 assert.deepEqual(await query('SELECT * FROM avatar_settings'),settings,'Default, provider spending and premium settings unchanged');
