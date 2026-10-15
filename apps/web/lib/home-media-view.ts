@@ -10,11 +10,12 @@ export function resolveHomeMedia(config: HomepageConfig, id: HomepageSlot): Home
     custom: true, title: asset.title, agency: asset.agency, locality: asset.locality, duration: asset.durationMs ? asset.durationMs / 1000 : null, width: asset.width, height: asset.height};
   const comparison=homeComparisonAssets.find(item=>item.src===slot.src);
   return {src: comparison?`/api/homepage/comparison/${comparison.id}`:slot.src, poster: slot.kind === 'video' ? slot.src.replace('/videos/', '/images/').replace(/\.mp4$/, '.webp') : null,
-    kind: slot.kind === 'video' ? 'video' : 'image', custom: false, title: null, agency: null, locality: null, duration: null, width: null, height: null};
+    kind: slot.kind === 'video' ? 'video' : 'image', custom: false, title: null, agency: null, locality: null,
+    duration:comparison&&'duration' in comparison?comparison.duration:null,width:comparison&&'width' in comparison?comparison.width:null,height:comparison&&'height' in comparison?comparison.height:null};
 }
 export function imageWidthUrl(src: string, width: number) {
   if (src.startsWith('/api/homepage/media/')) {const url = new URL(src, 'https://bienvu.online'); url.searchParams.set('w', String(width)); return `${url.pathname}${url.search}`;}
-  if (/^\/images\/studio-home\/(paris|sud|lyon|bordeaux|comparison-ai|comparison-classic)\.webp$/.test(src)) return src.replace('.webp', `-${width}.webp`);
+  if (/^\/images\/studio-home\/(paris|sud|lyon|bordeaux|comparison-ai|comparison-classic|renders-standard|renders-avatar|renders-avatar-ai)\.webp$/.test(src)) return src.replace('.webp', `-${width}.webp`);
   return src;
 }
 export function previewVideoUrl(src: string,width:540|720=720) {

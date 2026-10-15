@@ -8,7 +8,12 @@ export type VideoPairState={requested:boolean;playing:boolean;loading:boolean;re
 // becoming ready resumes the pair only if the visitor still wants to play.
 export function synchronizeVideos(primary:PairVideo,secondary:PairVideo,onChange:(state:VideoPairState)=>void,
   initialTime=0,fallbackDuration=0){
-  const players=[primary,secondary];
+  return synchronizeVideoGroup([primary,secondary],onChange,initialTime,fallbackDuration);
+}
+export function synchronizeVideoGroup(players:readonly PairVideo[],onChange:(state:VideoPairState)=>void,
+  initialTime=0,fallbackDuration=0){
+  if(!players.length||players.length>3||new Set(players).size!==players.length)throw Error('INVALID_VIDEO_GROUP');
+  const [primary,...followers]=players;
   let requested=false,loading=false,error=false,disposed=false,epoch=0,starting:number|null=null;
   let target:number|null=initialTime,frame:number|null=null,timer:ReturnType<typeof setTimeout>|null=null;
   const duration=()=>{const known=players.map(p=>p.duration).filter(d=>Number.isFinite(d)&&d>0);return known.length?Math.min(...known):fallbackDuration;};
@@ -30,7 +35,7 @@ export function synchronizeVideos(primary:PairVideo,secondary:PairVideo,onChange
   const tick=()=>{
     frame=null;timer=null;if(disposed||!requested||loading||error)return;
     if(duration()>0&&primary.currentTime>=duration()-.035){finish();return;}
-    if(!secondary.seeking&&Math.abs(primary.currentTime-secondary.currentTime)>.12){seek(primary.currentTime);return;}
+    if(followers.some(player=>!player.seeking&&Math.abs(primary.currentTime-player.currentTime)>.12)){seek(primary.currentTime);return;}
     schedule();
   };
   const schedule=()=>{
@@ -42,7 +47,7 @@ export function synchronizeVideos(primary:PairVideo,secondary:PairVideo,onChange
     if(disposed||!requested||error||starting!==null)return;
     applyTarget();
     if(!players.every(p=>p.readyState>=3&&!p.seeking)){loading=true;report();return;}
-    const token=epoch;starting=token;secondary.muted=true;
+    const token=epoch;starting=token;followers.forEach(player=>{player.muted=true;});
     void Promise.all(players.map(p=>p.play())).then(()=>{
       if(disposed||token!==epoch||!requested)return;
       starting=null;loading=false;report();schedule();

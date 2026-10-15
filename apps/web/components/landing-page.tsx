@@ -8,6 +8,8 @@ import {StudioSidebar} from './studio-sidebar';
 import {HomeShowcase} from './home-showcase';
 import {HomeAvatarShowcase} from './home-avatar-showcase';
 import {HomeAnimationComparison} from './home-animation-comparison';
+import {HomeRenderComparison} from './home-render-comparison';
+import {homeRenderPresetKey,parseHomeRenderPreset,type HomeRenderChoice,type HomeRenderPreset} from '../lib/home-render-presets';
 import {HomeMandateKit} from './home-mandate-kit';
 import {HomeSharing} from './home-sharing';
 import {HomeEditorShowcase} from './home-editor-showcase';
@@ -53,6 +55,13 @@ export function LandingPage() {
   const [conversationActive, setConversationActive] = useState(false);
   const [heroPlaying, setHeroPlaying] = useState(false);
   const [comparisonPlaying,setComparisonPlaying]=useState(false);
+  const [rendersPlaying,setRendersPlaying]=useState(false),[renderChoice,setRenderChoice]=useState<HomeRenderChoice|null>(null);
+  useEffect(()=>{try{const preset=parseHomeRenderPreset(sessionStorage.getItem(homeRenderPresetKey));if(preset)setRenderChoice({preset,revision:1});}catch{/* Optional choice persistence. */}},[]);
+  function chooseRender(preset:HomeRenderPreset|null){
+    setRenderChoice(current=>preset?{preset,revision:(current?.revision??0)+1}:null);
+    try{if(preset)sessionStorage.setItem(homeRenderPresetKey,preset);else sessionStorage.removeItem(homeRenderPresetKey);}catch{/* The current choice remains usable. */}
+    focusComposer();
+  }
   const modal = useRef<HTMLDialogElement>(null);
   const modalOpen = dialog !== null;
   useEffect(() => {
@@ -77,7 +86,7 @@ export function LandingPage() {
       <main className={`home-content${conversationActive ? ' home-content-conversation' : ''}`} id="home-content" tabIndex={-1}>
         <section className={`home-hero${conversationActive?'':' home-hero-dashboard'}`} aria-label={conversationActive?'Créer votre vidéo':undefined} aria-labelledby={conversationActive?undefined:'home-title'}>
           <div className={`home-hero-intro${conversationActive?' home-hero-intro-leaving':''}`} inert={conversationActive}><h1 id="home-title"><span>Vous rentrez le mandat.</span> BienVu s'occupe du <em><strong>marketing</strong>.</em></h1><p className="home-intro"><strong>Création, personnalisation et publication. Tout est automatisé.</strong></p></div>
-          <HomeCreate onLayoutChange={setConversationActive}/>
+          <HomeCreate onLayoutChange={setConversationActive} renderChoice={renderChoice} onClearRenderChoice={()=>chooseRender(null)}/>
           <aside className="home-hero-showcase" hidden={conversationActive} aria-label="Un aperçu de votre prochaine vidéo">
             <p>Votre prochain coup de cœur, en vidéo.</p>
             <HomeHeroVideo paused={modalOpen || conversationActive} onPlayingChange={setHeroPlaying}/>
@@ -85,8 +94,9 @@ export function LandingPage() {
         </section>
         {!conversationActive && <section id="explorer" className="home-discover" aria-labelledby="home-discover-title"><div className="home-discover-heading"><div><h2 id="home-discover-title">À découvrir sur BienVu</h2><p>Des inspirations pour donner une autre dimension à vos biens.</p></div><button type="button" className="home-explore-link" onClick={() => {setCategory('Tous'); setDialog('explore');}}>Tout explorer <HomeIcon name="external" size={17}/></button></div><div className="home-example-grid">{examples.map(example => <ExampleCard key={example.id} example={example} onPlay={play}/>)}</div></section>}
         {!conversationActive && <HomeAvatarShowcase paused={modalOpen}/>}
+        {!conversationActive && <HomeRenderComparison paused={modalOpen} selected={renderChoice?.preset} onChoose={chooseRender} onPlayingChange={setRendersPlaying}/>}
         {!conversationActive && <HomeAnimationComparison paused={modalOpen} onCreate={focusComposer} onPlayingChange={setComparisonPlaying}/>}
-        {!conversationActive && <HomeShowcase paused={modalOpen || heroPlaying || comparisonPlaying} onCreate={focusComposer}/>}
+        {!conversationActive && <HomeShowcase paused={modalOpen || heroPlaying || comparisonPlaying || rendersPlaying} onCreate={focusComposer}/>}
         {!conversationActive && <HomeMandateKit onPlay={playSlot} onCreate={focusComposer}/>}
         {!conversationActive && <HomeSharing onPlay={context => playSlot(`share.${context}.video`)} onCreate={focusComposer}/>}
         {!conversationActive && <HomeVitrineShowcase/>}

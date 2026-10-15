@@ -12,10 +12,17 @@ function fixture(){
  const request=(headers:HeadersInit={},method='GET',id:string=asset.id)=>publicHomeComparisonMedia(bucket,id,new Request('https://bienvu.test/asset',{headers,method}));
  return {asset,accesses,bucket,request};
 }
-test('Comparateur public : seuls les deux médias approuvés sont accessibles, aucun chemin ou job privé',async()=>{
+test('Comparateur public : seuls les médias approuvés sont accessibles, aucun chemin ou job privé',async()=>{
  const {accesses,request}=fixture();for(const id of ['6f8d15e0-927a-496a-95f9-519d27e54553','agencies/private/video.mp4','__proto__','comparison-ai.mp4'])assert.equal((await request({},'GET',id)).status,404);
  assert.equal(accesses.length,0);
  const defaults=resolveHomeMedia({version:0,slots:{}},'comparison.ai.video');assert.equal(defaults.src,`/api/homepage/comparison/${homeComparisonAssets[0].id}`);assert.equal(defaults.poster,'/images/studio-home/comparison-ai.webp');
+});
+test('Trois rendus publics : copies explicites et posters adaptatifs, identifiants privés toujours inaccessibles',async()=>{
+ for(const name of ['standard','avatar','avatar-ai'] as const){
+  const media=resolveHomeMedia({version:0,slots:{}},`renders.${name}.video`),asset=homeComparisonAssets.find(item=>media.src.endsWith(item.id));
+  assert.ok(asset);assert.equal(media.width,540);assert.equal(media.height,960);assert.equal(media.duration,20);assert.equal(media.poster,`/images/studio-home/renders-${name}.webp`);
+  assert.ok(asset.sizeBytes<4*1024*1024);
+ }
 });
 test('Comparateur public : ranges exactes, recherche distante, HEAD, suffixes et validation conditionnelle',async()=>{
  const {asset,accesses,request}=fixture(),etag=`"${asset.sha256}"`;

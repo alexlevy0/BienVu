@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {synchronizeVideos,type VideoPairState} from '../apps/web/lib/synchronized-videos';
+import {synchronizeVideos,synchronizeVideoGroup,type VideoPairState} from '../apps/web/lib/synchronized-videos';
 
 class Video extends EventTarget{
   currentTime=0;duration=NaN;readyState=0;seeking=false;paused=true;muted=false;plays=0;rejectPlay=false;
@@ -57,4 +57,23 @@ test('Comparaison : erreur sur une source ou refus de lecture arrête la paire e
   right.dispatchEvent(new Event('error'));assert.equal(state().error,true);assert.equal(left.paused,true);assert.equal(right.paused,true);
   right.rejectPlay=true;pair.play();await flush();assert.equal(state().error,true);assert.equal(state().requested,false);
   right.rejectPlay=false;pair.play();await flush();assert.equal(state().error,false);assert.equal(state().playing,true);
+});
+test('Trois rendus : attente commune, une seule piste audio, buffer et dérive du troisième corrigés',async t=>{
+  const players=[new Video(),new Video(),new Video()],states:VideoPairState[]=[],group=synchronizeVideoGroup(players,state=>states.push(state),0,20);t.after(()=>group.destroy());
+  group.play();players[0].ready(20);players[1].ready(20);await flush();assert.ok(players.every(p=>p.paused));
+  players[2].ready(20);await flush();assert.ok(states.at(-1)?.playing);assert.deepEqual(players.map(p=>p.muted),[false,true,true]);
+  players[2].readyState=2;players[2].dispatchEvent(new Event('waiting'));assert.ok(players.every(p=>p.paused));assert.ok(states.at(-1)?.loading);
+  players[2].readyState=4;players[2].dispatchEvent(new Event('canplay'));await flush();assert.ok(players.every(p=>!p.paused));
+  players[0].currentTime=8;players[1].currentTime=8.02;players[2].currentTime=6;players[0].frame();await flush();assert.ok(players.every(p=>Math.abs(p.currentTime-8)<=.021));assert.equal(players[2].currentTime,8);
+  group.pause();group.seek(12);assert.deepEqual(players.map(p=>p.currentTime),[12,12,12]);assert.ok(players.every(p=>p.paused));
+  group.destroy();assert.equal(players[0].frames.size,0);
+});
+test('Trois rendus : fin au plus court, erreur et annulation pendant une lecture demandée',async t=>{
+  const players=[new Video(),new Video(),new Video()],states:VideoPairState[]=[],group=synchronizeVideoGroup(players,state=>states.push(state));t.after(()=>group.destroy());
+  players.forEach((p,i)=>p.ready([40,30,20][i]));group.play();await flush();players[0].currentTime=19.99;players[0].frame();
+  assert.ok(players.every(p=>p.paused));assert.equal(states.at(-1)?.time,20);assert.equal(states.at(-1)?.requested,false);
+  group.play();await flush();assert.deepEqual(players.map(p=>p.currentTime),[0,0,0]);
+  players[2].dispatchEvent(new Event('error'));assert.ok(players.every(p=>p.paused));assert.ok(states.at(-1)?.error);
+  group.play();group.pause();await flush();assert.ok(players.every(p=>p.paused));assert.equal(states.at(-1)?.playing,false);
+  assert.throws(()=>synchronizeVideoGroup([],()=>{}),/INVALID_VIDEO_GROUP/);assert.throws(()=>synchronizeVideoGroup([players[0],players[0]],()=>{}),/INVALID_VIDEO_GROUP/);
 });

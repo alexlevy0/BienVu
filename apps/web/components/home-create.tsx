@@ -4,7 +4,7 @@ import {analyticsFetch as fetch,trackProductEvent} from '../lib/product-analytic
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import {useEffect, useLayoutEffect, useRef, useState, type DragEvent, type FormEvent} from 'react';
-import {VideoDuration,ImportUrl, GenerationView, defaultVideoCustomization,GenerationCustomization,generationCreditCost, type VideoCustomization, type CreationDraftData, type CreationDraftView, type GenerationRequest} from '@bienvu/contracts';
+import {VideoDuration,ImportUrl, GenerationView,AvatarCatalog,avatarVoiceWarning,requestedAnimations, defaultVideoCustomization,GenerationCustomization,generationCreditCost, type VideoCustomization, type CreationDraftData, type CreationDraftView, type GenerationRequest} from '@bienvu/contracts';
 import {useAnonymousTrial, TrialChallenge} from './anonymous-trial';
 import {useAccount} from './account';
 import {HomeIcon} from './home-icons';
@@ -18,6 +18,7 @@ import {inspectManualPhotos} from '../lib/manual-photos';
 import {useSubtitlePreference} from './video-settings';
 import {useUrlImportEstimate,urlImportPhotoSlots,type PreparedUrlImport} from './url-import-estimate';
 import {useStickyHomeComposer} from './use-sticky-home-composer';
+import {applyHomeRenderPreset,presetAvatar,homeRenderPresets,type HomeRenderChoice} from '../lib/home-render-presets';
 
 const loadingTool=()=> <p className="home-tool-loading" role="status">Ouverture de votre studio…</p>;
 const ManualListingForm=dynamic(()=>import('./manual-listing-form').then(module=>module.ManualListingForm),{loading:loadingTool});
@@ -45,12 +46,38 @@ function requestFor(job: GenerationView, url: string): RequestMessage {
     : {kind: 'url', text: url || job.title || 'Votre annonce immobilière'};
 }
 
-export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): void}) {
+export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice}: {onLayoutChange(active: boolean): void;renderChoice?:HomeRenderChoice|null;onClearRenderChoice?():void}) {
   const {me, loading,defaultVoice,resolveDefaultVoice} = useAccount();
   const {subtitlesEnabled,setSubtitlesEnabled,voiceEnabled,setVoiceEnabled,durationSeconds,setDurationSeconds,aspectRatio,setAspectRatio}=useSubtitlePreference();
   const [screen, setScreen] = useState<Screen>({kind: 'landing'});
   const [manualCredits,setManualCredits]=useState(1);
   const [customizing,setCustomizing]=useState(false),[guestSettings,setGuestSettings]=useState<VideoCustomization|undefined>();
+  const [presetPreparing,setPresetPreparing]=useState(false),[presetError,setPresetError]=useState(''),[presetWarning,setPresetWarning]=useState(''),presetApplied=useRef(false);
+  const presetNeedsLogin=Boolean(renderChoice&&renderChoice.preset!=='standard'&&!loading&&!me);
+  useEffect(()=>{
+    if(loading)return;
+    if(!renderChoice){if(presetApplied.current)setGuestSettings(undefined);presetApplied.current=false;setPresetPreparing(false);setPresetError('');setPresetWarning('');return;}
+    presetApplied.current=true;setPresetError('');setPresetWarning('');
+    if(renderChoice.preset!=='standard'&&!me){setPresetPreparing(false);return;}
+    const controller=new AbortController();setPresetPreparing(true);
+    void (async()=>{
+      const voice=await resolveDefaultVoice(),base=guestSettings??defaultVideoCustomization(me?.agency,voice);
+      let avatar=base.avatar;
+      if(renderChoice.preset!=='standard'){
+        const response=await fetch('/api/avatars',{cache:'no-store',signal:controller.signal});
+        if(!response.ok)throw Error('Les présentateurs ne sont pas disponibles actuellement.');
+        const catalog=AvatarCatalog.parse(await response.json());avatar=presetAvatar(catalog,base.avatar);
+        if(!controller.signal.aborted)setPresetWarning(avatarVoiceWarning(base.voice,catalog.looks.find(look=>look.id===avatar!.lookId)!.gender)??'');
+      }
+      if(controller.signal.aborted)return;
+      setGuestSettings(applyHomeRenderPreset(renderChoice.preset,base,base.photoOrder,avatar));
+      setDurationSeconds(20);setAspectRatio('9:16');if(renderChoice.preset!=='standard')setVoiceEnabled(true);
+    })().catch(cause=>{if(!controller.signal.aborted)setPresetError(cause instanceof Error?cause.message:'Ce rendu n’a pas pu être préparé.');})
+      .finally(()=>{if(!controller.signal.aborted)setPresetPreparing(false);});
+    return()=>controller.abort();
+    // Apply an explicit choice once; later personalization remains authoritative.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[renderChoice?.preset,renderChoice?.revision,loading,me?.agency.id]);
   const pendingCustomization=useRef<{id:string;key:string}|null>(null);
   const [url, setUrl] = useState(''), [description, setDescription] = useState('');
   const [feedback, setFeedback] = useState(''), [manualBusy, setManualBusy] = useState(false),[editingProperty,setEditingProperty]=useState(false);
@@ -96,7 +123,8 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     screen.kind!=='guest-customizing'&&!importPaused&&!activeGuestJob);
   function settingsForImport(imported:PreparedUrlImport,voice=defaultVoice):VideoCustomization{
     const slots=urlImportPhotoSlots(imported);
-    return {...guestSettings??defaultVideoCustomization(me?.agency,voice),photoOrder:slots,runwayPhotos:slots,runwayClips:undefined};
+    const base={...guestSettings??defaultVideoCustomization(me?.agency,voice),photoOrder:slots,runwayPhotos:slots,runwayClips:undefined};
+    return renderChoice?applyHomeRenderPreset(renderChoice.preset,base,slots):base;
   }
   const estimatedSettings=me&&estimate.value?settingsForImport(estimate.value):guestSettings;
   const creditCost=manual?manualCredits:generationCreditCost(estimatedSettings,durationSeconds);
@@ -375,7 +403,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
       }
       if(!draft)throw new Error('Ce site ne permet pas de préparer cette annonce. Vous pouvez saisir ses informations et ajouter vos photos manuellement.');
       if(interactionVersion.current!==version||currentOwner.current!==owner)return;
-      setImportDraft({...draft,data:{...draft.data,videoCustomization:draft.data.videoCustomization??settingsForImport(imported,voice)}});
+      setImportDraft({...draft,data:{...draft.data,videoCustomization:renderChoice?settingsForImport(imported,voice):draft.data.videoCustomization??settingsForImport(imported,voice)}});
       setGuestExtraction(null);setDescription(draft.data.fields.description??'');setScreen({kind:'manual'});setCustomizing(true);
       void refreshDrafts();
     }catch(error){if(interactionVersion.current===version&&currentOwner.current===owner)
@@ -387,6 +415,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     // The preview keyword must never become an import or an AI description,
     // including when the user presses Enter or clicks the creation button.
     if(confettiKeyword)return;
+    if(presetPreparing||presetError||presetNeedsLogin)return;
     if(loading||photoChecking||incomingPhotos)return;
     if(composerPhotos.length){openWithPhotos();return;}
     if (manual) {
@@ -442,7 +471,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
       const [imported,voice]=await Promise.all([estimate.prepare(parsed.data,true),resolveDefaultVoice()]);
       if(interactionVersion.current!==version||currentOwner.current!==owner)return;
       if(imported.status==='needs_input'&&imported.draft){
-        startFresh.current=true;forget();setImportDraft({...imported.draft,data:{...imported.draft.data,videoCustomization:imported.draft.data.videoCustomization??settingsForImport(imported,voice)}});setDescription(imported.draft.data.fields.description??'');
+        startFresh.current=true;forget();setImportDraft({...imported.draft,data:{...imported.draft.data,videoCustomization:renderChoice?settingsForImport(imported,voice):imported.draft.data.videoCustomization??settingsForImport(imported,voice)}});setDescription(imported.draft.data.fields.description??'');
         setScreen({kind:'manual'});
         void refreshDrafts();
         setFeedback(imported.draft.photos.length<3?'Les informations du bien ont été récupérées. Ajoutez vos photos pour continuer.':
@@ -460,7 +489,7 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
   const statusRequest = screen.kind === 'sending' || screen.kind === 'job' ? screen.request : null;
   const resultReady = screen.kind === 'job' && selectedJob?.status === 'ready';
   const composerPlaceholder = composerPhotos.length?'Décrivez votre bien, ou appuyez sur Entrée…':manual?'Ajoutez des précisions sur votre bien…':resultReady?'Collez le lien d’une autre annonce…':'Collez un lien ou décrivez votre bien…';
-  const composerDisabled = screen.kind==='guest-customizing'&&guestSettings&&!GenerationCustomization.safeParse(guestSettings).success || loading || busy || estimatePending || estimateFailed || photoChecking || Boolean(incomingPhotos) || (composerPhotos.length
+  const composerDisabled = presetPreparing||Boolean(presetError)||presetNeedsLogin||screen.kind==='guest-customizing'&&guestSettings&&!GenerationCustomization.safeParse(guestSettings).success || loading || busy || estimatePending || estimateFailed || photoChecking || Boolean(incomingPhotos) || (composerPhotos.length
     ? activeGuestJob : manual
     ? !manualReady||Boolean(noCredits)||!editingProperty&&activeOtherJob
     : Boolean(noCredits)||Boolean(importPaused&&!estimate.value&&ImportUrl.safeParse(url.trim()).success)||activeOtherJob||screen.kind==='job'&&
@@ -469,6 +498,10 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
     ? (noCredits?'Crédits insuffisants pour ce montage. Réduisez les animations ou consultez vos crédits.':'')
     : 'Accès anticipé · Préparez votre annonce';
   return <div className={`home-create${inConversation ? ' home-create-conversation' : ''}${customizing||screen.kind==='guest-customizing'?' home-create-customizing':''}`}>
+    {renderChoice&&<p className="home-render-preset-notice" role="status">{presetPreparing?'Préparation du rendu…':presetError||`Rendu « ${homeRenderPresets.find(item=>item.id===renderChoice.preset)!.title} » sélectionné.`}
+      {presetNeedsLogin&&<>Connectez-vous pour ajouter un avatar. <Link href="/connexion" onClick={()=>{const source=ImportUrl.safeParse(url.trim());if(source.success)saveListingDraft({kind:'url',url:source.data});}}>Me connecter</Link></>}
+      {presetWarning&&<span>{presetWarning}</span>}
+      {onClearRenderChoice&&<button type="button" onClick={onClearRenderChoice}>Réinitialiser</button>}</p>}
     <div ref={scrollRegion} className="home-conversation-scroll">
     {screen.kind==='guest-customizing'&&<VideoCustomizer sourceUrl={screen.url} settings={guestSettings??defaultVideoCustomization(undefined,defaultVoice)} onChange={value=>{const {photoOrder,runwayPhotos,...settings}=value;setGuestSettings(settings);}} photos={[]} fields={{title:'Votre annonce',propertyType:'',transaction:'',locality:'',description:'',priceCents:'',charges:'',area:'',rooms:''}} agencyName="" subtitlesEnabled={subtitlesEnabled} onSubtitles={setSubtitlesEnabled} voiceEnabled={voiceEnabled} onVoice={setVoiceEnabled} durationSeconds={durationSeconds} onDuration={setDurationSeconds} aspectRatio={aspectRatio} onBack={closeCustomization} onAdd={files=>{if(files){setIncomingPhotos({id:crypto.randomUUID(),files:Array.from(files)});openManual();setCustomizing(true);}}} busy={busy} ready onEdit={()=>{openManual();}} saved={false}/> }
     {manual && <div className="home-conversation-manual home-manual-sheet-view">
@@ -518,8 +551,8 @@ export function HomeCreate({onLayoutChange}: {onLayoutChange(active: boolean): v
           <span className="home-url-placeholder" aria-hidden="true">{composerPlaceholder}</span></span></div>
         <div className="home-composer-actions"><HomeCreateButton disabled={composerDisabled} aria-describedby={manual&&!manualReady?'home-manual-action-note':undefined}>
           {incomingPhotos?'Ajout des photos…':composerPhotos.length?'Compléter mon annonce':screen.kind==='sending'||manualBusy?'Envoi en cours':activeGuestJob?'Génération en cours':manual&&me&&!canGenerate?'Enregistrer mon annonce':'Créer ma vidéo'}<HomeIcon name="arrow" size={20}/></HomeCreateButton>
-          <span className="home-credit-cost" aria-live="polite">{estimatePending?'Estimation en cours…':estimateFailed?'Estimation indisponible':`${creditCost} crédit${creditCost>1?'s':''}${me&&estimate.value?' estimés':''}`}
-            {me&&estimate.value&&<small className="home-credit-estimate-detail">{urlImportPhotoSlots(estimate.value).length} photos · Animations IA activées</small>}
+          <span className="home-credit-cost" aria-live="polite">{estimatePending?'Estimation en cours…':estimateFailed?'Estimation indisponible':`${creditCost} crédit${creditCost>1?'s':''}${me&&estimate.value?` estimé${creditCost>1?'s':''}`:''}`}
+            {me&&estimate.value&&<small className="home-credit-estimate-detail">{urlImportPhotoSlots(estimate.value).length} photos · {requestedAnimations(estimatedSettings)?'Animations IA activées':'Mouvements classiques'}{estimatedSettings?.avatar&&!estimatedSettings.avatar.hidden?' · Avatar inclus':''}</small>}
           </span></div>
         <button type="button" className="home-composer-tools-toggle" title="Réglages de création" aria-label="Réglages de création" aria-expanded={composerExpanded} aria-controls="home-composer-options" onClick={()=>setComposerExpanded(current=>!current)}><HomeIcon name="settings" size={20}/><span>Réglages</span></button>
       </div>
