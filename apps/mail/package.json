@@ -12,8 +12,8 @@
     "@bienvu/contracts": "workspace:*",
     "@bienvu/db": "workspace:*",
     "html-to-text": "10.0.1",
-    "postal-mime": "4.0.4",
-    "zod": "4.6.5"
+    "postal-mime": "4.0.5",
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@types/html-to-text": "9.0.4"
