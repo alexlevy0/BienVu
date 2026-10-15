@@ -9,6 +9,7 @@ import {HomeShowcase} from './home-showcase';
 import {HomeAvatarShowcase} from './home-avatar-showcase';
 import {HomeAnimationComparison} from './home-animation-comparison';
 import {HomeRenderComparison} from './home-render-comparison';
+import {useSiteFeatures} from './site-features';
 import {homeRenderPresetKey,parseHomeRenderPreset,type HomeRenderChoice,type HomeRenderPreset} from '../lib/home-render-presets';
 import {HomeMandateKit} from './home-mandate-kit';
 import {HomeSharing} from './home-sharing';
@@ -45,8 +46,10 @@ function ExampleCard({example, onPlay}: {example: Example; onPlay(example: Examp
 }
 
 export function LandingPage() {
+  const features=useSiteFeatures();
   const homepage=useHomepageConfig(),customDiscover=Object.keys(homepage.slots).some(id=>id.startsWith('discover.'));
   const [dialog, setDialog] = useState<Dialog>(null);
+  useEffect(()=>{if(!features.explorer&&dialog==='explore')setDialog(null);},[features.explorer,dialog]);
   const [selected, setSelected] = useState<Example>(examples[0]), [category, setCategory] = useState('Tous');
   const [selectedSlot,setSelectedSlot]=useState<HomepageSlot>('hero.video');
   const movie=useHomepageMedia(selectedSlot);
@@ -92,7 +95,7 @@ export function LandingPage() {
             <HomeHeroVideo paused={modalOpen || conversationActive} onPlayingChange={setHeroPlaying}/>
           </aside>
         </section>
-        {!conversationActive && <section id="explorer" className="home-discover" aria-labelledby="home-discover-title"><div className="home-discover-heading"><div><h2 id="home-discover-title">À découvrir sur BienVu</h2><p>Des inspirations pour donner une autre dimension à vos biens.</p></div><button type="button" className="home-explore-link" onClick={() => {setCategory('Tous'); setDialog('explore');}}>Tout explorer <HomeIcon name="external" size={17}/></button></div><div className="home-example-grid">{examples.map(example => <ExampleCard key={example.id} example={example} onPlay={play}/>)}</div></section>}
+        {features.explorer && !conversationActive && <section id="explorer" className="home-discover" aria-labelledby="home-discover-title"><div className="home-discover-heading"><div><h2 id="home-discover-title">À découvrir sur BienVu</h2><p>Des inspirations pour donner une autre dimension à vos biens.</p></div><button type="button" className="home-explore-link" onClick={() => {setCategory('Tous'); setDialog('explore');}}>Tout explorer <HomeIcon name="external" size={17}/></button></div><div className="home-example-grid">{examples.map(example => <ExampleCard key={example.id} example={example} onPlay={play}/>)}</div></section>}
         {!conversationActive && <HomeAvatarShowcase paused={modalOpen}/>}
         {!conversationActive && <HomeRenderComparison paused={modalOpen} selected={renderChoice?.preset} onChoose={chooseRender} onPlayingChange={setRendersPlaying}/>}
         {!conversationActive && <HomeAnimationComparison paused={modalOpen} onCreate={focusComposer} onPlayingChange={setComparisonPlaying}/>}

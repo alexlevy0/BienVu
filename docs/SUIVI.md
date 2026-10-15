@@ -1,5 +1,15 @@
 # BienVu — suivi des sprints
 
+### 15/10/2026 — Explorer et inspirations derrière un feature flag
+
+Le flag interne **`explorer`**, désactivé par défaut, contrôle le lien « Explorer » de la sidebar et du footer ainsi que le bloc « À découvrir sur BienVu » de l’accueil. Les éléments sont retirés du rendu, sans masquer les autres démonstrations de la homepage. Les pages `/explorer`, les vidéos partagées et les médias déjà choisis restent disponibles ; réactiver le flag restaure les inspirations et leur configuration.
+
+Réglage dans **Super admin → Page d’accueil → Visibilité des fonctionnalités** : cocher « Afficher Explorer et À découvrir sur BienVu », puis « Enregistrer la visibilité ». Effet sans redéploiement ; les visiteurs reçoivent la valeur au chargement et lors du retour dans l’onglet (lectures espacées de 30 s minimum, sans polling). En l’absence de valeur connue, le rendu initial et un échec de chargement gardent la découverte masquée. Aucune dépendance à PostHog ni au consentement analytique. La lecture publique ne divulgue que la révision et le booléen, sans cache persistant ni données d’administration.
+
+**Migration 0076** : singleton de réglages et journal immuable, modification atomique avec contrôle de révision et limite de fréquence. API d’écriture réservée au Super admin vérifié, origine et corps JSON validés. **Deux tests d’intégration D1/HTTP réussis** : défaut, activation/désactivation persistante, média conservé, conflit de version, audit, anonymat/admin simple/compte non vérifié, origine externe et entrées invalides. Types web/tests, frontières **589 fichiers**, build Next/OpenNext et recette locale des composants réels validés : activation = deux liens Explorer et un bloc ; désactivation = aucun des trois, formulaire et autres sections conservés. Aucun appel de génération payant.
+
+En production à **100 %**, version web **`6161830a-ef91-434a-adb4-926742d69486`**, release **`1940d3778266-1792076375171`**. Migration appliquée, flag confirmé à `false` par l’API publique. Accueil et `/explorer` en 200, navigation/footer sans Explorer, inspirations absentes du HTML et après hydratation, comparatif des trois rendus toujours présent ; administration anonyme refusée en 401. **60 bindings**, deux crons, compatibilité et domaine conservés ; pipeline et renderer inchangés. Preuves privées ignorées sous `evidence/local/explorer-flag/`. Aucun commit/push à cette étape.
+
 ### 15/10/2026 — Accueil : une annonce, trois rendus
 
 Nouveau bloc entre la présentation des avatars et le comparateur avec/sans animations : trois cartes portrait, suivant la maquette fournie. Sources par défaut, de gauche à droite : **`3ea10191-a17e-4046-8185-ee5e4a11a967`** (standard), **`f6166d14-6013-4a84-b430-fb682bf41a5c`** (avatar sur toute la vidéo), **`81b51773-a933-4546-84be-d1aebde545d7`** (avatar et quatre animations). Métadonnées des trois exports vérifiées : environ 20 s, 9:16 et quatre photos. Coûts calculés par le contrat existant : **1 / 3 / 7 crédits**, avec rappel que le prix dépend des options et de la durée.

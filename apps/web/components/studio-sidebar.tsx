@@ -6,11 +6,13 @@ import {SignOut, useAccount} from './account';
 import {HomeIcon, HomeWordmark} from './home-icons';
 import {useGenerationStore} from './generation-store';
 import {DraftActions} from './draft-actions';
+import {useSiteFeatures} from './site-features';
 import './studio-sidebar.css';
 
 
 export function StudioSidebar({active}: {active: 'create' | 'videos' | 'explore' | 'agency' | 'showcase' | 'offers' | 'projects' | 'admin' | 'editor' | 'social'}) {
   const {me, loading} = useAccount();
+  const features=useSiteFeatures();
   const [menuOpen, setMenuOpen] = useState(false);
   const [collapsed,setCollapsed]=useState(false);
   const [tooltip,setTooltip]=useState<{label:string;top:number;left:number}|null>(null);
@@ -91,7 +93,7 @@ export function StudioSidebar({active}: {active: 'create' | 'videos' | 'explore'
       <nav className="home-navigation" aria-label="Navigation principale" data-analytics-public>
         {item('/', 'Créer une vidéo', 'plus', 'create')}
         {item('/biens', 'Mes biens', 'house', 'videos')}
-        {item('/explorer', 'Explorer', 'compass', 'explore')}
+        {features.explorer&&item('/explorer', 'Explorer', 'compass', 'explore')}
         {item('/agence', 'Mon agence', 'building', 'agency')}
         {me&&item('/ma-vitrine', 'Ma vitrine', 'globe', 'showcase')}
         {item('/editeur', 'Éditeur', 'clapper', 'editor')}

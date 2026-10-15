@@ -3,8 +3,10 @@
 import Link from 'next/link';
 import {HomeIcon, HomeWordmark} from './home-icons';
 import {CookiePreferencesButton} from './product-analytics';
+import {useSiteFeatures} from './site-features';
 
 export function HomeFooter({onCreate}:{onCreate:()=>void}) {
+  const features=useSiteFeatures();
   const backToTop=()=>{
     window.scrollTo({top:0,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
     document.getElementById('home-listing-url')?.focus({preventScroll:true});
@@ -30,7 +32,7 @@ export function HomeFooter({onCreate}:{onCreate:()=>void}) {
       <nav className="home-premium-footer-column" aria-labelledby="home-footer-product-title">
         <h3 id="home-footer-product-title">Produit</h3>
         <button type="button" onClick={onCreate}>Créer une vidéo</button>
-        <Link href="/explorer" prefetch={false}>Explorer</Link>
+        {features.explorer&&<Link href="/explorer" prefetch={false}>Explorer</Link>}
         <Link href="/editeur" prefetch={false}>Éditeur</Link>
         <Link href="/abonnement" prefetch={false}>Tarifs</Link>
       </nav>

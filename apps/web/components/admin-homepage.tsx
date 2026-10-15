@@ -3,6 +3,7 @@ import {useEffect,useRef,useState} from 'react';
 import {homepageSlots,type HomepageAdmin,type HomepageAsset,type HomepageCandidate,type HomepageLibrary,type HomepageSource,type HomepageSlot} from '@bienvu/contracts';
 import {HomepageMediaProvider,useHomepageMedia,homeClock} from './homepage-media';
 import {HomeIcon} from './home-icons';
+import {AdminSiteFeatureSettings} from './admin-site-features';
 
 type Slot=typeof homepageSlots[number];
 const groups=[...new Set(homepageSlots.map(slot=>slot.group))];
@@ -61,6 +62,7 @@ export function AdminHomepage(){
  const changed=state&&homepageSlots.some(s=>(state.draft[s.id]??null)!==(state.published[s.id]??null));
  const config={version:state?.revision??0,slots:Object.fromEntries(homepageSlots.flatMap(s=>{const id=state?.draft[s.id],asset=id?state?.assets[id]:null;return asset?[[s.id,asset]]:[];}))};
  return <section className="admin-home" aria-label="Visuels de la page d’accueil">
+  <AdminSiteFeatureSettings/>
   <div className="admin-home-toolbar"><div><h2>La page d’accueil, à votre image.</h2><p>Choisissez parmi les médias de toutes les agences. Les sélections restent privées jusqu’à leur publication.</p><small>{state?.publishedAt?'Dernière publication : '+new Date(state.publishedAt).toLocaleString('fr-FR'):'Les visuels par défaut sont actuellement en ligne.'}</small></div>
    <div className="admin-home-tools"><a className="admin-button" href="/?homePreview=1" target="_blank" rel="noopener">Aperçu du brouillon <HomeIcon name="external" size={16}/></a><button type="button" className="admin-button" disabled={!changed||saving} onClick={()=>void apply('discard')}>Annuler les changements</button><button type="button" className="admin-button admin-button-dark" disabled={!changed||saving} onClick={()=>void apply('publish')}>{saving?'Enregistrement…':'Publier les visuels'}</button></div>
   </div>

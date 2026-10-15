@@ -12,6 +12,7 @@ export * from './editor-voice';
 export * from './animation-library';
 export * from './retention';
 export * from './homepage';
+export * from './site-features';
 export * from './mailbox';
 export * from './partners';
 export * from './voices';

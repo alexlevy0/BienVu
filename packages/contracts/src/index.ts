@@ -31,6 +31,7 @@ export * from './video';
 export * from './generation';
 export * from './generation-queue';
 export * from './homepage';
+export * from './site-features';
 
 export const ProbeRender = z.object({
   id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
