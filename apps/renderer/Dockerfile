@@ -10,6 +10,8 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc tsconfig.base.json ./
 COPY apps/renderer apps/renderer
 COPY packages/contracts packages/contracts
+COPY packages/db packages/db
+COPY packages/maps packages/maps
 COPY packages/video packages/video
 COPY packages/voice packages/voice
 COPY apps/web/public/fonts/inter-tight.woff2 apps/web/public/fonts/inter-tight.woff2
