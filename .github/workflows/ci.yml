@@ -25,6 +25,8 @@ jobs:
       - run: pnpm --filter @bienvu/web typegen
       - run: pnpm --filter @bienvu/pipeline typegen
       - run: pnpm --filter @bienvu/mail typegen
+      - name: Vérifier les régressions de schéma et de cache
+        run: pnpm exec tsx --test --test-concurrency=2 tests/homepage-media.test.ts tests/monthly-budget.test.ts
       - run: pnpm check
       - run: pnpm probe:voice:worker
       - run: pnpm probe:narration:worker

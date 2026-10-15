@@ -186,7 +186,17 @@ test('Home : banque globale privée, copie indépendante, publication atomique e
   // Miniflare maps this proxy to Request in DOM-enabled TypeScript projects;
   // its runtime is the actual Workers CacheStorage used by these range tests.
   const storage=await mf.getCaches() as unknown as CacheStorage;
-  const cache=await storage.open('homepage-performance-fixture'),writes:Promise<unknown>[]=[],edge:HomepageCache={cache,origin:'https://bienvu.test',waitUntil:task=>{writes.push(task);}};
+  // Miniflare's prefixStream releases its writer before pipeTo(), but tries
+  // writer.abort() on cancellation. Materialize proxy hits at this test-only
+  // transport boundary so HEAD/416 cancellation exercises a normal Response.
+  // The cache, range handling, stored bytes and revocation checks stay real.
+  const openCache=async(name:string):Promise<HomepageCache['cache']>=>{
+   const proxy=await storage.open(name);
+   return {put:proxy.put.bind(proxy),match:async(...args:Parameters<Cache['match']>)=>{
+    const hit=await proxy.match(...args);return hit?readResponse(hit):undefined;
+   }};
+  };
+  const cache=await openCache('homepage-performance-fixture'),writes:Promise<unknown>[]=[],edge:HomepageCache={cache,origin:'https://bienvu.test',waitUntil:task=>{writes.push(task);}};
   const flush=async()=>{await Promise.all(writes.splice(0));};
   const cachedEnv={...env,MEDIA:{get:bucket.get.bind(bucket),head:bucket.head.bind(bucket),put:bucket.put.bind(bucket),delete:bucket.delete.bind(bucket)}};
   const reads=t.mock.method(cachedEnv.MEDIA,'get');
@@ -204,7 +214,7 @@ test('Home : banque globale privée, copie indépendante, publication atomique e
   const unchanged=await homepageMediaRequest(req(url,'',{headers:{'if-none-match':cachedRead.headers.get('etag')!}}),cachedEnv,asset.id,undefined,edge);
   assert.equal(unchanged.status,304);assert.equal(reads.mock.callCount(),1,'Les ranges, HEAD et revalidations utilisent la copie en cache');
   for(const value of ['bytes=99-','bytes=incorrect'])assert.equal((await homepageMediaRequest(req(url,'',{headers:{range:value}}),cachedEnv,asset.id,undefined,edge)).status,416);
-  const partialCache=await storage.open('homepage-partial-fixture');
+  const partialCache=await openCache('homepage-partial-fixture');
   await homepageMediaRequest(req(url,'',{headers:{range:'bytes=1-2'}}),cachedEnv,asset.id,undefined,{...edge,cache:partialCache});
   assert.equal(writes.length,0,'Un extrait partiel ne remplace jamais une copie complète');
   const smallerKey=`homepage/${asset.id}/seo/${asset.sha256}-540.mp4`,smaller=new Uint8Array([4,5]);await bucket.put(smallerKey,smaller,{httpMetadata:{contentType:'video/mp4'}});
