@@ -6,13 +6,19 @@ import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import {migrateNarrationProbe,seedNarrationFixture} from '../scripts/narration-fixtures';
 import {admitGeneration,findImport,beginImport,homepageAsset,homepageSettings,homepageSources} from '../packages/db/src/index';
 import {GeneratableListing,homepageSlots,defaultVideoCustomization,type HomepageAdmin} from '../packages/contracts/src/index';
-import {adminHomepageRequest,adminHomepageSourceRequest,homepageMediaRequest,readHomepageConfig,readHomepageAdmin,readHomepageLibrary,changeHomepage,cleanupHomepageAssets,type HomepageCache} from '../apps/web/lib/homepage-media';
+import {adminHomepageRequest,adminHomepageSourceRequest as sourceRequest,homepageMediaRequest as mediaRequest,readHomepageConfig,readHomepageAdmin,readHomepageLibrary,changeHomepage,cleanupHomepageAssets,type HomepageCache} from '../apps/web/lib/homepage-media';
 import {createAuth} from '../apps/web/lib/auth';
 import {createPrivateImport} from '../apps/web/lib/imports';
 import {fixtureImportTransport} from '../scripts/import-fixtures';
 import {videoFixture,videoReport} from '../fixtures/video';
 
 const sha=(bytes:Uint8Array)=>createHash('sha256').update(bytes).digest('hex');
+// Act as an HTTP client: finish reading each fixture response before replacing
+// or deleting its R2 object. An unread Miniflare proxy stream may abort later,
+// after its writer has already released the lock, obscuring the real assertion.
+async function readResponse(response:Response){return response.body?new Response(await response.arrayBuffer(),{status:response.status,statusText:response.statusText,headers:response.headers}):response;}
+const homepageMediaRequest=async(...args:Parameters<typeof mediaRequest>)=>readResponse(await mediaRequest(...args));
+const adminHomepageSourceRequest=async(...args:Parameters<typeof sourceRequest>)=>readResponse(await sourceRequest(...args));
 test('Home : banque globale privée, copie indépendante, publication atomique et lecture vidéo',async t=>{
  const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:'export default {fetch(){return new Response("fixture")}}',compatibilityDate:'2026-09-27',d1Databases:['DB'],r2Buckets:['MEDIA']}));t.after(()=>mf.dispose());
  const bindings=await mf.getBindings<{DB:D1Database;MEDIA:R2Bucket}>(),{DB:db,MEDIA:bucket}=bindings;await migrateNarrationProbe(db);
@@ -169,6 +175,7 @@ test('Home : banque globale privée, copie indépendante, publication atomique e
  await t.test('SEO : déduplication publique, aperçu allégé, repli et révocation des variantes',async()=>{
   const config=await readHomepageConfig(db),groups=new Map<string,Set<string>>();for(const asset of Object.values(config.slots)){const group=groups.get(asset.sha256)??new Set<string>();group.add(asset.url);groups.set(asset.sha256,group);}for(const group of groups.values())assert.equal(group.size,1);
   const asset=config.slots['kit.reel.video']!,row=(await homepageAsset(db,asset.id))!,original=await bucket.get(row.object_key);assert.ok(original);
+  const originalBytes=await original.arrayBuffer();
   const key=`homepage/${asset.id}/seo/${asset.sha256}-720.mp4`,url='/api/homepage/media/'+asset.id+'?preview=1';
   const fallback=await homepageMediaRequest(req(url,''),env,asset.id);assert.equal(fallback.headers.get('content-length'),String(original.size));
   const optimized=new Uint8Array([1,2,3]);await bucket.put(key,optimized,{httpMetadata:{contentType:'video/mp4'}});
@@ -208,7 +215,7 @@ test('Home : banque globale privée, copie indépendante, publication atomique e
   assert.equal(smallRead.status,200);assert.equal(smallRead.headers.has('content-range'),false);assert.deepEqual(new Uint8Array(await smallRead.arrayBuffer()),smaller);
   await bucket.delete(row.object_key);
   assert.equal((await homepageMediaRequest(req(url,''),cachedEnv,asset.id,undefined,edge)).status,404,'Le cache ne ressuscite pas une copie publique supprimée');
-  await bucket.put(row.object_key,await original.arrayBuffer(),{customMetadata:{sha256:asset.sha256}});
+  await bucket.put(row.object_key,originalBytes,{customMetadata:{sha256:asset.sha256}});
   const privateRead=await homepageMediaRequest(req('/api/admin/homepage/assets/'+asset.id),cachedEnv,asset.id,cachedEnv,edge);
   assert.equal(privateRead.headers.get('cache-control'),'private, no-store');assert.equal(writes.length,0,'Les originaux et aperçus privés ne sont jamais placés dans le cache partagé');
   assert.deepEqual(await readHomepageConfig(db,false,edge),config);await flush();

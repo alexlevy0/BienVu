@@ -1,5 +1,11 @@
 # BienVu — suivi des sprints
 
+### 15/10/2026 — CI : fixtures de migration et consommation des réponses R2
+
+Diagnostic de l’exécution GitHub `38755095553` sur `1940d37` : la fixture des budgets appliquait une liste partielle de migrations, sans la colonne récente des erreurs de préparation ; SQLite cherchait alors `error_code` dans plusieurs tables extérieures à la sous-requête. La recette applique désormais toutes les migrations courantes, en différant uniquement les deux extensions de plafond dont elle vérifie séparément l’historique.
+
+Le test des médias de l’accueil laissait aussi des réponses R2 non consommées, avec des objets ensuite remplacés/supprimés. Le client de recette lit maintenant ces réponses avant de poursuivre et conserve immédiatement les octets de l’original ; les assertions de contenu, de plages, de cache et de révocation sont maintenues. Cela évite l’erreur asynchrone de writer du proxy Miniflare. **12 tests ciblés réussis**. Aucun changement de code produit, de dépendance, de garde budgétaire ou de workflow, aucune génération payante ni nouvelle publication nécessaire pour ces deux corrections de test.
+
 ### 15/10/2026 — Explorer et inspirations derrière un feature flag
 
 Le flag interne **`explorer`**, désactivé par défaut, contrôle le lien « Explorer » de la sidebar et du footer ainsi que le bloc « À découvrir sur BienVu » de l’accueil. Les éléments sont retirés du rendu, sans masquer les autres démonstrations de la homepage. Les pages `/explorer`, les vidéos partagées et les médias déjà choisis restent disponibles ; réactiver le flag restaure les inspirations et leur configuration.

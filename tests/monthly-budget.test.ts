@@ -22,17 +22,10 @@ test('budget mensuel D1 : migration sans effacement, ouverture explicite, audit 
   assert.equal((await db.prepare("SELECT enabled FROM generation_control WHERE id='generations'").first<{enabled:number}>())!.enabled,0,'Le journal copié ne réexécute aucune ancienne action');
   assert.deepEqual(await db.prepare('SELECT * FROM hosted_import_budget').first(),{month:older,baseline_cents:3080,ceiling_cents:4500,paused:0});
   assert.equal(await db.prepare('SELECT * FROM narration_budget').first(),null);
-  // Continue against the current schema after verifying the historical upgrade.
-  for(const file of (await readdir('packages/db/migrations')).filter(f=>f.endsWith('.sql')&&f>'0025_monthly_budget.sql'&&f<'0059').sort())await migrate(file);
-  // Application queries use the current credit schema; budget upgrades below
-  // remain separate so their historical ceilings can still be verified.
-  await migrate('0061_full_length_avatars.sql');
-  await migrate('0062_generation_preparation_steps.sql');
-  await migrate('0063_offers_and_credit_rollover.sql');
-  await migrate('0064_automatic_import_estimates.sql');
-  await migrate('0069_generation_map_confirmation.sql');
-  await migrate('0072_generation_queue.sql');
-  await migrate('0073_legacy_job_serialization.sql');
+  // Application queries require the current schema. Defer only the two budget
+  // upgrades whose historical ceilings are explicitly checked below.
+  const deferred=new Set(['0059_monthly_budget_200.sql','0060_admin_budget_amounts.sql']);
+  for(const file of (await readdir('packages/db/migrations')).filter(f=>f.endsWith('.sql')&&f>'0025_monthly_budget.sql'&&!deferred.has(f)).sort())await migrate(file);
   const open={action:'monthly_budget' as const,month,envelopeCents:10000,ceilingCents:9000,openingCents:800,paused:false,expected:null,reason:'Ouverture du mois pour la recette'};
   assert.equal(AdminAction.safeParse({...open,envelopeCents:MAX_MONTHLY_BUDGET_CENTS+1}).success,false);
   assert.equal(AdminAction.safeParse({...open,ceilingCents:9600}).success,false);
