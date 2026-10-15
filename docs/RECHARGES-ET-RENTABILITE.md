@@ -1,5 +1,13 @@
 # Recharges de crédits et rentabilité — 03/10/2026
 
+## Accès aux achats — 15/10/2026
+
+Les nouveaux achats ponctuels sont réservés au compte superadmin confirmé, identifié par `SUPER_ADMIN_EMAIL`, dans une agence dont il peut gérer la facturation. Le rôle admin de Greg ou d’une agence ne suffit pas. Le serveur vérifie ce droit avant de créer ou de renvoyer un Checkout ; ni l’adresse de contact modifiable de l’agence ni un champ client ne peuvent l’accorder.
+
+Pour les autres comptes et les visiteurs, les blocs Découverte et recharges disparaissent des offres. Les abonnements et l’essai restent disponibles. Les textes des offres, pages marketing, article budget et conditions reflètent ce retrait. Les crédits existants, leur validité, l’historique, les factures et les webhooks de commandes déjà ouvertes restent conservés. Aucune migration ni modification des prix des abonnements. Les décisions initiales ci-dessous restent documentées pour les achats historiques.
+
+## Fonctionnement initial
+
 Décisions d’Alex : packs de **10 crédits / 7 € HT**, **30 / 19 € HT**, **100 / 59 € HT**. Achat ponctuel, sans modification de l’abonnement. L’option proposée sans expiration est retenue en l’absence de préférence différente. Les abonnements restent à 3 / 40 / 120 crédits mensuels ; l’essai anonyme reste à 1 crédit offert. Stripe reste en **mode test**, aucun encaissement réel activé.
 
 ## Portefeuille et paiement
@@ -7,7 +15,7 @@ Décisions d’Alex : packs de **10 crédits / 7 € HT**, **30 / 19 € HT**, *
 - Les crédits mensuels sont utilisés en premier ; les recharges sont ensuite consommées par ordre d’achat. Une seule génération peut réserver plusieurs sources.
 - Le règlement atomique restitue les crédits inutilisés dans leur source d’origine. La réussite d’une nouvelle animation reste facturée même en cas d’échec de l’export, conformément au fonctionnement précédent.
 - Les achats survivent au renouvellement de l’abonnement. Une suspension du service, le budget du pilote et les limites de génération restent applicables.
-- Checkout hébergé par Stripe ouvert directement après le choix du pack, sans case intermédiaire ; conditions et confidentialité accessibles près du bouton. Prix serveur et clé d’idempotence conservés. Seuls propriétaire et administrateurs d’agence peuvent acheter après connexion. Un retour de navigateur ne crée aucun crédit.
+- Checkout hébergé par Stripe ouvert directement après le choix du pack, sans case intermédiaire ; conditions et confidentialité accessibles près du bouton. Prix serveur et clé d’idempotence conservés. Depuis le 15/10/2026, le compte superadmin confirmé doit également avoir un rôle propriétaire ou administrateur dans l’agence sélectionnée. Un retour de navigateur ne crée aucun crédit.
 - Le webhook vérifie la signature sur le corps brut, puis relit le Checkout payé, son client, ses lignes, sa devise, son prix et son PaymentIntent. `checkout.session.completed` et `checkout.session.async_payment_succeeded` sont pris en charge. Des notifications répétées convergent vers un seul lot.
 - Les remboursements révoquent une quantité de crédits proportionnelle, arrondie au supérieur. Un litige bloque la dépense jusqu’à son règlement. Si des crédits déjà consommés sont remboursés, la dette bloque aussi les autres sources ; le rapprochement vérifie l’état actuel auprès de Stripe et ne dépend pas de l’ordre des notifications.
 - Un paiement terminé libère le verrou du Checkout suivant. Historique des 50 derniers achats, solde mensuel et solde des recharges séparés dans les offres.

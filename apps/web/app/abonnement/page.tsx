@@ -8,7 +8,7 @@ import {creditPlans} from '@bienvu/contracts';
 import '../landing.css';
 import './offers.css';
 
-export const metadata = seoMetadata({title:'Tarifs BienVu — 1 € HT par crédit, offres dès 50 €/mois',description:'Solo, Agence, Équipe et Réseau : 50 à 500 crédits par mois, à 1 € HT par crédit. Report plafonné à une mensualité, recharges sans expiration et essai gratuit.',path:'/abonnement'});
+export const metadata = seoMetadata({title:'Tarifs BienVu — 1 € HT par crédit, offres dès 50 €/mois',description:'Solo, Agence, Équipe et Réseau : 50 à 500 crédits par mois, à 1 € HT par crédit. Report plafonné à une mensualité et essai gratuit.',path:'/abonnement'});
 export const dynamic='force-dynamic';
 
 export default async function Page() {

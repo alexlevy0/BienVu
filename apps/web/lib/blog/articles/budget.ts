@@ -3,7 +3,7 @@ import type {BlogArticle} from '../types';
 export const budgetArticle: BlogArticle = {
   slug: 'cout-video-immobiliere-budget-credits', title: 'Coût d’une vidéo immobilière : budget et crédits — BienVu',
   heading: 'Combien coûte une vidéo immobilière ? Budget, crédits et coût par mandat',
-  description: 'Calculez le coût de vos vidéos immobilières avec BienVu : crédits vidéo, animations IA, abonnements, recharges et budget de communication par mandat.',
+  description: 'Calculez le coût de vos vidéos immobilières avec BienVu : crédits vidéo, animations IA, abonnements et budget de communication par mandat.',
   excerpt: 'Des exemples de calcul pour choisir votre volume, prévoir les animations et suivre le budget réellement consacré à chaque bien.',
   category: 'budget', keyword: 'coût vidéo immobilière', image: 'sud', imageAlt: 'Maison avec piscine illustrant le budget vidéo d’un mandat',
   intro: [
@@ -21,13 +21,13 @@ export const budgetArticle: BlogArticle = {
       'Après renouvellement payé, les crédits mensuels inutilisés et non réservés restent utilisables pendant un mois supplémentaire, dans la limite d’une mensualité. Ils sont consommés en premier, puis expirent ; ils ne sont pas reportés une seconde fois. Avec six nouvelles photos animées et un présentateur en introduction et conclusion, une vidéo coûte huit crédits : Solo permet six vidéos et conserve deux crédits.',
     ], table: {caption: 'Nouvelles offres au 9 octobre 2026', columns: ['Offre', 'Prix mensuel', 'Crédits mensuels'], rows: [['Gratuit', '0 €', '3'], ['Solo', '50 € HT', '50'], ['Agence', '100 € HT', '100'], ['Équipe', '200 € HT', '200'], ['Réseau', '500 € HT', '500']]}},
     {id: 'cout-unitaire', title: 'Distinguer coût théorique et utilisation réelle', paragraphs: [
-      'Un crédit correspond à 1 € HT dans les nouvelles offres et les recharges. Une vidéo classique coûte un crédit ; avec quatre nouvelles animations, elle coûte cinq crédits, soit 5 € HT. Le présentateur en introduction et/ou conclusion ajoute un crédit. Sur toute la vidéo, il ajoute un crédit par tranche de dix secondes : deux pour vingt secondes, trois pour trente, quatre pour quarante.',
+      'Un crédit correspond à 1 € HT dans les nouvelles offres mensuelles. Une vidéo classique coûte un crédit ; avec quatre nouvelles animations, elle coûte cinq crédits, soit 5 € HT. Le présentateur en introduction et/ou conclusion ajoute un crédit. Sur toute la vidéo, il ajoute un crédit par tranche de dix secondes : deux pour vingt secondes, trois pour trente, quatre pour quarante.',
       'Le prix nominal par crédit reste distinct de votre coût moyen selon les crédits réellement utilisés. Si vous consommez seulement dix crédits d’une mensualité Solo à cinquante euros, son coût se répartit sur ce volume tant que les autres crédits ne sont pas utilisés. Le report plafonné donne un mois de plus, sans rendre le solde mensuel permanent.',
     ]},
-    {id: 'recharges', title: 'Prévoir un besoin ponctuel avec une recharge', paragraphs: [
-      'Les recharges complètent le solde sans changer l’abonnement. Les packs proposés comprennent vingt crédits pour vingt euros HT, cinquante pour cinquante euros HT et cent pour cent euros HT. Les recharges sont sans expiration ; les crédits reportés puis les crédits du mois sont utilisés en premier. Les recharges achetées auparavant gardent leur montant et leur nombre de crédits.',
-      'Une recharge peut convenir à une série de nouveaux mandats ou à un projet demandant plusieurs animations. Un abonnement correspond davantage à un volume régulier. Comparez le nombre de crédits nécessaire et votre calendrier de consommation avant de choisir.',
-    ], table: {caption: 'Prix des recharges et division par crédit', columns: ['Pack', 'Prix', 'Prix par crédit'], rows: [['20 crédits', '20 € HT', '1 € HT'], ['50 crédits', '50 € HT', '1 € HT'], ['100 crédits', '100 € HT', '1 € HT']]}},
+    {id: 'recharges', title: 'Prévoir les mois avec davantage de mandats', paragraphs: [
+      'Choisissez votre abonnement selon le nombre de vidéos prévues et les options utilisées. Une série de nouveaux mandats ou plusieurs animations par vidéo peuvent justifier un volume mensuel plus important. Les offres Solo, Agence, Équipe et Réseau couvrent différents rythmes de publication.',
+      'Les achats de crédits à l’unité ne sont plus proposés. Les crédits déjà achetés restent utilisables selon leur validité d’origine ; leur historique et leurs factures restent accessibles dans votre compte.',
+    ]},
     {id: 'mandat', title: 'Calculer les crédits d’une campagne par mandat', paragraphs: [
       'Listez les créations réellement distinctes : une première vidéo, une autre version ou un nouveau format peuvent représenter plusieurs exports. Comptez ensuite les nouvelles animations nécessaires à chacun. Une animation disponible dans un format ne garantit pas sa réutilisation dans un autre.',
       'Prenons une première vidéo avec deux nouvelles photos animées : trois crédits. Une seconde version au même format réutilisant ces animations disponibles peut demander un crédit vidéo. La campagne représente alors quatre crédits dans cette hypothèse. Vérifiez le récapitulatif de chaque lancement, car les ressources disponibles déterminent la réutilisation.',

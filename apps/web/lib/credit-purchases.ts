@@ -4,11 +4,16 @@ import {Stripe,billingMode,stripeClient,type BillingEnv} from './billing';
 import {contentHash} from './manual-listings';
 import {RequestFailure} from './http';
 import {readChargeAccounting,accountingMutations} from './stripe-accounting';
+import {isSuperAdmin,type AdminIdentity} from './admin-access';
 
 export const stripeId=(value:string|{id:string}|null|undefined)=>typeof value==='string'?value:value?.id??null;
 // Tolerate older open tabs without treating this legacy field as a consent record.
 const packet=z.object({pack:z.enum(['pack20v2','pack50v2','pack100v2']),accepted:z.literal(true).optional()}).strict();
-export async function createTopupCheckout(env:BillingEnv,agencyId:string,email:string,origin:string,input:unknown,key:string,client=stripeClient(env)){
+export async function createTopupCheckout(env:BillingEnv&{SUPER_ADMIN_EMAIL?:string},user:AdminIdentity|null|undefined,agencyId:string,email:string,origin:string,input:unknown,key:string,client?:Stripe){
+ // The authenticated account grants access, never the editable agency contact
+ // email, membership role, request payload or an earlier Checkout URL.
+ if(!isSuperAdmin(env,user))throw new RequestFailure('FORBIDDEN');
+ client??=stripeClient(env);
  const parsed=packet.safeParse(input),mode=billingMode(env);
  if(!parsed.success||!EntityId.safeParse(agencyId).success||!/^[-a-zA-Z0-9_]{16,128}$/.test(key))throw new RequestFailure('VALIDATION_ERROR');
  const policy=await env.DB.prepare('SELECT mode,topup_valid_days AS validDays FROM credit_payment_policy WHERE id=1').first<{mode:string;validDays:number}>();
