@@ -2,6 +2,8 @@
 import {useEffect,useRef,useState} from 'react';
 import {MapImageInfo,MapLocation,MapSearchResult,VideoMapDefaults,DEFAULT_VIDEO_MAP,videoMapFromDefaults,automaticMapLocation,mapCredits,mapPublicLocation,mapInk,mapRasterScale,mapRasterOpacity,mapRasterStyle,mapZoomAt,mapZooms,mapDefaultZooms,mapRasterLevels,mapBuildingCamera,mapBuildingStyle,VIDEO_LAYERS,type VideoMap,type MapView} from '@bienvu/contracts';
 import {HomeIcon} from './home-icons';
+import {SatelliteMapImage} from './satellite-map-image';
+import {coastalMapSource} from '@bienvu/maps/coastal-raster';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './video-map.css';
 
@@ -69,12 +71,12 @@ export function MapScenePreview(p:{map:VideoMap;automatic?:boolean;aspectRatio:'
   const state=useMapImage(p.map.location,p.aspectRatio,p.map.view,{zoomStart:p.map.zoomStart,zoomEnd:p.map.zoomEnd}),ref=useRef<HTMLDivElement>(null),[scale,setScale]=useState(0),
     [decoded,setDecoded]=useState<string[]>([]),[failed,setFailed]=useState<string[]>([]),width=p.aspectRatio==='16:9'?1920:1080,height=p.aspectRatio==='16:9'?1080:1920,ink=mapInk(p.primaryColor,p.secondaryColor),
     plates=state.image?[state.image,...state.image.details??[]]:[],imageError=p.map.view!=='buildings-3d'&&plates.some(i=>failed.includes(i.id)),
-    imagesLoading=p.map.view!=='buildings-3d'&&plates.some(i=>!decoded.includes(i.id));
+    imagesLoading=p.map.view!=='buildings-3d'&&plates.some(i=>!decoded.includes(i.id)),RasterImage=p.map.view==='satellite'?SatelliteMapImage:'img';
   useEffect(()=>{const node=ref.current;if(!node)return;const observer=new ResizeObserver(entries=>setScale(entries[0].contentRect.width/width));observer.observe(node);return()=>observer.disconnect();},[width]);
   return <div className="map-scene-preview" ref={ref}>
     <div className="map-scene-canvas" style={{width,height,transform:`scale(${scale})`,background:p.primaryColor,color:ink}}>
       {state.image&&(p.map.view==='buildings-3d'&&p.map.location?<MapBuildingsPreview image={state.image} location={p.map.location} settings={p.map} frame={p.frame} duration={p.map.durationSeconds*30} color={p.primaryColor} width={width} height={height}/>:
-        plates.map((image,i)=><img key={image.id} className="map-scene-plate" src={image.url} alt={i?'':p.map.view==='satellite'?'Photographie aérienne':'Fond de carte'}
+        plates.map((image,i)=><RasterImage key={image.id} className="map-scene-plate" src={image.url} alt={i?'':p.map.view==='satellite'?'Photographie aérienne':'Fond de carte'}
           onLoad={e=>{const node=e.currentTarget;void node.decode().then(()=>{setDecoded(ids=>ids.includes(image.id)?ids:[...ids,image.id]);setFailed(ids=>ids.filter(id=>id!==image.id));},()=>setFailed(ids=>[...ids,image.id]));}}
           onError={()=>setFailed(ids=>[...ids,image.id])} style={{width:width*2,height:height*2,
           opacity:i?mapRasterOpacity(p.map.view,mapZoomAt(p.map,p.frame,p.map.durationSeconds*30,p.map.location?.precision),image.zoom!):1,
@@ -94,20 +96,30 @@ export function MapScenePreview(p:{map:VideoMap;automatic?:boolean;aspectRatio:'
 function MapLocator(p:{location:MapLocation;image:MapImageInfo;settings:VideoMap;color:string;onMove(location:MapLocation):void}){
   const ref=useRef<HTMLDivElement>(null),[error,setError]=useState(false),move=useRef(p.onMove);move.current=p.onMove;
   useEffect(()=>{let disposed=false,map:import('maplibre-gl').Map|undefined;setError(false);
-    void loadMapLibre().then(libre=>{
+    const controller=new AbortController(),resources:{dispose():void}[]=[];
+    void loadMapLibre().then(async libre=>{
       if(disposed||!ref.current)return;libre.setWorkerUrl('/maplibre/maplibre-gl-worker.mjs');
+      let image=p.image;
+      if(p.settings.view==='satellite'){
+        const layers:{url:string}[]=[];
+        for(const layer of [p.image,...p.image.details??[]]){
+          const source=await coastalMapSource(layer.url,controller.signal);resources.push(source);layers.push({...layer,url:source.url});
+        }
+        image={...p.image,url:layers[0].url,details:p.image.details?.map((detail,i)=>({...detail,url:layers[i+1].url}))};
+      }
+      if(disposed)return;
       const [west,south,east,north]=p.image.bounds;
       map=new libre.Map({container:ref.current,center:[p.location.longitude,p.location.latitude],zoom:mapZooms(p.settings,p.location.precision).zoomEnd,
         maxBounds:[[west,south],[east,north]],minZoom:11,maxZoom:18,attributionControl:false,
         ...(p.image.buildingsUrl?mapBuildingCamera(p.location,119,120,p.settings):{}),
-        style:p.image.buildingsUrl?mapBuildingStyle(p.image.url,p.image.bounds,p.image.buildingsUrl,p.color,p.image.details):mapRasterStyle(p.image.url,p.image.bounds,p.image.details,p.settings.view)});
+        style:image.buildingsUrl?mapBuildingStyle(image.url,image.bounds,image.buildingsUrl,p.color,image.details):mapRasterStyle(image.url,image.bounds,image.details,p.settings.view)});
       map.addControl(new libre.NavigationControl({showCompass:false}));
       map.on('load',()=>{if(!map||disposed)return;map.addSource('pin',{type:'geojson',data:{type:'Feature',properties:{},geometry:{type:'Point',coordinates:[p.location.longitude,p.location.latitude]}}});
         map.addLayer({id:'pin',type:'circle',source:'pin',paint:{'circle-radius':10,'circle-color':p.color,'circle-stroke-color':'#fff','circle-stroke-width':3}});});
       map.on('click',event=>move.current({...p.location,longitude:event.lngLat.lng,latitude:event.lngLat.lat,sourceType:'manual'}));
       map.on('error',()=>{if(!disposed)setError(true);});
     }).catch(()=>{if(!disposed)setError(true);});
-    return()=>{disposed=true;map?.remove();};
+    return()=>{disposed=true;controller.abort();map?.remove();for(const resource of resources)resource.dispose();};
   },[p.image.id,p.location.latitude,p.location.longitude,p.color,p.settings.zoomEnd]);
   return <><div ref={ref} className="map-locator" aria-label="Carte du repère à confirmer"/>{error&&<p className="customizer-hint">L’aperçu interactif n’est pas disponible dans ce navigateur. Vous pouvez confirmer le résultat de la recherche.</p>}</>;
 }

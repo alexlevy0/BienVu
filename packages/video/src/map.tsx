@@ -3,11 +3,13 @@ import {AbsoluteFill,Img,useCurrentFrame} from 'remotion';
 import {mapFrame,mapInk,mapRasterScale,mapRasterOpacity,mapZoomAt,editorCaptionStyle,VIDEO_LAYERS,type VideoManifest} from '@bienvu/contracts';
 import {subtitleGroups} from './layout';
 import {MapBuildingsScene} from './map-buildings';
+import {SatelliteMapPlate} from './satellite-map';
 
 export function MapOverlay({manifest:m,media,moduleUrl,workerUrl}:{manifest:VideoManifest;media:Record<string,string>;moduleUrl?:string;workerUrl?:string}){
   const globalFrame=useCurrentFrame(),total=m.scenes.reduce((n,s)=>n+s.durationFrames,0),frame=mapFrame(m.map?.settings,total,globalFrame);
   if(!m.map||frame===null)return null;
   const settings=m.map.settings,location=settings.location,approximate=location.precision==='approximate',ink=mapInk(m.brand.primaryColor,m.brand.secondaryColor);
+  const Raster=m.map.settings.view==='satellite'?SatelliteMapPlate:Img;
   let at=0,caption:string|undefined;
   if(m.voiceEnabled!==false&&m.subtitlesEnabled!==false&&m.editor?.textsVisible!==false){
     const scene=m.scenes.find(s=>{const start=at;at+=s.durationFrames;return globalFrame>=start&&globalFrame<at;});
@@ -17,7 +19,7 @@ export function MapOverlay({manifest:m,media,moduleUrl,workerUrl}:{manifest:Vide
   }
   return <AbsoluteFill data-bienvu-map="true" style={{overflow:'hidden',background:m.brand.primaryColor,color:ink,fontFamily:'"BienVu Video", Arial, sans-serif'}}>
     {settings.view==='buildings-3d'?<MapBuildingsScene manifest={m} media={media} frame={frame} moduleUrl={moduleUrl} workerUrl={workerUrl}/>:
-      [{asset:m.map.asset,zoom:m.map.rasterZoom},...m.map.details??[]].map((layer,i)=><Img key={layer.asset.id} src={media[layer.asset.id]} style={{position:'absolute',left:'50%',top:'50%',width:m.width*2,height:m.height*2,
+      [{asset:m.map.asset,zoom:m.map.rasterZoom},...m.map.details??[]].map((layer,i)=><Raster key={layer.asset.id} src={media[layer.asset.id]} style={{position:'absolute',left:'50%',top:'50%',width:m.width*2,height:m.height*2,
         opacity:i?mapRasterOpacity(settings.view,mapZoomAt(settings,frame,settings.durationSeconds*30,location.precision),layer.zoom!):1,
         transform:`translate(-50%,-50%) scale(${mapRasterScale(settings,frame,layer.zoom)})`}}/>)}
     <AbsoluteFill style={{background:'linear-gradient(180deg,#ffffff55,transparent 30%,transparent 60%,#ffffff99)'}}/>

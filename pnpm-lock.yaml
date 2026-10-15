@@ -331,6 +331,9 @@ importers:
       '@bienvu/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@bienvu/maps':
+        specifier: workspace:*
+        version: link:../maps
       maplibre-gl:
         specifier: 6.12.0
         version: 6.12.0
