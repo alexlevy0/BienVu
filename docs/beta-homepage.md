@@ -9,9 +9,10 @@ La homepage `/` continue d’utiliser `LandingPage`.
 
 - `app/beta/page.tsx` lit uniquement les médias **publiés** de la homepage.
 - `BetaLandingPage` réutilise le formulaire de création, le comparatif des trois
-  rendus, les avatars, l’éditeur et Ma Vitrine. Les styles sont limités à la bêta.
-- `HomeCreate` conserve son comportement par défaut ; le variant `beta` adapte
-  les libellés, les réglages et l’affichage détaillé des crédits.
+  rendus, les avatars, l’éditeur et Ma Vitrine. Les styles marketing restent limités à la bêta ; le panneau de création est partagé avec la homepage.
+- `HomeCreate` partage le formulaire compact, les réglages repliables, les libellés
+  et l’affichage détaillé des crédits entre `/` et `/beta`. Le variant `beta`
+  conserve uniquement son retour de connexion vers `/beta`.
 - `BetaExample` utilise les copies marketing publiques déjà préparées. Changer
   d’option et lire l’exemple ne déclenche aucun import, aucune réservation de
   crédits ni aucune génération chez les fournisseurs.
@@ -63,3 +64,18 @@ OpenNext. Vérifier ensuite sur ordinateur et mobile : le formulaire, les régla
 la lecture directe de l’exemple, les tarifs 1/3/7, les onglets et la FAQ. Les vérifications
 visuelles ne doivent pas lancer de génération payante. Confirmer après publication
 que `/` garde son titre et son parcours, et que le domaine bêta ouvre `/beta`.
+
+## Formulaire partagé sur la homepage (16/10/2026)
+
+Le panneau de création de la bêta est aussi utilisé sur `/`, sans remplacer le
+reste de la homepage. `home-create-panel.css` contient ses styles communs ; les
+réglages sont repliés au départ, avec fermeture par Échap. Le défilement conserve
+le même formulaire sticky sur desktop uniquement. `HomeImportPreview` et le
+détail des crédits réutilisent la préparation d’import existante, sans nouvel
+appel fournisseur pour afficher l’aperçu.
+
+Les sous-titres sont désactivés par défaut dès le premier rendu. Seule une
+activation explicite mémorisée dans l’onglet les réactive ; désactiver la voix
+les désactive aussi. Les réglages explicites des brouillons, de l’éditeur et des
+vidéos existantes restent conservés. Les valeurs historiques des manifestes et
+les règles serveur ne changent pas.

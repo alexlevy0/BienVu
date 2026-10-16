@@ -1,0 +1,59 @@
+/* Shared creation panel, promoted from the beta homepage. */
+
+.home-studio .home-create-panel .home-composer-modern {padding:12px;gap:11px;border-color:#cad6c2;border-radius:14px;box-shadow:0 8px 23px #2936200b}
+.home-studio .home-create-panel .home-composer-main {grid-template-columns:minmax(0,1fr) auto;gap:9px}
+.home-studio .home-create-panel .home-composer-modern .home-url-row {min-height:52px;padding-inline:11px;gap:9px}
+.home-studio .home-create-panel .home-composer-modern .home-url-row>svg {width:19px;height:19px}
+.home-studio .home-create-panel .home-composer-modern .home-url-input input,.home-studio .home-create-panel .home-url-placeholder {font-size:14px;letter-spacing:-.1px}
+.home-studio .home-create-panel .home-composer-modern .home-primary-button {min-width:150px;min-height:52px;padding:11px 14px;gap:12px;font-size:13px}
+.home-studio .home-create-panel .home-composer-modern .home-credit-cost {font-size:12px;min-height:15px;line-height:1.4}
+.home-studio .home-create-panel .home-composer-modern .home-composer-actions {gap:5px}
+.home-studio .home-create-panel .home-composer-modern .home-composer-bottom {gap:8px;flex-wrap:wrap}
+.home-studio .home-create-panel .home-composer-modern .home-setting-toggle {gap:7px;font-size:13px!important}
+.home-studio .home-create-panel .home-composer-modern .home-format-tags>label,.home-studio .home-create-panel .home-composer-modern .home-format-tags>button {padding-inline:6px}
+.home-studio .home-create-panel .home-composer-modern .home-format-control select {width:137px;font-size:13px;padding-left:28px;padding-right:22px}
+.home-studio .home-create-panel .home-composer-modern .home-duration-pill select {width:77px;font-size:13px!important;padding-left:27px}
+.home-studio .home-create-panel .home-composer-modern .home-select-content>svg:first-child {width:17px}
+.home-studio .home-create-panel .home-toggle-track {width:32px;height:20px}.home-studio .home-create-panel .home-toggle-track::after {width:14px;height:14px}.home-studio .home-create-panel .home-setting-toggle[aria-pressed=true] .home-toggle-track::after {transform:translateX(12px)}
+.home-studio .home-create-panel .home-composer-modern .home-customize-button {font-size:13px;min-height:34px;margin-left:auto;padding:2px 4px;gap:7px}
+.home-studio .home-create-panel .home-composer-dock>.home-mode-pill {display:inline-flex;margin:10px 0 0;padding:5px 2px;font-size:14px!important;min-height:32px;gap:7px}
+.home-studio .home-create-panel .home-create-note {margin:4px 0 0;font-size:12px;line-height:1.5;color:#627158;text-align:left}.home-create-panel .home-credit-details {padding-top:10px;border-top:1px solid #e2e8da;font-size:13px;color:#55694b}.home-create-panel .home-credit-details summary {cursor:pointer}.home-create-panel .home-credit-details dl {margin:10px 0}.home-create-panel .home-credit-details dl>div {display:flex;justify-content:space-between;gap:10px;margin-top:6px}.home-create-panel .home-credit-details dd {margin:0}.home-create-panel .home-credit-details small {font-size:12px;color:#78816f}
+.home-studio .home-create-panel .home-composer-dock[data-floating] .home-composer-main {grid-template-columns:minmax(0,1fr) auto auto}.home-studio .home-create-panel .home-composer-dock[data-floating] .home-credit-estimate-detail {display:none}
+.home-studio .home-create-panel .home-composer-modern .home-composer-tools-toggle {display:flex;align-items:center;justify-content:center;gap:6px;grid-column:1/-1;width:100%;min-height:30px;padding:5px;border:0;border-top:1px solid #ebeee5;border-radius:0;background:none;font-size:12px;color:#687c5a;cursor:pointer}
+.home-studio .home-create-panel .home-composer-modern .home-composer-tools-toggle>svg {width:15px;height:15px}
+.home-studio .home-create-panel .home-composer-options {display:none}
+.home-studio .home-create-panel .home-composer-dock[data-expanded=true] .home-composer-options {display:flex;flex-direction:column;gap:10px;padding-top:5px}
+.home-studio .home-create-panel .home-composer-dock[data-expanded=true] .home-composer-bottom {display:flex;flex-wrap:wrap}
+.home-studio .home-create-panel .home-composer-dock[data-floating] .home-composer-tools-toggle {grid-column:auto;width:auto;min-height:50px;padding:10px;border:1px solid #d6dfce;border-radius:10px;background:#f1f5ec;font-size:13px}
+.home-studio .home-create-panel .home-composer-dock[data-floating] .home-composer-actions {flex-direction:column;align-items:stretch;gap:4px}
+.home-studio .home-create-panel .home-composer-dock[data-floating] .home-credit-cost {min-width:0}
+@media(min-width:1500px){.home-studio .home-create-panel .home-composer-modern .home-primary-button {min-width:170px}}
+@media(max-width:1250px) and (min-width:901px){.home-studio .home-create-panel .home-composer-main {grid-template-columns:1fr}.home-studio .home-create-panel .home-composer-modern .home-composer-actions {display:flex;flex-direction:row;align-items:center;gap:13px}.home-studio .home-create-panel .home-composer-modern .home-primary-button {flex:1;min-height:45px}.home-studio .home-create-panel .home-composer-modern .home-credit-cost {min-width:85px}.home-studio .home-create-panel .home-composer-modern .home-composer-bottom {display:none}}
+@media(max-width:900px){.home-studio .home-create-panel .home-composer-main {grid-template-columns:1fr}.home-studio .home-create-panel .home-composer-modern .home-composer-actions {flex-direction:row;align-items:center;gap:10px}.home-studio .home-create-panel .home-composer-modern .home-primary-button {flex:1}.home-studio .home-create-panel .home-composer-modern .home-credit-cost {min-width:84px}.home-studio .home-create-panel .home-composer-modern .home-composer-bottom {display:none}}
+@media(max-width:620px){.home-studio .home-create-panel .home-composer-modern {padding:10px;gap:4px}.home-studio .home-create-panel .home-composer-main {gap:7px}.home-studio .home-create-panel .home-composer-modern .home-composer-actions {flex-direction:column;gap:5px}.home-studio .home-create-panel .home-composer-modern .home-primary-button {width:100%;min-height:45px;font-size:13px}.home-studio .home-create-panel .home-composer-modern .home-url-row {min-height:48px}.home-studio .home-create-panel .home-composer-modern .home-url-input input,.home-studio .home-create-panel .home-url-placeholder {font-size:14px}.home-studio .home-create-panel .home-credit-cost {min-height:15px}.home-studio .home-create-panel .home-composer-dock>.home-mode-pill {font-size:13px!important;margin-top:7px}.home-studio .home-create-panel .home-create-note {font-size:12px}}
+.home-studio .home-create-panel .home-composer-modern .home-primary-button {font-size:14px}
+.home-studio .home-create-panel .home-composer-modern .home-url-input input,.home-studio .home-create-panel .home-url-placeholder {font-size:15px}
+.home-studio .home-create-panel .home-composer-modern .home-credit-cost {font-size:13px;line-height:1.5}
+.home-studio .home-create-panel .home-create-note {font-size:13px;line-height:1.6}
+.home-studio .home-create-panel .home-composer-modern .home-setting-toggle,.home-studio .home-create-panel .home-composer-modern .home-duration-pill select {font-size:13px!important}
+.home-studio .home-create-panel .home-composer-modern .home-format-control select {width:151px;font-size:13px}
+.home-studio .home-create-panel .home-composer-modern .home-duration-pill select {width:87px}
+.home-studio .home-create-panel .home-composer-modern .home-customize-button,.home-studio .home-create-panel .home-composer-modern .home-composer-tools-toggle {font-size:13px;min-height:40px}
+.home-studio .home-create-panel .home-composer-modern .home-credit-estimate-detail {font-size:12px}
+.home-studio .home-create-panel .home-credit-details {font-size:13px;line-height:1.6}
+.home-studio .home-create-panel .home-credit-details small {font-size:12px}
+.home-create-panel .home-import-preview {display:grid;grid-template-columns:72px minmax(0,1fr);gap:13px;margin-top:18px;padding:14px;background:#fffefa;border:1px solid #cbd8bf;border-radius:13px;box-shadow:0 4px 20px #263e2110}
+.home-create-panel .home-import-cover {width:72px;height:84px;display:grid;place-items:center;border-radius:8px;overflow:hidden;background:#e8eee1;color:#6c835c}
+.home-create-panel .home-import-cover img {display:block;width:100%;height:100%;object-fit:cover}
+.home-create-panel .home-import-copy {min-width:0}
+.home-create-panel .home-import-copy>span {display:flex;align-items:center;gap:5px;color:#5c764d;font-size:12px}
+.home-studio .home-create-panel .home-import-copy h3 {font:550 15px/1.4 var(--home-font-text);margin:5px 0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.home-studio .home-create-panel .home-import-copy p {display:flex;align-items:center;gap:4px;font-size:13px;color:#66725c;margin:4px 0;line-height:1.4}
+.home-create-panel .home-import-action {grid-column:1/-1;border-top:1px solid #e0e7d9;padding-top:11px;display:flex;gap:12px;align-items:center;justify-content:space-between}
+.home-create-panel .home-import-action strong {font-size:15px;font-weight:550}.home-create-panel .home-import-action small {font-size:12px;font-weight:400;color:#74816a}
+.home-create-panel .home-import-action button {display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:40px;padding:8px 11px;background:#edf2e5;border:1px solid #d0dcc4;border-radius:8px;color:#314e30;font:inherit;font-size:13px;cursor:pointer}
+.home-create-panel .home-import-action button:disabled {opacity:.6;cursor:wait}
+@media(max-width:620px){
+ .home-studio .home-create-panel .home-url-placeholder,.home-studio .home-create-panel .home-composer-modern .home-url-input input {font-size:14px}
+ .home-create-panel .home-import-action {flex-wrap:wrap}.home-create-panel .home-import-action button {flex:1}
+}
