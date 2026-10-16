@@ -36,8 +36,12 @@ export const AvatarAudioSources=z.array(z.object({audioAssetId:AvatarId,audioSha
   startFrame:z.number().int().min(0).max(1199),durationMs:z.number().int().min(1).max(35000)}).strict()).min(4).max(6);
 export type AvatarAudioSources=z.infer<typeof AvatarAudioSources>;
 export const avatarPriceUsdPerMinute=(engine:AvatarCustomization['engine'],type:string)=>engine==='avatar_iii'?(type==='digital_twin'?.60:.99):(type==='photo_avatar'?2.31:4.83);
+export const AvatarGroupPreview=z.object({id:AvatarId,name:z.string().min(1).max(160),thumbnail:z.string().nullable(),preview:z.string().nullable()}).strict();
+export type AvatarGroupPreview=z.infer<typeof AvatarGroupPreview>;
+export const AvatarIdentity=z.object({id:AvatarId,groupId:AvatarId.optional(),groupName:z.string().min(1).max(100).optional()}).strict();
 export const AvatarLook=z.object({id:AvatarId,name:z.string().min(1).max(160),gender:AvatarGender,
   groupId:AvatarId.optional(),groupName:z.string().min(1).max(100).optional(),tags:z.array(z.string().max(100)).max(32).optional(),
+  groupPreviews:z.array(AvatarGroupPreview).min(1).max(3).optional(),
   variantsCount:z.number().int().min(1).max(5000).optional(),
   type:z.enum(['studio_avatar','photo_avatar','digital_twin']),engines:z.array(AvatarEngine).min(1).max(2),
   enabled:z.boolean(),thumbnail:z.string().nullable(),preview:z.string().nullable(),transparentVerified:z.boolean(),
@@ -68,7 +72,8 @@ export function avatarPresenters(looks:readonly AvatarLook[],favorites:readonly 
 // Provider identity wins over old editorial groups. Never merge on first name:
 // homonyms are different people. Existing look IDs and the default stay intact.
 export function groupAvatarPublication(publication:AvatarPublication,looks:readonly Pick<AvatarLook,'id'|'groupId'|'groupName'>[]):AvatarPublication{
-  const metadata=new Map(looks.map(look=>[look.id,look])),groups=new Map<string,AvatarPublicationGroup>();
+  const metadata=new Map<string,Pick<AvatarLook,'id'|'groupId'|'groupName'>>(),groups=new Map<string,AvatarPublicationGroup>();
+  for(const look of looks){const prior=metadata.get(look.id);metadata.set(look.id,{...look,groupId:look.groupId??prior?.groupId,groupName:look.groupName??prior?.groupName});}
   for(const previous of publication.groups)for(const id of previous.lookIds){
     const look=metadata.get(id),identity=look?.groupId??previous.id;
     let group=groups.get(identity);
@@ -76,6 +81,12 @@ export function groupAvatarPublication(publication:AvatarPublication,looks:reado
     group.recommended ||= previous.recommended;group.lookIds.push(id);
   }
   return AvatarPublication.parse({groups:[...groups.values()],defaultLookId:publication.defaultLookId});
+}
+export function addAvatarGroupToPublication(publication:AvatarPublication,groupId:string,looks:readonly AvatarLook[]):AvatarPublication{
+  if(!looks.length||looks.some(look=>(look.groupId??look.id)!==groupId))throw Error('AVATAR_GROUP_MISMATCH');
+  const prior=publication.groups.find(group=>group.id===groupId),ids=[...new Set([...(prior?.lookIds??[]),...looks.map(look=>look.id)])];
+  const group={id:groupId,name:prior?.name??looks[0].groupName??looks[0].name.slice(0,100),recommended:prior?.recommended??false,lookIds:ids};
+  return AvatarPublication.parse({groups:prior?publication.groups.map(item=>item.id===groupId?group:item):[...publication.groups,group],defaultLookId:publication.defaultLookId??ids[0]});
 }
 export function catalogAvatarLook(catalog:AvatarCatalog|null|undefined,id:string|undefined):AvatarLook|undefined{
   if(!catalog||!id)return undefined;return catalog.looks.find(look=>look.id===id)??(catalog.current?.id===id?catalog.current:undefined);
@@ -109,6 +120,7 @@ export type AvatarGallery=z.infer<typeof AvatarGallery>;
 export const AvatarAdmission=z.object({settings:AvatarSettings,look:AvatarLook,voice:z.string().min(1).max(128)}).strict();
 export type AvatarAdmission=z.infer<typeof AvatarAdmission>;
 export const AdminAvatarData=z.object({settings:AvatarSettings,revision:z.number().int().positive(),looks:z.array(AvatarLook).max(5000),
+  identities:z.array(AvatarIdentity).max(5000).default([]),
   publication:AvatarPublication,publicationRevision:z.number().int().positive(),catalogTotal:z.number().int().nonnegative(),
   connected:z.boolean(),wallet:z.object({currency:z.string().nullable(),balance:z.number().nullable(),autoReload:z.boolean(),billingType:z.string().nullable()}).nullable(),
   usage:z.object({month:z.string(),reservedUsd:z.number(),ready:z.number(),reused:z.number(),active:z.number(),uncertain:z.number()}),

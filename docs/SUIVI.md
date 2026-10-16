@@ -1,5 +1,9 @@
 # BienVu — suivi des sprints
 
+### 17/10/2026 — Mosaïques et ajout de groupes entiers
+
+Cartes avec un grand portrait et deux aperçus de variantes dans Personnaliser, `/avatar` et le superadmin. Les deux onglets administrateur sont présentés par identité HeyGen, avec l’identifiant visible et les actions « Ajouter le groupe entier » / « Compléter le groupe ». Toutes les pages sont lues avant ajout au brouillon ; seuls les moteurs autorisés sont inclus, sans doublon ni changement du défaut. Correction de la restauration des anciens brouillons qui pouvaient effacer la correspondance `group_id`. **36 tests ciblés réussis**, types et frontières validés ; [recette et détails](preuves/maintenance/MOSAIQUES-AVATARS-17-10.md).
+
 ### 17/10/2026 — Avatars regroupés par identité HeyGen
 
 Une fiche par personne dans Personnaliser, `/avatar` et le catalogue superadmin ; ouverture des déclinaisons dans une fenêtre dédiée, choix explicite, favoris et démonstrations au survol. Regroupement par `group_id`, avec nom officiel, sans fusion des homonymes. Les apparences publiées restent sous contrôle de l’administrateur ; les choix enregistrés, l’avatar par défaut, les tarifs et les générations existantes sont conservés. Couvertures légères pour les listes, variantes paginées à la demande dans la galerie et le catalogue administrateur. **43 tests ciblés**, types, frontières et build validés. Recette détaillée : [GROUPES-AVATARS-17-10](preuves/maintenance/GROUPES-AVATARS-17-10.md).

@@ -6,16 +6,16 @@ import {AdminAvatarSelection} from './admin-avatar-selection';
 
 export function AdminAvatars(){
   const [data,setData]=useState<AdminAvatarData|null>(null),[settings,setSettings]=useState<AvatarSettings|null>(null),
-    [busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[type,setType]=useState('studio_avatar'),[token,setToken]=useState<string|null>(null),alive=useRef(true);
+    [busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[type,setType]=useState('studio_avatar'),[token,setToken]=useState<string|null>(null),alive=useRef(true),mutating=useRef(false);
   async function load(){const value=AdminAvatarData.parse(await editorResponse(await fetch('/api/admin/avatars',{cache:'no-store'})));if(alive.current){setData(value);setSettings(value.settings);}return value;}
   useEffect(()=>{alive.current=true;void load().catch(cause=>{if(alive.current)setError(cause.message);});return()=>{alive.current=false;};},[]);
-  async function mutate(method:string,body:unknown):Promise<AdminAvatarData|null>{if(busy)return null;setBusy(true);setError('');setNotice('');
+  async function mutate(method:string,body:unknown):Promise<AdminAvatarData|null>{if(mutating.current)return null;mutating.current=true;setBusy(true);setError('');setNotice('');
     try{const result=await editorResponse<{imported?:number;nextToken?:string|null}>(await fetch('/api/admin/avatars',{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));
       if(!alive.current)return null;
       if(method==='POST'&&result.imported!==undefined){setToken(result.nextToken??null);setNotice(`${result.imported} apparences synchronisées dans le catalogue administrateur. La sélection publique reste inchangée.`);}
       else setNotice(method==='POST'?'Les traitements existants ont été vérifiés.':body&&typeof body==='object'&&'publication' in body?'La sélection est publiée dans Personnaliser et sur /avatar.':'Réglages enregistrés.');
       return await load();
-    }catch(cause){if(alive.current)setError(cause instanceof Error?cause.message:'Opération interrompue.');return null;}finally{if(alive.current)setBusy(false);}
+    }catch(cause){if(alive.current)setError(cause instanceof Error?cause.message:'Opération interrompue.');return null;}finally{mutating.current=false;if(alive.current)setBusy(false);}
   }
   return <div className="admin-avatars">
     <section className="admin-card"><h3>Avatars IA · HeyGen</h3><p>Option désactivée dans les nouveaux projets. Tarif BienVu : <strong>+1 crédit pour un ou deux passages</strong>, ou <strong>+1 crédit par tranche de 10 secondes</strong> sur toute la vidéo (20 s : +2, 30 s : +3, 40 s : +4). L’audio de la voix off existante est envoyé au fournisseur ; aucun appel OpenAI supplémentaire.</p>

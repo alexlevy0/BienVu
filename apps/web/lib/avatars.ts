@@ -1,6 +1,6 @@
 import {z} from 'zod';
 import {AdminAvatarData,AvatarId,AvatarSettings,AvatarLook,AvatarGalleryQuery,AvatarPublication,AdminAvatarCatalogQuery,publicErrors,type PublicErrorCode} from '@bienvu/contracts';
-import {avatarCatalog,avatarGallery,avatarSettings,avatarUsage,recentAvatarTasks,findAvatarLook,saveAvatarLook,setAvatarSettings,readAvatarPublication,publishedAvatarLooks,publishAvatarSelection,adminAvatarCatalog} from '@bienvu/db';
+import {avatarCatalog,avatarGallery,avatarSettings,avatarUsage,recentAvatarTasks,findAvatarLook,saveAvatarLook,setAvatarSettings,readAvatarPublication,publishedAvatarLooks,publishAvatarSelection,adminAvatarCatalog,avatarIdentities} from '@bienvu/db';
 import {heygenClient,downloadHeygenMedia,avatarCatalogKey,avatarMediaVersion,AvatarFailure,verifyHeygenSignature,type HeygenEnvironment} from '@bienvu/avatars';
 import type {AuthEnvironment} from './auth';
 import {createAuth} from './auth';
@@ -71,7 +71,7 @@ export async function adminAvatarRequest(request:Request,env:Env){return respond
     }else if(request.method!=='GET')throw new RequestFailure('NOT_FOUND');
     let wallet:AdminAvatarData['wallet']=null;if(env.HEYGEN_API_KEY)try{wallet=await heygenClient(env.HEYGEN_API_KEY).wallet();}catch{/* Settings remain available during a provider outage. */}
     const data=await avatarSettings(env.DB),published=await readAvatarPublication(env.DB),total=await env.DB.prepare('SELECT count(*) AS total FROM avatar_looks').first<{total:number}>();
-    return Response.json(AdminAvatarData.parse({...data,publication:published.publication,publicationRevision:published.revision,catalogTotal:total?.total??0,
+    return Response.json(AdminAvatarData.parse({...data,identities:await avatarIdentities(env.DB),publication:published.publication,publicationRevision:published.revision,catalogTotal:total?.total??0,
       looks:await publishedAvatarLooks(env.DB,published.publication.groups,data.settings.allowPremium),connected:Boolean(env.HEYGEN_API_KEY&&env.HEYGEN_ENABLED==='true'),wallet,
       usage:await avatarUsage(env.DB),tasks:await recentAvatarTasks(env.DB)}));
   }catch(cause){const code=cause instanceof AvatarFailure?cause.code:/\b(CONFLICT|RATE_LIMITED|AVATAR_[A-Z_]+)\b/.exec(String(cause))?.[1];

@@ -6,7 +6,7 @@ import {HomeIcon} from './home-icons';
 
 // Portraits load near the visible strip, not several screens ahead. Videos are
 // mounted only after deliberate interest; leaving also cancels a pending hover.
-export function AvatarPortrait({look,playing,root,onUnavailable,priority=false}:{look:AvatarLook;playing?:boolean;root?:RefObject<HTMLDivElement|null>;onUnavailable?():void;priority?:boolean}){
+export function AvatarPortrait({look,playing,root,onUnavailable,priority=false}:{look:Pick<AvatarLook,'id'|'name'|'thumbnail'|'preview'>;playing?:boolean;root?:RefObject<HTMLDivElement|null>;onUnavailable?():void;priority?:boolean}){
   const frame=useRef<HTMLSpanElement>(null),video=useRef<HTMLVideoElement>(null);
   const [visible,setVisible]=useState(priority),[ready,setReady]=useState(priority),[failed,setFailed]=useState(false),[videoReady,setVideoReady]=useState(false);
   useEffect(()=>{const node=frame.current;if(!node)return;

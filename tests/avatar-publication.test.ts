@@ -95,3 +95,12 @@ test('nombreuses tenues : pagination stable des variantes et retrait des profils
   await saveAvatarLook(db,'admin',{...rows[0],enabled:false},{image:null,video:null});
   const updated=await avatarGallery(db,input);assert.equal(updated.looks[0].id,'annie-01');assert.equal(updated.looks[0].variantsCount,69);
 });
+
+test('mosaïques : trois aperçus du même groupe, aucune variante non publiée',async t=>{
+  const rows=Array.from({length:5},(_,i)=>look('mosaic-'+i,{groupId:'mosaic-person',groupName:'Annie'})),db=await fixture(t,rows);
+  await publishAvatarSelection(db,'admin',{groups:[{id:'mosaic-person',name:'Annie',recommended:true,lookIds:rows.slice(0,4).map(look=>look.id)}],defaultLookId:rows[0].id},1);
+  const gallery=await avatarGallery(db,{query:'',gender:'all',offset:0});assert.deepEqual(gallery.looks[0].groupPreviews?.map(look=>look.id),['mosaic-0','mosaic-1','mosaic-2']);
+  assert.ok(!JSON.stringify(gallery).includes('mosaic-4'));assert.ok(!JSON.stringify(gallery).includes('SECRET_PROVIDER_URL'));
+  const admin=await adminAvatarCatalog(db,{catalog:'1',query:'',gender:'all',type:'all',availability:'all',offset:0},false);
+  assert.equal(admin.total,1);assert.equal(admin.looks[0].groupPreviews?.length,3);assert.equal(admin.looks[0].variantsCount,5);
+});
