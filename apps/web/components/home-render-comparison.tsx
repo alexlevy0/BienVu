@@ -8,17 +8,28 @@ import {homeRenderPresets,homeRenderExampleCredits,type HomeRenderPreset} from '
 
 const clock=(seconds:number)=>`${String(Math.floor(Math.max(0,seconds)/60)).padStart(2,'0')}:${String(Math.floor(Math.max(0,seconds)%60)).padStart(2,'0')}`;
 type Mode='all'|0|1|2;
-type Props={paused:boolean;selected?:HomeRenderPreset|null;onChoose(preset:HomeRenderPreset):void;onPlayingChange?(playing:boolean):void};
+type Props={paused:boolean;selected?:HomeRenderPreset|null;onChoose(preset:HomeRenderPreset):void;onPlayingChange?(playing:boolean):void;compact?:boolean};
 export function HomeRenderComparison(props:Props){
   const standard=useHomepageMedia('renders.standard.video'),avatar=useHomepageMedia('renders.avatar.video'),ai=useHomepageMedia('renders.avatar-ai.video');
   return <RenderPlayers key={[standard,avatar,ai].map(m=>m.src).join('|')} media={[standard,avatar,ai]} {...props}/>;
 }
 function SoundIcon({muted}:{muted:boolean}){return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M11 4 6 8H2v8h4l5 4V4Z"/>{muted?<path d="m16 9 6 6m0-6-6 6"/>:<><path d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></>}</svg>;}
-function RenderPlayers({media,paused,selected,onChoose,onPlayingChange}:Props&{media:[HomeMediaView,HomeMediaView,HomeMediaView]}){
+function RenderPlayers({media,paused,selected,onChoose,onPlayingChange,compact=false}:Props&{media:[HomeMediaView,HomeMediaView,HomeMediaView]}){
   const players=useRef<(HTMLVideoElement|null)[]>([]),section=useRef<HTMLElement>(null),frame=useRef<HTMLDivElement>(null),
     controller=useRef<ReturnType<typeof synchronizeVideoGroup>|null>(null),modeRef=useRef<Mode|null>(null);
   const [mode,setMode]=useState<Mode|null>(null),[muted,setMuted]=useState(true),[shown,setShown]=useState<boolean[]>([false,false,false]),
     [state,setState]=useState<VideoPairState>({requested:false,playing:false,loading:false,ready:false,error:false,time:0,duration:20});
+  const grid=useRef<HTMLDivElement>(null),[visibleCard,setVisibleCard]=useState(0);
+  useEffect(()=>{
+    const element=grid.current;if(!compact||!element||typeof IntersectionObserver==='undefined')return;
+    const observer=new IntersectionObserver(entries=>{for(const entry of entries)if(entry.intersectionRatio>.65)setVisibleCard(Number((entry.target as HTMLElement).dataset.renderIndex));},{root:element,threshold:.65});
+    element.querySelectorAll('[data-render-index]').forEach(card=>observer.observe(card));return()=>observer.disconnect();
+  },[compact]);
+  function showCard(index:number){
+    const element=grid.current,card=element?.children[index] as HTMLElement|undefined;if(!element||!card)return;
+    controller.current?.pause();setVisibleCard(index);
+    element.scrollTo({left:element.scrollLeft+card.getBoundingClientRect().left-element.getBoundingClientRect().left-(element.clientWidth-card.clientWidth)/2,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
+  }
   useEffect(()=>{
     const observer=typeof IntersectionObserver==='undefined'?null:new IntersectionObserver(entries=>{if(!entries.some(e=>e.isIntersecting))controller.current?.pause();});
     if(section.current)observer?.observe(section.current);
@@ -60,12 +71,13 @@ function RenderPlayers({media,paused,selected,onChoose,onPlayingChange}:Props&{m
   return <section ref={section} className="home-renders" aria-labelledby="home-renders-title">
     <header className="home-renders-heading"><h2 id="home-renders-title">Une annonce. <em>Trois rendus.</em></h2><p>Comparez les fonctionnalités et les crédits, sur le même bien.</p>
       <span className="home-renders-example"><HomeIcon name="image" size={16}/>Exemple : 20 s · 4 photos</span></header>
-    <div ref={frame} className="home-renders-frame"><div className="home-renders-grid">
+    {compact&&<div className="beta-render-selector" role="group" aria-label="Afficher un rendu">{homeRenderPresets.map((preset,index)=><button key={preset.id} type="button" aria-pressed={visibleCard===index} onClick={()=>showCard(index)}>{preset.title}<small>{homeRenderExampleCredits(preset.id)} crédit{index?'s':''}</small></button>)}</div>}
+    <div ref={frame} className="home-renders-frame"><div ref={grid} className="home-renders-grid">
       {homeRenderPresets.map((preset,index)=>{
         const own=mode==='all'||mode===index,current=own?state.time:players.current[index]?.currentTime??0,duration=own?state.duration:media[index].duration??20,
           isPlaying=own&&state.playing,isLoading=own&&state.loading,isError=own&&state.error,credits=homeRenderExampleCredits(preset.id),cardMuted=muted||!own||mode==='all'&&index!==0,
           poster={...media[index],kind:'image' as const,src:media[index].poster??`/images/studio-home/renders-${preset.id}.webp`};
-        return <article key={preset.id} className={`home-render-card${index===2?' is-featured':''}${selected===preset.id?' is-selected':''}`}>
+        return <article key={preset.id} data-render-index={index} className={`home-render-card${index===2?' is-featured':''}${selected===preset.id?' is-selected':''}`}>
           <header><span className="home-render-number">0{index+1}</span><div><h3>{preset.title}</h3><p>{preset.subtitle}</p></div></header>
           <div className="home-render-video" aria-busy={isLoading}>
             <HomeVisual media={poster} alt={`Aperçu du rendu ${preset.title}`} sizes="(max-width: 620px) 82vw, (max-width: 900px) 30vw, (max-width: 1500px) calc((100vw - 400px) / 3), 440px"/>
@@ -82,7 +94,7 @@ function RenderPlayers({media,paused,selected,onChoose,onPlayingChange}:Props&{m
             </div>
           </div>
           <div className="home-render-price"><strong>{credits} crédit{credits>1?'s':''}</strong><p>{preset.description}</p></div>
-          <ul>{preset.features.map(feature=><li key={feature}><span aria-hidden="true"><HomeIcon name="check" size={14}/></span>{feature}</li>)}</ul>
+          <ul>{(compact?preset.features.slice(0,2):preset.features).map(feature=><li key={feature}><span aria-hidden="true"><HomeIcon name="check" size={14}/></span>{feature}</li>)}</ul>
           <button type="button" className="home-render-choose" aria-pressed={selected===preset.id} onClick={()=>{controller.current?.pause();onChoose(preset.id);}}>Choisir ce rendu<HomeIcon name="arrow" size={19}/></button>
         </article>;
       })}

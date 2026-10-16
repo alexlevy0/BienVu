@@ -5,7 +5,7 @@ import {HomeIcon, HomeWordmark} from './home-icons';
 import {CookiePreferencesButton} from './product-analytics';
 import {useSiteFeatures} from './site-features';
 
-export function HomeFooter({onCreate}:{onCreate:()=>void}) {
+export function HomeFooter({onCreate,faqHref='#home-life-faq-title'}:{onCreate:()=>void;faqHref?:string}) {
   const features=useSiteFeatures();
   const backToTop=()=>{
     window.scrollTo({top:0,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
@@ -44,7 +44,7 @@ export function HomeFooter({onCreate}:{onCreate:()=>void}) {
         <Link href="/modeles-video-immobilier" prefetch={false}>Modèles de vidéos</Link>
         <Link href="/guides" prefetch={false}>Guides immobiliers</Link>
         <Link href="/sources" prefetch={false}>Sources d’import</Link>
-        <a href="#home-life-faq-title">Questions fréquentes</a>
+        <a href={faqHref}>Questions fréquentes</a>
       </nav>
       <div className="home-premium-footer-column home-premium-footer-contact">
         <h3>Parlons de votre agence</h3>

@@ -13,7 +13,8 @@ const config: NextConfig = {
       {key: 'X-Frame-Options', value: 'DENY'},
       {key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()'},
     ]},{source:'/api/admin/mailbox/messages/:messageId/html',headers:[{key:'X-Frame-Options',value:'SAMEORIGIN'}]},
-      {source:'/ma-vitrine/apercu',headers:[{key:'X-Frame-Options',value:'SAMEORIGIN'},{key:'Content-Security-Policy',value:"frame-ancestors 'self'"}]}];
+      {source:'/ma-vitrine/apercu',headers:[{key:'X-Frame-Options',value:'SAMEORIGIN'},{key:'Content-Security-Policy',value:"frame-ancestors 'self'"}]},
+      {source:'/beta/:path*',headers:[{key:'X-Robots-Tag',value:'noindex, follow'}]}];
   },
 };
 // Upload credentials are build-only, never a browser variable or Worker binding.

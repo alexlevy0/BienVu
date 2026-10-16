@@ -8,8 +8,10 @@ import {HeroBacklight} from './hero-backlight';
 
 type PlaybackProps = {paused: boolean; onPlayingChange(playing: boolean): void};
 
-export function HomeHeroVideo(props: PlaybackProps) {
-  const visual = useHomepageMedia('hero.visual'), movie = useHomepageMedia('hero.video');
+export function HomeHeroVideo({render,...props}: PlaybackProps & {render?:'standard'|'avatar-ai'}) {
+  const heroVisual = useHomepageMedia('hero.visual'), heroMovie = useHomepageMedia('hero.video');
+  const example=useHomepageMedia(render==='avatar-ai'?'renders.avatar-ai.video':'renders.standard.video');
+  const movie=render?example:heroMovie,visual=render?{...example,kind:'image' as const,src:example.poster??`/images/studio-home/renders-${render}.webp`,custom:true}:heroVisual;
   return <HeroPlayer key={movie.src} visual={visual} movie={movie} {...props}/>;
 }
 

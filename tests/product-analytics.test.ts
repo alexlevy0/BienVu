@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {ANALYTICS_CONSENT_KEY,CONSENT_DURATION_MS,analyticsConfiguration,analyticsPath,analyticsUrl,readAnalyticsConsent,replayAllowed,replayAttribute,replayUrl,safeAnalyticsProperties,safeWebVitalsProperties} from '../apps/web/lib/analytics-policy';
+import {ANALYTICS_CONSENT_KEY,CONSENT_DURATION_MS,analyticsConfiguration,analyticsPath,analyticsUrl,analyticsEvents,readAnalyticsConsent,replayAllowed,replayAttribute,replayUrl,safeAnalyticsProperties,safeWebVitalsProperties} from '../apps/web/lib/analytics-policy';
 
 test('analytics is disabled without a valid EU project configuration',()=>{
   assert.equal(analyticsConfiguration({}).enabled,false);
@@ -21,6 +21,14 @@ test('public pages retain their names but all private identifiers, query strings
   assert.equal(analyticsPath('/biens/listing%3A264c088b-5fe7-49f5-aca7-ff4332bc5531'),'/biens/[id]');
   assert.equal(analyticsPath('/historique/264c088b-5fe7-49f5-aca7-ff4332bc5531'),'/historique/[id]');
   assert.equal(analyticsPath('/blog'),'/blog');
+});
+test('beta funnel is measurable without leaking imported listing details',()=>{
+  assert.equal(analyticsPath('/beta?url=https://agency.fr/private&voice=private'),'/beta');
+  assert.equal(analyticsUrl('/beta?email=private@example.fr#private'),'https://bienvu.online/beta');
+  for(const name of ['beta_demo_opened','beta_render_selected','beta_demo_applied','beta_voice_applied'])assert.ok(analyticsEvents.has(name));
+  assert.deepEqual(safeAnalyticsProperties({page:'/beta',source_kind:'demo',render_preset:'avatar-ai',credit_cost:7,url:'https://agency.fr/private',title:'PRIVATE_TITLE',voice:'PRIVATE_VOICE'}),{page:'/beta',source_kind:'demo',render_preset:'avatar-ai',credit_cost:7});
+  assert.deepEqual(safeAnalyticsProperties({render_preset:'PRIVATE_TEXT'}),{});
+  assert.equal(analyticsPath('/beta?token=secret'),null);
 });
 test('admin, private validation links and OAuth/reset URLs are excluded',()=>{
   for(const url of ['/admin','/admin/boite','/api/social/oauth/callback?code=secret','/validation/private-secret','/agence?grant=private-secret','/connexion#token=secret','/agence?socialError=SOCIAL_PAGE_ACCESS','/laboratoire']){

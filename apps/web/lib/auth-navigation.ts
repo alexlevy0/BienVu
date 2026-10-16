@@ -1,5 +1,5 @@
 // Login may return to a studio page, never to an API or an external origin.
-const destinations = new Set(['/', '/agence', '/publications', '/editeur', '/abonnement', '/equipe', '/projets', '/historique', '/biens']);
+const destinations = new Set(['/', '/beta', '/agence', '/publications', '/editeur', '/abonnement', '/equipe', '/projets', '/historique', '/biens']);
 export function authReturnPath(value: unknown): string | null {
   if (typeof value !== 'string' || value.length > 2048 || !value.startsWith('/') || value.startsWith('//') || /[\\\u0000-\u0020]/.test(value)) return null;
   try {

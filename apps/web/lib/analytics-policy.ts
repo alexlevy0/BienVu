@@ -6,7 +6,7 @@ export type AnalyticsConsent={version:2;analytics:boolean;replay:boolean;at:numb
 export type AnalyticsConfig={enabled:boolean;token:string;host:string;errorTracking?:boolean};
 export type AnalyticsProperties=Record<string,string|number|boolean|undefined>;
 const privateParameters=new Set(['token','code','state','grant','socialError','socialConnected','session_id','checkout','homePreview','facebookPage']);
-const studioPaths=new Set(['/connexion','/agence','/biens','/historique','/editeur','/projets','/publications','/equipe','/ma-vitrine']);
+const studioPaths=new Set(['/beta','/connexion','/agence','/biens','/historique','/editeur','/projets','/publications','/equipe','/ma-vitrine']);
 
 // Public article slugs are retained; private property/project IDs never leave the browser.
 export function analyticsPath(value:string):string|null {
@@ -44,6 +44,7 @@ const enums:Record<string,readonly string[]>={
   metric:['CLS','INP','LCP'],quality:['good','needs-improvement','poor'],
   control_area:['navigation','composer','customizer','editor_media','editor_timeline','editor_preview','agency','properties','publications','partners','offers','page'],
   control_type:['link','button','input','select','textarea'],
+  render_preset:['standard','avatar','avatar-ai'],
 };
 const counts=new Set(['photo_count','animation_count','duration_seconds','credit_cost','destination_count','elapsed_ms','metric_value']);
 const flags=new Set(['voice_enabled','subtitles_enabled','map_enabled','verification_required','is_test','is_internal']);
@@ -54,7 +55,8 @@ export const analyticsEvents=new Set(['import_requested','import_completed','imp
   'agency_saved','agency_save_failed','social_connection_requested','social_connection_completed','social_connection_removed',
   'publication_requested','publication_created','publication_failed','publication_completed',
   'checkout_requested','checkout_opened','checkout_failed','partner_application_started','partner_application_requested','partner_application_received','partner_application_failed',
-  'video_played','video_download_clicked','share_clicked','navigation_clicked','control_interacted','preferences_updated','web_vital']);
+  'video_played','video_download_clicked','share_clicked','navigation_clicked','control_interacted','preferences_updated','web_vital',
+  'beta_demo_opened','beta_render_selected','beta_demo_applied','beta_voice_applied']);
 export function safeAnalyticsProperties(input:Record<string,unknown>):AnalyticsProperties {
   const result:AnalyticsProperties={};
   for(const [key,value] of Object.entries(input)){

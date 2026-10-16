@@ -1,6 +1,7 @@
 // @ts-ignore Le point d'entrée OpenNext est généré au build.
 import openNext from './.open-next/worker.js';
 import {httpsRedirect} from './lib/https-redirect';
+import {betaHomepageRedirect} from './lib/beta-homepage';
 import {collectTraffic,purgeTraffic} from './lib/traffic';
 import {collectSeo,purgeSeo} from './lib/seo-analytics';
 import {runSocialBatch} from './lib/social-publisher';
@@ -16,7 +17,7 @@ import {withServerErrorTracking,captureServerException} from './lib/error-tracki
 export default {
   async fetch(request, env, ctx) {
    return withServerErrorTracking(request,env,ctx,async()=>{try{
-    const response=protectShowcaseResponse(request,await (httpsRedirect(request, env) ?? openNext.fetch(request, env, ctx)));
+    const response=protectShowcaseResponse(request,await (betaHomepageRedirect(request) ?? httpsRedirect(request, env) ?? openNext.fetch(request, env, ctx)));
     collectTraffic(request,response,env,ctx,request.cf?.country);
     collectSeo(request,response,env,ctx);
     return response;
