@@ -1,6 +1,5 @@
 .home-studio .home-composer-dock {container-type:inline-size}
 .home-composer-slot {position:relative;flex:none;min-width:0;width:100%}
-.home-composer-options {display:contents}
 .home-composer-tools-toggle {display:none}
 .home-studio .home-composer-modern {min-height:0;padding:20px;gap:22px;border:1px solid #d3ddce;border-radius:16px;background:#fffefa;box-shadow:0 10px 30px #2936200c,0 1px 4px #29362008}
 .home-studio .home-composer-modern:focus-within {border-color:#c5d2bc;box-shadow:0 10px 30px #29362012,0 1px 5px #2936200c}
@@ -59,9 +58,9 @@
 .home-setting-toggle[aria-pressed=true] .home-toggle-track::after {transform:translateX(18px)}
 .home-studio .home-composer-modern .home-customize-button {grid-area:auto;display:inline-flex;align-items:center;justify-content:center;flex:none;gap:9px;min-width:0;min-height:44px;padding:7px 5px;border:0;border-radius:6px;background:transparent;font-size:14px;color:#242923}
 .home-studio .home-composer-modern .home-customize-button:hover,.home-studio .home-composer-modern .home-customize-button[aria-pressed=true] {background:#f0f4ea}
-.home-studio .home-composer-dock>.home-mode-pill {min-height:38px;padding:7px 4px;margin:12px 0 0 3px;border:0;border-radius:4px;background:transparent;color:#687169!important;font-size:14px!important;gap:10px}
-.home-studio .home-composer-dock>.home-mode-pill:hover {color:#263e22!important;text-decoration:underline;text-underline-offset:4px}
-.home-studio .home-composer-dock>.home-mode-pill.is-active {color:#34582d!important;font-weight:600}
+.home-studio .home-composer-secondary .home-mode-pill {min-height:38px;padding:7px 4px;margin:12px 0 0 3px;border:0;border-radius:4px;background:transparent;color:#687169!important;font-size:14px!important;gap:10px}
+.home-studio .home-composer-secondary .home-mode-pill:hover {color:#263e22!important;text-decoration:underline;text-underline-offset:4px}
+.home-studio .home-composer-secondary .home-mode-pill.is-active {color:#34582d!important;font-weight:600}
 .home-studio .home-composer-modern .home-format-control select:hover,.home-studio .home-composer-modern .home-duration-pill select:hover {background-color:#f4f6ee}
 .home-studio .home-composer-modern select:disabled {opacity:.55;cursor:default}
 @container(max-width:750px) {
@@ -116,16 +115,11 @@
 .home-studio .home-composer-dock[data-floating] .home-credit-cost {font-size:11px;min-height:16px}
 .home-studio .home-composer-dock[data-floating] .home-composer-tools-toggle {display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:50px;padding:10px;border:1px solid #d6dfce;border-radius:10px;background:#f1f5ec;color:#395036;font-size:13px;cursor:pointer}
 .home-studio .home-composer-dock[data-floating] .home-composer-tools-toggle:hover,.home-studio .home-composer-dock[data-floating] .home-composer-tools-toggle[aria-expanded=true] {background:#e1e9da}
-.home-studio .home-composer-dock[data-floating] .home-composer-options,.home-studio .home-composer-dock[data-floating]>.home-mode-pill {display:none}
-.home-studio .home-composer-dock[data-floating][data-expanded=true] .home-composer-options {display:flex;flex-direction:column;gap:12px;padding-top:10px;border-top:1px solid #e4e9de;animation:home-composer-settings-in .2s ease-out}
-.home-studio .home-composer-dock[data-floating][data-expanded=true]>.home-mode-pill {display:inline-flex;margin:0 20px 12px;padding:7px}
 .home-studio .home-composer-dock[data-floating]>.home-create-note {display:none}
 .home-studio .home-composer-dock[data-floating]>.home-form-feedback,.home-studio .home-composer-dock[data-floating]>.home-form-note {margin:0;padding:0 20px 12px;font-size:12px}
-@keyframes home-composer-settings-in {from {opacity:0;transform:translateY(-4px)}to {opacity:1;transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce) {
  .home-toggle-track,.home-toggle-track::after,.home-studio .home-composer-modern .home-url-row {transition:none}
  .home-url-input input:placeholder-shown+.home-url-placeholder {animation:none;background:none;color:#71777a}
- .home-studio .home-composer-dock[data-floating][data-expanded=true] .home-composer-options {animation:none}
 }
 @media(forced-colors:active) {
  .home-url-input input:placeholder-shown+.home-url-placeholder {display:none}
