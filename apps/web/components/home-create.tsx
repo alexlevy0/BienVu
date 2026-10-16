@@ -28,6 +28,7 @@ const loadingTool=()=> <p className="home-tool-loading" role="status">Ouverture 
 const ManualListingForm=dynamic(()=>import('./manual-listing-form').then(module=>module.ManualListingForm),{loading:loadingTool});
 const VideoCustomizer=dynamic(()=>import('./video-customizer').then(module=>module.VideoCustomizer),{loading:loadingTool});
 const ConversationGeneration=dynamic(()=>import('./conversation-generation').then(module=>module.ConversationGeneration),{loading:loadingTool});
+const BetaImportFeedback=dynamic(()=>import('./beta-import-feedback').then(module=>module.BetaImportFeedback),{loading:()=>null});
 
 type RequestMessage = {kind: 'url' | 'manual'; text: string};
 type ComposerPhoto={id:string;file:File;preview:string};
@@ -616,7 +617,7 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
     </>}
     {manual&&!manualReady&&<p id="home-manual-action-note" className="home-form-note" role="status">{manualReason}</p>}
     {screen.kind==='error'&&<p className="home-form-feedback" role="alert">{screen.message} Votre saisie est conservée pour réessayer.</p>}
-    {estimateFailed&&<p className="home-form-feedback" role="alert">{estimate.message} <button type="button" className="text-button" onClick={estimate.retry}>Réessayer l’estimation</button></p>}
+    {estimateFailed&&variant!=='beta'&&<p className="home-form-feedback" role="alert">{estimate.message} <button type="button" className="text-button" onClick={estimate.retry}>Réessayer l’estimation</button></p>}
     {feedback && <p className="home-form-feedback" id="home-url-error" role="alert">{feedback}</p>}
     {!me && trial.challenge && trial.siteKey && <TrialChallenge siteKey={trial.siteKey} version={trial.widgetVersion}
       purpose={guestPending.current?'description':'trial'} onToken={token=>{trial.setToken(token);if(!token)return;
@@ -633,6 +634,9 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
     {activeOtherJob && <p className="home-form-note">Une vidéo est déjà en cours de création. <Link href="/biens">Suivez-la dans Mes biens</Link>.</p>}
     <p className="home-create-note" id="home-create-note" hidden={manual?Boolean(me):!(screen.kind==='job'&&generationActive(selectedJob))&&!contextNote}>{manual ? '1 crédit offert pour créer votre vidéo sans compte. Connectez-vous pour la télécharger sans filigrane.' : screen.kind === 'job' && generationActive(selectedJob) ? me?'Votre création sera enregistrée dans Mes biens.':'Votre aperçu avec filigrane sera disponible dans ce navigateur.' : contextNote}</p>
     </div></div>
-    {!inConversation&&!manual&&!busy&&estimate.value&&!estimatePending&&!estimateFailed&&<HomeImportPreview value={estimate.value} credits={creditCost} busy={loading||presetPreparing||customizing} onPersonalize={()=>void personalize()}/>}
+    {variant==='beta'?<BetaImportFeedback source={!inConversation&&!manual&&!busy&&!loading&&!composerPhotos.length&&!importPaused?estimate.source:''}
+      phase={!me?'guest':estimate.phase==='ready'?'ready':estimate.phase==='error'?'error':estimate.phase==='loading'?(estimate.reading?'reading':'detected'):'idle'}
+      value={estimate.value} message={estimate.message} credits={creditCost} busy={loading||presetPreparing||customizing} onPersonalize={()=>void personalize()} onRetry={estimate.retry}/>
+      :!inConversation&&!manual&&!busy&&estimate.value&&!estimatePending&&!estimateFailed&&<HomeImportPreview value={estimate.value} credits={creditCost} busy={loading||presetPreparing||customizing} onPersonalize={()=>void personalize()}/>}
   </div>;
 }

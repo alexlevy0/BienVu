@@ -13,6 +13,7 @@ import '../home-composer.css';
 import '../home-noise.css';
 import '../home-typography.css';
 import './beta.css';
+import './import-feedback.css';
 
 export const dynamic='force-dynamic';
 export const metadata=seoMetadata({title:'BienVu — Votre annonce, sa prochaine vidéo',description:'Essayez une nouvelle façon de découvrir BienVu : une annonce, trois rendus et une vidéo à votre image.',path:'/beta',noindex:true});

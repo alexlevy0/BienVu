@@ -12,7 +12,8 @@ La homepage `/` continue d’utiliser `LandingPage`.
   rendus, les avatars, l’éditeur et Ma Vitrine. Les styles marketing restent limités à la bêta ; le panneau de création est partagé avec la homepage.
 - `HomeCreate` partage le formulaire compact, les réglages repliables, les libellés
   et l’affichage détaillé des crédits entre `/` et `/beta`. Le variant `beta`
-  conserve uniquement son retour de connexion vers `/beta`.
+  conserve son retour de connexion vers `/beta` et ses essais de présentation
+  d’import, sans les afficher sur la homepage principale.
 - `BetaExample` utilise les copies marketing publiques déjà préparées. Changer
   d’option et lire l’exemple ne déclenche aucun import, aucune réservation de
   crédits ni aucune génération chez les fournisseurs.
@@ -79,3 +80,25 @@ activation explicite mémorisée dans l’onglet les réactive ; désactiver la 
 les désactive aussi. Les réglages explicites des brouillons, de l’éditeur et des
 vidéos existantes restent conservés. Les valeurs historiques des manifestes et
 les règles serveur ne changent pas.
+
+## Retours d’import à tester sur la bêta (16/10/2026)
+
+`BetaImportFeedback` est rendu uniquement par le variant `beta` de `HomeCreate`.
+Ses styles sont chargés par `/beta` et limités à `.home-studio-beta`.
+
+- « Lien détecté » correspond à une URL publique valide, pendant le délai de
+  préparation existant. Le domaine du lien reste visible.
+- « Lecture de votre annonce… » commence au déclenchement de la préparation
+  réelle. Un indicateur et un squelette remplacent tout pourcentage fictif.
+- La réponse valide déplie la fiche existante : photo, informations du bien,
+  nombre de photos, estimation des crédits et choix des photos. Une annonce
+  incomplète est annoncée comme « récupérée », sans prétendre être prête à générer.
+- En cas d’échec, le lien est conservé et le bouton relance la lecture existante.
+- Sans connexion, le lien est seulement signalé comme détecté ; le message
+  explique que l’analyse commencera au lancement de l’essai. Aucun import
+  anonyme supplémentaire n’est déclenché.
+
+La préparation, son cache et son idempotence sont réutilisés : ni doublon de
+requête, ni génération payante pour l’affichage de ce retour. Changer ou effacer
+le lien retire la fiche de l’ancien lien. Les animations respectent la préférence
+de réduction des mouvements. `/` conserve sa présentation d’import existante.

@@ -5,7 +5,7 @@ import {analyticsFetch as fetch} from '../lib/product-analytics';
 
 export type PreparedUrlImport={id:string;status:'importing'|'ready'|'needs_input';listing:NormalizedListing|null;draft:CreationDraftView|null};
 type Entry={owner:string;url:string;key:string;createdAt:number;controller:AbortController;promise:Promise<PreparedUrlImport>};
-type State={owner:string;url:string;phase:'loading'|'ready'|'error';value?:PreparedUrlImport;message?:string};
+type State={owner:string;url:string;phase:'loading'|'ready'|'error';reading?:boolean;value?:PreparedUrlImport;message?:string};
 const lifetime=10*60_000,preparationVersion=2;
 const wait=(ms:number)=>new Promise<void>(resolve=>setTimeout(resolve,ms));
 export function urlImportPhotoSlots(value?:PreparedUrlImport){return (value?.listing?.photos??value?.draft?.photos??[]).slice(0,VIDEO_PHOTO_MAXIMUM).map(p=>p.sourceOrder);}
@@ -57,11 +57,11 @@ export function useUrlImportEstimate(url:string,owner:string|undefined,enabled:b
  function retry(){if(!owner||!source)return;entries.current.delete(owner+'\n'+source);try{sessionStorage.removeItem('bienvu:url-import-request');}catch{}setState(null);setRevision(n=>n+1);}
  useEffect(()=>{
   if(!enabled||!owner||!source)return;let cancelled=false;setState({owner,url:source,phase:'loading'});
-  const timer=setTimeout(()=>{void prepare(source).then(value=>{if(!cancelled&&scope.current===owner)setState({owner,url:source,phase:'ready',value});})
+  const timer=setTimeout(()=>{setState({owner,url:source,phase:'loading',reading:true});void prepare(source).then(value=>{if(!cancelled&&scope.current===owner)setState({owner,url:source,phase:'ready',value});})
    .catch(e=>{if(!cancelled&&scope.current===owner)setState({owner,url:source,phase:'error',message:e instanceof Error?e.message:'Estimation indisponible.'});});},800);
   return()=>{cancelled=true;clearTimeout(timer);};
  },[source,owner,enabled,revision]);
  useEffect(()=>{return()=>{for(const entry of entries.current.values())entry.controller.abort();entries.current.clear();};},[owner]);
  const current=state&&state.owner===owner&&state.url===source?state:null;
- return {source,phase:enabled&&owner&&source?(current?.phase??'loading'):'idle',value:current?.value,message:current?.message,prepare,retry};
+ return {source,phase:enabled&&owner&&source?(current?.phase??'loading'):'idle',reading:Boolean(enabled&&owner&&source&&current?.phase==='loading'&&current.reading),value:current?.value,message:current?.message,prepare,retry};
 }
