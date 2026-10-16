@@ -6,6 +6,7 @@ import {HomeIcon} from './home-icons';
 import {HomeVisual,useHomepageMedia,type HomeMediaView} from './homepage-media';
 import {imageWidthUrl,previewVideoUrl} from '../lib/home-media-view';
 import {VideoBacklight} from './video-backlight';
+import {useAvatarCardMotion} from './use-avatar-card-motion';
 
 const presentations=[{id:'circle',label:'Une présence discrète'},{id:'integrated',label:'Une présence intégrée'}] as const;
 const benefits=[
@@ -27,6 +28,7 @@ function AvatarPreview({id,label,movie,visual,videoRef,paused,onPlay}:{id:string
     finally{setLoading(false);}
   }
   return <figure className={`home-avatar-preview home-avatar-preview-${id}`}>
+    <div className="home-avatar-tilt-anchor">
     <div className="video-backlight-frame home-avatar-backlight-frame">
     <VideoBacklight video={videoRef} active={!paused} poster={poster?imageWidthUrl(poster,640):null} posterLoading="lazy" className="home-avatar-backlight"/>
     <div className={`home-avatar-frame${started?' is-started':''}`}>
@@ -39,6 +41,8 @@ function AvatarPreview({id,label,movie,visual,videoRef,paused,onPlay}:{id:string
       {(!started||error)&&<button type="button" className="home-avatar-play" onClick={()=>void play()} disabled={loading} aria-label={`${error?'Réessayer':'Lire'} la démonstration : ${label}`}><HomeIcon name={loading?'refresh':'play'} size={28}/></button>}
       {!started&&<span className="home-avatar-preview-line" aria-hidden="true"/>}
       {loading&&<span className="home-avatar-loading" role="status">Chargement de la vidéo…</span>}
+      <span className="home-avatar-foil" aria-hidden="true"/>
+    </div>
     </div>
     </div>
     <figcaption>{label}</figcaption>
@@ -50,6 +54,8 @@ export function HomeAvatarShowcase({paused}:{paused:boolean}){
   const circle=useHomepageMedia('avatars.circle.video'),circleVisual=useHomepageMedia('avatars.circle.visual');
   const integrated=useHomepageMedia('avatars.integrated.video'),integratedVisual=useHomepageMedia('avatars.integrated.visual');
   const circleRef=useRef<HTMLVideoElement>(null),integratedRef=useRef<HTMLVideoElement>(null),section=useRef<HTMLElement>(null);
+  const stage=useRef<HTMLDivElement>(null);
+  useAvatarCardMotion(stage,paused,[circle.src,circleVisual.src,integrated.src,integratedVisual.src].join('|'));
   function pause(){circleRef.current?.pause();integratedRef.current?.pause();}
   useEffect(()=>{if(paused)pause();},[paused]);
   useEffect(()=>{
@@ -70,7 +76,7 @@ export function HomeAvatarShowcase({paused}:{paused:boolean}){
         <Link href="/avatar" className="home-avatars-action">Voir les avatars en action <HomeIcon name="arrow" size={22}/></Link>
         <p className="home-avatars-note">Sans vous filmer. À votre image.</p>
       </div>
-      <div className="home-avatars-stage">
+      <div className="home-avatars-stage" ref={stage}>
         <AvatarPreview key={circle.src+circleVisual.src} {...presentations[0]} movie={circle} visual={circleVisual} videoRef={circleRef} paused={paused} onPlay={()=>started(circleRef.current)}/>
         <AvatarPreview key={integrated.src+integratedVisual.src} {...presentations[1]} movie={integrated} visual={integratedVisual} videoRef={integratedRef} paused={paused} onPlay={()=>started(integratedRef.current)}/>
       </div>
