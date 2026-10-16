@@ -1,4 +1,5 @@
 import {test} from 'node:test';
+import {avatarPublicationFixture} from './avatar-publication-fixture';
 import assert from 'node:assert/strict';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import {AvatarLook,AvatarCatalog,DEFAULT_AVATAR_SETTINGS} from '../packages/contracts/src/index';
@@ -13,6 +14,7 @@ test('Galerie publique : pagination SQL, visibilité, moteurs, filtres littérau
   const rows=Array.from({length:70},(_,i)=>({...look,id:'look-'+i,name:'Avatar '+String(i).padStart(2,'0'),gender:i%2?'male':'female'}));
   rows.push({...look,id:'disabled',enabled:false},{...look,id:'private',ownership:'private'},{...look,id:'premium',engines:['avatar_iv']},{...look,id:'literal',name:'Avatar 100%_test'});
   await DB.batch(rows.map(value=>DB.prepare('INSERT INTO avatar_looks VALUES(?,?,?,?)').bind(value.id,JSON.stringify(value),'SECRET_PROVIDER_URL',value.enabled?1:0)));
+  await avatarPublicationFixture(DB,['look-40',...rows.map(row=>row.id).filter(id=>id!=='look-40')],'look-40');
   const first=await avatarGallery(DB,{query:'',gender:'all',offset:0});assert.equal(first.total,71);assert.equal(first.looks.length,32);assert.equal(first.looks[0].id,'look-40');assert.equal(first.hasMore,true);
   const next=await avatarGallery(DB,{query:'',gender:'all',offset:32}),last=await avatarGallery(DB,{query:'',gender:'all',offset:64});
   assert.equal(last.hasMore,false);assert.equal(new Set([...first.looks,...next.looks,...last.looks].map(l=>l.id)).size,71);

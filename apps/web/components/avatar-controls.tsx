@@ -1,50 +1,56 @@
 'use client';
 import {useEffect,useRef,useState,type CSSProperties} from 'react';
-import {AvatarCatalog,defaultAvatarCustomization,avatarVoiceWarning,avatarFrameStyle,avatarContentStyle,avatarCreditCost,avatarSupportsCutout,avatarCutoutStatus,AVATAR_SECONDS_PER_CREDIT,type AvatarCustomization,type AvatarLook,type AvatarPreviewClip} from '@bienvu/contracts';
+import {AvatarCatalog,defaultAvatarCustomization,avatarVoiceWarning,avatarFrameStyle,avatarContentStyle,avatarCreditCost,avatarSupportsCutout,avatarCutoutStatus,catalogAvatarLook,AVATAR_SECONDS_PER_CREDIT,type AvatarCustomization,type AvatarLook,type AvatarPreviewClip} from '@bienvu/contracts';
 import {measureAvatarElement} from '../lib/avatar-placement';
 import {HomeIcon} from './home-icons';
 import {trackProductEvent} from '../lib/product-analytics';
 import {AvatarPicker} from './avatar-picker';
 
-let catalogCache:{value:AvatarCatalog;expires:number}|null=null;
-let catalogRequest:Promise<AvatarCatalog>|null=null;
-export function useAvatarCatalog(enabled=true){
+const catalogCache=new Map<string,{value:AvatarCatalog;expires:number}>(),catalogRequests=new Map<string,Promise<AvatarCatalog>>();
+export function useAvatarCatalog(enabled=true,selected?:string){
   const [catalog,setCatalog]=useState<AvatarCatalog|null>(null),[error,setError]=useState('');
-  useEffect(()=>{if(!enabled)return;let alive=true;
-    if(catalogCache&&catalogCache.expires>Date.now()){setCatalog(catalogCache.value);return;}
-    catalogRequest??=fetch('/api/avatars',{cache:'no-store'}).then(async response=>{
-      if(!response.ok)throw Error('Les présentateurs ne sont pas disponibles actuellement.');
-      const value=AvatarCatalog.parse(await response.json());catalogCache={value,expires:Date.now()+30000};return value;
-    }).finally(()=>{catalogRequest=null;});
-    void catalogRequest.then(value=>{if(alive){setCatalog(value);setError('');}}).catch(cause=>{if(alive)setError(cause.message);});
-    return()=>{alive=false;};
-  },[enabled]);return {catalog,error};
+  useEffect(()=>{if(!enabled){setCatalog(null);return;}let alive=true,version=0;const key=selected??'';
+    function load(force=false){
+      const requestVersion=++version;if(force){catalogCache.clear();catalogRequests.delete(key);}const cached=catalogCache.get(key);
+      if(cached&&cached.expires>Date.now()){setCatalog(cached.value);setError('');return;}
+      let pending=catalogRequests.get(key);
+      if(!pending){pending=fetch('/api/avatars'+(selected?'?'+new URLSearchParams({selected}):''),{cache:'no-store'}).then(async response=>{
+        if(!response.ok)throw Error('Les présentateurs ne sont pas disponibles actuellement.');
+        const value=AvatarCatalog.parse(await response.json()),newer=catalogCache.get(key);if(newer&&newer.value.revision>value.revision)return newer.value;catalogCache.set(key,{value,expires:Date.now()+15000});if(catalogCache.size>16)catalogCache.delete(catalogCache.keys().next().value!);return value;
+      }).finally(()=>{if(catalogRequests.get(key)===pending)catalogRequests.delete(key);});catalogRequests.set(key,pending);}
+      void pending.then(value=>{if(alive&&requestVersion===version){setCatalog(value);setError('');}}).catch(cause=>{if(alive&&requestVersion===version)setError(cause.message);});
+    }
+    load();const refresh=()=>load(true),channel=typeof BroadcastChannel==='undefined'?null:new BroadcastChannel('bienvu-avatar-publication');
+    if(channel)channel.onmessage=refresh;window.addEventListener('focus',refresh);window.addEventListener('bienvu:avatars-published',refresh);
+    return()=>{alive=false;channel?.close();window.removeEventListener('focus',refresh);window.removeEventListener('bienvu:avatars-published',refresh);};
+  },[enabled,selected]);return {catalog,error};
 }
 export function AvatarWarning({avatar,voice,catalog}:{avatar?:AvatarCustomization;voice:string;catalog:AvatarCatalog|null}){
-  const look=catalog?.looks.find(a=>a.id===avatar?.lookId),message=avatar&&!avatar.hidden&&look?avatarVoiceWarning(voice,look.gender):null;
+  const look=catalogAvatarLook(catalog,avatar?.lookId),message=avatar&&!avatar.hidden&&look?avatarVoiceWarning(voice,look.gender):null;
   return message?<p className="avatar-warning" role="status"><HomeIcon name="user" size={18}/>{message}</p>:null;
 }
 export function AvatarControls(p:{avatar?:AvatarCustomization;onChange(value:AvatarCustomization|undefined):void;voice:string;voiceEnabled:boolean;
   onEnableVoice?():void;authenticated:boolean;durationSeconds:number;busy?:boolean;catalog?:AvatarCatalog|null}){
-  const loaded=useAvatarCatalog(p.catalog===undefined),catalog=p.catalog??loaded.catalog;
-  const look=catalog?.looks.find(a=>a.id===p.avatar?.lookId),active=Boolean(p.avatar&&!p.avatar.hidden),patch=(next:Partial<AvatarCustomization>)=>p.avatar&&p.onChange({...p.avatar,...next});
+  const loaded=useAvatarCatalog(p.catalog===undefined,p.avatar?.lookId),catalog=p.catalog??loaded.catalog;
+  const look=catalogAvatarLook(catalog,p.avatar?.lookId),active=Boolean(p.avatar&&!p.avatar.hidden),patch=(next:Partial<AvatarCustomization>)=>p.avatar&&p.onChange({...p.avatar,...next});
   useEffect(()=>{if(active&&look&&p.avatar?.appearance==='cutout'&&!avatarSupportsCutout(look,p.avatar.engine))p.onChange({...p.avatar,appearance:'circle'});},[active,look,p.avatar,p.onChange]);
   const credits=avatarCreditCost(p.avatar?{...p.avatar,hidden:false}:undefined,p.durationSeconds)||1;
   function enable(){if(active){patch({hidden:true});return;}const id=p.avatar?.lookId??catalog?.defaultLookId??catalog?.looks[0]?.id;if(!id)return;
-    const selected=catalog?.looks.find(a=>a.id===id);if(!selected)return;
+    const selected=catalogAvatarLook(catalog,id);if(!selected)return;
     const engine=p.avatar?.engine&&selected.engines.includes(p.avatar.engine)&&(p.avatar.engine==='avatar_iii'||catalog?.allowPremium)?p.avatar.engine:selected.engines.includes('avatar_iii')?'avatar_iii':'avatar_iv';
     p.onEnableVoice?.();p.onChange({...p.avatar??defaultAvatarCustomization(id),engine,hidden:undefined,maxSeconds:Math.min(p.avatar?.maxSeconds??6,catalog!.maxSeconds)});
     trackProductEvent('editor_action',{action:'avatar_enabled'});
   }
   return <section className="avatar-controls" aria-label="Avatar IA">
     <div className="avatar-intro"><div><h3>Un présentateur pour votre bien</h3><p>La même voix que votre vidéo, avec un avatar sur toute la durée ou sur quelques passages.</p></div><span className="avatar-credit" role="status">+ {credits} crédit{credits>1?'s':''}</span></div>
-    <label className="customizer-checkbox"><input type="checkbox" checked={active} disabled={p.busy||!p.authenticated||!catalog?.enabled||!catalog.looks.length} onChange={enable}/>Ajouter un avatar IA</label>
+    <label className="customizer-checkbox"><input type="checkbox" checked={active} disabled={p.busy||!p.authenticated||!active&&(!catalog?.enabled||!catalog.looks.length&&!catalog.current)} onChange={enable}/>Ajouter un avatar IA</label>
     {!p.authenticated&&<p className="customizer-hint">Connectez-vous pour utiliser un présentateur. L’option reste désactivée pour l’essai sans compte.</p>}
     {loaded.error&&!catalog&&<p className="customizer-error" role="alert">{loaded.error}</p>}
     {catalog&&!catalog.enabled&&<p className="customizer-hint">Les présentateurs seront disponibles prochainement.</p>}
     {active&&p.avatar&&<>
+      {!look&&catalog&&<p className="avatar-warning" role="status">Ce présentateur n’est plus disponible. Choisissez-en un autre ou désactivez l’avatar.</p>}
       {!p.voiceEnabled&&<p className="avatar-warning" role="status">Activez la voix off pour synchroniser le présentateur.</p>}
-      <AvatarPicker looks={catalog?.looks??[]} selected={p.avatar.lookId} busy={p.busy} onSelect={item=>patch({lookId:item.id,
+      <AvatarPicker looks={catalog?.looks??[]} current={catalog?.current} selected={p.avatar.lookId} busy={p.busy} onSelect={item=>patch({lookId:item.id,
         engine:item.engines.includes(p.avatar!.engine)&&(p.avatar!.engine==='avatar_iii'||catalog?.allowPremium)?p.avatar!.engine:item.engines.includes('avatar_iii')?'avatar_iii':'avatar_iv',
         appearance:p.avatar!.appearance==='cutout'&&!avatarSupportsCutout(item)?'circle':p.avatar!.appearance})}/>
       <div className="avatar-fields">

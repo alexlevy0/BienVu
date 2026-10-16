@@ -1,4 +1,6 @@
 import {test} from 'node:test';
+import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
+import {avatarPublicationFixture} from './avatar-publication-fixture';
 import assert from 'node:assert/strict';
 import {AvatarLook,DEFAULT_AVATAR_SETTINGS} from '../packages/contracts/src/index';
 import {avatarCatalog} from '../packages/db/src/avatars';
@@ -22,9 +24,13 @@ test('Extraits publics : Range, suffixe, HEAD, ETag et revalidation sans lecture
   response=await streamAvatarCatalogue(request({Range:'bytes=0-2','If-Range':'"old"'}),bucket,'fixture');assert.equal(response.status,200);assert.equal(await response.text(),'abcdefghij');
   for(const range of ['bytes=99-','bytes=3-1','bytes=-0','bytes=0-1,4-5','bytes=9007199254740992-'])assert.equal((await streamAvatarCatalogue(request({Range:range}),bucket,'fixture')).status,416);
 });
-test('Catalogue : public, actif et moteur compatible, défaut conservé en premier',async()=>{
+test('Catalogue : public, actif et moteur compatible, défaut conservé en premier',async t=>{
   const looks=[{...look,id:'inactive',enabled:false},{...look,id:'private',ownership:'private'},{...look,id:'premium',engines:['avatar_iv']}, {...look,id:'other'},look];
-  const db={prepare(sql:string){return {async first(){return sql.includes('avatar_settings')?{settings:JSON.stringify({...DEFAULT_AVATAR_SETTINGS,enabled:true,defaultLookId:look.id}),revision:1}:{data:JSON.stringify(looks.filter(l=>l.enabled))};}};}};
+  const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:'export default {fetch(){return new Response("fixture")}}',compatibilityDate:'2026-09-27',d1Databases:['DB']}));t.after(()=>mf.dispose());const db=await mf.getD1Database('DB');
+  await db.exec('CREATE TABLE avatar_settings(id INTEGER PRIMARY KEY,settings_json TEXT,revision INTEGER); CREATE TABLE avatar_looks(id TEXT PRIMARY KEY,look_json TEXT,source_json TEXT,enabled INTEGER);');
+  await db.prepare('INSERT INTO avatar_settings VALUES(1,?,1)').bind(JSON.stringify({...DEFAULT_AVATAR_SETTINGS,enabled:true,defaultLookId:look.id})).run();
+  for(const item of looks)await db.prepare('INSERT INTO avatar_looks VALUES(?,?,?,?)').bind(item.id,JSON.stringify(item),'{}',item.enabled?1:0).run();
+  await avatarPublicationFixture(db,[look.id,...looks.map(item=>item.id).filter(id=>id!==look.id)],look.id);
   const catalog=await avatarCatalog(db as never);assert.deepEqual(catalog.looks.map(l=>l.id),[look.id,'other']);assert.equal(catalog.defaultLookId,look.id);
 });
 test('Version des médias : changement de source invalide les dérivés sans exposer l’URL fournisseur',async()=>{

@@ -1,4 +1,5 @@
 import {test} from 'node:test';
+import {avatarPublicationFixture} from './avatar-publication-fixture';
 import assert from 'node:assert/strict';
 import {createHmac,randomBytes} from 'node:crypto';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
@@ -22,6 +23,7 @@ test('Favoris personnels : sessions signées, isolation, idempotence, origine et
     enabled:id!=='disabled',ownership:id==='private'?'private':'public',thumbnail:'/portrait',preview:'/preview',transparentVerified:false,updatedAt:new Date().toISOString()}));
   await DB.batch(looks.map(look=>DB.prepare('INSERT INTO avatar_looks(id,look_json,source_json,enabled,updated_at) VALUES(?,?,?,?,?)').bind(look.id,JSON.stringify(look),JSON.stringify({image:'SECRET_PROVIDER_URL',video:null}),look.enabled?1:0,new Date().toISOString())));
   await DB.prepare('UPDATE avatar_settings SET settings_json=? WHERE id=1').bind(JSON.stringify({...DEFAULT_AVATAR_SETTINGS,enabled:true,defaultLookId:'default'})).run();
+  await avatarPublicationFixture(DB,['default','alpha','zeta'],'default');
   const request=(cookie=cookies[0],body?:unknown,headers:Record<string,string>={})=>new Request(env.BETTER_AUTH_URL+'/api/avatars/favorites',{
     method:body===undefined?'GET':'PUT',headers:{cookie,origin:env.BETTER_AUTH_URL,'Content-Type':'application/json',...headers},...(body===undefined?{}:{body:JSON.stringify(body)})});
   const call=(...args:Parameters<typeof request>)=>avatarFavoritesRequest(request(...args),env);

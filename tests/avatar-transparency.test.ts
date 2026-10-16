@@ -1,4 +1,5 @@
 import {test} from 'node:test';
+import {avatarPublicationFixture} from './avatar-publication-fixture';
 import assert from 'node:assert/strict';
 import {createHmac,randomBytes} from 'node:crypto';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
@@ -28,6 +29,7 @@ test('HeyGen : WebM conservé, refus de détourage précis et aucun refus suppos
 test('D1 : admission d’un autre avatar, refus mémorisé sans modifier ses autres données et décision manuelle protégée',async t=>{
   const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:'export default {fetch(){return new Response("fixture")}}',compatibilityDate:'2026-09-27',d1Databases:['DB']}));t.after(()=>mf.dispose());const db=await mf.getD1Database('DB');await migrateNarrationProbe(db);
   await saveAvatarLook(db,'admin',look,{image:null,video:null});await setAvatarSettings(db,'admin',{...DEFAULT_AVATAR_SETTINGS,enabled:true},1);
+  await avatarPublicationFixture(db,[look.id]);
   const avatar={...defaultAvatarCustomization(look.id),appearance:'cutout' as const};assert.ok(await admitAvatar(db,avatar,'fish-lucas',true));
   await recordAvatarTransparency(db,look,'unsupported');const denied=(await findAvatarLook(db,look.id))!;
   assert.equal(denied.look.transparency,'unsupported');assert.equal(denied.look.enabled,true);assert.equal(denied.look.transparentVerified,false);assert.deepEqual(denied.look.engines,look.engines);
@@ -58,6 +60,15 @@ test('Superadmin : trois états persistés, droits et origine contrôlés, état
   assert.equal((await call({...input,transparency:'supported',transparentVerified:true})).status,200);assert.equal((await findAvatarLook(DB,look.id))!.look.transparentVerified,true);
   assert.equal((await call({...input,transparentVerified:true})).status,422,'Un état contradictoire est refusé');
   assert.equal((await call({...input,transparency:null})).status,200);assert.equal((await findAvatarLook(DB,look.id))!.look.transparency,undefined);assert.equal((await findAvatarLook(DB,look.id))!.look.transparentVerified,false);
+  const publication={groups:[{id:look.id,name:'Présentateur sélectionné',lookIds:[look.id],recommended:true}],defaultLookId:look.id};
+  assert.equal((await call({publication,revision:1},cookies[1])).status,403);
+  assert.equal((await call({publication,revision:1},cookies[0],'https://other.example')).status,403);
+  assert.equal((await call({publication,revision:1})).status,200);
+  assert.equal((await call({publication,revision:1})).status,409,'Une publication périmée ne remplace pas la sélection actuelle');
+  for(const [cookie,status] of [['',401],[cookies[1],403],[cookies[0],200]] as const){
+    const response=await adminAvatarRequest(new Request(env.BETTER_AUTH_URL+'/api/admin/avatars?catalog=1',{headers:{cookie}}),env);assert.equal(response.status,status);
+    if(response.ok)assert.equal((await response.json() as {looks:unknown[]}).looks.length,1);
+  }
   await call(input);const original=globalThis.fetch;t.after(()=>{globalThis.fetch=original;});let providerCalls=0;
   globalThis.fetch=async url=>{const path=new URL(String(url)).pathname;providerCalls++;assert.equal(path,'/v3/avatars/looks');return Response.json({data:[{id:look.id,name:look.name,avatar_type:'studio_avatar',supported_api_engines:['avatar_iii','avatar_iv'],gender:'male',status:'completed'}],next_token:null});};
   const response=await call({action:'sync',type:'studio_avatar'},cookies[0],env.BETTER_AUTH_URL,'POST',{...env,HEYGEN_API_KEY:'fixture'} as typeof env);assert.equal(response.status,200);assert.equal(providerCalls,1);assert.equal((await findAvatarLook(DB,look.id))!.look.transparency,'unsupported');

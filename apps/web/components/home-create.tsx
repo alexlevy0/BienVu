@@ -4,7 +4,7 @@ import {analyticsFetch as fetch,trackProductEvent} from '../lib/product-analytic
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import {useEffect, useLayoutEffect, useRef, useState, type DragEvent, type FormEvent} from 'react';
-import {VideoDuration,ImportUrl, GenerationView,AvatarCatalog,avatarVoiceWarning,requestedAnimations, defaultVideoCustomization,GenerationCustomization,generationCreditCost, type VideoCustomization, type CreationDraftData, type CreationDraftView, type GenerationRequest} from '@bienvu/contracts';
+import {VideoDuration,ImportUrl, GenerationView,AvatarCatalog,defaultAvatarCustomization,avatarVoiceWarning,requestedAnimations, defaultVideoCustomization,GenerationCustomization,generationCreditCost, type VideoCustomization, type CreationDraftData, type CreationDraftView, type GenerationRequest} from '@bienvu/contracts';
 import {useAnonymousTrial, TrialChallenge} from './anonymous-trial';
 import {useAccount} from './account';
 import {HomeIcon} from './home-icons';
@@ -21,6 +21,7 @@ import {useStickyHomeComposer} from './use-sticky-home-composer';
 import {applyHomeRenderPreset,presetAvatar,homeRenderPresets,type HomeRenderChoice} from '../lib/home-render-presets';
 import {withBetaVoice,type BetaVoiceChoice} from '../lib/beta-preferences';
 import {BetaImportPreview} from './beta-import-preview';
+import {avatarIntentKey,parseAvatarIntent} from '../lib/avatar-intent';
 
 const loadingTool=()=> <p className="home-tool-loading" role="status">Ouverture de votre studio…</p>;
 const ManualListingForm=dynamic(()=>import('./manual-listing-form').then(module=>module.ManualListingForm),{loading:loadingTool});
@@ -54,6 +55,7 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
   const [screen, setScreen] = useState<Screen>({kind: 'landing'});
   const [manualCredits,setManualCredits]=useState(1);
   const [customizing,setCustomizing]=useState(false),[guestSettings,setGuestSettings]=useState<VideoCustomization|undefined>();
+  const [avatarPreparing,setAvatarPreparing]=useState(false),[avatarIntentError,setAvatarIntentError]=useState(''),[avatarIntentNotice,setAvatarIntentNotice]=useState('');
   const chosenVoice=useRef(voiceChoice?.voice);chosenVoice.current=voiceChoice?.voice;
   async function resolveCreationVoice(){const fallback=await resolveDefaultVoice();return chosenVoice.current??fallback;}
   useEffect(()=>{
@@ -104,6 +106,24 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
   const guestPending=useRef<{text:string;key:string}|null>(null);
   const lastOwner=useRef<string|null>(null);
   const currentOwner=useRef<string|undefined>(me?.agency.id);currentOwner.current=me?.agency.id;
+  useEffect(()=>{
+    if(loading)return;if(!me){setAvatarIntentError('');setAvatarIntentNotice('');setAvatarPreparing(false);return;}let intent:ReturnType<typeof parseAvatarIntent>=null;
+    try{intent=parseAvatarIntent(sessionStorage.getItem(avatarIntentKey));}catch{}if(!intent)return;
+    const owner=me.agency.id,controller=new AbortController();setAvatarPreparing(true);setAvatarIntentError('');
+    void (async()=>{
+      const [response,voice]=await Promise.all([fetch('/api/avatars',{cache:'no-store',signal:controller.signal}),resolveCreationVoice()]);
+      if(!response.ok)throw Error('La sélection de présentateurs est momentanément indisponible.');
+      const catalog=AvatarCatalog.parse(await response.json()),look=catalog.looks.find(item=>item.id===intent!.lookId);
+      if(!catalog.enabled||!look)throw Error('Ce présentateur ne fait plus partie de la sélection. Choisissez-en un autre dans Personnaliser.');
+      const engine=look.engines.includes('avatar_iii')?'avatar_iii':catalog.allowPremium&&look.engines.includes('avatar_iv')?'avatar_iv':null;
+      if(!engine)throw Error('Ce présentateur n’est plus disponible avec les réglages actuels.');
+      if(controller.signal.aborted||currentOwner.current!==owner)return;
+      setGuestSettings(current=>({...current??defaultVideoCustomization(me.agency,voice),avatar:{...current?.avatar??defaultAvatarCustomization(look.id),lookId:look.id,engine,hidden:undefined,maxSeconds:Math.min(current?.avatar?.maxSeconds??6,catalog.maxSeconds)}}));
+      setVoiceEnabled(true);setAvatarIntentNotice(`Présentateur « ${look.publication?.name??look.name} » sélectionné. Ajustez son apparition dans Personnaliser.`);
+    })().catch(cause=>{if(!controller.signal.aborted)setAvatarIntentError(cause instanceof Error?cause.message:'Le présentateur n’a pas pu être préparé.');})
+      .finally(()=>{if(!controller.signal.aborted)setAvatarPreparing(false);});
+    return()=>controller.abort();
+  },[loading,me?.agency.id]);
   const {job,jobs,setJob,unavailable,refreshDrafts} = useGenerationProgress(me?.agency.id);
   const trial = useAnonymousTrial(!loading && !me);
   const currentJob = me ? job : trial.job;
@@ -323,6 +343,7 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
     const customization=manualForm.current?.customization()??input.customization??guestSettings;
     const owner=me!.agency.id,version=interactionVersion.current,next = await requestGeneration(owner, {...input,subtitlesEnabled,voiceEnabled,durationSeconds,aspectRatio,...(customization?{customization}:{})});
     if(currentOwner.current!==owner||interactionVersion.current!==version)return;
+    try{sessionStorage.removeItem(avatarIntentKey);}catch{}setAvatarIntentNotice('');
     setJob(next); setScreen({kind: 'job', id: next.id, request}); remember(next.id, request);
     if(pendingCustomization.current){sessionStorage.removeItem(`bienvu:customize:${owner}:${pendingCustomization.current.id}`);pendingCustomization.current=null;}
     setUrl('');
@@ -413,7 +434,7 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
       }
       if(!draft)throw new Error('Ce site ne permet pas de préparer cette annonce. Vous pouvez saisir ses informations et ajouter vos photos manuellement.');
       if(interactionVersion.current!==version||currentOwner.current!==owner)return;
-      setImportDraft({...draft,data:{...draft.data,videoCustomization:withBetaVoice(renderChoice?settingsForImport(imported,voice):draft.data.videoCustomization??settingsForImport(imported,voice),chosenVoice.current)}});
+      setImportDraft({...draft,data:{...draft.data,videoCustomization:withBetaVoice((renderChoice||avatarIntentNotice)?settingsForImport(imported,voice):draft.data.videoCustomization??settingsForImport(imported,voice),chosenVoice.current)}});
       setGuestExtraction(null);setDescription(draft.data.fields.description??'');setScreen({kind:'manual'});setCustomizing(true);
       void refreshDrafts();
     }catch(error){if(interactionVersion.current===version&&currentOwner.current===owner)
@@ -425,7 +446,7 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
     // The preview keyword must never become an import or an AI description,
     // including when the user presses Enter or clicks the creation button.
     if(confettiKeyword)return;
-    if(presetPreparing||presetError||presetNeedsLogin)return;
+    if(presetPreparing||presetError||presetNeedsLogin||avatarPreparing||avatarIntentError)return;
     if(loading||photoChecking||incomingPhotos)return;
     if(composerPhotos.length){openWithPhotos();return;}
     if (manual) {
@@ -481,7 +502,7 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
       const [imported,voice]=await Promise.all([estimate.prepare(parsed.data,true),resolveCreationVoice()]);
       if(interactionVersion.current!==version||currentOwner.current!==owner)return;
       if(imported.status==='needs_input'&&imported.draft){
-        startFresh.current=true;forget();setImportDraft({...imported.draft,data:{...imported.draft.data,videoCustomization:withBetaVoice(renderChoice?settingsForImport(imported,voice):imported.draft.data.videoCustomization??settingsForImport(imported,voice),chosenVoice.current)}});setDescription(imported.draft.data.fields.description??'');
+        startFresh.current=true;forget();setImportDraft({...imported.draft,data:{...imported.draft.data,videoCustomization:withBetaVoice((renderChoice||avatarIntentNotice)?settingsForImport(imported,voice):imported.draft.data.videoCustomization??settingsForImport(imported,voice),chosenVoice.current)}});setDescription(imported.draft.data.fields.description??'');
         setScreen({kind:'manual'});
         void refreshDrafts();
         setFeedback(imported.draft.photos.length<3?'Les informations du bien ont été récupérées. Ajoutez vos photos pour continuer.':
@@ -499,7 +520,7 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
   const statusRequest = screen.kind === 'sending' || screen.kind === 'job' ? screen.request : null;
   const resultReady = screen.kind === 'job' && selectedJob?.status === 'ready';
   const composerPlaceholder = composerPhotos.length?'Décrivez votre bien, ou appuyez sur Entrée…':manual?'Ajoutez des précisions sur votre bien…':resultReady?'Collez le lien d’une autre annonce…':'Collez un lien ou décrivez votre bien…';
-  const composerDisabled = presetPreparing||Boolean(presetError)||presetNeedsLogin||screen.kind==='guest-customizing'&&guestSettings&&!GenerationCustomization.safeParse(guestSettings).success || loading || busy || estimatePending || estimateFailed || photoChecking || Boolean(incomingPhotos) || (composerPhotos.length
+  const composerDisabled = avatarPreparing||Boolean(avatarIntentError)||presetPreparing||Boolean(presetError)||presetNeedsLogin||screen.kind==='guest-customizing'&&guestSettings&&!GenerationCustomization.safeParse(guestSettings).success || loading || busy || estimatePending || estimateFailed || photoChecking || Boolean(incomingPhotos) || (composerPhotos.length
     ? activeGuestJob : manual
     ? !manualReady||Boolean(noCredits)||!editingProperty&&activeOtherJob
     : Boolean(noCredits)||Boolean(importPaused&&!estimate.value&&ImportUrl.safeParse(url.trim()).success)||activeOtherJob||screen.kind==='job'&&
@@ -508,6 +529,7 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
     ? (noCredits?'Crédits insuffisants pour ce montage. Réduisez les animations ou consultez vos crédits.':'')
     : 'Accès anticipé · Préparez votre annonce';
   return <div className={`home-create${variant==='beta'?' home-create-beta':''}${inConversation ? ' home-create-conversation' : ''}${customizing||screen.kind==='guest-customizing'?' home-create-customizing':''}`}>
+    {(avatarPreparing||avatarIntentNotice||avatarIntentError)&&<p className="home-render-preset-notice" role={avatarIntentError?'alert':'status'}>{avatarPreparing?'Préparation de votre présentateur…':avatarIntentError||avatarIntentNotice}{!manual&&<button type="button" disabled={avatarPreparing} onClick={()=>{try{sessionStorage.removeItem(avatarIntentKey);}catch{}setAvatarIntentError('');setAvatarIntentNotice('');setGuestSettings(current=>current?{...current,avatar:undefined}:current);}}>Continuer sans cet avatar</button>}</p>}
     {renderChoice&&<p className="home-render-preset-notice" role="status">{presetPreparing?'Préparation du rendu…':presetError||`Rendu « ${homeRenderPresets.find(item=>item.id===renderChoice.preset)!.title} » sélectionné.`}
       {presetNeedsLogin&&<>Connectez-vous pour ajouter un avatar. <Link href={variant==='beta'?'/connexion?next=/beta':'/connexion'} onClick={()=>{const source=ImportUrl.safeParse(url.trim());if(source.success)saveListingDraft({kind:'url',url:source.data});}}>Me connecter</Link></>}
       {presetWarning&&<span>{presetWarning}</span>}

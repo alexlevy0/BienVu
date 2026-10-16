@@ -19,6 +19,7 @@ export * from './voices';
 export * from './video-map-settings';
 export * from './ai-quality';
 export * from './avatars';
+export * from './avatar-publication';
 
 // Port structurel minimal compatible D1 ; pas de transaction interactive.
 export interface SqlStatement {

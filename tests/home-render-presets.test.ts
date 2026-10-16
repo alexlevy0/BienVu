@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {defaultVideoCustomization,generationCreditCost,VideoCustomization,type AvatarCatalog} from '../packages/contracts/src/index';
 import {applyHomeRenderPreset,homeRenderExampleCredits,homeRenderPresets,parseHomeRenderPreset,presetAvatar} from '../apps/web/lib/home-render-presets';
 
-const catalog:AvatarCatalog={enabled:true,allowPremium:false,maxSeconds:6,defaultLookId:'fixture-avatar',looks:[{
+const catalog:AvatarCatalog={enabled:true,allowPremium:false,maxSeconds:6,current:null,revision:1,defaultLookId:'fixture-avatar',looks:[{
   id:'fixture-avatar',name:'Présentatrice',gender:'female',type:'studio_avatar',engines:['avatar_iii'],enabled:true,thumbnail:null,preview:null,transparentVerified:false,ownership:'public',updatedAt:new Date().toISOString()}]};
 test('Trois rendus : les prix utilisent les règles produit et les options réelles de la sélection',()=>{
   const base=defaultVideoCustomization(),avatar=presetAvatar(catalog),slots=[29,18,7,2];

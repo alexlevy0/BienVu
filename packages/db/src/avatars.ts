@@ -1,5 +1,6 @@
 import {AvatarSettings,AvatarLook,AvatarAdmission,AvatarCatalog,AvatarGallery,AvatarGalleryQuery,AvatarFavorites,AvatarFavoriteUpdate,DEFAULT_AVATAR_SETTINGS,avatarCreditCost,avatarSupportsCutout,type AvatarCustomization} from '@bienvu/contracts';
 import type {Database} from './index';
+import {readAvatarPublication,publishedAvatarLooks,publishedAvatarGallery} from './avatar-publication';
 
 export async function avatarSettings(db:Database){
   const row=await db.prepare('SELECT settings_json AS settings,revision FROM avatar_settings WHERE id=1').first<{settings:string;revision:number}>();
@@ -9,27 +10,19 @@ export async function avatarLooks(db:Database,enabledOnly=false){
   const row=await db.prepare(`SELECT json_group_array(json(look_json)) AS data FROM (SELECT look_json FROM avatar_looks ${enabledOnly?'WHERE enabled=1':''} ORDER BY id LIMIT 5000)`).first<{data:string}>();
   return (JSON.parse(row?.data??'[]') as unknown[]).map(value=>AvatarLook.parse(value));
 }
-// A public gallery request reads only one page; provider URLs and private looks
-// never enter its response. Stable ordering keeps pagination deterministic.
+// The published selection is the single discovery source for both interfaces.
 export async function avatarGallery(db:Database,input:AvatarGalleryQuery){
-  const {query,gender,offset}=AvatarGalleryQuery.parse(input),{settings}=await avatarSettings(db);
-  const where=`enabled=1 AND json_extract(look_json,'$.ownership')='public'
-    AND EXISTS(SELECT 1 FROM json_each(look_json,'$.engines') WHERE value='avatar_iii' OR (?=1 AND value='avatar_iv'))
-    AND (?='all' OR json_extract(look_json,'$.gender')=?) AND json_extract(look_json,'$.name') LIKE ? ESCAPE '\\'`;
-  const params=[settings.allowPremium?1:0,gender,gender,'%'+query.replace(/[\\%_]/g,'\\$&')+'%'];
-  const [count,row]=await Promise.all([
-    db.prepare(`SELECT count(*) AS total FROM avatar_looks WHERE ${where}`).bind(...params).first<{total:number}>(),
-    db.prepare(`SELECT json_group_array(json(look_json)) AS data FROM (SELECT look_json FROM avatar_looks WHERE ${where}
-      ORDER BY (id=?) DESC,json_extract(look_json,'$.name') COLLATE NOCASE,id LIMIT 32 OFFSET ?)`).bind(...params,settings.defaultLookId,offset).first<{data:string}>()
-  ]);
-  const looks=JSON.parse(row?.data??'[]');
-  return AvatarGallery.parse({looks,total:count?.total??0,offset,hasMore:offset+looks.length<(count?.total??0)});
+  const {settings}=await avatarSettings(db);return publishedAvatarGallery(db,AvatarGalleryQuery.parse(input),settings.allowPremium);
 }
-export async function avatarCatalog(db:Database){const {settings}=await avatarSettings(db);
-  const looks=(await avatarLooks(db,true)).filter(look=>look.ownership==='public'&&(look.engines.includes('avatar_iii')||settings.allowPremium&&look.engines.includes('avatar_iv')))
-    .sort((a,b)=>Number(b.id===settings.defaultLookId)-Number(a.id===settings.defaultLookId)||a.name.localeCompare(b.name,'fr'));
+export async function avatarCatalog(db:Database,selected?:string){
+  const [{settings},{publication,revision}]=await Promise.all([avatarSettings(db),readAvatarPublication(db)]);
+  const looks=await publishedAvatarLooks(db,publication.groups,settings.allowPremium);
+  // A known saved choice is independent of discovery. Frozen generations and
+  // technical availability are deliberately unchanged by editorial withdrawal.
+  const stored=selected&&!looks.some(look=>look.id===selected)?await findAvatarLook(db,selected):null;
+  const current=stored?.look.enabled&&stored.look.ownership==='public'&&(stored.look.engines.includes('avatar_iii')||settings.allowPremium&&stored.look.engines.includes('avatar_iv'))?stored.look:null;
   return AvatarCatalog.parse({enabled:settings.enabled,allowPremium:settings.allowPremium,maxSeconds:settings.maxSeconds,
-    defaultLookId:looks.some(look=>look.id===settings.defaultLookId)?settings.defaultLookId:null,looks});
+    defaultLookId:looks.some(look=>look.id===publication.defaultLookId)?publication.defaultLookId:looks[0]?.id??null,looks,current,revision});
 }
 export async function findAvatarLook(db:Database,id:string){
   const row=await db.prepare('SELECT look_json AS look,source_json AS source FROM avatar_looks WHERE id=?').bind(id).first<{look:string;source:string}>();
@@ -40,6 +33,7 @@ export async function avatarFavorites(db:Database,userId:string){
   const row=await db.prepare(`SELECT json_group_array(look_id) AS ids FROM (
     SELECT f.look_id FROM avatar_favorites f JOIN avatar_looks a ON a.id=f.look_id
     WHERE f.user_id=? AND a.enabled=1 AND json_extract(a.look_json,'$.ownership')='public'
+      AND EXISTS(SELECT 1 FROM avatar_publication p JOIN json_each(p.publication_json,'$.groups') g JOIN json_each(g.value,'$.lookIds') v WHERE p.id=1 AND v.value=a.id)
       AND EXISTS(SELECT 1 FROM json_each(a.look_json,'$.engines') WHERE value='avatar_iii' OR (?=1 AND value='avatar_iv'))
     ORDER BY f.look_id LIMIT 5000)`).bind(userId,settings.allowPremium?1:0).first<{ids:string}>();
   return AvatarFavorites.parse({ids:JSON.parse(row?.ids??'[]')});
@@ -50,6 +44,7 @@ export async function setAvatarFavorite(db:Database,userId:string,input:AvatarFa
   // Check visibility inside the write, including concurrent catalogue changes.
   await db.prepare(`INSERT INTO avatar_favorites(user_id,look_id,created_at)
     SELECT ?,a.id,? FROM avatar_looks a WHERE a.id=? AND a.enabled=1 AND json_extract(a.look_json,'$.ownership')='public'
+      AND EXISTS(SELECT 1 FROM avatar_publication p JOIN json_each(p.publication_json,'$.groups') g JOIN json_each(g.value,'$.lookIds') v WHERE p.id=1 AND v.value=a.id)
       AND EXISTS(SELECT 1 FROM json_each(a.look_json,'$.engines') WHERE value='avatar_iii' OR (
         coalesce((SELECT json_extract(settings_json,'$.allowPremium') FROM avatar_settings WHERE id=1),0)=1 AND value='avatar_iv'))
     ON CONFLICT(user_id,look_id) DO NOTHING`).bind(userId,new Date().toISOString(),lookId).run();

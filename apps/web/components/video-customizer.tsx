@@ -2,7 +2,7 @@
 import '../app/customizer.css';
 import {trackProductEvent} from '../lib/product-analytics';
 import {useEffect,useRef,useState,type CSSProperties} from 'react';
-import {VIDEO_PHOTO_MAXIMUM,CustomNarration,videoStyles,frenchVoices,requestedAnimations,generationCreditCost,selectedAnimationIndices,mapFrame,mapInterval,mapInk,videoMapFromDefaults,VIDEO_LAYERS,type VideoCustomization,type VideoDuration,type VideoAspectRatio} from '@bienvu/contracts';
+import {VIDEO_PHOTO_MAXIMUM,catalogAvatarLook,CustomNarration,videoStyles,frenchVoices,requestedAnimations,generationCreditCost,selectedAnimationIndices,mapFrame,mapInterval,mapInk,videoMapFromDefaults,VIDEO_LAYERS,type VideoCustomization,type VideoDuration,type VideoAspectRatio} from '@bienvu/contracts';
 import {suggestedNarration,narrationWordLimit,wordCount} from '@bienvu/narration/suggestion';
 import type {ManualDraftFields} from '../lib/listing-draft';
 import {HomeIcon} from './home-icons';
@@ -19,7 +19,7 @@ type Props={settings:VideoCustomization;onChange(value:VideoCustomization):void;
   agencyName:string;durationSeconds?:VideoDuration;onDuration?(value:VideoDuration):void;aspectRatio?:VideoAspectRatio;voiceEnabled?:boolean;onVoice?(value:boolean):void;subtitlesEnabled:boolean;onSubtitles(value:boolean):void;onBack():void;onAdd(files:FileList|null):void;
   busy:boolean;ready:boolean;onEdit():void;saved:boolean;sourceUrl?:string;onRetry?(id:string):void;onRemove?(id:string):void};
 export function VideoCustomizer(p:Props){
-  const {me,voiceCatalog}=useAccount(),{catalog:avatarCatalog}=useAvatarCatalog();
+  const {me,voiceCatalog}=useAccount(),{catalog:avatarCatalog}=useAvatarCatalog(true,p.settings.avatar?.lookId);
   const mapDefaults=useVideoMapDefaults(),automaticMap=Boolean(p.settings.mapAutomatic||(!p.settings.map&&!p.settings.mapDisabled&&!p.settings.editor&&mapDefaults?.enabled)),
     automaticLocation=useAutomaticMapLocation(p.fields.locality,automaticMap),mapSettings=p.settings.map??(automaticMap&&mapDefaults?videoMapFromDefaults(mapDefaults):undefined),
     previewMap=mapSettings?{...mapSettings,...(automaticMap?{location:automaticLocation}:{})}:undefined;
@@ -122,7 +122,7 @@ export function VideoCustomizer(p:Props){
         <div className="customizer-poster-copy" style={{zIndex:VIDEO_LAYERS.content,visibility:previewMap&&mapAt!==null?'hidden':undefined}}><h2>{p.settings.style==='cinematic'?p.fields.title||'Une nouvelle adresse':time>=duration*.8?p.agencyName||'Découvrez le bien':p.fields.title||'Une nouvelle adresse'}</h2><p>{[p.fields.area?`${p.fields.area} m²`:'',p.fields.rooms?`${p.fields.rooms} pièces`:''].filter(Boolean).join(' · ')}</p><strong>{price}</strong></div>
         <div className="customizer-poster-agency" style={{zIndex:VIDEO_LAYERS.content,visibility:previewMap&&mapAt!==null?'hidden':undefined}}>{p.agencyName||'BienVu'}</div>
         {previewMap&&mapAt!==null&&<MapScenePreview map={previewMap} automatic={automaticMap} aspectRatio={p.aspectRatio??'9:16'} frame={mapAt} primaryColor={p.settings.primaryColor} secondaryColor={p.settings.secondaryColor} agencyName={p.agencyName}/>}
-      <AvatarPoster avatar={p.settings.avatar} look={avatarCatalog?.looks.find(a=>a.id===p.settings.avatar?.lookId)} frame={time*30} total={duration*30} width={previewSize.width} height={previewSize.height}/>
+      <AvatarPoster avatar={p.settings.avatar} look={catalogAvatarLook(avatarCatalog,p.settings.avatar?.lookId)} frame={time*30} total={duration*30} width={previewSize.width} height={previewSize.height}/>
       </div><div className="customizer-player-controls"><button type="button" aria-label={playing?'Pause':'Lecture'} disabled={!chosen.length} onClick={()=>{if(time>=duration)setTime(0);setPlaying(!playing);}}>{playing?'Ⅱ':'▶'}</button><span>0:{String(Math.floor(time)).padStart(2,'0')} / 0:{duration}</span>
         <input type="range" min="0" max={duration} step=".1" value={time} aria-label="Position de l’aperçu" onChange={event=>{setPlaying(false);setTime(Number(event.target.value));}}/>
         <button type="button" aria-label="Aperçu en plein écran" onClick={()=>void preview.current?.requestFullscreen?.()}>⛶</button></div>

@@ -1,75 +1,39 @@
 'use client';
 import '../app/avatars.css';
-import {useCallback,useEffect,useRef,useState,type RefObject} from 'react';
-import type {AvatarLook} from '@bienvu/contracts';
+import '../app/avatar-selection.css';
+import {useEffect,useRef,useState} from 'react';
+import {avatarPresenters,type AvatarLook} from '@bienvu/contracts';
 import {HomeIcon} from './home-icons';
 import {useAvatarFavorites} from './avatar-favorites';
-import {prioritizeAvatarFavorites} from '@bienvu/contracts';
+import {AvatarPresenterCard,useAvatarPreview} from './avatar-presenter-card';
+export {AvatarPortrait} from './avatar-portrait';
 
-// Portraits load near the visible strip, not several screens ahead. Videos are
-// mounted only after deliberate interest; leaving also cancels a pending hover.
-export function AvatarPortrait({look,playing,root,onUnavailable,priority=false}:{look:AvatarLook;playing?:boolean;root?:RefObject<HTMLDivElement|null>;onUnavailable?():void;priority?:boolean}){
-  const frame=useRef<HTMLSpanElement>(null),video=useRef<HTMLVideoElement>(null);
-  const [visible,setVisible]=useState(priority),[ready,setReady]=useState(priority),[failed,setFailed]=useState(false),[videoReady,setVideoReady]=useState(false);
-  useEffect(()=>{const node=frame.current;if(!node)return;
-    const observer=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)){setVisible(true);observer.disconnect();}},
-      {root:root?.current??null,rootMargin:'160px'});observer.observe(node);return()=>observer.disconnect();
-  },[root]);
-  useEffect(()=>{if(!playing)return;const node=video.current;if(!node)return;
-    node.muted=true;node.src=look.preview!;void node.play().catch(()=>{/* The explicit play button stays available. */});
-    const stop=()=>{if(document.hidden)onUnavailable?.();};document.addEventListener('visibilitychange',stop);
-    return()=>{node.pause();node.removeAttribute('src');node.load();document.removeEventListener('visibilitychange',stop);};
-  },[playing,look.preview,onUnavailable]);
-  useEffect(()=>{setVideoReady(false);},[playing]);
-  return <span className={`avatar-portrait${ready?' is-ready':''}`} ref={frame}>
-    {visible&&look.thumbnail&&!failed?<img src={look.thumbnail} alt="" width={320} height={400} decoding="async" loading={priority?'eager':'lazy'} fetchPriority={priority?'high':'auto'}
-      onLoad={()=>setReady(true)} onError={()=>{setFailed(true);setReady(true);}}/>:<HomeIcon name="user" size={36}/>}
-    {playing&&look.preview&&<video ref={video} src={look.preview} muted autoPlay loop playsInline preload="none"
-      className={videoReady?'is-playing':''} onPlaying={()=>setVideoReady(true)} onError={onUnavailable} aria-label={`Extrait de ${look.name}`}/>}
-    {playing&&!videoReady&&<span className="avatar-excerpt-loading" role="status">Chargement de l’extrait…</span>}
-  </span>;
-}
-
-export function AvatarPicker({looks,selected,busy,onSelect}:{looks:AvatarLook[];selected:string;busy?:boolean;onSelect(look:AvatarLook):void}){
-  const favorites=useAvatarFavorites();
-  const strip=useRef<HTMLDivElement>(null),timer=useRef<ReturnType<typeof setTimeout>|null>(null);
-  const [query,setQuery]=useState(''),[gender,setGender]=useState('all'),[preview,setPreview]=useState<{id:string;pinned:boolean}|null>(null);
-  const clearTimer=()=>{if(timer.current!==null){clearTimeout(timer.current);timer.current=null;}};
-  useEffect(()=>()=>clearTimer(),[]);
-  useEffect(()=>{clearTimer();setPreview(null);if(strip.current)strip.current.scrollLeft=0;},[query,gender,busy]);
-  const stop=useCallback(()=>setPreview(null),[]);
+export function AvatarPicker({looks,current,selected,busy,onSelect}:{looks:AvatarLook[];current?:AvatarLook|null;selected:string;busy?:boolean;onSelect(look:AvatarLook):void}){
+  const favorites=useAvatarFavorites(),strip=useRef<HTMLDivElement>(null),dialog=useRef<HTMLDialogElement>(null);
+  const [query,setQuery]=useState(''),[gender,setGender]=useState('all'),[open,setOpen]=useState(false),playback=useAvatarPreview(busy);
   const normalized=query.trim().toLocaleLowerCase('fr');
-  const filtered=prioritizeAvatarFavorites(looks,favorites.ids).filter(look=>(gender==='all'||look.gender===gender)&&look.name.toLocaleLowerCase('fr').includes(normalized));
-  function hover(look:AvatarLook,pointer:string){
-    clearTimer();if(busy||!look.preview||pointer!=='mouse'||!matchMedia('(hover: hover) and (pointer: fine)').matches)return;
-    timer.current=setTimeout(()=>{setPreview({id:look.id,pinned:false});timer.current=null;},800);
-  }
-  function leave(id:string){clearTimer();setPreview(current=>current?.id===id&&!current.pinned?null:current);}
-  function scroll(direction:number){strip.current?.scrollBy({left:direction*strip.current.clientWidth*.8,
-    behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});}
-  return <div className="avatar-picker">
+  const presenters=avatarPresenters(looks,favorites.ids),filtered=presenters.filter(presenter=>(!normalized||presenter.name.toLocaleLowerCase('fr').includes(normalized)||presenter.looks.some(look=>look.name.toLocaleLowerCase('fr').includes(normalized)))&&(gender==='all'||presenter.looks.some(look=>look.gender===gender)));
+  const selectedPresenter=filtered.find(presenter=>presenter.looks.some(look=>look.id===selected));
+  const short=filtered.slice(0,12);if(selectedPresenter&&!short.includes(selectedPresenter)){short.pop();short.unshift(selectedPresenter);}
+  useEffect(()=>{playback.stop();if(strip.current)strip.current.scrollLeft=0;},[query,gender,busy]);
+  useEffect(()=>{if(!open)return;const element=dialog.current,trigger=document.activeElement as HTMLElement|null,previous=document.body.style.overflow;
+    element?.showModal();document.body.style.overflow='hidden';return()=>{element?.close();document.body.style.overflow=previous;trigger?.focus({preventScroll:true});};
+  },[open]);
+  function close(){playback.stop();setOpen(false);}
+  function select(look:AvatarLook){onSelect(look);close();}
+  function scroll(direction:number){strip.current?.scrollBy({left:direction*strip.current.clientWidth*.8,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});}
+  const filters=<div className="avatar-picker-toolbar"><input type="search" aria-label="Rechercher dans la sélection BienVu" placeholder="Rechercher un présentateur…" maxLength={100} value={query} onChange={event=>setQuery(event.target.value)}/><select aria-label="Genre du présentateur" value={gender} onChange={event=>setGender(event.target.value)}><option value="all">Tous les profils</option><option value="female">Présentatrices</option><option value="male">Présentateurs</option><option value="unknown">Non renseigné</option></select><span role="status">{filtered.length} présentateur{filtered.length>1?'s':''}</span></div>;
+  return <div className="avatar-picker avatar-picker-curated">
+    <div className="avatar-selection-heading"><div><h4>La sélection BienVu</h4><p>Des présentateurs choisis pour vos annonces immobilières.</p></div><button type="button" className="avatar-selection-see-all" disabled={busy} onClick={()=>{playback.stop();setOpen(true);}}>Voir toute la sélection ({presenters.length}) <HomeIcon name="grid" size={17}/></button></div>
     {favorites.authenticated&&favorites.loading&&<p className="avatar-picker-hint" role="status">Chargement de vos favoris…</p>}
-    {favorites.error&&<p className="avatar-favorites-error" role="alert">{favorites.error} <button type="button" onClick={favorites.refresh}>Actualiser les favoris</button></p>}
-    <div className="avatar-picker-toolbar">
-      <input type="search" aria-label="Rechercher un avatar" placeholder="Rechercher un présentateur…" value={query} onChange={e=>setQuery(e.target.value)}/>
-      <select aria-label="Genre du présentateur" value={gender} onChange={e=>setGender(e.target.value)}><option value="all">Tous les avatars</option><option value="female">Présentatrices</option><option value="male">Présentateurs</option><option value="unknown">Genre non renseigné</option></select>
-      <span role="status">{filtered.length} avatar{filtered.length!==1?'s':''}</span>
-      <div className="avatar-picker-arrows"><button type="button" aria-label="Avatars précédents" onClick={()=>scroll(-1)}>←</button><button type="button" aria-label="Avatars suivants" onClick={()=>scroll(1)}>→</button></div>
-    </div>
-    <div className="avatar-look-strip" ref={strip} tabIndex={0} role="region" aria-label="Choisir un présentateur" onScroll={()=>{clearTimer();setPreview(current=>current?.pinned?current:null);}}>
-      {filtered.map(look=><div className={`avatar-look${look.id===selected?' is-selected':''}`} key={look.id} data-avatar-id={look.id}
-        onPointerEnter={e=>hover(look,e.pointerType)} onPointerLeave={()=>leave(look.id)}>
-        <button type="button" aria-pressed={look.id===selected} disabled={busy} onClick={()=>{clearTimer();setPreview(null);onSelect(look);}}>
-          <AvatarPortrait look={look} root={strip} playing={preview?.id===look.id} onUnavailable={stop}/>
-          <strong>{look.name}</strong><small>{look.gender==='female'?'Présentatrice':look.gender==='male'?'Présentateur':'Présentation'}</small>
-          {favorites.ids.includes(look.id)&&<span className="avatar-picker-favorite"><HomeIcon name="heart" size={12} filled/>Favori</span>}
-        </button>
-        {look.preview&&<button type="button" className="avatar-look-preview" disabled={busy} onClick={()=>{clearTimer();setPreview(current=>current?.id===look.id?null:{id:look.id,pinned:true});}}>
-          {preview?.id===look.id?'Fermer l’extrait':'Voir un extrait'}
-        </button>}
-      </div>)}
+    {favorites.error&&<p className="avatar-favorites-error" role="alert">{favorites.error} <button type="button" onClick={favorites.refresh}>Actualiser</button></p>}
+    {!open&&filters}
+    {current&&!looks.some(look=>look.id===current.id)&&current.id===selected&&<div className="avatar-selection-legacy"><HomeIcon name="user" size={20}/><p><strong>{current.name}</strong> · Votre choix enregistré est conservé. Ce présentateur n’est plus proposé dans la nouvelle sélection.</p></div>}
+    <div className="avatar-look-strip avatar-curated-strip" ref={strip} tabIndex={0} role="region" aria-label="Choisir un présentateur" onScroll={()=>playback.clear()}>
+      {short.map((presenter,index)=><AvatarPresenterCard key={presenter.id} presenter={presenter} selected={selected} busy={busy} onChoose={onSelect} playback={open?{...playback,preview:null}:playback} root={strip} priority={index<2}/>)}
       {!filtered.length&&<p className="customizer-hint">Aucun présentateur ne correspond à votre recherche.</p>}
     </div>
-    <p className="avatar-picker-hint">Survolez un avatar pour voir son extrait, ou cliquez sur « Voir un extrait ». Les démonstrations sont lues sans son.</p>
+    <div className="avatar-curated-footer"><p className="avatar-picker-hint">Vos favoris en premier. Survolez un portrait pour voir son extrait, ou utilisez le bouton de lecture.</p><div className="avatar-picker-arrows"><button type="button" aria-label="Avatars précédents" onClick={()=>scroll(-1)}>←</button><button type="button" aria-label="Avatars suivants" onClick={()=>scroll(1)}>→</button></div></div>
+    {open&&<dialog ref={dialog} className="avatar-selection-dialog" aria-labelledby="avatar-selection-dialog-title" onCancel={close} onClick={event=>{if(event.target===event.currentTarget)close();}}><header><div><span>LA SÉLECTION BIENVU</span><h2 id="avatar-selection-dialog-title">Le présentateur de votre bien.</h2><p>Choisissez un visage, puis une tenue. Vous gardez votre voix et vos réglages.</p></div><button type="button" aria-label="Fermer la sélection des avatars" onClick={close}><HomeIcon name="close" size={23}/></button></header>{filters}<div className="avatar-selection-grid">{filtered.map((presenter,index)=><AvatarPresenterCard key={presenter.id} presenter={presenter} selected={selected} busy={busy} onChoose={select} playback={playback} priority={index<2}/>)}</div>{!filtered.length&&<p>Aucun présentateur ne correspond à votre recherche.</p>}</dialog>}
   </div>;
 }

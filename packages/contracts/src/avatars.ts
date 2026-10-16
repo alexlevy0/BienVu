@@ -39,8 +39,32 @@ export const avatarPriceUsdPerMinute=(engine:AvatarCustomization['engine'],type:
 export const AvatarLook=z.object({id:AvatarId,name:z.string().min(1).max(160),gender:AvatarGender,
   type:z.enum(['studio_avatar','photo_avatar','digital_twin']),engines:z.array(AvatarEngine).min(1).max(2),
   enabled:z.boolean(),thumbnail:z.string().nullable(),preview:z.string().nullable(),transparentVerified:z.boolean(),
-  ownership:z.enum(['public','private']),updatedAt:z.string(),transparency:z.enum(['supported','unsupported']).optional()}).strict();
+  ownership:z.enum(['public','private']),updatedAt:z.string(),transparency:z.enum(['supported','unsupported']).optional(),
+  publication:z.object({presenterId:AvatarId,name:z.string().min(1).max(100),recommended:z.boolean()}).strict().optional()}).strict();
 export type AvatarLook=z.infer<typeof AvatarLook>;
+export const AvatarPublicationGroup=z.object({id:AvatarId,name:z.string().trim().min(1).max(100),recommended:z.boolean(),
+  lookIds:z.array(AvatarId).min(1).max(8)}).strict();
+export const AvatarPublication=z.object({groups:z.array(AvatarPublicationGroup).max(200),defaultLookId:AvatarId.nullable()}).strict().superRefine((value,ctx)=>{
+  const ids=value.groups.flatMap(group=>group.lookIds);
+  if(new Set(ids).size!==ids.length||new Set(value.groups.map(group=>group.id)).size!==value.groups.length)
+    ctx.addIssue({code:'custom',message:'Un avatar ne peut apparaître qu’une fois dans la sélection.'});
+  if(value.defaultLookId&&!ids.includes(value.defaultLookId)||value.groups.length&&!value.defaultLookId)
+    ctx.addIssue({code:'custom',message:'Choisissez un présentateur par défaut dans la sélection.'});
+});
+export type AvatarPublication=z.infer<typeof AvatarPublication>;
+export type AvatarPublicationGroup=z.infer<typeof AvatarPublicationGroup>;
+export type AvatarPresenter={id:string;name:string;recommended:boolean;looks:AvatarLook[]};
+export function avatarPresenters(looks:readonly AvatarLook[],favorites:readonly string[]=[]):AvatarPresenter[]{
+  const groups=new Map<string,AvatarPresenter>();
+  for(const look of prioritizeAvatarFavorites(looks,favorites)){
+    const id=look.publication?.presenterId??look.id;
+    let group=groups.get(id);if(!group){group={id,name:look.publication?.name??look.name,recommended:look.publication?.recommended??false,looks:[]};groups.set(id,group);}
+    group.looks.push(look);
+  }return [...groups.values()];
+}
+export function catalogAvatarLook(catalog:AvatarCatalog|null|undefined,id:string|undefined):AvatarLook|undefined{
+  if(!catalog||!id)return undefined;return catalog.looks.find(look=>look.id===id)??(catalog.current?.id===id?catalog.current:undefined);
+}
 // The v3 catalogue does not expose matting support. A legacy false verification
 // flag means untested, not incompatible. Only a confirmed refusal blocks WebM.
 export function avatarCutoutStatus(look:AvatarLook):'supported'|'unsupported'|'unknown'{
@@ -57,16 +81,19 @@ export type AvatarSettings=z.infer<typeof AvatarSettings>;
 export const DEFAULT_AVATAR_SETTINGS:AvatarSettings={enabled:false,allowPremium:false,defaultLookId:null,maxSeconds:6,
   monthlyUsd:5,perVideoUsd:1,concurrent:2,priceIII:.99,priceIVPhoto:2.31,priceIVStudio:4.83};
 export const AvatarCatalog=z.object({enabled:z.boolean(),allowPremium:z.boolean(),maxSeconds:z.number(),defaultLookId:AvatarId.nullable(),
-  looks:z.array(AvatarLook).max(5000)}).strict();
+  looks:z.array(AvatarLook).max(5000),current:AvatarLook.nullable().default(null),revision:z.number().int().nonnegative().default(0)}).strict();
 export type AvatarCatalog=z.infer<typeof AvatarCatalog>;
 export const AvatarGalleryQuery=z.object({query:z.string().trim().max(100).default(''),gender:AvatarGender.or(z.literal('all')).default('all'),
   offset:z.coerce.number().int().min(0).max(5000).default(0)}).strict();
 export type AvatarGalleryQuery=z.infer<typeof AvatarGalleryQuery>;
-export const AvatarGallery=z.object({looks:z.array(AvatarLook).max(32),total:z.number().int().min(0),offset:z.number().int().min(0),hasMore:z.boolean()}).strict();
+export const AdminAvatarCatalogQuery=AvatarGalleryQuery.safeExtend({catalog:z.literal('1'),type:z.enum(['all','studio_avatar','photo_avatar','digital_twin']).default('all'),availability:z.enum(['all','available','unavailable']).default('all')});
+export type AdminAvatarCatalogQuery=z.infer<typeof AdminAvatarCatalogQuery>;
+export const AvatarGallery=z.object({looks:z.array(AvatarLook).max(256),total:z.number().int().min(0),offset:z.number().int().min(0),hasMore:z.boolean(),revision:z.number().int().nonnegative().default(0)}).strict();
 export type AvatarGallery=z.infer<typeof AvatarGallery>;
 export const AvatarAdmission=z.object({settings:AvatarSettings,look:AvatarLook,voice:z.string().min(1).max(128)}).strict();
 export type AvatarAdmission=z.infer<typeof AvatarAdmission>;
 export const AdminAvatarData=z.object({settings:AvatarSettings,revision:z.number().int().positive(),looks:z.array(AvatarLook).max(5000),
+  publication:AvatarPublication,publicationRevision:z.number().int().positive(),catalogTotal:z.number().int().nonnegative(),
   connected:z.boolean(),wallet:z.object({currency:z.string().nullable(),balance:z.number().nullable(),autoReload:z.boolean(),billingType:z.string().nullable()}).nullable(),
   usage:z.object({month:z.string(),reservedUsd:z.number(),ready:z.number(),reused:z.number(),active:z.number(),uncertain:z.number()}),
   tasks:z.array(z.object({id:AvatarId,jobId:z.string(),moment:z.string(),engine:AvatarEngine,state:z.string(),reused:z.boolean(),

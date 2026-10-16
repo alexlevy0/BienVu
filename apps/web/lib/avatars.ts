@@ -1,17 +1,24 @@
 import {z} from 'zod';
-import {AdminAvatarData,AvatarId,AvatarSettings,AvatarLook,AvatarGalleryQuery,publicErrors,type PublicErrorCode} from '@bienvu/contracts';
-import {avatarCatalog,avatarGallery,avatarLooks,avatarSettings,avatarUsage,recentAvatarTasks,findAvatarLook,saveAvatarLook,setAvatarSettings} from '@bienvu/db';
+import {AdminAvatarData,AvatarId,AvatarSettings,AvatarLook,AvatarGalleryQuery,AvatarPublication,AdminAvatarCatalogQuery,publicErrors,type PublicErrorCode} from '@bienvu/contracts';
+import {avatarCatalog,avatarGallery,avatarSettings,avatarUsage,recentAvatarTasks,findAvatarLook,saveAvatarLook,setAvatarSettings,readAvatarPublication,publishedAvatarLooks,publishAvatarSelection,adminAvatarCatalog} from '@bienvu/db';
 import {heygenClient,downloadHeygenMedia,avatarCatalogKey,avatarMediaVersion,AvatarFailure,verifyHeygenSignature,type HeygenEnvironment} from '@bienvu/avatars';
 import type {AuthEnvironment} from './auth';
+import {createAuth} from './auth';
 import {requireAdmin} from './admin-access';
 import {respond,RequestFailure,assertSameOrigin,boundedJson,boundedBytes} from './http';
 import {streamAvatarCatalogue} from './avatar-media-stream';
 
 type Env=AuthEnvironment&HeygenEnvironment&{MEDIA:R2Bucket;SUPER_ADMIN_EMAIL?:string;GENERATION_SERVICE?:Fetcher;GENERATION_TOKEN?:string};
 const update=z.union([z.object({settings:AvatarSettings,revision:z.number().int().positive()}).strict(),
+  z.object({publication:AvatarPublication,revision:z.number().int().positive()}).strict(),
   z.object({enableLooks:z.array(AvatarId).min(1).max(100)}).strict(),
   z.object({lookId:AvatarId,enabled:z.boolean(),transparentVerified:z.boolean(),transparency:z.enum(['supported','unsupported']).nullable().optional()}).strict()]);
-export async function publicAvatarRequest(env:Env){return respond(async()=>Response.json(await avatarCatalog(env.DB)));}
+export async function publicAvatarRequest(env:Env,request?:Request){return respond(async()=>{
+  const selected=request?new URL(request.url).searchParams.get('selected'):null;
+  if(selected&&!AvatarId.safeParse(selected).success)throw new RequestFailure('VALIDATION_ERROR');
+  const session=selected&&request?await createAuth(env).api.getSession({headers:request.headers}):null;
+  return Response.json(await avatarCatalog(env.DB,session?.user.emailVerified?selected??undefined:undefined));
+});}
 export async function publicAvatarGalleryRequest(request:Request,env:Pick<Env,'DB'>){return respond(async()=>{
   const input=AvatarGalleryQuery.safeParse(Object.fromEntries(new URL(request.url).searchParams));
   if(!input.success)throw new RequestFailure('VALIDATION_ERROR');
@@ -21,9 +28,15 @@ export async function adminAvatarRequest(request:Request,env:Env){return respond
   const actor=await requireAdmin(request,env);
   if(request.method!=='GET')assertSameOrigin(request,env);
   try{
+    if(request.method==='GET'&&new URL(request.url).searchParams.has('catalog')){
+      const input=AdminAvatarCatalogQuery.safeParse(Object.fromEntries(new URL(request.url).searchParams));
+      if(!input.success)throw new RequestFailure('VALIDATION_ERROR');
+      return Response.json(await adminAvatarCatalog(env.DB,input.data,(await avatarSettings(env.DB)).settings.allowPremium));
+    }
     if(request.method==='PATCH'){
-      const input=update.safeParse(await boundedJson(request,16000));if(!input.success)throw new RequestFailure('VALIDATION_ERROR');
+      const input=update.safeParse(await boundedJson(request,256000));if(!input.success)throw new RequestFailure('VALIDATION_ERROR');
       if('settings' in input.data)await setAvatarSettings(env.DB,actor.id,input.data.settings,input.data.revision);
+      else if('publication' in input.data)await publishAvatarSelection(env.DB,actor.id,input.data.publication,input.data.revision);
       else if('enableLooks' in input.data){
         const {settings}=await avatarSettings(env.DB),stored=await Promise.all([...new Set(input.data.enableLooks)].map(id=>findAvatarLook(env.DB,id)));
         if(stored.some(value=>!value||value.look.ownership!=='public'||!(value.look.engines.includes('avatar_iii')||settings.allowPremium&&value.look.engines.includes('avatar_iv'))))throw new RequestFailure('AVATAR_UNAVAILABLE');
@@ -50,7 +63,9 @@ export async function adminAvatarRequest(request:Request,env:Env){return respond
       return Response.json({imported:page.looks.length,nextToken:page.nextToken});
     }else if(request.method!=='GET')throw new RequestFailure('NOT_FOUND');
     let wallet:AdminAvatarData['wallet']=null;if(env.HEYGEN_API_KEY)try{wallet=await heygenClient(env.HEYGEN_API_KEY).wallet();}catch{/* Settings remain available during a provider outage. */}
-    const data=await avatarSettings(env.DB);return Response.json(AdminAvatarData.parse({...data,looks:await avatarLooks(env.DB),connected:Boolean(env.HEYGEN_API_KEY&&env.HEYGEN_ENABLED==='true'),wallet,
+    const data=await avatarSettings(env.DB),published=await readAvatarPublication(env.DB),total=await env.DB.prepare('SELECT count(*) AS total FROM avatar_looks').first<{total:number}>();
+    return Response.json(AdminAvatarData.parse({...data,publication:published.publication,publicationRevision:published.revision,catalogTotal:total?.total??0,
+      looks:await publishedAvatarLooks(env.DB,published.publication.groups,data.settings.allowPremium),connected:Boolean(env.HEYGEN_API_KEY&&env.HEYGEN_ENABLED==='true'),wallet,
       usage:await avatarUsage(env.DB),tasks:await recentAvatarTasks(env.DB)}));
   }catch(cause){const code=cause instanceof AvatarFailure?cause.code:/\b(CONFLICT|RATE_LIMITED|AVATAR_[A-Z_]+)\b/.exec(String(cause))?.[1];
     if(code&&code in publicErrors)throw new RequestFailure(code as PublicErrorCode);if(cause instanceof RequestFailure)throw cause;throw new RequestFailure('AVATAR_UNAVAILABLE');}

@@ -11,7 +11,7 @@ import './avatar.css';
 
 export const dynamic='force-dynamic';
 export const metadata=seoMetadata({title:'Avatars IA immobiliers — Découvrez les présentateurs BienVu',
-  description:'Découvrez les avatars HeyGen disponibles dans BienVu. Comparez leurs styles et regardez leurs démonstrations avant de créer vos vidéos immobilières.',path:'/avatar',image:'/images/studio-home/avatar-integrated.webp'});
+  description:'Découvrez les présentateurs sélectionnés par BienVu pour vos annonces immobilières. Comparez leurs styles et regardez leurs démonstrations avant de créer vos vidéos immobilières.',path:'/avatar',image:'/images/studio-home/avatar-integrated.webp'});
 export default async function AvatarPage(){
   const {env}=await getCloudflareContext({async:true});
   const initial=await avatarGallery(env.DB,{query:'',gender:'all',offset:0});
@@ -20,7 +20,7 @@ export default async function AvatarPage(){
     <Link href="/" className="avatar-back">← Retour au studio</Link>
     <header className="avatar-gallery-intro"><div><span className="avatar-gallery-eyebrow"><HomeIcon name="sparkle" filled size={18}/>LES AVATARS IA BIENVU</span>
       <h1>Vos annonces <em>prennent la parole.</em></h1>
-      <p>Trouvez le présentateur qui ressemble à votre agence.<br/>BienVu lui donne la voix de votre vidéo.</p></div>
+      <p>Des présentateurs choisis pour l’immobilier. Trouvez celui qui ressemble à votre agence.<br/>BienVu lui donne la voix de votre vidéo.</p></div>
       <Link className="avatar-gallery-create" href="/">Créer ma vidéo <HomeIcon name="arrow" size={20}/></Link></header>
     <AvatarGallery initial={initial}/>
     <aside className="avatar-gallery-next"><HomeIcon name="user" size={30}/><div><h2>Un visage, votre voix, vos biens.</h2>
