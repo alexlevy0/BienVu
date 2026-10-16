@@ -6,7 +6,9 @@ export const avatarHash=async(bytes:Uint8Array)=>[...new Uint8Array(await crypto
 // Stable across catalogue refreshes; changing provider assets invalidates only
 // their own derivatives. Signed provider URLs never leave the server.
 export const avatarMediaVersion=(source:string)=>avatarHash(new TextEncoder().encode(source)).then(hash=>hash.slice(0,16));
-export const avatarCatalogKey=(id:string,kind:'thumbnail'|'preview',version:string)=>`catalogue/heygen/${AvatarId.parse(id)}/${kind==='thumbnail'?'thumbnail-320-v1':'preview-v1'}-${version}`;
+// Preview v1 was a heavily compressed 320px derivative. Keep the provider's
+// original demo under a separate key so old low-resolution objects cannot win.
+export const avatarCatalogKey=(id:string,kind:'thumbnail'|'preview',version:string)=>`catalogue/heygen/${AvatarId.parse(id)}/${kind==='thumbnail'?'thumbnail-320-v1':'preview-source-v2'}-${version}`;
 export async function boundedBytes(response:Response,max:number){
   if(Number(response.headers.get('content-length'))>max){await response.body?.cancel();throw new AvatarFailure('AVATAR_MEDIA_INVALID');}
   const reader=response.body?.getReader();if(!reader)throw new AvatarFailure('AVATAR_MEDIA_INVALID');let size=0;const chunks:Uint8Array[]=[];

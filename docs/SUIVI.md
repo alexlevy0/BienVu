@@ -1,5 +1,9 @@
 # BienVu — suivi des sprints
 
+### 17/10/2026 — Démonstrations d’avatars en qualité source
+
+Les démos au survol utilisent désormais les MP4 HeyGen d’origine, sans passage en 320×180 ni recompression CRF 29. Mesures sur les sources publiques : Annie 1280×720, Daphne 1920×1080 ; anciennes copies limitées à 320×180. Clé R2 distincte et URL de lecture renouvelée pour ignorer les anciens caches, y compris après une nouvelle préparation du catalogue. Portraits légers, vidéo montée uniquement à la demande, arrêt à la sortie, cache R2 et lecture par plages conservés. Aucun nouveau rendu payant, changement de publication ou migration. **20 tests ciblés réussis**, types et frontières (619 fichiers) validés ; la régression vérifie l’abandon du dérivé historique, les octets source exacts et les plages sans second téléchargement fournisseur. Preuves locales ignorées : `evidence/local/avatar-preview-quality/`.
+
 ### 17/10/2026 — Mosaïques et ajout de groupes entiers
 
 Cartes avec un grand portrait et deux aperçus de variantes dans Personnaliser, `/avatar` et le superadmin. Les deux onglets administrateur sont présentés par identité HeyGen, avec l’identifiant visible et les actions « Ajouter le groupe entier » / « Compléter le groupe ». Toutes les pages sont lues avant ajout au brouillon ; seuls les moteurs autorisés sont inclus, sans doublon ni changement du défaut. Correction de la restauration des anciens brouillons qui pouvaient effacer la correspondance `group_id`. **36 tests ciblés réussis**, types et frontières validés ; [recette et détails](preuves/maintenance/MOSAIQUES-AVATARS-17-10.md).

@@ -37,6 +37,7 @@ test('Version des médias : changement de source invalide les dérivés sans exp
   const a=await avatarMediaVersion('https://files.heygen.ai/a.webp'),b=await avatarMediaVersion('https://files.heygen.ai/b.webp');
   assert.match(a,/^[a-f0-9]{16}$/);assert.notEqual(a,b);assert.equal(await avatarMediaVersion('https://files.heygen.ai/a.webp'),a);
   assert.match(avatarCatalogKey(look.id,'thumbnail',a),/^catalogue\/heygen\/fixture-look\/thumbnail-320-v1-/);
+  assert.match(avatarCatalogKey(look.id,'preview',a),/^catalogue\/heygen\/fixture-look\/preview-source-v2-/);
   assert.throws(()=>avatarCatalogKey('../private','preview',a));
 });
 test('Catalogue HeyGen : exclut les portraits non prêts et conserve le curseur opaque',async()=>{
@@ -56,4 +57,22 @@ test('Média catalogue : visibilité avant R2, cache uniquement des réponses pu
   response=await avatarMediaRequest(new Request('https://bienvu.online/api/avatars/fixture-look/media?kind=preview&v=obsolete'),env(look),look.id);assert.equal(response.status,404);assert.equal(response.headers.get('cache-control'),'private, no-store');
   response=await avatarMediaRequest(new Request('https://bienvu.online/api/avatars/fixture-look/media?kind=preview'),env({...look,ownership:'private'}),look.id);assert.equal(response.status,404);
   response=await avatarMediaRequest(new Request('https://bienvu.online/api/avatars/fixture-look/media?kind=preview'),env({...look,enabled:false}),look.id);assert.equal(response.status,401);assert.equal(response.headers.get('cache-control'),'private, no-store');
+});
+test('Extraits : ignore l’ancien dérivé 320px et sert la source exacte puis ses plages depuis R2',async t=>{
+  const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:'export default {fetch(){return new Response("fixture")}}',compatibilityDate:'2026-09-27',r2Buckets:['MEDIA']}));t.after(()=>mf.dispose());
+  const {MEDIA:media}=await mf.getBindings<{MEDIA:R2Bucket}>(),source={image:null,video:'https://files.heygen.ai/original-demo.mp4'},version=await avatarMediaVersion(source.video);
+  const original=new Uint8Array([0,0,0,24,102,116,121,112,...new TextEncoder().encode('original-HD-demo-never-reencoded')]);
+  const oldKey=`catalogue/heygen/${look.id}/preview-v1-${version}`,key=avatarCatalogKey(look.id,'preview',version);
+  await media.put(oldKey,'old-low-quality-demo',{httpMetadata:{contentType:'video/mp4'}});
+  const env={DB:{prepare(){return {bind(){return this;},async first(){return {look:JSON.stringify(look),source:JSON.stringify(source)};}};}},MEDIA:media} as never;
+  let downloads=0;const before=globalThis.fetch;t.after(()=>{globalThis.fetch=before;});
+  globalThis.fetch=async url=>{assert.equal(String(url),source.video);downloads++;return new Response(original,{headers:{'Content-Length':String(original.length)}});};
+  const url=`https://bienvu.online/api/avatars/${look.id}/media?kind=preview&v=${version}&quality=original`;
+  let response=await avatarMediaRequest(new Request(url),env,look.id);
+  assert.equal(response.status,200);assert.deepEqual(new Uint8Array(await response.arrayBuffer()),original);assert.equal(downloads,1);
+  assert.deepEqual(new Uint8Array(await (await media.get(key))!.arrayBuffer()),original);
+  assert.equal(await (await media.get(oldKey))!.text(),'old-low-quality-demo');
+  response=await avatarMediaRequest(new Request(url,{headers:{Range:'bytes=8-18'}}),env,look.id);
+  assert.equal(response.status,206);assert.deepEqual(new Uint8Array(await response.arrayBuffer()),original.slice(8,19));
+  assert.equal(downloads,1,'La source est téléchargée une seule fois, puis lue par plages depuis R2');
 });

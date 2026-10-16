@@ -1,12 +1,9 @@
 // Public presets only. No audio upload, avatar creation or billable HeyGen call.
 // Run with node --import tsx; --activate explicitly enables the selected public
 // presets. Derivatives are bounded and scoped to catalogue/heygen, never jobs.
-import {readFile,writeFile,mkdir,mkdtemp,rm} from 'node:fs/promises';
-import {homedir,tmpdir} from 'node:os';
-import {join,dirname,resolve} from 'node:path';
-import {createRequire} from 'node:module';
-import {execFile} from 'node:child_process';
-import {promisify} from 'node:util';
+import {readFile,writeFile,mkdir} from 'node:fs/promises';
+import {homedir} from 'node:os';
+import {join,resolve} from 'node:path';
 import sharp from 'sharp';
 import {cloudflare,accountId} from './cloudflare-operator.mjs';
 import {heygenClient,downloadHeygenMedia,avatarMediaVersion,avatarCatalogKey} from '../packages/avatars/src/index.ts';
@@ -42,11 +39,9 @@ async function upload(objectKey,bytes,type){
  const response=await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/bienvu-s00-private/objects/${objectKey}`,{method:'PUT',body:bytes,signal:AbortSignal.timeout(60000),headers:{Authorization:`Bearer ${oauth}`,'Content-Type':type,'Content-Length':String(bytes.length),'cf-r2-data-catalog-check':'true'}});
  await response.body?.cancel();if(!response.ok)throw Error(`R2_UPLOAD_${response.status}`);
 }
-const require=createRequire(new URL('../apps/renderer/package.json',import.meta.url)),rr=createRequire(require.resolve('@remotion/renderer'));
-const binaries=dirname(rr.resolve(`@remotion/compositor-${process.platform==='darwin'?'darwin':'linux'}-${process.arch}/package.json`)),ffmpeg=join(binaries,'ffmpeg'),run=promisify(execFile);
-const work=await mkdtemp(join(tmpdir(),'bienvu-avatar-catalog-')),report=[],prepared=[];
+const report=[],prepared=[];
 let cursor=0;
-try {await Promise.all(Array.from({length:6},async()=>{while(cursor<selected.length){const entry=selected[cursor++],id=entry.look.id,record=before.find(row=>row.id===id),prior=record?{look:JSON.parse(record.look_json),source:JSON.parse(record.source_json)}:null;
+await Promise.all(Array.from({length:6},async()=>{while(cursor<selected.length){const entry=selected[cursor++],id=entry.look.id,record=before.find(row=>row.id===id),prior=record?{look:JSON.parse(record.look_json),source:JSON.parse(record.source_json)}:null;
  const row={id,originalBytes:0,thumbnailBytes:0,previewBytes:0,previewReady:false};
  try{
   if(defer&&prior?.look.enabled&&prior.source.image===entry.source.image&&prior.source.video===entry.source.video){prepared.push({look:prior.look,source:prior.source});report.push({...row,alreadyPrepared:true});continue;}
@@ -54,10 +49,10 @@ try {await Promise.all(Array.from({length:6},async()=>{while(cursor<selected.len
   const thumbnail=await sharp(original,{limitInputPixels:16_000_000}).rotate().resize({width:320,height:400,fit:'inside',withoutEnlargement:true}).webp({quality:72}).toBuffer();
   await upload(avatarCatalogKey(id,'thumbnail',version),thumbnail,'image/webp');row.originalBytes=original.length;row.thumbnailBytes=thumbnail.length;
   if(entry.source.video){try{
-    const source=await downloadHeygenMedia(entry.source.video,10*1024*1024),videoVersion=await avatarMediaVersion(entry.source.video),input=join(work,id+'.mp4'),output=join(work,id+'-demo.mp4');
-    await writeFile(input,source);await run(ffmpeg,['-hide_banner','-loglevel','error','-y','-i',input,'-t','8','-vf',"scale='min(320,iw)':-2",'-c:v','libx264','-preset','veryfast','-crf','29','-pix_fmt','yuv420p','-an','-movflags','+faststart',output],{timeout:60000,env:{...process.env,DYLD_LIBRARY_PATH:binaries}});
-    const bytes=await readFile(output);await upload(avatarCatalogKey(id,'preview',videoVersion),bytes,'video/mp4');row.previewBytes=bytes.length;row.previewReady=true;
-   }catch{row.previewError='DEMO_OPTIMIZATION_UNAVAILABLE';}}
+    const bytes=await downloadHeygenMedia(entry.source.video,10*1024*1024),videoVersion=await avatarMediaVersion(entry.source.video);
+    // Store the original demo byte-for-byte; only static portraits are resized.
+    await upload(avatarCatalogKey(id,'preview',videoVersion),bytes,'video/mp4');row.previewBytes=bytes.length;row.previewReady=true;
+   }catch{row.previewError='DEMO_PREPARATION_UNAVAILABLE';}}
   const look={...entry.look,enabled:true,transparentVerified:prior?.look.transparentVerified??false,transparency:prior?.look.transparency,
     thumbnail:`/api/avatars/${id}/media?kind=thumbnail&v=${version}`,
     preview:entry.source.video?`/api/avatars/${id}/media?kind=preview&v=${await avatarMediaVersion(entry.source.video)}`:null};
@@ -70,4 +65,3 @@ try {await Promise.all(Array.from({length:6},async()=>{while(cursor<selected.len
  const totals=await query('SELECT count(*) AS total,sum(enabled) AS enabled FROM avatar_looks');
  console.log(JSON.stringify({catalog:totals[0],prepared:defer?prepared.length:report.filter(r=>r.activated).length,demos:report.filter(r=>r.previewReady).length,
   originalBytes:report.reduce((n,r)=>n+r.originalBytes,0),thumbnailBytes:report.reduce((n,r)=>n+r.thumbnailBytes,0)}));
-}finally{await rm(work,{recursive:true,force:true});}
