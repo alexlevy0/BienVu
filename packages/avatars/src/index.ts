@@ -42,6 +42,9 @@ export function heygenClient(key:string,fetcher:typeof fetch=fetch){
     return body;
   }
   return {
+    async group(id:string){const body=await request('/v3/avatars/'+AvatarId.parse(id)),data=body.data as JsonRecord;
+      if(data.id!==id||typeof data.name!=='string'||!data.name.trim())throw new AvatarFailure('AVATAR_RESPONSE_INVALID');
+      return {id,name:data.name.trim().slice(0,100)};},
     async wallet(){const body=await request('/v3/users/me'),data=body.data as JsonRecord,wallet=data.wallet as JsonRecord|undefined;
       const balance=wallet?.remaining_balance;return {currency:wallet?.currency==='usd'?'USD':null,balance:typeof balance==='number'&&Number.isFinite(balance)?balance:null,
         autoReload:(wallet?.auto_reload as JsonRecord|undefined)?.enabled===true,billingType:typeof data.billing_type==='string'?data.billing_type:null};},
@@ -52,6 +55,8 @@ export function heygenClient(key:string,fetcher:typeof fetch=fetch){
         if(!AvatarId.safeParse(raw.id).success||!engines.length||raw.status!==undefined&&raw.status!=='completed'||!['studio_avatar','photo_avatar','digital_twin'].includes(String(raw.avatar_type)))return [];
         const source={image:typeof raw.preview_image_url==='string'?heygenMediaUrl(raw.preview_image_url):null,video:typeof raw.preview_video_url==='string'?heygenMediaUrl(raw.preview_video_url):null};
         return [{look:{id:String(raw.id),name:String(raw.name??'Présentateur').slice(0,160),gender:raw.gender==='female'||raw.gender==='male'?raw.gender:'unknown',type:raw.avatar_type,
+          ...(AvatarId.safeParse(raw.group_id).success?{groupId:String(raw.group_id)}:{}),
+          tags:Array.isArray(raw.tags)?raw.tags.filter((tag):tag is string=>typeof tag==='string'&&tag.length<=100).slice(0,32):[],
           engines,enabled:false,thumbnail:null,preview:null,transparentVerified:false,ownership:'public',updatedAt:new Date().toISOString()} as AvatarLook,source}];});
       return {looks,nextToken:typeof body.next_token==='string'?body.next_token:null};
     },

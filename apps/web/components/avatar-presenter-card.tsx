@@ -19,20 +19,20 @@ export function useAvatarPreview(disabled=false){
   function toggle(look:AvatarLook){clear();if(!disabled)setPreview(current=>current?.id===look.id?null:{id:look.id,pinned:true});}
   return {preview,hover,leave,toggle,stop,clear};
 }
-export function AvatarPresenterCard({presenter,selected,onChoose,busy=false,gallery=false,root,priority=false,playback}:{presenter:AvatarPresenter;selected?:string;onChoose(look:AvatarLook):void;busy?:boolean;gallery?:boolean;root?:RefObject<HTMLDivElement|null>;priority?:boolean;playback:ReturnType<typeof useAvatarPreview>}){
-  const favorites=useAvatarFavorites(),[variant,setVariant]=useState(presenter.looks.find(look=>look.id===selected)?.id??presenter.looks[0].id);
-  const look=presenter.looks.find(item=>item.id===variant)??presenter.looks[0],chosen=presenter.looks.some(item=>item.id===selected),favorite=favorites.ids.includes(look.id);
-  useEffect(()=>{if(selected&&presenter.looks.some(item=>item.id===selected))setVariant(selected);},[selected,presenter.id]);
+export function AvatarPresenterCard({presenter,selected,onOpen,busy=false,root,priority=false,playback}:{presenter:AvatarPresenter;selected?:string;onOpen(presenter:AvatarPresenter):void;busy?:boolean;gallery?:boolean;root?:RefObject<HTMLDivElement|null>;priority?:boolean;playback:ReturnType<typeof useAvatarPreview>}){
+  const favorites=useAvatarFavorites(),look=presenter.looks.find(item=>item.id===selected)??presenter.looks[0];
+  const chosen=presenter.looks.some(item=>item.id===selected),favorite=favorites.ids.includes(look.id);
+  function open(){playback.stop();onOpen(presenter);}
   return <article className={`avatar-presenter-card${chosen?' is-selected':''}`} data-avatar-id={look.id} onPointerEnter={event=>playback.hover(look,event.pointerType)} onPointerLeave={()=>playback.leave(look.id)}>
-    <div className="avatar-presenter-portrait"><button type="button" className="avatar-presenter-face" aria-label={gallery?`Voir l’extrait de ${presenter.name}`:`Choisir ${presenter.name}`} aria-pressed={gallery?undefined:chosen} disabled={busy||gallery&&!look.preview} onClick={()=>{if(gallery)playback.toggle(look);else{playback.stop();onChoose(look);}}}><AvatarPortrait key={look.id} look={look} root={root} playing={playback.preview?.id===look.id} onUnavailable={playback.stop} priority={priority}/></button>
+    <div className="avatar-presenter-portrait"><button type="button" className="avatar-presenter-face" aria-label={`Voir les apparences de ${presenter.name}`} aria-haspopup="dialog" disabled={busy} onClick={open}><AvatarPortrait key={look.id} look={look} root={root} playing={playback.preview?.id===look.id} onUnavailable={playback.stop} priority={priority}/></button>
       {presenter.recommended&&<span className="avatar-presenter-badge"><HomeIcon name="sparkle" size={12}/>Recommandé</span>}
       {favorites.authenticated&&look.publication&&<button type="button" className="avatar-presenter-heart" aria-label={`${favorite?'Retirer des favoris':'Ajouter aux favoris'} : ${presenter.name}`} aria-pressed={favorite} disabled={busy||favorites.loading||!favorites.ready||favorites.busy.has(look.id)} onPointerEnter={playback.clear} onFocus={playback.clear} onClick={()=>{playback.clear();void favorites.toggle(look.id);}}><HomeIcon name="heart" size={18} filled={favorite}/></button>}
       {chosen&&<span className="avatar-presenter-chosen"><HomeIcon name="check" size={13}/>Sélectionné</span>}
+      <span className="avatar-presenter-count"><HomeIcon name="grid" size={12}/>{presenter.total} apparence{presenter.total>1?'s':''}</span>
     </div>
     <div className="avatar-presenter-info"><h3>{presenter.name}</h3><p>{look.gender==='female'?'Présentatrice':look.gender==='male'?'Présentateur':'Présentation'}{favorite?' · Favori':''}</p>
-      {presenter.looks.length>1&&<label><span>Tenue / cadrage</span><select aria-label={`Variante de ${presenter.name}`} value={look.id} disabled={busy} onChange={event=>{playback.stop();setVariant(event.target.value);if(!gallery){const next=presenter.looks.find(item=>item.id===event.target.value);if(next)onChoose(next);}}}>{presenter.looks.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}
       {avatarCutoutStatus(look)==='supported'&&<small className="avatar-presenter-cutout"><HomeIcon name="check" size={12}/>Silhouette sans fond confirmée</small>}
     </div>
-    <div className="avatar-presenter-actions">{look.preview&&<button type="button" disabled={busy} onClick={()=>playback.toggle(look)}><HomeIcon name={playback.preview?.id===look.id?'pause':'play'} size={14}/>{playback.preview?.id===look.id?'Arrêter':'Voir l’extrait'}</button>}{gallery&&<button type="button" className="avatar-presenter-use" disabled={busy} onClick={()=>{playback.stop();onChoose(look);}}>Utiliser ce présentateur <HomeIcon name="arrow" size={15}/></button>}</div>
+    <div className="avatar-presenter-actions"><button type="button" className="avatar-presenter-use" disabled={busy} aria-haspopup="dialog" onClick={open}>Choisir une apparence <HomeIcon name="arrow" size={15}/></button>{look.preview&&<button type="button" disabled={busy} onClick={()=>playback.toggle(look)}><HomeIcon name={playback.preview?.id===look.id?'pause':'play'} size={14}/>{playback.preview?.id===look.id?'Arrêter':'Voir l’extrait'}</button>}</div>
   </article>;
 }

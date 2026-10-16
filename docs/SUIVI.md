@@ -1,5 +1,9 @@
 # BienVu — suivi des sprints
 
+### 17/10/2026 — Avatars regroupés par identité HeyGen
+
+Une fiche par personne dans Personnaliser, `/avatar` et le catalogue superadmin ; ouverture des déclinaisons dans une fenêtre dédiée, choix explicite, favoris et démonstrations au survol. Regroupement par `group_id`, avec nom officiel, sans fusion des homonymes. Les apparences publiées restent sous contrôle de l’administrateur ; les choix enregistrés, l’avatar par défaut, les tarifs et les générations existantes sont conservés. Couvertures légères pour les listes, variantes paginées à la demande dans la galerie et le catalogue administrateur. **43 tests ciblés**, types, frontières et build validés. Recette détaillée : [GROUPES-AVATARS-17-10](preuves/maintenance/GROUPES-AVATARS-17-10.md).
+
 ### 15/10/2026 — CI : fixtures de migration et consommation des réponses R2
 
 Diagnostic de l’exécution GitHub `38755095553` sur `1940d37` : la fixture des budgets appliquait une liste partielle de migrations, sans la colonne récente des erreurs de préparation ; SQLite cherchait alors `error_code` dans plusieurs tables extérieures à la sous-requête. La recette applique désormais toutes les migrations courantes, en différant uniquement les deux extensions de plafond dont elle vérifie séparément l’historique.

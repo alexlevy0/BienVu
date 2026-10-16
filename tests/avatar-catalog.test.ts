@@ -40,9 +40,10 @@ test('Version des médias : changement de source invalide les dérivés sans exp
   assert.throws(()=>avatarCatalogKey('../private','preview',a));
 });
 test('Catalogue HeyGen : exclut les portraits non prêts et conserve le curseur opaque',async()=>{
-  let called='';const raw={id:look.id,name:look.name,avatar_type:'studio_avatar',gender:'female',supported_api_engines:['avatar_iii'],preview_image_url:'https://files.heygen.ai/a.webp',status:'completed'};
+  let called='';const raw={id:look.id,name:look.name,avatar_type:'studio_avatar',gender:'female',group_id:'heygen-identity',tags:['business','formal'],supported_api_engines:['avatar_iii'],preview_image_url:'https://files.heygen.ai/a.webp',status:'completed'};
   const client=heygenClient('fixture',async url=>{called=String(url);return Response.json({data:[raw,{...raw,id:'pending',status:'processing'},{...raw,id:'failed',status:'failed'},{...raw,id:'unsupported',supported_api_engines:['avatar_v']}],next_token:'opaque-next'});});
   const page=await client.looks('studio_avatar','opaque-current');assert.equal(page.looks.length,1);assert.equal(page.looks[0].look.enabled,false);
+  assert.equal(page.looks[0].look.groupId,'heygen-identity');assert.deepEqual(page.looks[0].look.tags,['business','formal']);
   assert.equal(page.nextToken,'opaque-next');assert.equal(new URL(called).searchParams.get('token'),'opaque-current');assert.equal(new URL(called).searchParams.get('ownership'),'public');
 });
 test('Média catalogue : visibilité avant R2, cache uniquement des réponses publiques réussies',async()=>{

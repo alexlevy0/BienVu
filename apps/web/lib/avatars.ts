@@ -55,8 +55,15 @@ export async function adminAvatarRequest(request:Request,env:Env){return respond
         if(!response.ok)throw new RequestFailure('AVATAR_UNAVAILABLE');await response.body?.cancel();return Response.json({checked:true});
       }
       const page=await heygenClient(env.HEYGEN_API_KEY).looks(input.data.type,input.data.token);
+      const client=heygenClient(env.HEYGEN_API_KEY),names=new Map<string,string>();
+      // A page usually contains many outfits for a few people. Resolve each
+      // identity once, using our existing metadata before reading HeyGen.
+      for(const id of new Set(page.looks.flatMap(entry=>entry.look.groupId?[entry.look.groupId]:[]))){
+        const cached=await env.DB.prepare("SELECT json_extract(look_json,'$.groupName') AS name FROM avatar_looks WHERE json_extract(look_json,'$.groupId')=? AND json_extract(look_json,'$.groupName') IS NOT NULL LIMIT 1").bind(id).first<{name:string}>();
+        names.set(id,cached?.name??(await client.group(id)).name);
+      }
       for(const entry of page.looks){const current=await findAvatarLook(env.DB,entry.look.id);
-        const look:AvatarLook={...entry.look,enabled:current?.look.enabled??false,transparentVerified:current?.look.transparentVerified??false,transparency:current?.look.transparency,
+        const look:AvatarLook={...entry.look,groupName:entry.look.groupId?names.get(entry.look.groupId):undefined,enabled:current?.look.enabled??false,transparentVerified:current?.look.transparentVerified??false,transparency:current?.look.transparency,
           thumbnail:entry.source.image?`/api/avatars/${entry.look.id}/media?kind=thumbnail&v=${await avatarMediaVersion(entry.source.image)}`:null,
           preview:entry.source.video?`/api/avatars/${entry.look.id}/media?kind=preview&v=${await avatarMediaVersion(entry.source.video)}`:null};
         await saveAvatarLook(env.DB,actor.id,look,entry.source);}

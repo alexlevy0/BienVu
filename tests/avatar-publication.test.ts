@@ -32,21 +32,22 @@ test('publication atomique : même sélection, ordre, noms et variantes dans les
   const selected:Publication={groups:[{id:'c',name:'Camille',lookIds:['c'],recommended:false},{id:'ab',name:'Alex',lookIds:['a','b'],recommended:true}],defaultLookId:'b'};
   const saved=await publishAvatarSelection(db,'admin',selected,1),catalog=await avatarCatalog(db),gallery=await avatarGallery(db,{query:'',gender:'all',offset:0});
   assert.equal(saved.revision,2);assert.equal(catalog.revision,2);assert.equal(gallery.revision,2);assert.equal(gallery.total,2);
-  assert.deepEqual(catalog.looks.map(row=>row.id),['a','b','c']);assert.deepEqual(gallery.looks,catalog.looks);assert.equal(catalog.defaultLookId,'b');
+  assert.deepEqual(catalog.looks.map(row=>row.id),['a','b','c']);assert.deepEqual(gallery.looks.map(row=>[row.id,row.variantsCount]),[['a',2],['c',1]]);assert.equal(catalog.defaultLookId,'b');
   assert.deepEqual(avatarPresenters(catalog.looks).map(group=>[group.name,group.looks.length]),[['Alex',2],['Camille',1]]);
   assert.deepEqual(avatarPresenters(catalog.looks,['c']).map(group=>group.name),['Camille','Alex']);
   await assert.rejects(publishAvatarSelection(db,'other-admin',publication(['other']),1),/CONFLICT/);assert.deepEqual((await readAvatarPublication(db)).publication,selected);
   assert.equal((await db.prepare("SELECT count(*) AS n FROM avatar_audit WHERE action='selection_published'").first<{n:number}>())!.n,1);
   assert.ok(!JSON.stringify(catalog).includes('SECRET_PROVIDER_URL'));
 });
-test('pagination par présentateur : les variantes ne sont jamais séparées entre deux pages',async t=>{
+test('pagination par présentateur : couvertures légères et variantes chargées à la demande',async t=>{
   const rows=Array.from({length:70},(_,i)=>look('look-'+i)),db=await fixture(t,rows);
   const groups=Array.from({length:35},(_,i)=>({id:'group-'+i,name:'Groupe '+i,lookIds:['look-'+(i*2),'look-'+(i*2+1)],recommended:false}));
   await publishAvatarSelection(db,'admin',{groups,defaultLookId:'look-0'},1);
   const first=await avatarGallery(db,{query:'',gender:'all',offset:0}),last=await avatarGallery(db,{query:'',gender:'all',offset:32});
-  assert.equal(first.total,35);assert.equal(first.looks.length,64);assert.equal(avatarPresenters(first.looks).length,32);assert.equal(last.looks.length,6);assert.equal(last.hasMore,false);
-  assert.equal(new Set([...first.looks,...last.looks].map(row=>row.id)).size,70);
-  assert.equal((await avatarGallery(db,{query:'Groupe 34',gender:'all',offset:0})).looks.length,2);
+  assert.equal(first.total,35);assert.equal(first.looks.length,32);assert.equal(avatarPresenters(first.looks).length,32);assert.equal(last.looks.length,3);assert.equal(last.hasMore,false);
+  assert.equal(new Set([...first.looks,...last.looks].map(row=>row.id)).size,35);
+  assert.equal((await avatarGallery(db,{query:'Groupe 34',gender:'all',offset:0})).looks.length,1);
+  const variants=await avatarGallery(db,{groupId:'group-34',query:'',gender:'all',offset:0});assert.deepEqual(variants.looks.map(look=>look.id),['look-68','look-69']);
 });
 test('favoris conservés en base après retrait ; ancien choix utilisable, catalogue public limité',async t=>{
   const db=await fixture(t,[look('a'),look('b')]);
@@ -69,4 +70,28 @@ test('rejets de publication : privé, désactivé, moteur indisponible, doublon 
 test('transfert du choix depuis la galerie : identifiant borné et expiration',()=>{
   assert.deepEqual(parseAvatarIntent(JSON.stringify({lookId:'look-123',at:100}),200),{lookId:'look-123',at:100});
   for(const value of [null,'{}','invalid',JSON.stringify({lookId:'../private',at:100}),JSON.stringify({lookId:'a',at:300}),JSON.stringify({lookId:'a',at:100})])assert.equal(parseAvatarIntent(value,value?.includes('"lookId":"a","at":100')?86400200:200),null);
+});
+
+test('identités HeyGen : fusion des tenues, homonymes distincts et publication limitée',async t=>{
+  const rows=[look('annie-a',{groupId:'heygen-annie',groupName:'Annie'}),look('annie-b',{groupId:'heygen-annie',groupName:'Annie'}),look('annie-hidden',{groupId:'heygen-annie',groupName:'Annie'}),look('homonym',{groupId:'other-annie',groupName:'Annie'})];
+  const db=await fixture(t,rows);await publishAvatarSelection(db,'admin',publication(['annie-a','annie-b','homonym'],'annie-b'),1);
+  const saved=await readAvatarPublication(db),catalog=await avatarCatalog(db),gallery=await avatarGallery(db,{query:'',gender:'all',offset:0});
+  assert.deepEqual(saved.publication.groups.map(group=>[group.id,group.lookIds]),[['heygen-annie',['annie-a','annie-b']],['other-annie',['homonym']]]);
+  assert.equal(saved.publication.defaultLookId,'annie-b');assert.equal(avatarPresenters(catalog.looks).length,2);assert.equal(gallery.total,2);
+  const variants=await avatarGallery(db,{groupId:'heygen-annie',query:'',gender:'all',offset:0});assert.deepEqual(variants.looks.map(look=>look.id),['annie-a','annie-b']);
+  assert.equal((await avatarGallery(db,{groupId:'not-published',query:'',gender:'all',offset:0})).total,0);
+  const input={catalog:'1' as const,query:'',gender:'all' as const,offset:0,type:'all' as const,availability:'all' as const};
+  const admin=await adminAvatarCatalog(db,input,false);assert.equal(admin.total,2);assert.deepEqual(admin.looks.map(look=>look.variantsCount).sort(),[1,3]);
+  assert.equal((await adminAvatarCatalog(db,{...input,groupId:'heygen-annie'},false)).looks.length,3);
+  assert.ok(!JSON.stringify(gallery).includes('annie-hidden'));
+});
+test('nombreuses tenues : pagination stable des variantes et retrait des profils inactifs',async t=>{
+  const rows=Array.from({length:70},(_,i)=>look('annie-'+String(i).padStart(2,'0'),{groupId:'annie',groupName:'Annie'})),db=await fixture(t,rows);
+  await publishAvatarSelection(db,'admin',{groups:[{id:'annie',name:'Annie',lookIds:rows.map(row=>row.id),recommended:true}],defaultLookId:'annie-00'},1);
+  const input={query:'',gender:'all' as const,offset:0};
+  const gallery=await avatarGallery(db,input);assert.equal(gallery.looks.length,1);assert.equal(gallery.looks[0].variantsCount,70);
+  const pages=await Promise.all([0,32,64].map(offset=>avatarGallery(db,{...input,offset,groupId:'annie'})));
+  assert.deepEqual(pages.map(page=>page.looks.length),[32,32,6]);assert.equal(new Set(pages.flatMap(page=>page.looks.map(look=>look.id))).size,70);
+  await saveAvatarLook(db,'admin',{...rows[0],enabled:false},{image:null,video:null});
+  const updated=await avatarGallery(db,input);assert.equal(updated.looks[0].id,'annie-01');assert.equal(updated.looks[0].variantsCount,69);
 });

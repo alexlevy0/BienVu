@@ -1,7 +1,8 @@
 'use client';
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {AvatarGallery as GallerySchema,avatarPresenters,type AvatarGallery as Gallery,type AvatarLook,type AvatarGalleryQuery} from '@bienvu/contracts';
+import {AvatarGallery as GallerySchema,avatarPresenters,type AvatarGallery as Gallery,type AvatarLook,type AvatarPresenter,type AvatarGalleryQuery} from '@bienvu/contracts';
 import {AvatarPresenterCard,useAvatarPreview} from './avatar-presenter-card';
+import {AvatarVariantsDialog} from './avatar-variants-dialog';
 import {useAccount} from './account';
 import {avatarIntentKey} from '../lib/avatar-intent';
 import {homeRenderPresetKey} from '../lib/home-render-presets';
@@ -13,6 +14,7 @@ import {useAvatarFavorites} from './avatar-favorites';
 export function AvatarGallery({initial}:{initial:Gallery}){
   const favorites=useAvatarFavorites(),{me,loading}=useAccount();
   const [data,setData]=useState(initial),[query,setQuery]=useState(''),[gender,setGender]=useState<AvatarGalleryQuery['gender']>('all');
+  const [group,setGroup]=useState<AvatarPresenter|null>(null);
   const [pending,setPending]=useState(false),[error,setError]=useState('');
   const playback=useAvatarPreview(pending),{stop}=playback,publishedRevision=useRef(initial.revision);
   const end=useRef<HTMLDivElement>(null);
@@ -69,12 +71,12 @@ export function AvatarGallery({initial}:{initial:Gallery}){
       <select aria-label="Genre du présentateur" value={gender} onChange={event=>setGender(event.target.value as typeof gender)}>
         <option value="all">Tous les profils</option><option value="female">Présentatrices</option><option value="male">Présentateurs</option><option value="unknown">Genre non renseigné</option></select>
       <span role="status">{pending?'Chargement…':`${data.total.toLocaleString('fr-FR')} présentateur${data.total!==1?'s':''}`}</span></div>
-    <p className="avatar-gallery-hint">Survolez un portrait pour lancer la démonstration, ou cliquez sur « Voir l’extrait ». Les extraits sont lus sans son.</p>
+    <p className="avatar-gallery-hint">Un visage, plusieurs styles. Ouvrez un présentateur pour choisir son apparence. Survolez un portrait pour voir sa démonstration.</p>
     {favorites.authenticated&&<p className="avatar-gallery-favorites-hint">Cliquez sur le cœur pour retrouver vos favoris en premier dans « Personnaliser ». <span role="status">{favorites.loading?'Chargement des favoris…':`${favorites.ids.length} favori${favorites.ids.length!==1?'s':''}`}</span></p>}
     {favorites.error&&<p className="avatar-gallery-error" role="alert">{favorites.error} <button type="button" onClick={favorites.refresh}>Actualiser les favoris</button></p>}
     {!failedRequest.current?.append&&failure}
     <div className="avatar-gallery-grid avatar-selection-grid" aria-busy={pending}>
-      {presenters.map((presenter,index)=><AvatarPresenterCard key={presenter.id} presenter={presenter} gallery busy={pending||loading} onChoose={choose} playback={playback} priority={index<2}/>)}
+      {presenters.map((presenter,index)=><AvatarPresenterCard key={presenter.id} presenter={presenter} gallery busy={pending||loading} onOpen={presenter=>{stop();setGroup(presenter);}} playback={playback} priority={index<2}/>)}
     </div>
     {!pending&&!error&&!data.looks.length&&<div className="avatar-gallery-empty"><h2>Aucun présentateur ne correspond à votre recherche.</h2><button type="button" onClick={()=>{setQuery('');setGender('all');}}>Voir toute la sélection</button></div>}
     {data.looks.length>0&&<div className="avatar-gallery-more" ref={end}><p>{presenters.length} sur {data.total.toLocaleString('fr-FR')} présentateurs</p>
@@ -82,5 +84,6 @@ export function AvatarGallery({initial}:{initial:Gallery}){
       {failedRequest.current?.append&&failure}
       {!data.hasMore&&!pending&&!error&&<p>Tous les résultats sont affichés.</p>}
     </div>}
+    {group&&<AvatarVariantsDialog key={group.id} presenter={group} remote="public" busy={pending||loading} onClose={()=>setGroup(null)} onChoose={choose}/>}
   </section>;
 }
