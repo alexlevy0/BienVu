@@ -4,6 +4,7 @@ import Link from 'next/link';
 import {HomeIcon, HomeWordmark} from './home-icons';
 import {CookiePreferencesButton} from './product-analytics';
 import {useSiteFeatures} from './site-features';
+import {NotificationSettingsButton} from './browser-notifications';
 
 export function HomeFooter({onCreate,faqHref='#home-life-faq-title'}:{onCreate:()=>void;faqHref?:string}) {
   const features=useSiteFeatures();
@@ -65,6 +66,7 @@ export function HomeFooter({onCreate,faqHref='#home-life-faq-title'}:{onCreate:(
         <Link href="/conditions" prefetch={false}>CGU</Link>
         <Link href="/conditions#offres" prefetch={false}>CGV</Link>
         <CookiePreferencesButton/>
+        <NotificationSettingsButton/>
       </nav>
       <button type="button" className="home-premium-footer-back-top" onClick={backToTop} aria-label="Retour en haut de page"><HomeIcon name="arrow" size={20}/></button>
     </div>

@@ -4,10 +4,10 @@ import {assertSameOrigin,boundedJson,RequestFailure,respond} from '../../../lib/
 import {callGeneration,generationHistory} from '../../../lib/generations';
 export const dynamic='force-dynamic';
 export async function POST(request:Request){return respond(async()=>{
-  const {env,agency}=await requireOwner(request);assertSameOrigin(request,env);
+  const {env,agency,user}=await requireOwner(request);assertSameOrigin(request,env);
   const input=GenerationRequest.safeParse(await boundedJson(request,32_000));
   if(!input.success)throw new RequestFailure('VALIDATION_ERROR');
-  return callGeneration(env,agency.id,'/generations',input.data,request.headers.get('Idempotency-Key')??'',request);
+  return callGeneration(env,agency.id,'/generations',input.data,request.headers.get('Idempotency-Key')??'',request,user.id);
 });}
 export async function GET(request:Request){return respond(async()=>{
   const {env,agency}=await requireOwner(request);

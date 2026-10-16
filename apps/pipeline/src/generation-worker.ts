@@ -17,8 +17,9 @@ import {safeAiEvent} from '@bienvu/observability';
 import {submitJobAvatars,pollJobAvatars,timeoutJobAvatars,reconcileAvatarTasks} from './avatars';
 import type {HeygenEnvironment} from '@bienvu/avatars';
 import {generationController,waitForGenerationResource,syncRunwayLimits} from './generation-queue';
+import {sendGenerationNotifications,type BrowserPushEnvironment} from '@bienvu/notifications';
 export {VideoRenderer};
-export type GenerationEnv=VideoEnv&Pick<NarrationEnv,'GOOGLE_SERVICE_ACCOUNT_JSON'|'GOOGLE_CLOUD_PROJECT'|'GOOGLE_TTS_VOICE'|'OPENAI_API_KEY'|'SCRIPT_MODEL'>&FishVoiceEnv&HeygenEnvironment&{
+export type GenerationEnv=VideoEnv&Pick<NarrationEnv,'GOOGLE_SERVICE_ACCOUNT_JSON'|'GOOGLE_CLOUD_PROJECT'|'GOOGLE_TTS_VOICE'|'OPENAI_API_KEY'|'SCRIPT_MODEL'>&FishVoiceEnv&HeygenEnvironment&BrowserPushEnvironment&{
   GENERATIONS_ENABLED:string;GENERATION_TOKEN:string;IMPORT_TOKEN:string;IMPORT_SERVICE:Fetcher;GENERATION_WORKFLOW:Workflow<{agencyId:string;jobId:string}>;
   RUNWAY_ENABLED?:string;RUNWAYML_API_SECRET?:string;RUNWAY_TEST_AGENCY_ID?:string;
 };
@@ -65,7 +66,11 @@ async function settleVideo(env:GenerationEnv,row:GenerationRow,result:unknown){
       .bind(row.jobId,key,JSON.stringify(report),at,row.jobId),
     env.DB.prepare("UPDATE jobs SET status='ready',stage='rendering',progress_percent=100,lease_until=NULL,error_code=NULL,updated_at=? WHERE id=? AND agency_id=? AND status NOT IN ('ready','failed')")
       .bind(at,row.jobId,row.agencyId),
-  ]);return true;
+  ]);
+  // The MP4 and credits are already committed. Push failures never fail a video;
+  // durable leases and the web cron recover a missed or interrupted delivery.
+  try{await sendGenerationNotifications(env,row.jobId);}catch{console.warn(JSON.stringify({event:'browser_push_dispatch_failed'}));}
+  return true;
 }
 export async function reconcileGeneration(env:GenerationEnv,row:GenerationRow,code='GENERATION_TIMEOUT'){
   if(['ready','failed'].includes(row.status))return;

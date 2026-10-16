@@ -13,6 +13,7 @@ import {GenerationCelebration} from './generation-celebration';
 import {anonymousGenerationScope,useGenerationStore} from './generation-store';
 import {submitTrialManual,TrialManualFailure,type TrialManualSettings,type TrialManualInput,type TrialManualIntent} from '../lib/anonymous-manual-client';
 import {TurnstileCheck} from './turnstile-check';
+import {announceGenerationStarted} from '../lib/browser-notification-client';
 // The token lives only in memory. The HttpOnly session is the ownership proof.
 type TrialReply={error?:{message?:string};enabled:boolean;siteKey:string|null;used:boolean;job:unknown};
 async function value(response:Response){const body=await response.json() as TrialReply;if(!response.ok)throw new Error(body.error?.message??'La demande a été interrompue. Réessayez.');return body;}
@@ -42,7 +43,7 @@ export function useAnonymousTrial(enabled:boolean) {
     try{
       const response=await fetch('/api/trial',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':intent.current.key},body:JSON.stringify({url,subtitlesEnabled,voiceEnabled,durationSeconds,aspectRatio,...(customization?{customization}:{}),turnstileToken:currentToken})});
       const body=await response.json() as {error?:{code?:string;message?:string}};if(!response.ok){if(body.error?.code==='BOT_VERIFICATION_FAILED'){intent.current=null;setChallenge(true);}throw new Error(body.error?.message??'La création n’a pas démarré. Réessayez.');}
-      setJob(GenerationView.parse(body));setChallenge(false);intent.current=null;
+      const next=GenerationView.parse(body);announceGenerationStarted(next);setJob(next);setChallenge(false);intent.current=null;
     }catch(e){setFailure(e instanceof Error?e.message:'La connexion a été interrompue. Réessayez pour retrouver votre demande.');}
     finally{setToken('');setWidgetVersion(n=>n+1);lock.current=false;}
   }
@@ -65,7 +66,7 @@ export function useAnonymousTrial(enabled:boolean) {
     lock.current=true;setPreparingManual(true);setPendingManual(null);setChallenge(false);
     try{
       const result=await submitTrialManual(input,settings,manualIntent.current,currentToken,setManualProgress);
-      setJob(result);manualIntent.current=null;try{sessionStorage.removeItem('bienvu:trial-manual-request');}catch{}return result;
+      announceGenerationStarted(result);setJob(result);manualIntent.current=null;try{sessionStorage.removeItem('bienvu:trial-manual-request');}catch{}return result;
     }catch(error){
       if(error instanceof TrialManualFailure){
         if(error.code==='BOT_VERIFICATION_FAILED'){setPendingManual({input,settings});setChallenge(true);}

@@ -3,6 +3,7 @@ import {authOrigin} from './auth';
 import {assertSameOrigin,boundedJson,RequestFailure} from './http';
 import {callGeneration,streamGenerationMedia} from './generations';
 import {verifyBot} from './bot-verification';
+import {watchAcceptedBrowserGeneration} from './browser-push-cookie';
 export type TrialEnv=CloudflareEnv&{ANONYMOUS_TRIALS_ENABLED?:string;TURNSTILE_SITE_KEY?:string;TURNSTILE_SECRET_KEY?:string;TRIAL_IP_HMAC_SECRET?:string};
 const cookieName=(env:TrialEnv)=>authOrigin(env).startsWith('https://')?'__Host-bienvu-trial':'bienvu-trial';
 export function trialCookie(request:Request,env:TrialEnv){const name=cookieName(env);return request.headers.get('cookie')?.split(';').map(s=>s.trim()).find(s=>s.startsWith(name+'='))?.slice(name.length+1);}
@@ -67,6 +68,7 @@ export async function startTrial(request:Request,env:TrialEnv,trustedCloudflare:
     try{await callGeneration(env,row.agencyId,`/generations/${row.jobId}/retry`,{});}catch{/* The durable outbox remains authoritative; cron retries launch. */}
   }
   try{await rememberAiContext(env.DB,row.jobId,request);}catch{}
+  await watchAcceptedBrowserGeneration(env,request,row.jobId,{kind:'trial',id:session.id});
   return Response.json(generationView(row,Date.now(),'anonymous'),{status:202});
 }
 export async function ownAnonymousJob(request:Request,env:TrialEnv,id:string){

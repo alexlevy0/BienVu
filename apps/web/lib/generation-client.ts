@@ -1,6 +1,7 @@
 import {analyticsFetch as fetch} from './product-analytics';
 import {GenerationView, publicErrors, type GenerationRequest, type PublicErrorCode} from '@bienvu/contracts';
 import {clearListingDraft} from './listing-draft';
+import {announceGenerationStarted} from './browser-notification-client';
 
 // Shared by the home page and studio. A lost response keeps the same admission key.
 export async function requestGeneration(agencyId: string, input: GenerationRequest): Promise<GenerationView> {
@@ -19,6 +20,7 @@ export async function requestGeneration(agencyId: string, input: GenerationReque
     throw new Error(code && code in publicErrors ? publicErrors[code][1] : 'La création n’a pas abouti. Réessayez.');
   }
   const job = GenerationView.parse(value);
+  announceGenerationStarted(job);
   clearListingDraft();
   try {sessionStorage.removeItem(storageKey);} catch {}
   return job;

@@ -11,6 +11,9 @@
     "binding": "ASSETS"
   },
   "vars": {
+    "WEB_PUSH_ENABLED": "false",
+    "WEB_PUSH_PUBLIC_KEY": "",
+    "WEB_PUSH_SUBJECT": "mailto:contact@bienvu.online",
     "HEYGEN_ENABLED": "false",
     "CARTESIA_TTS_ENABLED": "false",
     "MAILBOX_ENABLED": "false",

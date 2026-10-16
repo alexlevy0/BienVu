@@ -4,7 +4,7 @@ const release=process.env.BIENVU_RELEASE??process.env.GITHUB_SHA??'development';
 const config: NextConfig = {
   env:{NEXT_PUBLIC_BIENVU_RELEASE:release},
   poweredByHeader: false,
-  transpilePackages: ['@bienvu/contracts', '@bienvu/db', '@bienvu/observability', '@bienvu/importers', '@bienvu/maps'],
+  transpilePackages: ['@bienvu/contracts', '@bienvu/db', '@bienvu/observability', '@bienvu/importers', '@bienvu/maps', '@bienvu/notifications'],
   async redirects() {return [{source:'/studio',destination:'/',permanent:true},{source:'/generer',destination:'/',permanent:true}];},
   async headers() {
     return [{source: '/:path*', headers: [
@@ -14,7 +14,8 @@ const config: NextConfig = {
       {key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()'},
     ]},{source:'/api/admin/mailbox/messages/:messageId/html',headers:[{key:'X-Frame-Options',value:'SAMEORIGIN'}]},
       {source:'/ma-vitrine/apercu',headers:[{key:'X-Frame-Options',value:'SAMEORIGIN'},{key:'Content-Security-Policy',value:"frame-ancestors 'self'"}]},
-      {source:'/beta/:path*',headers:[{key:'X-Robots-Tag',value:'noindex, follow'}]}];
+      {source:'/beta/:path*',headers:[{key:'X-Robots-Tag',value:'noindex, follow'}]},
+      {source:'/notifications-sw.js',headers:[{key:'Cache-Control',value:'no-cache'},{key:'Service-Worker-Allowed',value:'/'}]}];
   },
 };
 // Upload credentials are build-only, never a browser variable or Worker binding.

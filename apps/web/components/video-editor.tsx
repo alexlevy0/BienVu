@@ -1,4 +1,5 @@
 'use client';
+import {announceGenerationStarted} from '../lib/browser-notification-client';
 import {catalogAvatarLook} from '@bienvu/contracts';
 import {analyticsFetch as fetch,trackProductEvent} from '../lib/product-analytics';
 import Link from 'next/link';
@@ -265,7 +266,7 @@ function EditorProject({initial,agency,guest}:{initial:CreationDraftView;agency:
       const key=previous?.version===body.version?previous.key:crypto.randomUUID();try{sessionStorage.setItem(storageKey,JSON.stringify({version:body.version,key}));}catch{}
       if(!GenerationCustomization.safeParse(settings).success)throw new Error('Sélectionnez au moins trois photos et vérifiez la narration.');
       const job=GenerationView.parse(await editorResponse(await fetch(`/api/imports/${draft.id}/editor-export`,{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key},body:JSON.stringify(body)})));
-      store.setJob(job,agency.id);void refreshRights();try{sessionStorage.removeItem(storageKey);}catch{}
+      announceGenerationStarted(job);store.setJob(job,agency.id);void refreshRights();try{sessionStorage.removeItem(storageKey);}catch{}
       if(previewIntent){setFullPreview({version:current.version,job});setConfirm(false);setExporting(false);setPlaying(false);}else window.location.assign(`/historique/${job.id}`);
     }catch(cause){setError(cause instanceof Error?cause.message:'L’export n’a pas pu démarrer.');setConfirm(false);setExporting(false);}
   }

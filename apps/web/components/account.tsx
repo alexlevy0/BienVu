@@ -4,6 +4,7 @@ import {Me,VoiceCatalog,DEFAULT_VIDEO_VOICE,type VideoCustomization, type Agency
 import {clearListingDraft} from '../lib/listing-draft';
 import {clearAgencyDraft} from '../lib/agency-draft';
 import {trackProductEvent,suspendProductAnalytics} from '../lib/product-analytics';
+import {disableBrowserNotifications} from '../lib/browser-notification-client';
 
 type AccountState = {me: Me | null; loading: boolean; error: string; refresh: () => Promise<void>; refreshRights: () => Promise<void>; setAgency: (agency: AgencyProfile) => void;
   defaultVoice:VideoCustomization['voice'];voiceLoading:boolean;voiceCatalog:VoiceCatalog|null;refreshVoices:()=>Promise<void>;resolveDefaultVoice:()=>Promise<VideoCustomization['voice']>};
@@ -62,6 +63,7 @@ export function SignOut() {
   async function signOut() {
     setBusy(true); setError('');
     try {
+      await disableBrowserNotifications();
       const response = await fetch('/api/auth/sign-out', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'});
       if (!response.ok) throw new Error();
       trackProductEvent('logout_completed');suspendProductAnalytics();
