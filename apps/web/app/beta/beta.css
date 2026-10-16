@@ -135,3 +135,30 @@
 
 .home-studio-beta .home-render-video:fullscreen {max-width:none;aspect-ratio:auto;align-self:auto}
 .home-studio-beta .home-renders-frame:fullscreen .home-render-video {max-width:none}
+
+/* Keep the current choices visible without opening the settings panel. */
+.home-studio .home-create-panel.home-create-beta .home-composer-modern .beta-settings-toggle {justify-content:space-between;gap:12px;min-height:60px;padding:12px 2px 2px;text-align:left}
+.beta-settings-overview {display:grid;gap:7px;min-width:0}
+.beta-settings-label {font-size:10px;font-weight:550;letter-spacing:.08em;text-transform:uppercase;color:#7c8772}
+.beta-settings-summary {display:flex;align-items:center;flex-wrap:wrap;gap:6px;min-width:0}
+.beta-setting-pill {display:inline-flex;align-items:center;gap:5px;min-height:27px;padding:4px 7px;border:1px solid #dfe6d7;border-radius:7px;background:#f1f5ec;color:#3f5a35;font-size:11px;font-weight:450;line-height:1.3;white-space:nowrap;transition:background-color 180ms ease,border-color 180ms ease}
+.beta-setting-pill>svg {flex:none;opacity:.8}
+.beta-setting-pill>span {animation:beta-setting-in 200ms ease-out both}
+.beta-setting-pill[data-muted=true] {background:#f8f9f4;border-color:#e8ece2;color:#7b8274}
+.beta-settings-edit {display:inline-flex;align-items:center;justify-content:center;gap:5px;flex:none;align-self:center;min-height:34px;padding:6px 7px;border-radius:7px;font-size:11px;font-weight:500;color:#47633a;transition:background-color 180ms ease}
+.beta-settings-toggle:hover .beta-settings-edit,.beta-settings-toggle[aria-expanded=true] .beta-settings-edit {background:#eaf0e1}
+.beta-settings-toggle:hover .beta-setting-pill {border-color:#cedbc1}
+.home-studio .home-create-panel.home-create-beta .home-composer-dock[data-floating] .home-composer-main {grid-template-columns:minmax(0,1fr) auto}
+.home-studio .home-create-panel.home-create-beta .home-composer-dock[data-floating] .beta-settings-toggle {grid-column:1/-1;width:100%;padding:8px 0 0;min-height:40px;border:0;border-top:1px solid #e7ecdf;border-radius:0;background:transparent}
+.home-create-beta .home-composer-dock[data-floating] .beta-settings-overview {display:flex;align-items:center;gap:12px}
+.home-create-beta .home-composer-dock[data-floating] .beta-settings-label {flex:none}
+@keyframes beta-setting-in {from {opacity:.35;transform:translateY(2px)}to {opacity:1;transform:translateY(0)}}
+@media(max-width:620px){
+ .home-studio .home-create-panel.home-create-beta .home-composer-modern .beta-settings-toggle {gap:8px;padding-top:11px;padding-bottom:2px}
+ .beta-settings-edit {padding-inline:3px;font-size:11px;gap:4px}
+ .beta-settings-edit>svg {display:none}
+ .beta-settings-summary {gap:5px}
+ .beta-setting-pill {padding:4px 6px;font-size:11px}
+}
+@media(prefers-reduced-motion:reduce){.beta-setting-pill,.beta-settings-edit {transition:none}.beta-setting-pill>span {animation:none}}
+@media(forced-colors:active){.beta-setting-pill,.beta-setting-pill[data-muted=true] {border-color:ButtonText;color:ButtonText}.beta-settings-label,.beta-settings-edit {color:ButtonText}}

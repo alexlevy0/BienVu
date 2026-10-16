@@ -11,6 +11,7 @@ import {useAnonymousTrial, TrialChallenge} from './anonymous-trial';
 import {useAccount} from './account';
 import {HomeIcon} from './home-icons';
 import {HomeCreateButton} from './home-create-button';
+import {BetaSettingsSummary} from './beta-settings-summary';
 import {PhotoDurationAdvice} from './photo-duration-advice';
 import type {ManualListingFormHandle,PreparedManualListing} from './manual-listing-form';
 import {generationActive, useGenerationProgress} from './generation-progress-state';
@@ -588,7 +589,11 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
           <span className="home-credit-cost" aria-live="polite">{estimatePending?'Estimation en cours…':estimateFailed?'Estimation indisponible':presetNeedsLogin?'Options payantes · connexion requise':!me&&!loading&&!trial.used?'Essai classique offert':`${!manual&&!estimate.value?'À partir de ':''}${creditCost} crédit${creditCost>1?'s':''}${me&&estimate.value?` estimé${creditCost>1?'s':''}`:''}`}
             {me&&estimate.value&&<small className="home-credit-estimate-detail">{urlImportPhotoSlots(estimate.value).length} photos · {requestedAnimations(estimatedSettings)?'Animations IA activées':'Mouvements classiques'}{estimatedSettings?.avatar&&!estimatedSettings.avatar.hidden?' · Avatar inclus':''}</small>}
           </span></div>
-        <button type="button" className="home-composer-tools-toggle" title="Réglages de création" aria-label="Réglages de création" aria-expanded={composerExpanded} aria-controls="home-composer-options" onClick={()=>setComposerExpanded(current=>!current)}><HomeIcon name="settings" size={20}/><span>Réglages</span><span className="home-composer-tools-chevron" aria-hidden="true"><HomeIcon name="chevron" size={15}/></span></button>
+        <button type="button" className={`home-composer-tools-toggle${variant==='beta'?' beta-settings-toggle':''}`} title="Réglages de création" aria-label="Réglages de création" aria-describedby={variant==='beta'?'home-settings-summary':undefined} aria-expanded={composerExpanded} aria-controls="home-composer-options" onClick={()=>setComposerExpanded(current=>!current)}>
+          {variant==='beta'?<><BetaSettingsSummary aspectRatio={aspectRatio} durationSeconds={durationSeconds} voiceEnabled={voiceEnabled} subtitlesEnabled={subtitlesEnabled} animations={me?requestedAnimations(estimatedSettings):0} avatar={Boolean(me&&estimatedSettings?.avatar&&!estimatedSettings.avatar.hidden)}/>
+            <span className="beta-settings-edit"><HomeIcon name="settings" size={15}/><span>{composerExpanded?'Fermer':'Modifier'}</span><span className="home-composer-tools-chevron" aria-hidden="true"><HomeIcon name="chevron" size={14}/></span></span></>
+            :<><HomeIcon name="settings" size={20}/><span>Réglages</span><span className="home-composer-tools-chevron" aria-hidden="true"><HomeIcon name="chevron" size={15}/></span></>}
+        </button>
       </div>
       {me&&estimate.value&&!estimatePending&&!estimateFailed&&<details className="home-credit-details"><summary>Détail des {creditCost} crédit{creditCost>1?'s':''}</summary><dl><div><dt>Création de la vidéo</dt><dd>1 crédit</dd></div><div><dt>{requestedAnimations(estimatedSettings)} photo{requestedAnimations(estimatedSettings)>1?'s':''} animée{requestedAnimations(estimatedSettings)>1?'s':''} par IA</dt><dd>{requestedAnimations(estimatedSettings)} crédit{requestedAnimations(estimatedSettings)!==1?'s':''}</dd></div><div><dt>Présentateur IA</dt><dd>{creditCost-1-requestedAnimations(estimatedSettings)} crédit{creditCost-1-requestedAnimations(estimatedSettings)!==1?'s':''}</dd></div></dl><small>Le coût est confirmé avant le lancement. Vous pouvez ajuster les photos et les options dans Personnaliser.</small></details>}
       <div id="home-composer-options" className="home-composer-options" inert={!composerExpanded} aria-hidden={!composerExpanded}>
