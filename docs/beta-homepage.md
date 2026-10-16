@@ -12,8 +12,8 @@ La homepage `/` continue d’utiliser `LandingPage`.
   rendus, les avatars, l’éditeur et Ma Vitrine. Les styles marketing restent limités à la bêta ; le panneau de création est partagé avec la homepage.
 - `HomeCreate` partage le formulaire compact, les réglages repliables, les libellés
   et l’affichage détaillé des crédits entre `/` et `/beta`. Le variant `beta`
-  conserve son retour de connexion vers `/beta` et ses essais de présentation
-  d’import, sans les afficher sur la homepage principale.
+  conserve son retour de connexion vers `/beta`. Le retour d’import validé sur
+  la bêta est partagé avec la homepage principale.
 - `BetaExample` utilise les copies marketing publiques déjà préparées. Changer
   d’option et lire l’exemple ne déclenche aucun import, aucune réservation de
   crédits ni aucune génération chez les fournisseurs.
@@ -81,10 +81,11 @@ les désactive aussi. Les réglages explicites des brouillons, de l’éditeur e
 vidéos existantes restent conservés. Les valeurs historiques des manifestes et
 les règles serveur ne changent pas.
 
-## Retours d’import à tester sur la bêta (16/10/2026)
+## Retours d’import validés sur la bêta, partagés avec la homepage (16/10/2026)
 
-`BetaImportFeedback` est rendu uniquement par le variant `beta` de `HomeCreate`.
-Ses styles sont chargés par `/beta` et limités à `.home-studio-beta`.
+`HomeImportFeedback` est rendu par `HomeCreate` sur `/` et `/beta`.
+`home-import-feedback.css` est chargé par le formulaire partagé et reste limité
+à `.home-studio .home-create-panel`. Le composant garde un chargement différé.
 
 - « Lien détecté » correspond à une URL publique valide, pendant le délai de
   préparation existant. Le domaine du lien reste visible.
@@ -101,4 +102,5 @@ Ses styles sont chargés par `/beta` et limités à `.home-studio-beta`.
 La préparation, son cache et son idempotence sont réutilisés : ni doublon de
 requête, ni génération payante pour l’affichage de ce retour. Changer ou effacer
 le lien retire la fiche de l’ancien lien. Les animations respectent la préférence
-de réduction des mouvements. `/` conserve sa présentation d’import existante.
+de réduction des mouvements. Les deux homepages utilisent les mêmes états et
+animations, sans modifier les appels d’import ni les règles de crédits.

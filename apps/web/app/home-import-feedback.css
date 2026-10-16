@@ -1,0 +1,47 @@
+/* Shared import feedback, approved on the beta homepage. */
+.home-studio .home-create-panel .home-import-feedback {display:grid;grid-template-rows:0fr;opacity:0;visibility:hidden;transition:grid-template-rows 380ms cubic-bezier(.22,1,.36,1),opacity 220ms ease,visibility 0s linear 380ms;overflow-anchor:none}
+.home-studio .home-create-panel .home-import-feedback[data-active=true] {grid-template-rows:1fr;opacity:1;visibility:visible;transition-delay:0s}
+.home-studio .home-create-panel .home-import-feedback-clip {min-height:0;min-width:0;overflow:hidden}
+.home-studio .home-create-panel .home-import-card {margin-top:16px;padding:16px;border:1px solid #cad8c0;border-radius:14px;background:#fffefa;box-shadow:0 5px 20px #263e210b;transform:translateY(-5px);transition:transform 380ms cubic-bezier(.22,1,.36,1),border-color 220ms ease}
+.home-studio .home-create-panel .home-import-feedback[data-active=true] .home-import-card {transform:translateY(0)}
+.home-studio .home-create-panel .home-import-status {display:flex;align-items:flex-start;gap:11px}
+.home-studio .home-create-panel .home-import-status-icon {position:relative;flex:none;display:grid;place-items:center;width:38px;height:38px;border:1px solid #dbe5d2;border-radius:50%;background:#eef3e7;color:#526f41}
+.home-studio .home-create-panel .home-import-status-copy {min-width:0;flex:1}
+.home-studio .home-create-panel .home-import-status-copy p {display:grid;gap:3px;margin:0;font-size:13px;line-height:1.5;color:#68755e}
+.home-studio .home-create-panel .home-import-status-copy strong {color:#304c2b;font-size:14px;font-weight:550}
+.home-studio .home-create-panel .home-import-status-host {flex:none;max-width:30%;margin-top:2px;padding:3px 8px;border:1px solid #e1e7db;border-radius:6px;background:#f6f8f1;font-size:11px;line-height:1.4;color:#68775b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.home-studio .home-create-panel .home-import-feedback[data-phase=reading] .home-import-status-icon::after {content:'';position:absolute;inset:-2px;border:2px solid transparent;border-top-color:#789367;border-radius:50%;animation:home-import-spin 900ms linear infinite}
+.home-studio .home-create-panel .home-import-feedback[data-phase=ready] .home-import-status-icon {background:#e1ebd7;border-color:#ccdcbc;color:#355e2c}
+.home-studio .home-create-panel .home-import-feedback[data-phase=ready] .home-import-status-icon svg {animation:home-import-check 300ms cubic-bezier(.22,1,.36,1)}
+.home-studio .home-create-panel .home-import-feedback[data-phase=error] .home-import-card {border-color:#d9bba4}
+.home-studio .home-create-panel .home-import-feedback[data-phase=error] .home-import-status-icon {color:#8e5b3d;border-color:#e6d5c7;background:#fcf4eb}
+.home-studio .home-create-panel .home-import-reveal {display:grid;grid-template-rows:0fr;opacity:0;visibility:hidden;transition:grid-template-rows 380ms cubic-bezier(.22,1,.36,1),opacity 180ms ease,visibility 0s linear 380ms}
+.home-studio .home-create-panel .home-import-reveal[data-open=true] {grid-template-rows:1fr;opacity:1;visibility:visible;transition-delay:0s}
+.home-studio .home-create-panel .home-import-skeleton {display:grid;grid-template-columns:72px minmax(0,1fr);gap:13px;margin-top:14px;padding-top:14px;border-top:1px solid #e4eadd}
+.home-studio .home-create-panel .home-import-skeleton>div {display:flex;flex-direction:column;justify-content:center;gap:10px}
+.home-studio .home-create-panel .home-import-skeleton span {display:block;height:10px;border-radius:5px;background:#edf1e6;animation:home-import-breathe 1.8s ease-in-out infinite}
+.home-studio .home-create-panel .home-import-skeleton .home-import-skeleton-image {height:84px;border-radius:8px}
+.home-studio .home-create-panel .home-import-skeleton>div span:nth-child(2) {width:68%}
+.home-studio .home-create-panel .home-import-skeleton>div span:nth-child(3) {width:44%}
+.home-studio .home-create-panel .home-import-skeleton .home-import-skeleton-footer {grid-column:1/-1;height:34px;margin-top:7px;width:100%}
+.home-studio .home-create-panel .home-import-result .home-import-preview {margin:14px 0 0;padding:14px 0 0;border:0;border-top:1px solid #e4eadd;border-radius:0;background:transparent;box-shadow:none}
+.home-studio .home-create-panel .home-import-result .home-import-copy>span {display:none}
+.home-studio .home-create-panel .home-import-result .home-import-cover {background:#e8eee1}
+.home-studio .home-create-panel .home-import-error {padding-top:12px;font-size:13px;color:#805b43}
+.home-studio .home-create-panel .home-import-error p {margin:0 0 10px;font-size:13px;line-height:1.6;color:inherit}
+.home-studio .home-create-panel .home-import-error button {display:inline-flex;align-items:center;gap:7px;min-height:40px;padding:8px 11px;border:1px solid #dfcbbb;border-radius:8px;background:#fffefa;color:#805b43;font:inherit;font-size:13px;cursor:pointer}
+.home-studio .home-create-panel .home-import-error button:focus-visible,.home-studio .home-create-panel .home-import-result button:focus-visible {outline:2px solid #76936c;outline-offset:2px}
+@keyframes home-import-spin {to {transform:rotate(360deg)}}
+@keyframes home-import-breathe {50% {opacity:.45}}
+@keyframes home-import-check {from {opacity:0;transform:scale(.7)}to {opacity:1;transform:scale(1)}}
+@media(max-width:620px){
+ .home-studio .home-create-panel .home-import-card {padding:13px}
+ .home-studio .home-create-panel .home-import-status {gap:9px}
+ .home-studio .home-create-panel .home-import-status-copy p {font-size:12px}
+ .home-studio .home-create-panel .home-import-status-copy strong {font-size:13px}
+ .home-studio .home-create-panel .home-import-status-host {max-width:27%;padding-inline:5px;font-size:10px}
+}
+@media(prefers-reduced-motion:reduce){
+ .home-studio .home-create-panel .home-import-feedback,.home-studio .home-create-panel .home-import-card,.home-studio .home-create-panel .home-import-reveal {transition:none;transform:none}
+ .home-studio .home-create-panel .home-import-status-icon::after,.home-studio .home-create-panel .home-import-status-icon svg,.home-studio .home-create-panel .home-import-skeleton span {animation:none}
+}
