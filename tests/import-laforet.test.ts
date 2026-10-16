@@ -28,7 +28,7 @@ const fails = (code: string) => (error: unknown) => error instanceof ImportFailu
 test('Laforêt : DOM SSR, prix du bien, surface habitable et pièces distinctes du terrain et des chambres', () => {
   const result = extractListingHtml(html, url);
   assert.equal(selectAdapter(url).id, 'laforet'); assert.ok(ImportInput.safeParse({url}).success);
-  assert.equal(result.sourceListingId, id); assert.equal(result.adapterVersion, 'laforet-dom/1.0');
+  assert.equal(result.sourceListingId, id); assert.equal(result.adapterVersion, 'laforet-dom/1.1');
   assert.equal(result.transaction, 'sale'); assert.equal(result.facts.propertyType.value, 'house');
   assert.equal(result.facts.price.value?.amountCents, 97500000); assert.equal(result.facts.area.value, 220);
   assert.equal(result.facts.rooms?.value, 7); assert.equal(result.facts.locality.value, 'VILLE DE RECETTE');
@@ -43,6 +43,38 @@ test('Laforêt : les copies et miniatures sont dédupliquées, les originaux son
   const withoutOriginals = html.replace(letters.map(letter => '<img src="' + image(letter) + '">').join(''), '')
     .replace(/<meta property="og:image_\d+"[^>]*>/g, '');
   assert.deepEqual(extractListingHtml(withoutOriginals, url).photoUrls, letters.map(letter => 'https://www.laforet.com' + cropped(letter)));
+});
+
+test('Laforêt : les dossiers d’agence nommés conservent les contrôles de référence et la déduplication', () => {
+  const named = html.replaceAll('/laforet_100000/', '/laforet_seynod/');
+  assert.deepEqual(extractListingHtml(named, url).photoUrls, letters.map(letter => image(letter).replace('/laforet_100000/', '/laforet_seynod/')));
+  const first = image('a').replace('/laforet_100000/', '/laforet_seynod/');
+  const foreign = image('a', '87654321').replace('/laforet_100000/', '/laforet_seynod/');
+  for (const allowPartial of [false, true]) assert.throws(() => extractListingHtml(named.replace(first, foreign), url, {allowPartial}), fails('CONFLICTING_FACTS'));
+});
+
+test('Laforêt : les résumés arrondis restent cohérents avec la surface habitable précise', () => {
+  for (const [precise, displayed, expected] of [['291.27', '291', 291.27], ['291,27', '291', 291.27],
+    ['220.75', '221', 220.75], ['220.27', '220.3', 220.27], ['220.50', '221', 220.5]] as const) {
+    const rounded = html.replaceAll('220 m²', displayed + ' m²').replace('Surface : ' + displayed + ' m²', 'Surface : ' + precise + ' m²');
+    for (const allowPartial of [false, true]) {
+      const result = extractListingHtml(rounded, url, {allowPartial});
+      assert.equal(result.facts.area.value, expected);
+      assert.equal(result.facts.price.value?.amountCents, 97500000);
+      assert.equal(result.facts.rooms?.value, 7);
+    }
+  }
+});
+
+test('Laforêt : les arrondis ne masquent ni un entier incorrect ni des décimales contradictoires', () => {
+  for (const altered of [
+    html.replace('Surface : 220 m²', 'Surface : 221.27 m²'),
+    html.replace('Surface : 220 m²', 'Surface : 220.75 m²'),
+    html.replaceAll('220 m²', '220.27 m²').replace('Surface : 220.27 m²', 'Surface : 220.28 m²'),
+    html.replace('Surface : 220 m²', 'Surface : 220.27 m²').replace('7 pièce(s) - 220 m² - 975 000 €">', '7 pièce(s) - 220.28 m² - 975 000 €">'),
+    html.replace('<span>Surface : 220 m²</span>', '<span>Surface : 220.27 m²</span><span>Surface : 220.28 m²</span>'),
+    html.replace('</head>', '<meta property="og:title" content="Achat maison VILLE DE RECETTE - 7 pièce(s) - 220.27 m² - 975 000 €"><meta property="og:title" content="Achat maison VILLE DE RECETTE - 7 pièce(s) - 220.28 m² - 975 000 €"></head>'),
+  ]) for (const allowPartial of [false, true]) assert.throws(() => extractListingHtml(altered, url, {allowPartial}), fails('CONFLICTING_FACTS'));
 });
 
 test('Laforêt : contradictions de prix, surface, pièces, type et localisation bloquées même en mode partiel', () => {

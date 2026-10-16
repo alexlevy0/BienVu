@@ -1,5 +1,11 @@
 # Imports d’annonces — sprints 03 et 04
 
+## Laforêt — arrondis de surface et galerie — 16/10/2026
+
+L’adaptateur `laforet-dom/1.1` accepte les surfaces cohérentes à leur précision d’affichage : un résumé à **291 m²** peut accompagner des caractéristiques à **291,27 m²**. La valeur visible la plus précise est conservée. Les désaccords entre valeurs de même précision, les arrondis incorrects et les métadonnées contradictoires restent bloquants, y compris en import partiel. Les dossiers photo d’agence nommés (`laforet_seynod`, par exemple) sont acceptés avec les mêmes contrôles d’hôte et de référence du bien dans le chemin et le nom de fichier.
+
+Le lien de Thusy fourni le 16/10 a été importé entièrement en local via le transport HTTPS sécurisé existant : **473 000 €, 291,27 m², 6 pièces et 16 photos distinctes décodées et normalisées**, sans rejet ni navigateur, en 3,1 secondes. Cette recette valide la lecture et les médias réels ; elle ne crée ni import Cloudflare persistant ni vidéo. Les fichiers et le rapport restent hors Git dans `evidence/local/laforet-thusy/`. Les régressions synthétiques couvrent les arrondis, les décimales contradictoires, les métadonnées multiples et les photos étrangères à l’annonce.
+
 ## Galerie importée et sélection vidéo — 15/10/2026
 
 Les imports conservent désormais jusqu’à **40 photos distinctes**, au lieu de douze, sous les limites existantes de **50 Mio**, de durée, de sécurité réseau et de budget. Quarante-quatre ressources au maximum dans le pipeline d’import, quarante-huit candidats ; le plafond financier hébergé de quarante-huit ressources reste inchangé et couvre aussi la lecture navigateur. Les photos sont téléchargées par paires puis vérifiées et stockées dans l’ordre source ; les échecs, doublons, annulations et tentatives restent comptés. Les limites peuvent conduire à une galerie partielle signalée dans les avertissements.

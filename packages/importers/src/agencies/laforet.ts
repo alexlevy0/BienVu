@@ -11,6 +11,22 @@ import type {ExtractedListing} from '../listing';
 const localityKey = (value: string) => value.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase('fr').replace(/[^a-z0-9]/g, '');
 const galleryHost = 'laforetbusiness.laforet-intranet.com';
 
+// Laforêt rounds the summary and SEO surface while the feature panel can keep
+// hundredths. Compare at each displayed precision, retaining the most precise
+// visible value; equally precise disagreements still fail.
+function livingArea(values: unknown[]): number | undefined {
+  const readings = values.flatMap(raw => {
+    const value = numeric(raw);
+    return value === null ? [] : [{value, decimals: String(raw).replace(/\s/gu, '').split(/[.,]/)[1]?.length ?? 0}];
+  });
+  if (!readings.length) return undefined;
+  const precise = readings.reduce((best, item) => item.decimals > best.decimals ? item : best);
+  const hundredths = Math.round(precise.value * 100);
+  if (readings.some(item => Math.round(hundredths / 10 ** (2 - item.decimals)) !== Math.round(item.value * 10 ** item.decimals)))
+    throw new ImportFailure('CONFLICTING_FACTS', 'Surface habitable Laforêt contradictoire.');
+  return precise.value;
+}
+
 export function extractLaforet(nodes: HtmlNode[], documents: unknown[], url: string, canonicalUrl: string, id: string): ExtractedListing {
   const route = new URL(url).pathname.match(/^\/agence-immobiliere\/[^/]+\/(acheter|louer)\/([^/]+)\/(maison|appartement)-(\d+)-pieces?-(\d+)\/?$/);
   if (!route || route[5] !== id) throw new ImportFailure('NOT_A_LISTING', 'Route Laforêt non reconnue.', 'not_listing');
@@ -51,23 +67,26 @@ export function extractLaforet(nodes: HtmlNode[], documents: unknown[], url: str
   const positive = (values: unknown[]) => values.map(numeric).filter((value): value is number => value !== null);
   const rooms = unique(positive([route[4], heading[2], ...compact.map(value => value[2]),
     ...criteria.map(value => value.match(/^(\d+)\s*pièces?$/iu)?.[1])]), 'Pièces Laforêt contradictoires.');
-  const area = unique(positive([...compact.map(value => value[1]),
-    ...criteria.map(value => value.match(/^Surface\s*:\s*([\d.,]+)\s*m[²2]$/iu)?.[1])]), 'Surface habitable Laforêt contradictoire.');
+  const areaReadings = [...compact.map(value => value[1]),
+    ...criteria.map(value => value.match(/^Surface\s*:\s*([\d.,]+)\s*m[²2]$/iu)?.[1])];
+  const area = livingArea(areaReadings);
   const pricePattern = transaction === 'sale' ? /^\d[\d\s.,]*\s*€$/u
     : /^\d[\d\s.,]*\s*€(?:\s*(?:\/|par)\s*mois)?(?:\s*(?:CC|HC|charges (?:comprises|incluses|exclues)))?$/iu;
   const priceLabels = overview ? descendants(overview).filter(node => tag(node) === 'p' && hasClass(node, 'font-bold') && hasClass(node, 'text-primary'))
     .map(text).filter(value => pricePattern.test(value)) : [];
   const amounts = positive(priceLabels.map(value => euroAmount(value.match(/^([\d\s.,]+)\s*€/)?.[1])));
   const metaTitles = nodes.filter(node => tag(node) === 'meta' && attr(node, 'property') === 'og:title').map(node => attr(node, 'content'));
+  const metaAreas: string[] = [];
   for (const value of metaTitles) {
     const meta = value.match(/^(Achat|Location)\s+(maison|appartement)\s+(.+?)\s+-\s+(\d+)\s+pièce(?:s|\(s\))?\s+-\s+([\d.,]+)\s*m[²2]\s+-\s+([\d\s.,]+)\s*€/iu);
     if (!meta) continue;
     if ((meta[1].toLocaleLowerCase('fr') === 'achat' ? 'sale' : 'rent') !== transaction || meta[2].toLocaleLowerCase('fr') !== route[3]
       || localityKey(meta[3]) !== localityKey(locality)) throw new ImportFailure('CONFLICTING_FACTS', 'Métadonnées Laforêt étrangères au bien.');
     unique(positive([rooms, meta[4]]), 'Pièces Laforêt contradictoires.');
-    unique(positive([area, meta[5]]), 'Surfaces Laforêt contradictoires.');
+    metaAreas.push(meta[5]);
     unique(positive([...amounts, euroAmount(meta[6])]), 'Prix Laforêt contradictoires.');
   }
+  livingArea([...areaReadings, ...metaAreas]);
   let price: ExtractedListing['facts']['price'] = salePrice(amounts, 'Laforet.#content overview price');
   if (transaction === 'rent') {
     const label = unique(priceLabels, 'Loyers Laforêt contradictoires.'), monthly = label && /(?:\/|par)\s*mois/iu.test(label);
@@ -81,7 +100,7 @@ export function extractLaforet(nodes: HtmlNode[], documents: unknown[], url: str
   const image = (value: string) => {
     const source = scopedUrl(value, hosts, {stage: 'photo', resourceType: 'image'});
     const path = source.pathname.replace(/^\/glide(?=\/office)/, '');
-    const match = path.match(/^\/office\d+\/laforet_\d+\/catalog\/images\/pr_[pb]\/((?:\d\/)+)(\d+)[a-z]+\.jpe?g$/iu);
+    const match = path.match(/^\/office\d+\/laforet_[a-z0-9]+(?:[-_][a-z0-9]+)*\/catalog\/images\/pr_[pb]\/((?:\d\/)+)(\d+)[a-z]+\.jpe?g$/iu);
     if (!match || match[2] !== id || match[1].replaceAll('/', '') !== id
       || source.hostname !== galleryHost && !source.pathname.startsWith('/glide/'))
       throw new ImportFailure('CONFLICTING_FACTS', 'Photo étrangère à la référence Laforêt.');
@@ -99,7 +118,7 @@ export function extractLaforet(nodes: HtmlNode[], documents: unknown[], url: str
   }
   const descriptionRoot = section('section-description', false), descriptionNodes = descriptionRoot
     ? children(descriptionRoot).filter(node => tag(node) === 'div' && hasClass(node, 'prose')) : [];
-  return {canonicalUrl, sourceListingId: id, adapterVersion: 'laforet-dom/1.0', transaction,
+  return {canonicalUrl, sourceListingId: id, adapterVersion: 'laforet-dom/1.1', transaction,
     description: descriptionFromNodes(descriptionNodes, 'Laforet.#section-description .prose'),
     facts: {title: verified(title, 'text', 'Laforet.h1'), propertyType: verified(route[3] === 'maison' ? 'house' as const : 'apartment' as const, 'category', 'Laforet.h1 + route'),
       locality: verified(locality, 'text', 'Laforet.h1 + #section-location'),
