@@ -13,6 +13,8 @@ import {HomeIcon} from './home-icons';
 import {HomeCreateButton} from './home-create-button';
 import {BetaSettingsSummary} from './beta-settings-summary';
 import {PhotoDurationAdvice} from './photo-duration-advice';
+import {PhotoAnimationToggle} from './photo-animation-toggle';
+import {withPhotoAnimationChoice,type PhotoAnimationSelection} from '../lib/photo-animation-choice';
 import type {ManualListingFormHandle,PreparedManualListing} from './manual-listing-form';
 import {generationActive, useGenerationProgress} from './generation-progress-state';
 import {requestGeneration} from '../lib/generation-client';
@@ -54,9 +56,10 @@ function requestFor(job: GenerationView, url: string): RequestMessage {
 
 export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voiceChoice,variant='default'}: {onLayoutChange(active: boolean): void;renderChoice?:HomeRenderChoice|null;onClearRenderChoice?():void;voiceChoice?:BetaVoiceChoice|null;variant?:'default'|'beta'}) {
   const {me, loading,defaultVoice,resolveDefaultVoice} = useAccount();
-  const {subtitlesEnabled,setSubtitlesEnabled,voiceEnabled,setVoiceEnabled,durationSeconds,setDurationSeconds,aspectRatio,setAspectRatio}=useSubtitlePreference();
+  const {subtitlesEnabled,setSubtitlesEnabled,voiceEnabled,setVoiceEnabled,durationSeconds,setDurationSeconds,aspectRatio,setAspectRatio,animationPreference,setAnimationPreference}=useSubtitlePreference();
   const [screen, setScreen] = useState<Screen>({kind: 'landing'});
   const [manualCredits,setManualCredits]=useState(1);
+  const [manualAnimationSelection,setManualAnimationSelection]=useState<PhotoAnimationSelection>({selected:0,total:0});
   const [customizing,setCustomizing]=useState(false),[guestSettings,setGuestSettings]=useState<VideoCustomization|undefined>();
   const [avatarPreparing,setAvatarPreparing]=useState(false),[avatarIntentError,setAvatarIntentError]=useState(''),[avatarIntentNotice,setAvatarIntentNotice]=useState('');
   const chosenVoice=useRef(voiceChoice?.voice);chosenVoice.current=voiceChoice?.voice;
@@ -86,6 +89,7 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
       }
       if(controller.signal.aborted)return;
       setGuestSettings(current=>({...applyHomeRenderPreset(renderChoice.preset,base,base.photoOrder,avatar),voice:current?.voice??base.voice}));
+      setAnimationPreference(renderChoice.preset==='avatar-ai');
       setDurationSeconds(20);setAspectRatio('9:16');if(renderChoice.preset!=='standard')setVoiceEnabled(true);
     })().catch(cause=>{if(!controller.signal.aborted)setPresetError(cause instanceof Error?cause.message:'Ce rendu n’a pas pu être préparé.');})
       .finally(()=>{if(!controller.signal.aborted)setPresetPreparing(false);});
@@ -154,12 +158,17 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
   },[confettiKeyword]);
   const estimate=useUrlImportEstimate(url,me?.agency.id,!loading&&!busy&&!manual&&!composerPhotos.length&&
     screen.kind!=='guest-customizing'&&!importPaused&&!activeGuestJob);
+  const importAnimations=animationPreference??(renderChoice?renderChoice.preset==='avatar-ai':true);
   function settingsForImport(imported:PreparedUrlImport,voice=chosenVoice.current??defaultVoice):VideoCustomization{
     const slots=urlImportPhotoSlots(imported);
     const base={...guestSettings??defaultVideoCustomization(me?.agency,voice),photoOrder:slots,runwayPhotos:slots,runwayClips:undefined};
-    return renderChoice?applyHomeRenderPreset(renderChoice.preset,base,slots):base;
+    return withPhotoAnimationChoice(renderChoice?applyHomeRenderPreset(renderChoice.preset,base,slots):base,slots,importAnimations);
   }
-  const estimatedSettings=me&&estimate.value?settingsForImport(estimate.value):guestSettings;
+  const estimatedSettings=me&&estimate.value?settingsForImport(estimate.value):guestSettings&&me?
+    withPhotoAnimationChoice(guestSettings,guestSettings.photoOrder??[],importAnimations):guestSettings;
+  const animationSelection=manual?manualAnimationSelection:{selected:me?requestedAnimations(estimatedSettings):0,total:estimate.value?urlImportPhotoSlots(estimate.value).length:0};
+  const animationsEnabled=Boolean(me&&(manual?animationSelection.total?animationSelection.selected>0:animationPreference:importAnimations));
+  function changeAnimations(enabled:boolean){setAnimationPreference(enabled);if(manual)manualForm.current?.setAnimations(enabled);}
   const creditCost=manual?manualCredits:generationCreditCost(estimatedSettings,durationSeconds);
   const noCredits = !editingProperty && canGenerate && (me?.rights.developmentRemaining??0)<creditCost;
   const estimatePending=Boolean(me&&estimate.source&&!manual&&!composerPhotos.length&&estimate.phase==='loading');
@@ -437,7 +446,9 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
       }
       if(!draft)throw new Error('Ce site ne permet pas de préparer cette annonce. Vous pouvez saisir ses informations et ajouter vos photos manuellement.');
       if(interactionVersion.current!==version||currentOwner.current!==owner)return;
-      setImportDraft({...draft,data:{...draft.data,videoCustomization:withBetaVoice((renderChoice||avatarIntentNotice)?settingsForImport(imported,voice):draft.data.videoCustomization??settingsForImport(imported,voice),chosenVoice.current)}});
+      const settings=(renderChoice||avatarIntentNotice)?settingsForImport(imported,voice):draft.data.videoCustomization??settingsForImport(imported,voice);
+      setImportDraft({...draft,data:{...draft.data,videoCustomization:withBetaVoice(animationPreference===undefined?settings:
+        withPhotoAnimationChoice(settings,settings.photoOrder??urlImportPhotoSlots(imported),animationPreference),chosenVoice.current)}});
       setGuestExtraction(null);setDescription(draft.data.fields.description??'');setScreen({kind:'manual'});setCustomizing(true);
       void refreshDrafts();
     }catch(error){if(interactionVersion.current===version&&currentOwner.current===owner)
@@ -505,7 +516,9 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
       const [imported,voice]=await Promise.all([estimate.prepare(parsed.data,true),resolveCreationVoice()]);
       if(interactionVersion.current!==version||currentOwner.current!==owner)return;
       if(imported.status==='needs_input'&&imported.draft){
-        startFresh.current=true;forget();setImportDraft({...imported.draft,data:{...imported.draft.data,videoCustomization:withBetaVoice((renderChoice||avatarIntentNotice)?settingsForImport(imported,voice):imported.draft.data.videoCustomization??settingsForImport(imported,voice),chosenVoice.current)}});setDescription(imported.draft.data.fields.description??'');
+        const settings=(renderChoice||avatarIntentNotice)?settingsForImport(imported,voice):imported.draft.data.videoCustomization??settingsForImport(imported,voice);
+        startFresh.current=true;forget();setImportDraft({...imported.draft,data:{...imported.draft.data,videoCustomization:withBetaVoice(animationPreference===undefined?settings:
+          withPhotoAnimationChoice(settings,settings.photoOrder??urlImportPhotoSlots(imported),animationPreference),chosenVoice.current)}});setDescription(imported.draft.data.fields.description??'');
         setScreen({kind:'manual'});
         void refreshDrafts();
         setFeedback(imported.draft.photos.length<3?'Les informations du bien ont été récupérées. Ajoutez vos photos pour continuer.':
@@ -541,9 +554,9 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
     {screen.kind==='guest-customizing'&&<VideoCustomizer sourceUrl={screen.url} settings={guestSettings??defaultVideoCustomization(undefined,defaultVoice)} onChange={value=>{const {photoOrder,runwayPhotos,...settings}=value;setGuestSettings(settings);}} photos={[]} fields={{title:'Votre annonce',propertyType:'',transaction:'',locality:'',description:'',priceCents:'',charges:'',area:'',rooms:''}} agencyName="" subtitlesEnabled={subtitlesEnabled} onSubtitles={setSubtitlesEnabled} voiceEnabled={voiceEnabled} onVoice={setVoiceEnabled} durationSeconds={durationSeconds} onDuration={setDurationSeconds} aspectRatio={aspectRatio} onBack={closeCustomization} onAdd={files=>{if(files){setIncomingPhotos({id:crypto.randomUUID(),files:Array.from(files)});openManual();setCustomizing(true);}}} busy={busy} ready onEdit={()=>{openManual();}} saved={false}/> }
     {manual && <div className="home-conversation-manual home-manual-sheet-view">
       <div className="home-manual-panel">
-        {!me ? <ManualListingForm onCreditCost={setManualCredits} ref={manualForm} key="guest" initialCustomization={guestSettings} customizing={customizing} onCloseCustomizer={closeCustomization} subtitlesEnabled={subtitlesEnabled} onSubtitles={setSubtitlesEnabled} voiceEnabled={voiceEnabled} onVoice={setVoiceEnabled} durationSeconds={durationSeconds} onDuration={setDurationSeconds} aspectRatio={aspectRatio} prepareGuest incomingPhotos={incomingPhotos} onPhotosReceived={receivePhotos} guided={{description,setDescription,initialData:guestExtraction,onCancel:()=>{previousComposer.current=composerDock.current?.getBoundingClientRect()??null;setCustomizing(false);setScreen({kind:'landing'});},
+        {!me ? <ManualListingForm onCreditCost={setManualCredits} onAnimationSelection={setManualAnimationSelection} ref={manualForm} key="guest" initialCustomization={guestSettings} customizing={customizing} onCloseCustomizer={closeCustomization} subtitlesEnabled={subtitlesEnabled} onSubtitles={setSubtitlesEnabled} voiceEnabled={voiceEnabled} onVoice={setVoiceEnabled} durationSeconds={durationSeconds} onDuration={setDurationSeconds} aspectRatio={aspectRatio} prepareGuest incomingPhotos={incomingPhotos} onPhotosReceived={receivePhotos} guided={{description,setDescription,initialData:guestExtraction,onCancel:()=>{previousComposer.current=composerDock.current?.getBoundingClientRect()??null;setCustomizing(false);setScreen({kind:'landing'});},
           onReadyChange:(ready,reason)=>{setManualReady(ready);setManualReason(reason);}}} busy={manualBusy||guestManualBusy} setBusy={setManualBusy} onPrepared={prepareManualTrial}/>
-          : <ManualListingForm initialCustomization={guestSettings} saveOnly={editingProperty} onSaved={draft=>{clearListingDraft();void refreshDrafts();window.location.assign(`/biens/${encodeURIComponent(`listing:${draft.id}`)}`);}} onCreditCost={setManualCredits} ref={manualForm} customizing={customizing} onCloseCustomizer={closeCustomization} brand={me.agency} subtitlesEnabled={subtitlesEnabled} onSubtitles={setSubtitlesEnabled} voiceEnabled={voiceEnabled} onVoice={setVoiceEnabled} durationSeconds={durationSeconds} onDuration={setDurationSeconds} aspectRatio={aspectRatio} key={`agency:${me.agency.id}:${importDraft?.id??'manual'}`} incomingPhotos={incomingPhotos} onPhotosReceived={receivePhotos} generate={canGenerate} guided={{description,setDescription,agencyId:me.agency.id,initialDraft:importDraft,
+          : <ManualListingForm initialCustomization={guestSettings} initialAnimations={!importDraft?animationPreference:undefined} onAnimationSelection={setManualAnimationSelection} saveOnly={editingProperty} onSaved={draft=>{clearListingDraft();void refreshDrafts();window.location.assign(`/biens/${encodeURIComponent(`listing:${draft.id}`)}`);}} onCreditCost={setManualCredits} ref={manualForm} customizing={customizing} onCloseCustomizer={closeCustomization} brand={me.agency} subtitlesEnabled={subtitlesEnabled} onSubtitles={setSubtitlesEnabled} voiceEnabled={voiceEnabled} onVoice={setVoiceEnabled} durationSeconds={durationSeconds} onDuration={setDurationSeconds} aspectRatio={aspectRatio} key={`agency:${me.agency.id}:${importDraft?.id??'manual'}`} incomingPhotos={incomingPhotos} onPhotosReceived={receivePhotos} generate={canGenerate} guided={{description,setDescription,agencyId:me.agency.id,initialDraft:importDraft,
             onReadyChange:(ready,reason)=>{setManualReady(ready);setManualReason(reason);},onDraftChange:()=>void refreshDrafts(),
             onCancel:()=>{previousComposer.current=composerDock.current?.getBoundingClientRect()??null;setCustomizing(false);setScreen({kind:'landing'});}}} busy={manualBusy} setBusy={setManualBusy} onCreated={async value => {
             void refreshDrafts();
@@ -566,6 +579,7 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
           <label>Durée<select aria-label="Durée de la vidéo" value={durationSeconds} onChange={event=>setDurationSeconds(VideoDuration.parse(Number(event.target.value)))}><option value={20}>20 secondes</option><option value={30}>30 secondes</option><option value={40}>40 secondes</option></select></label>
           <label className="home-manual-setting-check"><input type="checkbox" aria-label="Voix off" checked={voiceEnabled} onChange={event=>setVoiceEnabled(event.target.checked)}/>Voix off</label>
           <label className="home-manual-setting-check"><input type="checkbox" aria-label="Sous-titres de la voix off" checked={subtitlesEnabled} disabled={!voiceEnabled} onChange={event=>setSubtitlesEnabled(event.target.checked)}/>Sous-titres</label>
+          <PhotoAnimationToggle enabled={animationsEnabled} selection={animationSelection} requiresLogin={!me} disabled={loading||busy||photoChecking||activeGuestJob} onChange={changeAnimations}/>
           <button type="button" className="home-manual-personalize" disabled={photoChecking||activeOtherJob} onClick={event=>{event.currentTarget.closest('details')!.open=false;void personalize();}}>{customizing?'Revenir à la fiche du bien':'Personnaliser la vidéo'}<HomeIcon name="arrow" size={17}/></button>
         </fieldset></details></div>
       <p className="home-manual-settings-summary">{aspectRatio==='16:9'?'Horizontal':'Vertical'} · {durationSeconds} s{voiceEnabled?' · Voix off':''}{subtitlesEnabled?' · Sous-titres':''}</p>
@@ -614,6 +628,7 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
         <button type="button" className={`home-subtitles-pill home-setting-toggle${subtitlesEnabled?' is-active':''}`} aria-pressed={subtitlesEnabled} aria-label="Sous-titres de la voix off"
           title={voiceEnabled?"Afficher ou masquer les sous-titres de la voix off":"Activez la voix off pour ajouter des sous-titres"} disabled={!voiceEnabled||loading||busy||activeGuestJob}
           onClick={()=>setSubtitlesEnabled(!subtitlesEnabled)}><span className="home-option-label">Sous-titres</span><span className="home-toggle-track" aria-hidden="true"/></button>
+        <PhotoAnimationToggle enabled={animationsEnabled} selection={animationSelection} requiresLogin={!me} disabled={loading||busy||presetPreparing||photoChecking||activeGuestJob} onChange={changeAnimations}/>
         </div><button type="button" className="home-customize-button" aria-pressed={customizing||screen.kind==='guest-customizing'} disabled={loading||busy||photoChecking||activeOtherJob||activeGuestJob} onClick={()=>void personalize()}><HomeIcon name="settings" size={21}/>Personnaliser</button>
       </div>
       </div></div></div>

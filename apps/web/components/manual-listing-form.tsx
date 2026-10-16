@@ -6,6 +6,7 @@ import {generationCreditCost,selectedAnimationIndices,defaultVideoCustomization,
   type CreationDraftData, type CreationDraftView, type NormalizedListing,type VideoDuration,type VideoAspectRatio} from '@bienvu/contracts';
 import {HomeIcon} from './home-icons';
 import {PhotoDurationAdvice} from './photo-duration-advice';
+import {withPhotoAnimationChoice,type PhotoAnimationSelection} from '../lib/photo-animation-choice';
 import type {ImportView} from './generation-form';
 import {manualDraftFields, readManualListingDraft, saveManualListingDraft, type ManualDraftFields} from '../lib/listing-draft';
 import {inspectManualPhotos} from '../lib/manual-photos';
@@ -22,7 +23,7 @@ type SelectedPhoto = {id: string; file: File|null; preview: string; sourceHash?:
 type Guided={description:string;setDescription(value:string):void;onCancel():void;
   agencyId?:string;initialDraft?:CreationDraftView|null;initialData?:CreationDraftData|null;
   onReadyChange?(ready:boolean,reason:string):void;onDraftChange?():void};
-export type ManualListingFormHandle = {cancel():Promise<void>;isDraft(id:string):boolean;customization():VideoCustomization|undefined};
+export type ManualListingFormHandle = {cancel():Promise<void>;isDraft(id:string):boolean;customization():VideoCustomization|undefined;setAnimations(enabled:boolean):void};
 export type PreparedManualListing={listing:ManualListingInput;photos:File[];customization?:VideoCustomization};
 class FormFailure extends Error {}
 const emptyFields:ManualDraftFields={title:'',locality:'',propertyType:'',transaction:'',priceCents:'',charges:'',area:'',rooms:'',description:''};
@@ -48,6 +49,7 @@ const labels: Record<string, string> = {title: 'titre', locality: 'localisation'
 type Props = {busy: boolean; generate?: boolean; setBusy(value: boolean): void;guided?:Guided;ref?:Ref<ManualListingFormHandle>;
   saveOnly?:boolean;onSaved?(draft:CreationDraftView):void;
   onCreditCost?(value:number):void;
+  onAnimationSelection?(value:PhotoAnimationSelection):void;initialAnimations?:boolean;
   customizing?:boolean;onCloseCustomizer?():void;brand?:{name:string;primaryColor:string;secondaryColor:string};
   initialCustomization?:VideoCustomization;
   subtitlesEnabled?:boolean;onSubtitles?(value:boolean):void;voiceEnabled?:boolean;onVoice?(value:boolean):void;
@@ -75,9 +77,24 @@ export function ManualListingForm(props: Props) {
   const [customization,setCustomization]=useState<VideoCustomization|undefined>(),[settingsSaved,setSettingsSaved]=useState(false);
   useEffect(()=>{props.onCreditCost?.(generationCreditCost(customization,props.durationSeconds));},[customization,props.durationSeconds,props.onCreditCost]);
   const customizationRef=useRef<VideoCustomization|undefined>(undefined),settingsVersion=useRef(0),customInitialized=useRef(false),settingsWrite=useRef<Promise<void>|null>(null);
+  const animationPolicy=useRef<boolean|undefined>(props.initialAnimations),animationInitialized=useRef(false);
   customizationRef.current=customization;
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
-  useImperativeHandle(props.ref,()=>({cancel:cancelGuided,isDraft:id=>serverRef.current?.id===id,customization:()=>customizationRef.current}));
+  useImperativeHandle(props.ref,()=>({cancel:cancelGuided,isDraft:id=>serverRef.current?.id===id,customization:()=>customizationRef.current,setAnimations}));
+  function setAnimations(enabled:boolean){
+    if(!me||me.role==='viewer'||busy)return;
+    animationPolicy.current=enabled;settingsVersion.current++;setSettingsSaved(false);
+    setCustomization(current=>withPhotoAnimationChoice(current??defaultVideoCustomization(props.brand,defaultVoice),
+      current?.photoOrder??selected.current.slice(0,12).map(photo=>photo.slot),enabled));
+  }
+  useEffect(()=>{
+    if(!hydrated||animationInitialized.current)return;animationInitialized.current=true;
+    if(props.initialAnimations!==undefined)setAnimations(props.initialAnimations);
+  },[hydrated]);
+  useEffect(()=>{
+    const order=customization?.photoOrder??photos.slice(0,12).map(photo=>photo.slot),animated=photoAnimations(customization,order);
+    props.onAnimationSelection?.({selected:animated.filter(slot=>order.includes(slot)).length,total:order.length});
+  },[customization,photos,props.onAnimationSelection]);
   selected.current = photos;
   function finalInput(){
     if(!formRef.current)return null;
@@ -250,8 +267,12 @@ export function ManualListingForm(props: Props) {
       const previousSlots=selected.current.map(p=>p.slot);
       selected.current=[...selected.current,...additions];setPhotos(selected.current);
       settingsVersion.current++;setSettingsSaved(false);
-      setCustomization(current=>current?{...current,photoOrder:[...(current.photoOrder??previousSlots),...additions.map(p=>p.slot)],
-        runwayClips:undefined,runwayPhotos:photoAnimations(current,current.photoOrder??previousSlots)}:current);
+      setCustomization(current=>{
+        if(!current)return current;
+        const order=[...(current.photoOrder??previousSlots),...additions.map(p=>p.slot)].slice(0,12);
+        return animationPolicy.current===undefined?{...current,photoOrder:order,runwayClips:undefined,runwayPhotos:photoAnimations(current,current.photoOrder??previousSlots)}
+          :withPhotoAnimationChoice(current,order,animationPolicy.current);
+      });
       if(props.guided?.agencyId)for(const photo of additions)void uploadSelected(photo);
     }
     return result;
@@ -453,7 +474,7 @@ export function ManualListingForm(props: Props) {
     if(!me||me.role==='viewer'||busy||photoChecking||voiceLoading||photo.state!=='ready'||photo.removing)return;
     const chosen=customization?.photoOrder??selected.current.slice(0,12).map(p=>p.slot);
     if(!chosen.includes(photo.slot)&&chosen.length>=12){setFeedback('Désélectionnez une photo dans Personnaliser pour en choisir une autre.');return;}
-    settingsVersion.current++;setSettingsSaved(false);
+    animationPolicy.current=undefined;settingsVersion.current++;setSettingsSaved(false);
     setCustomization(current=>{
       const order=current?.photoOrder??selected.current.slice(0,12).map(p=>p.slot),animated=photoAnimations(current,order);
       return {...defaultVideoCustomization(props.brand,defaultVoice),...current,photoOrder:order.includes(photo.slot)?order:[...order,photo.slot],runwayClips:undefined,
@@ -469,7 +490,7 @@ export function ManualListingForm(props: Props) {
   const pendingConfirmation=unresolved();
   return <>{props.customizing&&hydrated&&voiceLoading&&<p className="home-tool-loading" role="status">Chargement des voix disponibles…</p>}
     {props.customizing&&hydrated&&!voiceLoading&&<VideoCustomizer settings={customization??defaultVideoCustomization(props.brand,defaultVoice)}
-    onChange={value=>{settingsVersion.current++;setSettingsSaved(false);setCustomization(value);}} photos={photos} fields={draftFields()}
+    onChange={value=>{animationPolicy.current=undefined;settingsVersion.current++;setSettingsSaved(false);setCustomization(value);}} photos={photos} fields={draftFields()}
     agencyName={props.brand?.name??''} durationSeconds={props.durationSeconds} onDuration={props.onDuration} aspectRatio={props.aspectRatio} voiceEnabled={props.voiceEnabled} onVoice={props.onVoice} subtitlesEnabled={props.subtitlesEnabled!==false} onSubtitles={value=>props.onSubtitles?.(value)}
     onBack={()=>props.onCloseCustomizer?.()} onAdd={files=>void addPhotos(files)}
     onRetry={id=>{const photo=selected.current.find(p=>p.id===id);if(photo)void uploadSelected(photo);}}

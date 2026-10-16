@@ -58,6 +58,21 @@
 .home-studio .home-create-panel .home-composer-modern .home-credit-estimate-detail {font-size:12px}
 .home-studio .home-create-panel .home-credit-details {font-size:13px;line-height:1.6}
 .home-studio .home-create-panel .home-credit-details small {font-size:12px}
+.home-create-panel .home-animation-pill {display:inline-flex;align-items:center;justify-content:space-between;gap:10px;border:0;background:transparent;color:#242923;font:inherit;font-size:13px;cursor:pointer;text-align:left}
+.home-create-panel .home-animation-pill .home-option-label {display:grid;gap:3px;min-width:0}
+.home-create-panel .home-animation-pill small {display:block;font-size:10px;font-weight:400;line-height:1.35;color:#77836d;white-space:normal;text-decoration:none}
+.home-create-panel .home-animation-pill:disabled {opacity:.55;cursor:default}
+.home-create-panel .home-animation-pill:focus-visible {outline:2px solid #76936c;outline-offset:4px;border-radius:4px}
+.home-create-panel .home-setting-toggle[aria-pressed=mixed] .home-toggle-track {background:#8da17d}
+.home-create-panel .home-setting-toggle[aria-pressed=mixed] .home-toggle-track::after {width:14px;height:3px;top:9px;left:9px;transform:none;border-radius:2px;box-shadow:none}
+.home-create-panel .home-manual-settings-panel .home-animation-pill {padding:8px 0;width:100%}
+.home-studio .home-create-panel .home-composer-modern .home-format-tags {display:grid;grid-template-columns:minmax(135px,1.1fr) 82px repeat(2,minmax(105px,1fr)) minmax(155px,1.3fr);flex:1 1 100%;width:100%;gap:0}
+.home-studio .home-create-panel .home-composer-modern .home-format-tags>.home-animation-pill {justify-content:space-between;padding-inline:12px 2px}
+@container(max-width:680px){
+ .home-studio .home-create-panel .home-composer-modern .home-format-tags {grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 0}
+ .home-studio .home-create-panel .home-composer-modern .home-format-tags>:nth-child(2n) {border-right:0}
+ .home-studio .home-create-panel .home-composer-modern .home-format-tags>.home-animation-pill {grid-column:1/-1;justify-content:space-between;min-height:47px;padding:12px 6px 0;border-top:1px solid #e7ecdf}
+}
 .home-create-panel .home-import-preview {display:grid;grid-template-columns:72px minmax(0,1fr);gap:13px;margin-top:18px;padding:14px;background:#fffefa;border:1px solid #cbd8bf;border-radius:13px;box-shadow:0 4px 20px #263e2110}
 .home-create-panel .home-import-cover {width:72px;height:84px;display:grid;place-items:center;border-radius:8px;overflow:hidden;background:#e8eee1;color:#6c835c}
 .home-create-panel .home-import-cover img {display:block;width:100%;height:100%;object-fit:cover}
