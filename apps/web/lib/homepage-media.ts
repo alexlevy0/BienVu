@@ -148,7 +148,7 @@ function mediaRange(range:string|null,size:number){
   if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start<0||start>=size||end<start)return null;}
  return {start,end};
 }
-async function serveMedia(request:Request,env:Env,media:Media,publicAccess=false,knownHead?:R2Object){
+async function serveMedia(request:Request,env:Env,media:Omit<Media,'mime'>&{mime:Media['mime']|'image/avif'},publicAccess=false,knownHead?:R2Object){
  const head=knownHead??await env.MEDIA.head(media.key);
  if(!head||head.size!==media.sizeBytes||head.customMetadata?.sha256&&head.customMetadata.sha256!==media.sha256)throw new RequestFailure('NOT_FOUND');
  const range=request.headers.get('range'),interval=mediaRange(range,head.size);
@@ -170,10 +170,14 @@ export async function adminHomepageRequest(request:Request,env:AdminEnv){return 
  try{return Response.json(await readHomepageLibrary(env,input.data));}catch(cause){if(cause instanceof Error&&cause.message==='HOMEPAGE_INVALID_CURSOR')throw new RequestFailure('VALIDATION_ERROR');throw cause;}
 });}
 export async function homepageMediaRequest(request:Request,env:Env,id:string,admin?:AdminEnv,context?:HomepageCache){
+ const acceptsAvif=request.headers.get('accept')?.split(',').some(part=>{
+  const [type,...params]=part.trim().toLowerCase().split(';'),quality=params.find(value=>value.trim().startsWith('q='));
+  return type.trim()==='image/avif'&&(!quality||Number(quality.trim().slice(2))>0);
+ })??false;
  const response=await respond(async()=>{
   if(admin)await requireAdmin(request,admin);
-  const row=await homepageAsset(env.DB,id);if(!row||row.state!=='active')throw new RequestFailure('NOT_FOUND');
-  const state=await homepageSettings(env.DB),published=HomepageSelections.parse(JSON.parse(state.published_json));
+  const [row,state]=await Promise.all([homepageAsset(env.DB,id),homepageSettings(env.DB)]);if(!row||row.state!=='active')throw new RequestFailure('NOT_FOUND');
+  const published=HomepageSelections.parse(JSON.parse(state.published_json));
   if(!admin&&!Object.values(published).includes(id))throw new RequestFailure('NOT_FOUND');
   const poster=new URL(request.url).searchParams.get('poster')==='1';
   if(poster&&!row.poster_json)throw new RequestFailure('NOT_FOUND');
@@ -184,7 +188,8 @@ export async function homepageMediaRequest(request:Request,env:Env,id:string,adm
    if(!await mediaPresent(env,media))throw new RequestFailure('NOT_FOUND');
    if(width&&(!['320','640','960'].includes(width)||media.mime==='video/mp4')||preview&&(!['1','540'].includes(preview)||media.mime!=='video/mp4'))throw new RequestFailure('VALIDATION_ERROR');
    const headers=new Headers();for(const name of ['range','if-none-match']){const value=request.headers.get(name);if(value)headers.set(name,value);}
-   const entry=context?cacheKey(context,`media/${state.published_version}/${row.id}/${poster?'poster':'main'}/${media.sha256}/${width??preview}`,headers):null;
+   const format=width&&acceptsAvif?'avif':'webp';
+   const entry=context?cacheKey(context,`media/${state.published_version}/${row.id}/${poster?'poster':'main'}/${media.sha256}/${width?`${width}-${format}`:preview}`,headers):null;
    if(entry&&context){try{const hit=await context.cache.match(entry);
     const length=Number(hit?.headers.get('X-Homepage-Media-Length')),range=headers.get('range'),interval=mediaRange(range,length);
     if(hit&&Number.isSafeInteger(length)&&length>0&&length<=Math.min(media.sizeBytes,4*1024*1024)){
@@ -198,9 +203,10 @@ export async function homepageMediaRequest(request:Request,env:Env,id:string,adm
     await hit?.body?.cancel();
    }catch{/* A cache miss or outage uses the public snapshot. */}}
    const sizes=width?[width]:preview==='540'?['540','720']:['720'];
-   for(const size of sizes){const key=`homepage/${row.id}/seo/${media.sha256}-${size}.${width?'webp':'mp4'}`,head=await env.MEDIA.head(key);
-    if(head&&head.size>0&&head.size<=media.sizeBytes&&head.httpMetadata?.contentType===(width?'image/webp':'video/mp4')){
-     const result=await serveMedia(request,env,{...media,key,sizeBytes:head.size,mime:width?'image/webp':'video/mp4'},true,head);
+   const formats=width?(acceptsAvif?['avif','webp'] as const:['webp'] as const):['mp4'] as const;
+   for(const extension of formats)for(const size of sizes){const key=`homepage/${row.id}/seo/${media.sha256}-${size}.${extension}`,head=await env.MEDIA.head(key),mime=extension==='mp4'?'video/mp4':extension==='avif'?'image/avif':'image/webp';
+    if(head&&head.size>0&&head.size<=media.sizeBytes&&head.httpMetadata?.contentType===mime){
+     const result=await serveMedia(request,env,{...media,key,sizeBytes:head.size,mime},true,head);
      // Only complete, bounded derivatives enter the shared cache. A full-file
      // bytes=0- request can populate it; partial ranges and originals cannot.
      if(entry&&context&&request.method==='GET'&&head.size<=4*1024*1024&&
@@ -214,7 +220,10 @@ export async function homepageMediaRequest(request:Request,env:Env,id:string,adm
   }
   return serveMedia(request,env,media,!admin);
  });
- if(!admin&&[200,206,304].includes(response.status))response.headers.set('Cache-Control','public, max-age=60, must-revalidate');return response;
+ if(!admin&&[200,206,304].includes(response.status)){
+  response.headers.set('Cache-Control','public, max-age=60, must-revalidate');
+  if(new URL(request.url).searchParams.has('w'))response.headers.set('Vary','Accept');
+ }return response;
 }
 export async function adminHomepageSourceRequest(request:Request,env:AdminEnv,kind:string,id:string){return respond(async()=>{
  await requireAdmin(request,env);const ref=HomepageSource.safeParse({kind,id});if(!ref.success)throw new RequestFailure('NOT_FOUND');
@@ -229,7 +238,7 @@ export async function cleanupHomepageAssets(env:Env,now=Date.now()){
  let removed=0;for(const row of candidates){
   const claim=await env.DB.prepare(`UPDATE homepage_assets AS a SET state='deleting' WHERE id=? AND ${refs} RETURNING id`).bind(row.id).first();if(!claim)continue;
   const media:Media={...homepageStoredMetadata(row),key:row.object_key},poster=row.poster_json?JSON.parse(row.poster_json) as Media:null;
-  const variants=(item:Media)=>item.mime==='video/mp4'?[540,720].map(width=>`homepage/${row.id}/seo/${item.sha256}-${width}.mp4`):[320,640,960].map(width=>`homepage/${row.id}/seo/${item.sha256}-${width}.webp`);
+  const variants=(item:Media)=>item.mime==='video/mp4'?[540,720].map(width=>`homepage/${row.id}/seo/${item.sha256}-${width}.mp4`):[320,640,960].flatMap(width=>['webp','avif'].map(format=>`homepage/${row.id}/seo/${item.sha256}-${width}.${format}`));
   const keys=[row.object_key,...variants(media),...(poster?[poster.key,...variants(poster)]:[])];
   if(keys.some(key=>!key.startsWith(`homepage/${row.id}/`)))throw Error('HOMEPAGE_SCOPE_INVALID');
   await env.MEDIA.delete(keys);await env.DB.prepare("DELETE FROM homepage_assets WHERE id=? AND state='deleting'").bind(row.id).run();removed++;

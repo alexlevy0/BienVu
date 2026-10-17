@@ -41,17 +41,21 @@ try{
     const length=response.headers.get('content-length');if(!response.ok||length!==null&&Number(length)!==item.sizeBytes)throw Error(`PUBLIC_SNAPSHOT_UNAVAILABLE_${response.status}`);bytes=Buffer.from(await response.arrayBuffer());
     if(bytes.length!==item.sizeBytes||createHash('sha256').update(bytes).digest('hex')!==item.sha256)throw Error('PUBLIC_SNAPSHOT_HASH_MISMATCH');files.set(item.sha256,bytes);}
    const widths=item.mime==='video/mp4'?heroOnly?[540]:[540,720]:[320,640,960];
-   for(const width of widths){const key=`homepage/${row.id}/seo/${item.sha256}-${width}.${item.mime==='video/mp4'?'mp4':'webp'}`,cacheKey=`${item.sha256}-${width}`,file=join(work,`${cacheKey}.${item.mime==='video/mp4'?'mp4':'webp'}`);
+   const formats=item.mime==='video/mp4'?['mp4']:['webp','avif'];
+   for(const format of formats)for(const width of widths){const key=`homepage/${row.id}/seo/${item.sha256}-${width}.${format}`,cacheKey=`${item.sha256}-${width}-${format}`,file=join(work,`${cacheKey}.${format}`);
     if(!outputs.has(cacheKey)&&item.mime==='video/mp4'){const source=join(work,`${item.sha256}.mp4`);await writeFile(source,bytes);
      await run(ffmpeg,['-hide_banner','-loglevel','error','-y','-i',source,'-vf',`scale='min(${width},iw)':-2`,'-c:v','libx264','-preset','slow','-crf','28','-pix_fmt','yuv420p','-c:a','aac','-b:a','96k','-movflags','+faststart',file]);
-    }else if(!outputs.has(cacheKey))await sharp(bytes).rotate().resize({width,withoutEnlargement:true}).webp({quality:72}).toFile(file);
+    }else if(!outputs.has(cacheKey)){
+     const image=sharp(bytes).rotate().resize({width,withoutEnlargement:true});
+     await (format==='avif'?image.avif({quality:45,effort:6}):image.webp({quality:72})).toFile(file);
+    }
     const output=outputs.get(cacheKey)??await readFile(file);outputs.set(cacheKey,output);if(output.length>=bytes.length){report.push({id:row.id,width,original:bytes.length,skipped:'not_smaller'});continue;}
     if(apply){ // Re-check revocation before each remote write.
      const current=await remoteSql(`SELECT 1 AS available FROM homepage_assets a,homepage_settings s WHERE a.id='${row.id}' AND a.state='active' AND EXISTS(SELECT 1 FROM json_each(s.published_json) WHERE value=a.id)`);
      if(!current.length)throw Error('PUBLIC_SNAPSHOT_WITHDRAWN');
-     await upload(key,output,item.mime==='video/mp4'?'video/mp4':'image/webp');
+     await upload(key,output,format==='mp4'?'video/mp4':format==='avif'?'image/avif':'image/webp');
     }
-    report.push({id:row.id,width,original:bytes.length,optimized:output.length,uploaded:apply});
+    report.push({id:row.id,width,format,original:bytes.length,optimized:output.length,uploaded:apply});
    }
   }
  }

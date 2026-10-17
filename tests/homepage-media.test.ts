@@ -198,6 +198,17 @@ test('Home : banque globale privée, copie indépendante, publication atomique e
   };
   const cache=await openCache('homepage-performance-fixture'),writes:Promise<unknown>[]=[],edge:HomepageCache={cache,origin:'https://bienvu.test',waitUntil:task=>{writes.push(task);}};
   const flush=async()=>{await Promise.all(writes.splice(0));};
+  const photo=Object.values(config.slots).find(asset=>asset.kind==='image')!;assert.ok(photo);
+  const imageUrl=photo.url+'?w=640',imageKey=`homepage/${photo.id}/seo/${photo.sha256}-640`,webp=new Uint8Array([20,21,22,23]),avif=new Uint8Array([30,31,32]);
+  await bucket.put(imageKey+'.webp',webp,{httpMetadata:{contentType:'image/webp'}});
+  const avifRequest=(accept='image/avif,image/webp,*/*')=>req(imageUrl,'',{headers:{accept}});
+  const webpFallback=await homepageMediaRequest(avifRequest(),env,photo.id);assert.equal(webpFallback.headers.get('content-type'),'image/webp');assert.deepEqual(new Uint8Array(await webpFallback.arrayBuffer()),webp);
+  await bucket.put(imageKey+'.avif',avif,{httpMetadata:{contentType:'image/avif'}});
+  const modern=await homepageMediaRequest(avifRequest(),env,photo.id,undefined,edge);assert.equal(modern.headers.get('content-type'),'image/avif');assert.equal(modern.headers.get('vary'),'Accept');assert.deepEqual(new Uint8Array(await modern.arrayBuffer()),avif);await flush();
+  for(const accept of ['image/webp,*/*','image/avif;q=0,image/webp','*/*']){
+   const legacy=await homepageMediaRequest(avifRequest(accept),env,photo.id,undefined,edge);assert.equal(legacy.headers.get('content-type'),'image/webp');assert.deepEqual(new Uint8Array(await legacy.arrayBuffer()),webp);await flush();
+  }
+  const modernCached=await homepageMediaRequest(avifRequest(),env,photo.id,undefined,edge);assert.equal(modernCached.headers.get('content-type'),'image/avif');assert.deepEqual(new Uint8Array(await modernCached.arrayBuffer()),avif);
   const cachedEnv={...env,MEDIA:{get:bucket.get.bind(bucket),head:bucket.head.bind(bucket),put:bucket.put.bind(bucket),delete:bucket.delete.bind(bucket)}};
   const reads=t.mock.method(cachedEnv.MEDIA,'get');
   const firstRead=await homepageMediaRequest(req(url,''),cachedEnv,asset.id,undefined,edge);
@@ -238,5 +249,8 @@ test('Home : banque globale privée, copie indépendante, publication atomique e
   const withdrawn=await readHomepageConfig(db,false,edge);assert.ok(withdrawn.version>config.version);assert.ok(!Object.values(withdrawn.slots).some(item=>item.id===asset.id));await flush();
   await cleanupHomepageAssets(env,Date.now()+2*86400_000);assert.equal(await bucket.head(key),null);
   assert.equal(await bucket.head(smallerKey),null);
+  for(const slot of homepageSlots)if(selected.draft[slot.id]===photo.id)await assign(slot.id,null);await publish();
+  assert.equal((await homepageMediaRequest(avifRequest(),env,photo.id,undefined,edge)).status,404,'Une variante AVIF en cache ne contourne pas le retrait public');
+  await cleanupHomepageAssets(env,Date.now()+2*86400_000);assert.equal(await bucket.head(imageKey+'.avif'),null);assert.equal(await bucket.head(imageKey+'.webp'),null);
  });
 });

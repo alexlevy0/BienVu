@@ -31,8 +31,8 @@ export default async function Page({searchParams}:{searchParams:Promise<{homePre
   if(preview){try{await requireAdmin(new Request(env.BETTER_AUTH_URL,{headers:await headers()}),env);}catch{notFound();}}
   const config=await readHomepageConfig(env.DB,preview,await homepageEdgeCache(env.BETTER_AUTH_URL,task=>ctx.waitUntil(task)));
   return <HomepageMediaProvider config={config}>
-    <link rel="preload" href="/fonts/newsreader.woff2" as="font" type="font/woff2" crossOrigin="anonymous"/>
-    <link rel="preload" href="/fonts/newsreader-italic.woff2" as="font" type="font/woff2" crossOrigin="anonymous"/>
+    <link rel="preload" href="/fonts/newsreader-ui.woff2" as="font" type="font/woff2" crossOrigin="anonymous"/>
+    <link rel="preload" href="/fonts/newsreader-italic-ui.woff2" as="font" type="font/woff2" crossOrigin="anonymous"/>
     {!preview&&<StructuredData data={siteSchema}/>} {preview&&<div className="homepage-preview-banner" role="status">Aperçu privé · Ces changements ne sont pas encore publiés. <a href="/admin?view=homepage">Retour à l’administration →</a></div>}<LandingPage/>
   </HomepageMediaProvider>;
 }

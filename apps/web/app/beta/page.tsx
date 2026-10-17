@@ -19,5 +19,5 @@ export const metadata=seoMetadata({title:'BienVu — Votre annonce, sa prochaine
 export default async function Page(){
   const {env,ctx}=await getCloudflareContext({async:true});
   const config=await readHomepageConfig(env.DB,false,await homepageEdgeCache(env.BETTER_AUTH_URL,task=>ctx.waitUntil(task)));
-  return <HomepageMediaProvider config={config}><link rel="preload" href="/fonts/newsreader.woff2" as="font" type="font/woff2" crossOrigin="anonymous"/><BetaLandingPage/></HomepageMediaProvider>;
+  return <HomepageMediaProvider config={config}><link rel="preload" href="/fonts/newsreader-ui.woff2" as="font" type="font/woff2" crossOrigin="anonymous"/><BetaLandingPage/></HomepageMediaProvider>;
 }
