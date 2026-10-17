@@ -1,5 +1,6 @@
 export const blogPublishedAt = '2026-10-05T20:04:00Z';
 export const blogSecondBatchPublishedAt = '2026-10-05T20:25:02Z';
+export const blogThirdBatchPublishedAt = '2026-10-17T17:22:42Z';
 export const blogCategories = [
   {id: 'strategie', label: 'Stratégie'},
   {id: 'video', label: 'Création vidéo'},

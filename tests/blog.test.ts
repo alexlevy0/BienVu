@@ -2,15 +2,15 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {blogArticles, blogArticleDates, blogArticlePath, blogArticleSchema, blogDateLabel, blogImagePath, blogUpdatedAt, blogWordCount, blogReadingMinutes, findBlogArticle} from '../apps/web/lib/blog-content';
 import {blogTopics} from '../apps/web/lib/blog-navigation';
-import {blogCategories, blogPublishedAt, blogSecondBatchPublishedAt} from '../apps/web/lib/blog/types';
+import {blogCategories, blogPublishedAt, blogSecondBatchPublishedAt, blogThirdBatchPublishedAt} from '../apps/web/lib/blog/types';
 import {publicSeoPaths, seoPage} from '../apps/web/lib/seo-paths';
 import {seoMetadata, schemaJson} from '../apps/web/lib/seo';
 
-test('Blog : vingt articles complets, liens valides, sommaires et références cohérentes', () => {
-  assert.equal(blogArticles.length, 20);
+test('Blog : trente articles complets, liens valides, sommaires et références cohérentes', () => {
+  assert.equal(blogArticles.length, 30);
   assert.deepEqual(blogTopics.map(article => article.slug), blogArticles.map(article => article.slug));
   const titles = new Set(), keywords = new Set();
-  const linkable = new Set([...publicSeoPaths, '/publications', '/conditions', '/agence', '/projets', '/biens']);
+  const linkable = new Set([...publicSeoPaths, '/publications', '/conditions', '/agence', '/projets', '/biens', '/ma-vitrine/exemple']);
   for (const article of blogArticles) {
     assert.match(article.slug, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
     assert.ok(!titles.has(article.heading), 'Chaque intention a son titre'); titles.add(article.heading);
@@ -24,7 +24,7 @@ test('Blog : vingt articles complets, liens valides, sommaires et références c
       if (section.table) for (const row of section.table.rows) assert.equal(row.length, section.table.columns.length, 'Tableau accessible et complet');
       for (const source of section.sources ?? []) {
         const url = new URL(source.url); assert.equal(url.protocol, 'https:');
-        assert.ok(['creativecommons.org', 'www.facebook.com', 'www.economie.gouv.fr', 'www.service-public.gouv.fr', 'www.w3.org', 'support.google.com'].includes(url.hostname));
+        assert.ok(['creativecommons.org', 'www.facebook.com', 'www.economie.gouv.fr', 'www.service-public.gouv.fr', 'www.w3.org', 'support.google.com', 'developers.google.com'].includes(url.hostname));
       }
     }
     for (const slug of article.related) {assert.ok(findBlogArticle(slug), slug + ' article lié'); assert.notEqual(slug, article.slug);}
@@ -58,8 +58,9 @@ test('Blog : pages indexables, métadonnées article, auteur réel et schémas s
 test('Blog : les ajouts ne modifient pas les dates de publication des articles existants', () => {
   assert.equal(blogArticles.filter(article => blogArticleDates(article).publishedAt === blogPublishedAt).length, 10);
   assert.equal(blogArticles.filter(article => blogArticleDates(article).publishedAt === blogSecondBatchPublishedAt).length, 10);
-  assert.equal(blogUpdatedAt(), blogSecondBatchPublishedAt);
-  const updated = {...blogArticles[0]!, modifiedAt: blogSecondBatchPublishedAt};
+  assert.equal(blogArticles.filter(article => blogArticleDates(article).publishedAt === blogThirdBatchPublishedAt).length, 10);
+  assert.equal(blogUpdatedAt(), blogThirdBatchPublishedAt);
+  const updated = {...findBlogArticle('marketing-immobilier-ia-agence')!, modifiedAt: blogSecondBatchPublishedAt};
   assert.deepEqual(blogArticleDates(updated), {publishedAt: blogPublishedAt, modifiedAt: blogSecondBatchPublishedAt});
   assert.equal(blogDateLabel(blogPublishedAt), '5 octobre 2026');
 });

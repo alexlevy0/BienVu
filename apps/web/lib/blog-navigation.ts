@@ -1,5 +1,15 @@
 // Shared with small client utilities; article bodies are only imported by public server pages.
 export const blogTopics = [
+  {slug: 'transformer-annonce-immobiliere-video-lien', heading: 'Transformer une annonce immobilière en vidéo à partir de son lien'},
+  {slug: 'avatar-ia-video-immobiliere', heading: 'Avatar IA pour une vidéo immobilière : choisir le visage et la bonne place'},
+  {slug: 'vitrine-video-agence-immobiliere', heading: 'Créer une vitrine vidéo pour son agence immobilière'},
+  {slug: 'format-video-immobiliere-vertical-horizontal', heading: 'Quel format choisir pour une vidéo immobilière : 9:16 ou 16:9 ?'},
+  {slug: 'video-maison-a-vendre-scenario', heading: 'Vidéo de maison à vendre : raconter les espaces en trente secondes'},
+  {slug: 'video-appartement-a-vendre-agencement', heading: 'Vidéo d’appartement à vendre : rendre l’agencement compréhensible'},
+  {slug: 'video-immobilier-prestige', heading: 'Vidéo d’immobilier de prestige : laisser les lieux faire leur effet'},
+  {slug: 'video-immobiliere-rendez-vous-vendeur-mandat', heading: 'Présenter votre communication vidéo lors d’un rendez-vous vendeur'},
+  {slug: 'referencement-local-agence-immobiliere-video', heading: 'Référencement local d’une agence immobilière : quelle place pour la vidéo ?'},
+  {slug: 'video-immobiliere-visite-virtuelle-differences', heading: 'Vidéo immobilière ou visite virtuelle : quel usage pour votre mandat ?'},
   {slug: 'marketing-immobilier-ia-agence', heading: 'Marketing immobilier IA : automatiser la communication de votre agence'},
   {slug: 'un-mandat-sept-contenus-immobiliers', heading: '1 mandat, 7 contenus : décliner une annonce immobilière'},
   {slug: 'reel-immobilier-instagram-scripts', heading: 'Reel immobilier Instagram : 7 scripts pour présenter un bien'},

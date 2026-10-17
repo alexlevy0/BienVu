@@ -9,7 +9,7 @@ import '../landing.css';
 import '../blog.css';
 
 export const metadata = seoMetadata({title: 'Blog immobilier : vidéo, IA et réseaux sociaux — BienVu',
-  description: 'Marketing immobilier IA, vidéos, Instagram, TikTok, YouTube, photos, textes et suivi : vingt articles pratiques pour les agences immobilières.', path: '/blog'});
+  description: 'Vidéo immobilière, avatars IA, vitrine d’agence et référencement local : des méthodes, exemples et conseils concrets pour vos mandats.', path: '/blog'});
 
 export default function Page() {
   const featured = blogArticles[0]!;

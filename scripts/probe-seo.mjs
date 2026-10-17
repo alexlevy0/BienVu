@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
 const base=process.env.BIENVU_SEO_URL??'http://localhost:8787',url=new URL(base);
 if(!['localhost','127.0.0.1','bienvu.online'].includes(url.hostname))throw Error('SEO_PROBE_ORIGIN_INVALID');
-const headers={'User-Agent':'Googlebot SEO validation BienVu'},report=[];
+const headers={'User-Agent':'Googlebot SEO validation BienVu','x-bienvu-audit':'1'},report=[];
 async function status(path){const response=await fetch(base+path,{headers});const result=response.status;await response.body?.cancel();return result;}
 const features=['video-immobiliere-ia','animation-photo-immobiliere','editeur-video-immobilier','publication-reseaux-sociaux-immobilier','modeles-video-immobilier','comment-ca-marche'];
 const guides=['creer-reel-immobilier-instagram','choisir-photos-video-immobiliere','programmer-publications-immobilieres','creer-video-immobiliere-gratuite'];
 const indexResponse=await fetch(base+'/blog',{headers});assert.equal(indexResponse.status,200,'Blog index');
 const indexHtml=await indexResponse.text(),articles=[...new Set([...indexHtml.matchAll(/href="(\/blog\/[a-z0-9-]+)"/g)].map(match=>match[1]))];
-assert.equal(articles.length,20,'Les vingt articles sont accessibles dans le HTML sans JavaScript');
+assert.equal(articles.length,30,'Les trente articles sont accessibles dans le HTML sans JavaScript');
 const paths=['/','/explorer','/abonnement','/sources','/guides','/blog','/partenaires',...articles,...features.map(slug=>`/${slug}`),...guides.map(slug=>`/guides/${slug}`),...['paris','sud','lyon','bordeaux'].map(id=>`/exemples/${id}`)];
 const titles=new Set();
 for(const path of paths){const response=await fetch(base+path,{headers}),html=await response.text();assert.equal(response.status,200,path);

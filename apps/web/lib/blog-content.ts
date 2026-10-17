@@ -18,10 +18,22 @@ import {approvalArticle} from './blog/articles/validation';
 import {clientMessagesArticle} from './blog/articles/messages-clients';
 import {performanceArticle} from './blog/articles/performance';
 import {rentalArticle} from './blog/articles/location';
+import {importVideoArticle} from './blog/articles/import-video';
+import {avatarRealEstateArticle} from './blog/articles/avatar-immobilier';
+import {agencyShowcaseArticle} from './blog/articles/vitrine-agence';
+import {videoFormatsArticle} from './blog/articles/formats-video';
+import {houseVideoArticle} from './blog/articles/maison-vendre';
+import {apartmentVideoArticle} from './blog/articles/appartement-vendre';
+import {prestigeVideoArticle} from './blog/articles/prestige';
+import {sellerMeetingArticle} from './blog/articles/mandat-vendeur';
+import {localSeoArticle} from './blog/articles/seo-local';
+import {virtualTourArticle} from './blog/articles/visite-virtuelle';
 import {blogPublishedAt, type BlogArticle} from './blog/types';
 import {absoluteUrl} from './seo';
 
-export const blogArticles: BlogArticle[] = [marketingArticle, mandatArticle, reelsArticle, montageArticle, voixArticle,
+export const blogArticles: BlogArticle[] = [importVideoArticle, avatarRealEstateArticle, agencyShowcaseArticle,
+  videoFormatsArticle, houseVideoArticle, apartmentVideoArticle, prestigeVideoArticle, sellerMeetingArticle, localSeoArticle, virtualTourArticle,
+  marketingArticle, mandatArticle, reelsArticle, montageArticle, voixArticle,
   animationArticle, musiqueArticle, calendrierArticle, redactionArticle, budgetArticle, storiesArticle, tiktokArticle,
   shortsArticle, smartphoneArticle, subtitlesArticle, identityArticle, approvalArticle, clientMessagesArticle, performanceArticle, rentalArticle];
 export const findBlogArticle = (slug: string) => blogArticles.find(article => article.slug === slug);
