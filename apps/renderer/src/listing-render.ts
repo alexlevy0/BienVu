@@ -215,7 +215,7 @@ export async function renderListingVideo(input: unknown, directory: string): Pro
     const dimensions={width:manifest.width,height:manifest.height};
     // Sources are measured before rendering. An editor can intentionally keep a
     // short, quiet music passage or reduce voice gain; retain the silence guard.
-    const report=await verifyVideoArtifact(partial,id,frames,manifest.rights.watermarked,startedAt,start,editorHasAudio(manifest),dimensions,manifest.editor?-90:-50);
+    const report=await verifyVideoArtifact(partial,id,frames,manifest.rights.watermarked,startedAt,start,editorHasAudio(manifest),dimensions,manifest.editor||manifest.music?.settings?-90:-50);
     await rename(partial,output);await chmod(output,0o600);
     progress(90);
     if(manifest.rights.kind==='anonymous'){

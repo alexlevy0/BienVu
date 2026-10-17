@@ -5,6 +5,7 @@ import {EditorDocument} from './editor';
 import {VideoMap} from './maps';
 import {AvatarCustomization} from './avatars';
 import {IMPORT_PHOTO_MAXIMUM,VIDEO_PHOTO_MAXIMUM} from './photo-limits';
+import {VideoMusic} from './music-library';
 
 export const DEFAULT_VIDEO_VOICE='fish-manon' as const;
 
@@ -34,10 +35,11 @@ export const VideoCustomization=z.object({style:VideoStyle,
   runwayPhotos:photoOrder.optional(),
   // Draft text may be incomplete while editing; generation validates it below.
   narration:z.array(z.string().max(500)).min(4).max(6).optional(),editor:EditorDocument.optional(),map:VideoMap.optional(),
-  mapDisabled:z.boolean().optional(),mapAutomatic:z.boolean().optional(),avatar:AvatarCustomization.optional(),
+  mapDisabled:z.boolean().optional(),mapAutomatic:z.boolean().optional(),avatar:AvatarCustomization.optional(),music:VideoMusic.optional(),
   voiceSourceId:z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/).optional()}).strict();
 export type VideoCustomization=z.infer<typeof VideoCustomization>;
 export const GenerationCustomization=VideoCustomization.superRefine((value,context)=>{
+  if(value.music&&value.editor)context.addIssue({code:'custom',path:['music'],message:'Réglez la musique dans la timeline de l’éditeur.'});
   if(value.map&&!value.map.location&&!value.mapAutomatic)context.addIssue({code:'custom',path:['map','location'],message:'Confirmez la localisation de la carte avant de créer la vidéo.'});
   if(value.mapDisabled&&(value.map||value.mapAutomatic))context.addIssue({code:'custom',path:['map'],message:'Désactivez la carte ou choisissez ses réglages.'});
   if(value.mapAutomatic&&(!value.map||value.editor))context.addIssue({code:'custom',path:['mapAutomatic'],message:'La localisation automatique nécessite une carte et une nouvelle vidéo.'});

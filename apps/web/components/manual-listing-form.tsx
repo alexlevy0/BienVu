@@ -2,7 +2,7 @@
 import {analyticsFetch as fetch} from '../lib/product-analytics';
 import dynamic from 'next/dynamic';
 import {useEffect, useImperativeHandle, useRef, useState, type ChangeEvent, type FormEvent, type Ref} from 'react';
-import {generationCreditCost,selectedAnimationIndices,defaultVideoCustomization,createEditorDocument,CreationFields,VideoCustomization,GenerationCustomization,DESCRIPTION_MAX_CHARACTERS, ManualListingInput, PropertyListingInput,MANUAL_PHOTO_LIMITS, publicErrors, type PublicErrorCode,
+import {generationCreditCost,selectedAnimationIndices,defaultVideoCustomization,createEditorDocument,musicForTimeline,defaultEditorMix,VideoMusic,DEFAULT_MUSIC_VOLUME,CreationFields,VideoCustomization,GenerationCustomization,DESCRIPTION_MAX_CHARACTERS, ManualListingInput, PropertyListingInput,MANUAL_PHOTO_LIMITS, publicErrors, type PublicErrorCode,
   type CreationDraftData, type CreationDraftView, type NormalizedListing,type VideoDuration,type VideoAspectRatio} from '@bienvu/contracts';
 import {HomeIcon} from './home-icons';
 import {PhotoDurationAdvice} from './photo-duration-advice';
@@ -127,8 +127,8 @@ export function ManualListingForm(props: Props) {
       photos.some(photo=>photo.removing)?'Retrait des photos en cours.':photos.some(photo=>photo.state==='sending')?'Envoi des photos en cours.':photos.some(photo=>photo.state==='error')?
       'Réessayez ou retirez les photos en erreur.':issue?fieldMessage(String(issue.path[0]),issue.code,issue.message):!props.saveOnly&&photos.length<3?'Ajoutez au moins trois photos.':!serverDraft&&props.guided.agencyId?
       'Préparation du brouillon privé en cours.':!fieldsValid?'Vérifiez les informations du bien.':'';
-    props.guided.onReadyChange?.(Boolean(ready&&selectionValid),reason);
-  },[props.guided?.agencyId,props.guided?.description,hydrated,photos,serverDraft,revision,propertyType,transaction,completed,guestConfirmed,customization,props.customizing,props.saveOnly,voiceLoading]);
+    props.guided.onReadyChange?.(Boolean(ready&&selectionValid&&!busy),busy?'Enregistrement de vos réglages…':reason);
+  },[props.guided?.agencyId,props.guided?.description,hydrated,photos,serverDraft,revision,propertyType,transaction,completed,guestConfirmed,customization,props.customizing,props.saveOnly,voiceLoading,busy]);
   async function confirmField(name:string){
     await settingsWrite.current;const draft=serverRef.current;if(!draft){setGuestConfirmed(current=>new Set([...current,name]));return;}
     try{const response=await fetch(`/api/imports/${draft.id}/draft`,{method:'PATCH',headers:{'Content-Type':'application/json'},
@@ -436,6 +436,14 @@ export function ManualListingForm(props: Props) {
     } catch (error) {setFeedback(error instanceof FormFailure ? error.message : 'L’envoi a été interrompu. Réessayez avec les mêmes informations et photos.');}
     finally {submitLock.current=false;setBusy(false); setProgress('');}
   }
+  async function addLibraryMusic(id:string):Promise<VideoMusic>{
+    if(busy||!props.guided?.agencyId)throw new FormFailure('Connectez-vous pour choisir une musique.');setBusy(true);
+    try{const draft=await ensureServerDraft(),response=await fetch(`/api/imports/${draft.id}/music/from-library`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({musicId:id})});
+      if(!response.ok)throw new FormFailure(await photoUploadError(response,'Cette musique n’a pas pu être ajoutée. Réessayez.'));
+      const value=await response.json() as {assetId:string;name:string;durationMs:number};
+      return VideoMusic.parse({assetId:value.assetId,name:value.name,durationMs:value.durationMs,volume:DEFAULT_MUSIC_VOLUME,libraryId:id});
+    }finally{setBusy(false);}
+  }
   async function openEditor(){if(busy||!props.guided?.agencyId)return;setBusy(true);setFeedback('');
     try{await settingsWrite.current;const current=await ensureServerDraft(),raw=draftFields(),number=(value:string)=>value.trim()?Number(value.replace(/\s/g,'').replace(',','.')):null;
       const fields=CreationFields.parse({title:listingTitle(raw.title,raw.locality,propertyType,transaction),locality:raw.locality.trim()||null,propertyType:raw.propertyType||null,transaction:raw.transaction||null,
@@ -444,8 +452,9 @@ export function ManualListingForm(props: Props) {
         settings={...rawSettings,...(rawSettings.mapAutomatic?{map:undefined,mapAutomatic:undefined}:{})},order=settings.photoOrder??current.photos.slice(0,12).map(p=>p.sourceOrder),
         editor=settings.editor??createEditorDocument(order.flatMap(slot=>current.photos.filter(p=>p.sourceOrder===slot)),fields,{agencyName:props.brand?.name,durationSeconds:props.durationSeconds,aspectRatio:props.aspectRatio,
           voiceEnabled:props.voiceEnabled,subtitlesEnabled:props.subtitlesEnabled});
+      if(settings.music){editor.music=musicForTimeline(settings.music,editor.durationSeconds*30);editor.audioMix=defaultEditorMix;}
       const response=await fetch(`/api/imports/${current.id}/draft`,{method:'PATCH',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({version:current.version,changes:fields,confirm:[],videoCustomization:{...settings,photoOrder:[...new Set(editor.clips.map(c=>c.photoSlot))],editor}})});
+        body:JSON.stringify({version:current.version,changes:fields,confirm:[],videoCustomization:{...settings,music:undefined,photoOrder:[...new Set(editor.clips.map(c=>c.photoSlot))],editor}})});
       if(!response.ok)throw new Error('Le brouillon n’a pas pu être enregistré. Réessayez avant d’ouvrir l’Éditeur.');
       window.location.assign(`/editeur?draft=${encodeURIComponent(current.id)}`);
     }catch(error){setFeedback(error instanceof Error&&error.name!=='ZodError'?error.message:'Vérifiez les informations saisies avant d’ouvrir l’Éditeur.');setBusy(false);}
@@ -492,7 +501,7 @@ export function ManualListingForm(props: Props) {
     {props.customizing&&hydrated&&!voiceLoading&&<VideoCustomizer settings={customization??defaultVideoCustomization(props.brand,defaultVoice)}
     onChange={value=>{animationPolicy.current=undefined;settingsVersion.current++;setSettingsSaved(false);setCustomization(value);}} photos={photos} fields={draftFields()}
     agencyName={props.brand?.name??''} durationSeconds={props.durationSeconds} onDuration={props.onDuration} aspectRatio={props.aspectRatio} voiceEnabled={props.voiceEnabled} onVoice={props.onVoice} subtitlesEnabled={props.subtitlesEnabled!==false} onSubtitles={value=>props.onSubtitles?.(value)}
-    onBack={()=>props.onCloseCustomizer?.()} onAdd={files=>void addPhotos(files)}
+    onBack={()=>props.onCloseCustomizer?.()} onAdd={files=>void addPhotos(files)} onMusicPick={props.guided?.agencyId?addLibraryMusic:undefined}
     onRetry={id=>{const photo=selected.current.find(p=>p.id===id);if(photo)void uploadSelected(photo);}}
     onRemove={id=>{const photo=selected.current.find(p=>p.id===id);if(photo)void removePhoto(photo);}} busy={busy||photoChecking}
     ready={finalInput()?.success===true&&unresolved().length===0&&photos.filter(p=>p.state==='ready').length>=3}

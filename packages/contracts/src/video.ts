@@ -4,7 +4,7 @@ import {ScriptScene} from './narration';
 import {SYNTHETIC_VOICE_DISCLOSURE} from './voice';
 import {VideoStyle} from './customization';
 import {EditorDocument} from './editor';
-import {MUSIC_LIMITS} from './music-library';
+import {MUSIC_LIMITS,VideoMusic} from './music-library';
 import {ConfirmedVideoMap,MapZoom,mapRasterLevels} from './maps';
 import {AvatarCustomization,AvatarEngine,AvatarId,avatarMoments,AvatarAudioSources,AVATAR_AUDIO_BYTES,AVATAR_VIDEO_BYTES} from './avatars';
 
@@ -77,7 +77,7 @@ export const VideoManifest = z.object({schemaVersion: z.literal(2), templateVers
   visualStyle:VideoStyle.optional(),photoMotion:z.boolean().optional(),photoTransition:z.enum(['fade','cut']).optional(),
   photoAnimations:z.array(PhotoAnimation).max(12).optional(),
   editor:EditorDocument.optional(),
-  music:z.object({asset:VideoAsset}).strict().optional(),
+  music:z.object({asset:VideoAsset,settings:VideoMusic.optional()}).strict().optional(),
   avatar:z.object({settings:AvatarCustomization,clips:z.array(z.object({id:AvatarId,moment:z.enum(['intro','outro','full']),
     startFrame:z.number().int().min(0).max(1199),durationFrames:z.number().int().min(1).max(1200),
     audioAssetId:EntityId,audioSha256:Sha256,lookId:AvatarId,engine:AvatarEngine,transparent:z.boolean(),asset:AvatarVideoAsset,
@@ -103,8 +103,9 @@ export const VideoManifest = z.object({schemaVersion: z.literal(2), templateVers
       ||c.asset.mime!=='video/mp4'||!((c.asset.width===720&&c.asset.height===1280)||(m.width===1920&&c.asset.width===1280&&c.asset.height===720)))))fail('Animation hors périmètre ou invalide.');
   if ([...m.photos, ...(m.logo ? [m.logo] : [])].some(a => !a.mime.startsWith('image/') || !a.width || !a.height || a.durationMs)
     || m.audio.some(a => a.mime !== 'audio/wav' || !a.durationMs || a.durationMs>35000 || a.width || a.height)) fail('Type de média invalide.');
-  if(Boolean(m.music)!==Boolean(m.editor?.music)||m.music&&(!m.editor||m.music.asset.mime!=='audio/wav'||
-    m.music.asset.id!==m.editor.music?.assetId||m.music.asset.durationMs!==m.editor.music.durationMs||m.music.asset.width||m.music.asset.height))fail('Musique hors périmètre ou invalide.');
+  const musicSettings=m.editor?.music??m.music?.settings;
+  if(Boolean(m.music)!==Boolean(musicSettings)||m.editor&&m.music?.settings||m.music&&(!musicSettings||m.music.asset.mime!=='audio/wav'||
+    m.music.asset.id!==musicSettings.assetId||m.music.asset.durationMs!==musicSettings.durationMs||m.music.asset.width||m.music.asset.height))fail('Musique hors périmètre ou invalide.');
   if (new Set(m.photos.map(a => a.sha256)).size !== m.photos.length
     || new Set(m.scenes.map(s => s.id)).size !== m.scenes.length
     || new Set(m.scenes.map(s => s.kind)).size !== m.scenes.length

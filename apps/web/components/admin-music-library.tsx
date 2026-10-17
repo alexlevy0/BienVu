@@ -39,7 +39,7 @@ export function AdminMusicLibrary(){
     setPage(before=>before?{...next,items:[...before.items,...next.items.filter(t=>!before.items.some(p=>p.id===t.id))]}:next);
   }catch(cause){setError(cause instanceof Error?cause.message:'Chargement interrompu.');}finally{setMore(false);}}
   return <div className="admin-music-library">
-    <p className="admin-music-intro">Publiez vos musiques autorisées pour les rendre disponibles à toutes les agences dans l’Éditeur. La musique est incluse, sans crédit supplémentaire.</p>
+    <p className="admin-music-intro">Publiez vos musiques autorisées pour les proposer dans Personnaliser → Musique et dans l’Éditeur. Les morceaux masqués ne sont plus proposés ; les vidéos déjà créées conservent leur musique. Musique incluse, sans crédit supplémentaire.</p>
     <form className="admin-music-upload" onSubmit={event=>void upload(event)}>
       <div className={`admin-music-drop${dragging?' is-dragging':''}`} onDragOver={event=>{if(event.dataTransfer.types.includes('Files')&&!phase){event.preventDefault();setDragging(true);}}}
         onDragLeave={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node))setDragging(false);}}

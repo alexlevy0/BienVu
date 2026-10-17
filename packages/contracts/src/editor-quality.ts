@@ -5,7 +5,7 @@ export function audioNormalizationGain(rmsDbfs:number,peak:number,target=-20){
   if(!Number.isFinite(rmsDbfs)||!Number.isFinite(peak)||peak<=0)return 1;
   return Math.max(.1,Math.min(4,10**((target-rmsDbfs)/20),.8/peak));
 }
-export function editorMusicFrames(doc:EditorDocument){
+export function editorMusicFrames(doc:Pick<EditorDocument,'music'>&{durationSeconds:number}){
   const music=doc.music;if(!music)return 0;
   return Math.min(doc.durationSeconds*30-music.startFrame,music.durationFrames??1200,
     music.loop?1200:Math.floor(music.durationMs*30/1000)-music.trimFromFrame);
@@ -34,7 +34,7 @@ export function editorMusicWaveform(doc:EditorDocument,count=128){
     return peak;
   });
 }
-export function editorMusicGain(doc:EditorDocument,frame:number,intervals:{startFrame:number;durationMs:number}[]=[]){
+export function editorMusicGain<T extends Pick<EditorDocument,'music'|'voiceEnabled'|'audioMix'>&{durationSeconds:number}>(doc:T,frame:number,intervals:{startFrame:number;durationMs:number}[]=[]){
   const music=doc.music;if(!music)return 0;const length=editorMusicFrames(doc),at=frame-music.startFrame;
   if(at<0||at>=length)return 0;
   const mix=doc.audioMix;const fadeIn=mix?.fadeInFrames??12,fadeOut=mix?.fadeOutFrames??18,

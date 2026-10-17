@@ -145,7 +145,7 @@ export async function admitGeneration(db:Database,agencyId:string,key:string,inp
     try{saved=customizedListing(saved,parsed.data.customization);}catch{throw new GenerationFailure('VALIDATION_ERROR');}
     const voiceSourceId=parsed.data.customization?.voiceSourceId;
     if(voiceSourceId&&!await findEditorVoiceSource(db,agencyId,parsed.data.listingId,voiceSourceId))throw new GenerationFailure('VALIDATION_ERROR');
-    const music=parsed.data.customization?.editor?.music;
+    const music=parsed.data.customization?.editor?.music??parsed.data.customization?.music;
     if(music){const stored=await db.prepare('SELECT asset_json AS asset FROM editor_music_assets WHERE id=? AND agency_id=? AND import_id=?')
       .bind(music.assetId,agencyId,parsed.data.listingId).first<{asset:string}>();
       const asset=stored?VideoAsset.safeParse(JSON.parse(stored.asset)):null;

@@ -1,5 +1,11 @@
 # BienVu — suivi des sprints
 
+### 17/10/2026 — Musique dans Personnaliser
+
+Nouvel onglet **Musique** : banque active du superadmin, recherche et pagination, écoute volontaire d’un seul morceau, sélection/retrait et volume de 0 à 100 %. Départ à **15 %**, recommandation explicite de **10 à 20 %** avec une voix off, avertissement au-delà de 25 % et retour au volume conseillé. Aucune musique ni aucun audio chargé par défaut ; les visiteurs sont invités à se connecter. Interface vérifiée à 1280 et 390 px, sans débordement ; arrêt d’écoute lors du choix ou du changement d’onglet, choix conservé et erreur de lecture annulée sans faux avertissement.
+
+Réutilisation de la copie privée D1/R2 de la banque, validée à l’admission avant réservation des crédits, puis figée dans le manifeste. Piste adaptée à toute la durée, boucle si nécessaire, normalisation et mixage existants avec atténuation sous la narration et fondus de 0,5/1 s. Formats portrait/paysage, vidéos avec ou sans voix, réouverture dans l’Éditeur et documents historiques conservés. Les musiques masquées ne sont plus proposées ; une copie déjà choisie reste utilisable. Aucun supplément de crédit, aucune dépendance ni migration. **28 tests ciblés distincts réussis**, types complets et frontières (620 fichiers) validés. Preuves privées ignorées sous `evidence/local/customizer-music/`.
+
 ### 17/10/2026 — Démonstrations d’avatars en qualité source
 
 Les démos au survol utilisent désormais les MP4 HeyGen d’origine, sans passage en 320×180 ni recompression CRF 29. Mesures sur les sources publiques : Annie 1280×720, Daphne 1920×1080 ; anciennes copies limitées à 320×180. Clé R2 distincte et URL de lecture renouvelée pour ignorer les anciens caches, y compris après une nouvelle préparation du catalogue. Portraits légers, vidéo montée uniquement à la demande, arrêt à la sortie, cache R2 et lecture par plages conservés. Aucun nouveau rendu payant, changement de publication ou migration. **20 tests ciblés réussis**, types et frontières (619 fichiers) validés ; la régression vérifie l’abandon du dérivé historique, les octets source exacts et les plages sans second téléchargement fournisseur. Preuves locales ignorées : `evidence/local/avatar-preview-quality/`.

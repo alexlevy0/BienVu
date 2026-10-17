@@ -1,5 +1,5 @@
 import {CreationDraftData,EditorDocument,GenerationRequest,GeneratableListing,VideoAsset,VideoManifest,videoManifestHash,defaultVideoCustomization,createEditorDocument,selectedAnimationIndices,audioNormalizationGain,generationCreditCost,
-  MUSIC_LIMITS,type CreationDraftView,type VideoCustomization} from '@bienvu/contracts';
+  MUSIC_LIMITS,musicForTimeline,defaultEditorMix,type CreationDraftView,type VideoCustomization} from '@bienvu/contracts';
 import {findCreationDraft,findImport,draftFromListing,updateCreationDraft,beginManualImport,startCreationDraft,blankCreationDraft,retainedAnimations,generationRetained,retainedAnimationLibrarySql,ImportStateFailure,type Database} from '@bienvu/db';
 import {measureMusicWav} from '../../../packages/voice/src/audio';
 import {contentHash} from './manual-listings';
@@ -134,10 +134,11 @@ export async function editExistingVideo(env:Env,agencyId:string,jobId:string,key
   const editor=old?.editor?EditorDocument.parse({...old.editor,clips:old.editor.clips.map(c=>({...c,photoSlot:remap(c.photoSlot)})),music:null}):
     createEditorDocument(m.photos.map((_,sourceOrder)=>({sourceOrder})),data.fields,{durationSeconds:seconds,aspectRatio:input.aspectRatio,
       voiceEnabled:input.voiceEnabled,subtitlesEnabled:input.subtitlesEnabled,agencyName:m.brand.name,logo:Boolean(m.logo)});
-  if(m.music&&old?.editor?.music){const music=await copyMusic(env,agencyId,draft.id,m.music.asset,`agencies/${job.agencyId}/jobs/${jobId}/`);
-    editor.music={...old.editor.music,...music};}
+  if(m.music){const settings=old?.editor?.music??(m.music.settings?musicForTimeline(m.music.settings,seconds*30):null);
+    if(settings){const music=await copyMusic(env,agencyId,draft.id,m.music.asset,`agencies/${job.agencyId}/jobs/${jobId}/`);
+      editor.music={...settings,...music};if(m.music.settings)editor.audioMix=defaultEditorMix;}}
   const voiceSourceId=await restoreVideoVoice(env,agencyId,draft.id,m,sourceVoice,seconds,signal);
-  const settings:VideoCustomization={...defaultVideoCustomization(m.brand),...old,...(m.avatar?{avatar:m.avatar.settings}:{}),map:m.map?.settings,mapAutomatic:undefined,mapDisabled:m.map?undefined:true,editor,voice:sourceVoice,voiceSourceId,
+  const settings:VideoCustomization={...defaultVideoCustomization(m.brand),...old,music:undefined,...(m.avatar?{avatar:m.avatar.settings}:{}),map:m.map?.settings,mapAutomatic:undefined,mapDisabled:m.map?undefined:true,editor,voice:sourceVoice,voiceSourceId,
     ...(voiceSourceId?{narration:m.scenes.map(s=>s.narrationText)}:{}),photoOrder:[...new Set(editor.clips.map(c=>c.photoSlot))],
     runwayClips:undefined,runwayPhotos:m.photoAnimations?.length?m.photos.flatMap((photo,slot)=>
       m.photoAnimations!.some(clip=>clip.photoAssetId===photo.id&&clip.sourceSha256===photo.sha256)?[slot]:[]):

@@ -47,6 +47,7 @@ export function trialInput(input:unknown) {
   const parsed=GenerationRequest.safeParse(input);
   if(!parsed.success)throw new GenerationFailure('INVALID_URL');
   if(avatarCreditCost(parsed.data.customization?.avatar))throw new GenerationFailure('AVATAR_LOGIN_REQUIRED');
+  if(parsed.data.customization?.music)throw new GenerationFailure('VALIDATION_ERROR');
   if(requestedAnimations(parsed.data.customization))throw new GenerationFailure('RUNWAY_LOGIN_REQUIRED');
   if('url' in parsed.data){
     const url=new URL(parsed.data.url),source=sourceForHost(url.hostname);

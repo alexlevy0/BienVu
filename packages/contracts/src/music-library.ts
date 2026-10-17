@@ -17,3 +17,12 @@ export const EditorMusicUpload=z.object({assetId:EntityId,durationMs:z.number().
   normalizationGain:z.number().min(.1).max(4),waveform:MusicWaveform}).strict();
 export type EditorMusicUpload=z.infer<typeof EditorMusicUpload>;
 export const MUSIC_DRAG_TYPE='application/x-bienvu-music';
+export const DEFAULT_MUSIC_VOLUME=.15;
+// References a private copy attached to this import, never a caller-supplied URL.
+export const VideoMusic=z.object({assetId:EntityId,name:z.string().min(1).max(100),
+  durationMs:z.number().int().min(500).max(MUSIC_LIMITS.durationMs),volume:z.number().min(0).max(1),libraryId:EntityId.optional()}).strict();
+export type VideoMusic=z.infer<typeof VideoMusic>;
+export function musicForTimeline(music:VideoMusic,totalFrames:number){
+  const {libraryId,...track}=music;
+  return {...track,startFrame:0,trimFromFrame:0,durationFrames:totalFrames,loop:Math.floor(music.durationMs*30/1000)<totalFrames};
+}

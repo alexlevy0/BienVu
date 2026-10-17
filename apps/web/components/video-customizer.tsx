@@ -12,19 +12,21 @@ import {useAccount} from './account';
 import {MapScenePreview,VideoMapControls,useVideoMapDefaults,useAutomaticMapLocation} from './video-map';
 import {AvatarControls,AvatarWarning,AvatarPoster,useAvatarCatalog} from './avatar-controls';
 import {PhotoPreviewImage} from './photo-preview-image';
+import {CustomizerMusic} from './customizer-music';
+import {musicForTimeline,type VideoMusic} from '@bienvu/contracts';
 
 export type CustomizerPhoto={id:string;preview:string;slot:number;state:string;file?:File|null;error?:string;removing?:boolean};
 export {suggestedNarration};
 type Props={settings:VideoCustomization;onChange(value:VideoCustomization):void;photos:CustomizerPhoto[];fields:ManualDraftFields;
   agencyName:string;durationSeconds?:VideoDuration;onDuration?(value:VideoDuration):void;aspectRatio?:VideoAspectRatio;voiceEnabled?:boolean;onVoice?(value:boolean):void;subtitlesEnabled:boolean;onSubtitles(value:boolean):void;onBack():void;onAdd(files:FileList|null):void;
-  busy:boolean;ready:boolean;onEdit():void;saved:boolean;sourceUrl?:string;onRetry?(id:string):void;onRemove?(id:string):void};
+  busy:boolean;ready:boolean;onEdit():void;saved:boolean;sourceUrl?:string;onRetry?(id:string):void;onRemove?(id:string):void;onMusicPick?(id:string):Promise<VideoMusic>};
 export function VideoCustomizer(p:Props){
   const {me,voiceCatalog}=useAccount(),{catalog:avatarCatalog}=useAvatarCatalog(true,p.settings.avatar?.lookId);
   const mapDefaults=useVideoMapDefaults(),automaticMap=Boolean(p.settings.mapAutomatic||(!p.settings.map&&!p.settings.mapDisabled&&!p.settings.editor&&mapDefaults?.enabled)),
     automaticLocation=useAutomaticMapLocation(p.fields.locality,automaticMap),mapSettings=p.settings.map??(automaticMap&&mapDefaults?videoMapFromDefaults(mapDefaults):undefined),
     previewMap=mapSettings?{...mapSettings,...(automaticMap?{location:automaticLocation}:{})}:undefined;
   const duration=p.durationSeconds??20;
-  const [tab,setTab]=useState<'photos'|'style'|'voice'|'map'|'avatar'>('photos'),[drag,setDrag]=useState<number|null>(null),
+  const [tab,setTab]=useState<'photos'|'style'|'voice'|'music'|'map'|'avatar'>('photos'),[drag,setDrag]=useState<number|null>(null),
     [playing,setPlaying]=useState(false),[time,setTime]=useState(0);
   const secondaryInk=()=>{const rgb=p.settings.secondaryColor.match(/[a-f\d]{2}/gi)!.map(h=>parseInt(h,16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);return rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722>.179?'#101d18':'#ffffff';};
   const upload=useRef<HTMLInputElement>(null),preview=useRef<HTMLDivElement>(null);
@@ -58,10 +60,10 @@ export function VideoCustomizer(p:Props){
       <div className="customizer-property">{p.photos[0]&&<PhotoPreviewImage src={chosen[0]?.preview??p.photos[0].preview} alt=""/>}<div><strong>{p.sourceUrl?new URL(p.sourceUrl).hostname:p.fields.title||'Votre annonce'}</strong>
         <span>{[price,p.fields.area?`${p.fields.area} m²`:'',p.fields.rooms?`${p.fields.rooms} pièces`:''].filter(Boolean).join(' · ')||'Complétez les informations du bien'}</span></div></div></header>
     <div className={`customizer-panel${p.aspectRatio==='16:9'?' is-horizontal':''}`}><div className="customizer-controls">
-      <div className="customizer-tabs" role="tablist" aria-label="Réglages vidéo">{([['photos','Photos','image'],['style','Style','palette'],['voice','Voix et texte','microphone'],['map','Carte','pin'],['avatar','Avatar IA','user']] as const).map(([id,label,icon])=>
-        <button type="button" key={id} role="tab" id={`customizer-tab-${id}`} aria-controls={`customizer-panel-${id}`} aria-selected={tab===id} tabIndex={tab===id?0:-1}
-          onKeyDown={event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const ids=['photos','style','voice','map','avatar'] as const;
-            const at=ids.indexOf(tab),next=event.key==='Home'?'photos':event.key==='End'?'avatar':ids[(at+(event.key==='ArrowRight'?1:4))%5];setTab(next);document.getElementById(`customizer-tab-${next}`)?.focus();}}
+      <div className="customizer-tabs" role="tablist" aria-label="Réglages vidéo">{([['photos','Photos','image'],['style','Style','palette'],['voice','Voix et texte','microphone'],['music','Musique','music'],['map','Carte','pin'],['avatar','Avatar IA','user']] as const).map(([id,label,icon])=>
+        <button type="button" key={id} role="tab" id={`customizer-tab-${id}`} aria-controls={`customizer-panel-${id}`} aria-selected={tab===id} tabIndex={tab===id?0:-1} disabled={p.busy}
+          onKeyDown={event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const ids=['photos','style','voice','music','map','avatar'] as const;
+            const at=ids.indexOf(tab),next=event.key==='Home'?'photos':event.key==='End'?'avatar':ids[(at+(event.key==='ArrowRight'?1:ids.length-1))%ids.length];setTab(next);document.getElementById(`customizer-tab-${next}`)?.focus();}}
           onClick={()=>setTab(id)}><HomeIcon name={icon} size={21}/>{label}</button>)}</div>
       <AvatarWarning avatar={p.settings.avatar} voice={p.settings.voice??voiceCatalog?.defaultVoice??frenchVoices[0].id} catalog={avatarCatalog}/>
       <div role="tabpanel" id={`customizer-panel-${tab}`} aria-labelledby={`customizer-tab-${tab}`}>
@@ -107,6 +109,8 @@ export function VideoCustomizer(p:Props){
         <p className={validNarration.success||p.sourceUrl&&!p.settings.narration?'customizer-hint':'customizer-error'} role="status">{p.sourceUrl&&!p.settings.narration?`Rédaction automatique · ${duration} secondes.`:validNarration.success?`${wordCount(narration.join(' '))} mots · ${duration} secondes · ${narrationWordLimit(duration)} mots conseillés maximum${wordCount(narration.join(' '))>narrationWordLimit(duration)?' — raccourcissez le texte ou choisissez une durée supérieure.':''}`:
           validNarration.error.issues[0].message}</p><button type="button" className="customizer-reset" disabled={p.busy} onClick={()=>patch({narration:undefined})}>Reprendre le texte proposé</button>
       </>}
+      {tab==='music'&&<CustomizerMusic music={p.settings.music??p.settings.editor?.music??undefined} authenticated={Boolean(me?.agency)} voiceEnabled={p.voiceEnabled!==false} busy={p.busy} onPick={p.onMusicPick}
+        onChange={music=>p.settings.editor?patch({music:undefined,editor:{...p.settings.editor,music:music?musicForTimeline(music,duration*30):null}}):patch({music})}/>}
       {tab==='avatar'&&<AvatarControls catalog={avatarCatalog} avatar={p.settings.avatar} onChange={avatar=>patch({avatar})} voice={p.settings.voice??voiceCatalog?.defaultVoice??frenchVoices[0].id} voiceEnabled={p.voiceEnabled!==false} onEnableVoice={()=>p.onVoice?.(true)} authenticated={Boolean(me?.agency)} durationSeconds={p.durationSeconds??20} busy={p.busy}/>}
       {tab==='map'&&<VideoMapControls map={mapSettings} automatic={automaticMap} defaults={mapDefaults} onChange={(map,automatic=automaticMap)=>patch({map,mapDisabled:map?undefined:true,mapAutomatic:map&&automatic?true:undefined})} onPreview={endpoint=>{setPlaying(false);setTime((interval.startFrame+(endpoint==='end'?interval.durationFrames-1:0))/30);}} locality={p.fields.locality} aspectRatio={p.aspectRatio??'9:16'} busy={p.busy} color={mapInk(p.settings.primaryColor,p.settings.secondaryColor)} duration={duration}/>}
       </div>

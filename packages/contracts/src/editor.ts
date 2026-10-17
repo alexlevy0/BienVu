@@ -131,8 +131,8 @@ export function resizeEditorClip(doc:EditorDocument,id:string,frames:number):Edi
     next=Math.max(15,Math.min(clip.durationFrames+neighbour.durationFrames-15,Math.round(frames))),delta=next-clip.durationFrames;
   return EditorDocument.parse({...doc,clips:doc.clips.map((c,i)=>i===index?{...c,durationFrames:next}:i===other?{...c,durationFrames:c.durationFrames-delta}:c)});
 }
-export function editorHasAudio(m:{voiceEnabled?:boolean;editor?:EditorDocument;music?:{asset:unknown}|null}){
-  return m.voiceEnabled!==false||Boolean(m.music&&m.editor?.music&&(m.editor.music.volume>0));
+export function editorHasAudio(m:{voiceEnabled?:boolean;editor?:EditorDocument;music?:{asset:unknown;settings?:{volume:number}}|null}){
+  return m.voiceEnabled!==false||Boolean(m.music&&((m.editor?.music?.volume??m.music.settings?.volume??0)>0));
 }
 export function editorPhotoMotion(at:number,durationFrames:number,index:number,enabled=true,camera?:EditorCamera){
   const progress=Math.max(0,Math.min(1,at/Math.max(1,durationFrames-1)));

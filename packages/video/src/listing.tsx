@@ -5,6 +5,7 @@ import {contrastInk, displayArea, displayLocation, displayPrice, displayRooms, f
 import {cameraMotion} from './camera-motion';
 import {HorizontalPhotoScene} from './horizontal';
 import {EditorFilm} from './editor';
+import {BackgroundMusic} from './background-music';
 import {AvatarOverlay} from './avatar';
 import {MapOverlay} from './map';
 import {SceneLayers} from './scene-layers';
@@ -214,6 +215,7 @@ export function ListingFilm(props: ListingVideoProps) {
   const editorial=m.templateVersion!=='bienvu-vertical/1',cinematic=editorial&&m.visualStyle==='cinematic';
   const compactBrand=m.brand.name.length<=28?m.brand.name:null;
   return <AbsoluteFill style={{background:editorial?'#151b16':paper,fontFamily:'BienVu Video, DejaVu Sans, sans-serif',color:editorial?'#fff':dark}}>
+    <BackgroundMusic manifest={m} media={props.media}/>
     {m.photoTimeline&&<GalleryBackground manifest={m} media={props.media}/>}
     {scenes.map(({s,index,from}) => <Sequence key={s.id} from={from} durationInFrames={s.durationFrames}>
       {horizontal?<HorizontalPhotoScene manifest={m} media={props.media} logoBackground={props.logoBackground} index={index}/>:editorial?cinematic?<CinematicPhotoScene manifest={m} media={props.media} index={index}/>:m.visualStyle==='minimal'?<StyledPhotoScene manifest={m} media={props.media} index={index}/>:<EditorialPhotoScene manifest={m} media={props.media} index={index}/>:<PhotoScene manifest={m} media={props.media} index={index}/>}

@@ -203,7 +203,7 @@ export const videoDimensions = (ratio:VideoAspectRatio='9:16') => ratio==='16:9'
 // Optional fields preserve existing admission hashes and historical timing.
 export const GenerationInput = z.union([
   z.object({url:ImportUrl,subtitlesEnabled:z.boolean().optional(),voiceEnabled:z.boolean().optional(),durationSeconds:VideoDuration.optional(),aspectRatio:VideoAspectRatio.optional(),customization:GenerationCustomization.optional()}).strict()
-    .refine(value=>value.customization?.photoOrder===undefined&&value.customization?.runwayPhotos===undefined&&value.customization?.editor===undefined,'Importez les photos avant de choisir leur ordre ou leurs animations.'),
+    .refine(value=>value.customization?.photoOrder===undefined&&value.customization?.runwayPhotos===undefined&&value.customization?.editor===undefined&&value.customization?.music===undefined,'Importez l’annonce avant de choisir les photos ou la musique.'),
   z.object({listingId:EntityId,subtitlesEnabled:z.boolean().optional(),voiceEnabled:z.boolean().optional(),durationSeconds:VideoDuration.optional(),aspectRatio:VideoAspectRatio.optional(),customization:GenerationCustomization.optional()}).strict(),
 ]).refine(value=>!value.customization?.editor||(
   value.durationSeconds===value.customization.editor.durationSeconds&&value.aspectRatio===value.customization.editor.aspectRatio&&

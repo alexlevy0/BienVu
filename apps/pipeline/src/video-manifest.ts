@@ -113,6 +113,14 @@ export async function prepareJobVideo(env: {DB: Database; MEDIA: NarrationBucket
         music={asset:{...source,objectKey:`${prefix}music/${source.sha256}.wav`}};sources.push({id:source.id,key:source.objectKey});
       }
     }
+    if(!editor&&customization?.music){
+      const settings=customization.music,stored=await env.DB.prepare('SELECT asset_json AS asset FROM editor_music_assets WHERE id=? AND agency_id=? AND import_id=?')
+        .bind(settings.assetId,agency,entitlement.listingId).first<{asset:string}>();
+      if(!stored)fail('VIDEO_SCOPE_INVALID');
+      const source=VideoAsset.parse(JSON.parse(stored.asset));
+      if(source.mime!=='audio/wav'||!source.objectKey.startsWith(`agencies/${agency}/imports/${entitlement.listingId}/music/`)||source.durationMs!==settings.durationMs)fail('VIDEO_SCOPE_INVALID');
+      music={settings,asset:{...source,objectKey:`${prefix}music/${source.sha256}.wav`}};sources.push({id:source.id,key:source.objectKey});
+    }
     if((prepared.voiceEnabled!==false)!==(input?.voiceEnabled!==false))fail('VIDEO_SCOPE_INVALID');
     if(prepared.durationSeconds!==input?.durationSeconds)fail('VIDEO_SCOPE_INVALID');
     const animations:PhotoAnimation[]=[];
