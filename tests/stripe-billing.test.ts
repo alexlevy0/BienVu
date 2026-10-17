@@ -306,7 +306,7 @@ test('Annuel Checkout : montant serveur, changement de cadence et idempotence sa
  await assert.rejects(open('year','annual-month-key-001'),{fields:{checkout:'invalid_intent'}});
  await open('year','annual-year-key-0001');assert.equal(f.checkoutSessions.get('cs_annual_1')!.status,'expired');
  assert.equal(seen[1].line_items![0].price_data!.unit_amount,54000);assert.equal(seen[1].line_items![0].price_data!.recurring!.interval,'year');
- assert.match(seen[1].custom_text!.submit!.message,/540 € HT facturés pour un an/);assert.equal(seen[1].subscription_data!.metadata!.billingInterval,'year');
+ const submit=seen[1].custom_text!.submit;assert.ok(submit&&typeof submit==='object');assert.match(submit.message,/540 € HT facturés pour un an/);assert.equal(seen[1].subscription_data!.metadata!.billingInterval,'year');
  await open('year','annual-year-other-tab');assert.equal(seen.length,2);
  await assert.rejects(open('week','annual-invalid-key01'),{code:'VALIDATION_ERROR'});
  await open('month','annual-new-month-key');assert.equal(f.checkoutSessions.get('cs_annual_2')!.status,'expired');assert.equal(seen[2].line_items![0].price_data!.unit_amount,5000);
