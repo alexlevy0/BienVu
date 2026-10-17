@@ -133,22 +133,24 @@ export function VideoMapControls(p:{map?:VideoMap;automatic?:boolean;defaults?:V
       setResults(locations);if(!locations.length)setError('Aucun résultat. Précisez la ville ou l’adresse.');
     }catch(cause){if(searchRef.current===token)setError(cause instanceof Error?cause.message:'Recherche indisponible.');}finally{if(searchRef.current===token)setSearching(false);}}
   const patch=(value:Partial<VideoMap>)=>p.map&&p.onChange({...p.map,...value},p.automatic);
-  return <div className="map-controls"><div className="customizer-section-title"><strong>Le bien sur la carte</strong><p>Un zoom animé pour situer votre bien. La carte reste facultative et ne coûte aucun crédit supplémentaire.</p></div>
+  return <div className="map-controls"><div className="customizer-section-title"><strong>Localisation du bien</strong><p>Séquence incluse, sans crédit supplémentaire.</p></div>
     <label className="customizer-checkbox"><input type="checkbox" checked={Boolean(p.map)} disabled={p.busy} onChange={e=>p.onChange(e.target.checked?videoMapFromDefaults(p.defaults??DEFAULT_VIDEO_MAP):undefined,e.target.checked)}/>Ajouter une séquence de carte</label>
     {p.map&&<><label>Style de carte<select value={p.map.view??'plan'} disabled={p.busy} onChange={e=>{const view=e.target.value as MapView,
       suggested=(['approximate','exact'] as const).some(precision=>{const d=mapDefaultZooms(p.map?.view,precision);return zooms.zoomStart===d.zoomStart&&zooms.zoomEnd===d.zoomEnd;});
       patch({view,...(suggested?mapDefaultZooms(view,candidate?.precision):{})});p.onPreview?.('start');}}><option value="plan">Plan · sans satellite</option><option value="buildings-3d">Bâtiments en 3D</option><option value="satellite">Satellite · vue aérienne</option></select></label>
       <div className="map-options"><label>Emplacement<select value={p.map.position} disabled={p.busy} onChange={e=>patch({position:e.target.value as 'start'|'end'})}><option value="start">Au début</option><option value="end">À la fin</option></select></label>
       <label>Durée<select value={p.map.durationSeconds} disabled={p.busy} onChange={e=>patch({durationSeconds:Number(e.target.value)})}>{[3,4,5].map(n=><option key={n} value={n}>{n} secondes</option>)}</select></label></div>
-      <p className="customizer-hint">{p.map.durationSeconds} s de carte + {p.duration-p.map.durationSeconds} s de photos = {p.duration} s au total. La voix off conserve sa durée.</p>
+      <p className="customizer-hint">{p.map.durationSeconds} s de carte dans votre vidéo de {p.duration} s.</p>
+      <details className="customizer-disclosure"><summary>Mouvement de caméra<HomeIcon name="chevron" size={17}/></summary><div>
       <div className="map-options map-zooms">{(['start','end'] as const).map(endpoint=>{const field=endpoint==='start'?'zoomStart':'zoomEnd',value=zooms[field],title=endpoint==='start'?'Zoom au départ':'Zoom à l’arrivée';
         const update=(value:number)=>{if(!Number.isFinite(value)||value<12||value>18)return;patch({...zooms,[field]:value});p.onPreview?.(endpoint);};
         return <div key={endpoint}><label htmlFor={`map-zoom-${endpoint}`}>{title}</label><input id={`map-zoom-${endpoint}`} type="range" min="12" max="18" step="0.25" value={value} disabled={p.busy} onChange={e=>update(Number(e.target.value))}/>
           <input type="number" aria-label={`${title} : niveau précis`} min="12" max="18" step="0.25" value={value} disabled={p.busy} onChange={e=>{if(e.target.value)update(Number(e.target.value));}}/>
           {p.onPreview&&<button type="button" className="customizer-reset" disabled={p.busy||(!p.map?.location&&!p.automatic)} onClick={()=>p.onPreview?.(endpoint)}>{endpoint==='start'?'Voir le départ':'Voir l’arrivée'}</button>}</div>;})}</div>
-      <p className="customizer-hint">Un niveau plus bas montre une zone plus large. Choisissez deux niveaux identiques pour une vue fixe, ou un départ plus élevé pour un dézoom.</p>
+      <p className="customizer-hint">Un niveau bas montre une zone plus large. Deux niveaux identiques donnent une vue fixe.</p>
       <button type="button" className="customizer-reset" disabled={p.busy} onClick={()=>{const defaults=p.defaults&&p.defaults.view===(p.map?.view??'plan')?p.defaults:mapDefaultZooms(p.map?.view,candidate?.precision);patch({zoomStart:defaults.zoomStart,zoomEnd:defaults.zoomEnd});p.onPreview?.('start');}}>Réinitialiser les zooms</button>
-      {p.automatic?<><p className="customizer-hint">Localisation automatique depuis la ville de l’annonce{p.locality?` : ${p.locality}`:''}. Aucune adresse précise n’est exposée. Si la ville ne peut pas être située, la vidéo est créée sans carte.</p>
+      </div></details>
+      {p.automatic?<><div className="customizer-map-location"><HomeIcon name="pin" size={19}/><div><strong>{p.locality||'Ville de l’annonce'}</strong><p>Localisation automatique · Adresse précise masquée.</p></div></div>
         <button type="button" className="customizer-reset" disabled={p.busy} onClick={()=>p.onChange({...p.map!,location:null},false)}>Choisir un repère précis</button></>:<>
       <button type="button" className="customizer-reset" disabled={p.busy} onClick={()=>p.onChange({...p.map!,location:null},true)}>Utiliser la ville de l’annonce</button>
       <label htmlFor="map-search">Ville ou adresse du bien</label><div className="map-search"><input id="map-search" value={query} maxLength={120} disabled={p.busy||searching} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();if(query.trim().length>=2&&!searching)void search();}}} placeholder="Lyon 6e ou une adresse"/>
