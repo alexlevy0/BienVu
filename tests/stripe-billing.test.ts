@@ -279,3 +279,85 @@ test('Checkout : échec d’expiration et paiement concomitant ne libèrent pas 
  await f.DB.prepare("INSERT INTO subscriptions(agency_id,stripe_customer_id,stripe_subscription_id,plan_code,status,stripe_mode,updated_at) VALUES(?,?,?,'solo','canceled','test',?)").bind(f.agencyId,'cus_fixture','sub_race',new Date().toISOString()).run();
  await open('agence','race-agence-key-first');assert.equal(calls,2,'Un abonnement déjà synchronisé et terminé permet une nouvelle souscription');
 });
+
+// Annual payment must fund monthly periods, never expose the entire year at once.
+import {subscriptionCreditPeriods} from '../apps/web/lib/subscription-periods';
+import {subscriptionPricing,creditPlans} from '../packages/contracts/src/credits';
+function annual(f:Awaited<ReturnType<typeof fixture>>,start=Math.floor(Date.now()/1000)-10){
+ const end=(()=>{const d=new Date(start*1000);d.setUTCFullYear(d.getUTCFullYear()+1);return Math.floor(d.getTime()/1000);})();
+ f.sub.metadata.plan='solo';Object.assign(f.sub.items.data[0].price,{unit_amount:54000,recurring:{interval:'year',interval_count:1}});
+ Object.assign(f.sub.items.data[0],{current_period_start:start,current_period_end:end});
+ Object.assign(f.invoice,{amount_paid:54000,subtotal:54000,subtotal_excluding_tax:54000});
+ Object.assign(f.invoice.lines.data[0],{amount:54000,period:{start,end}});
+ return subscriptionCreditPeriods('year',start,end);
+}
+test('Annuel : remise exacte sur les quatre offres et calendrier ancré aux fins de mois',()=>{
+ assert.deepEqual(creditPlans.filter(p=>p.price).map(p=>subscriptionPricing(p.price,'year').amountCents),[54000,108000,216000,540000]);
+ const periods=subscriptionCreditPeriods('year',Date.parse('2028-01-31T15:22:13Z')/1000,Date.parse('2029-01-31T15:22:13Z')/1000);
+ assert.equal(periods.length,12);assert.equal(periods[0].end,'2028-02-29T15:22:13.000Z');assert.equal(periods[1].end,'2028-03-31T15:22:13.000Z');
+ const leap=subscriptionCreditPeriods('year',Date.parse('2028-02-29T10:00:00Z')/1000,Date.parse('2029-02-28T10:00:00Z')/1000);assert.equal(leap.at(-1)!.end,'2029-02-28T10:00:00.000Z');
+ assert.throws(()=>subscriptionCreditPeriods('year',1,1+30*86400),/INVALID/);
+});
+test('Annuel Checkout : montant serveur, changement de cadence et idempotence sans reprendre le mauvais prix',async t=>{
+ const f=await fixture(t,'annual-checkout'),seen:Stripe.Checkout.SessionCreateParams[]=[];
+ f.client.checkout.sessions.create=async params=>{seen.push(params!);const id='cs_annual_'+seen.length;return {id,url:'https://checkout.stripe.com/c/pay/'+id} as Stripe.Response<Stripe.Checkout.Session>;};
+ const open=(billingInterval:string,key:string)=>createCheckout(f.env,f.agencyId,'fixture@example.com','https://bienvu.online',{plan:'solo',billingInterval},key,f.client);
+ await open('month','annual-month-key-001');
+ await assert.rejects(open('year','annual-month-key-001'),{fields:{checkout:'invalid_intent'}});
+ await open('year','annual-year-key-0001');assert.equal(f.checkoutSessions.get('cs_annual_1')!.status,'expired');
+ assert.equal(seen[1].line_items![0].price_data!.unit_amount,54000);assert.equal(seen[1].line_items![0].price_data!.recurring!.interval,'year');
+ assert.match(seen[1].custom_text!.submit!.message,/540 € HT facturés pour un an/);assert.equal(seen[1].subscription_data!.metadata!.billingInterval,'year');
+ await open('year','annual-year-other-tab');assert.equal(seen.length,2);
+ await assert.rejects(open('week','annual-invalid-key01'),{code:'VALIDATION_ERROR'});
+ await open('month','annual-new-month-key');assert.equal(f.checkoutSessions.get('cs_annual_2')!.status,'expired');assert.equal(seen[2].line_items![0].price_data!.unit_amount,5000);
+ assert.equal((await f.DB.prepare('SELECT count(*) n FROM financial_receipts').first<{n:number}>())!.n,0);
+});
+test('Annuel : paiement vérifié, replay concurrent, 12 quotas bornés, report limité à un mois et fin des droits',async t=>{
+ const f=await fixture(t,'annual-periods'),periods=annual(f);
+ await Promise.all([1,2].map(n=>processStripeEvent(f.env,f.event('evt_annual_'+n),String(n).repeat(64),f.client)));
+ assert.equal((await billingStatus(f.env,f.agencyId)).subscription!.billingInterval,'year');
+ assert.equal((await creditBalance(f.DB,f.agencyId)).available,50);assert.equal((await generationRights(f.DB,f.agencyId,'true')).developmentRemaining,50);
+ const rows=await f.DB.prepare('SELECT a.id,a.valid_from start,a.valid_until end FROM annual_credit_periods p JOIN allocations a ON a.id=p.allocation_id ORDER BY ordinal').all<{id:string;start:string;end:string}>();
+ assert.deepEqual(rows.results.map(({start,end})=>({start,end})),periods);assert.equal(rows.results.length,12);
+ await f.DB.prepare('UPDATE allocations SET consumed=12 WHERE id=?').bind(rows.results[0].id).run();
+ const second=await creditBalance(f.DB,f.agencyId,Date.parse(periods[1].start));assert.equal(second.available,88);assert.equal(second.rolloverAvailable,38);
+ const third=await creditBalance(f.DB,f.agencyId,Date.parse(periods[2].start));assert.equal(third.available,100,'Les 38 crédits déjà reportés ne sont pas reportés de nouveau');
+ assert.equal((await f.DB.prepare('SELECT count(*) n FROM billing_invoices').first<{n:number}>())!.n,1);
+ assert.deepEqual(await f.DB.prepare('SELECT credits,gross_cents gross FROM financial_receipts').first(),{credits:600,gross:54000});
+ f.sub.cancel_at_period_end=true;await processStripeEvent(f.env,f.event('evt_annual_cancel','customer.subscription.updated'),'c'.repeat(64),f.client);
+ assert.equal((await creditBalance(f.DB,f.agencyId,Date.parse(periods[11].start))).available,100,'La résiliation conserve l’année payée');
+ assert.equal((await creditBalance(f.DB,f.agencyId,Date.parse(periods[11].end))).available,0);
+ const renewalStart=f.invoice.lines.data[0].period.end,renewed=annual(f,renewalStart);f.invoice.id='in_annual_renew';f.invoice.billing_reason='subscription_cycle';
+ await processStripeEvent(f.env,f.event('evt_annual_renew'),'d'.repeat(64),f.client);
+ assert.equal((await creditBalance(f.DB,f.agencyId,Date.parse(renewed[0].start))).available,100);assert.equal((await f.DB.prepare('SELECT count(*) n FROM annual_credit_periods').first<{n:number}>())!.n,24);
+});
+test('Annuel : impayé, faux prix et durée incohérente ne donnent aucun crédit',async t=>{
+ const f=await fixture(t,'annual-invalid');annual(f);
+ await processStripeEvent(f.env,f.event('evt_annual_unpaid','invoice.payment_failed'),'1'.repeat(64),f.client);assert.equal((await creditBalance(f.DB,f.agencyId)).available,0);
+ f.sub.items.data[0].price.unit_amount=5000;await assert.rejects(processStripeEvent(f.env,f.event('evt_annual_bad_price'),'2'.repeat(64),f.client));
+ f.sub.items.data[0].price.unit_amount=54000;f.invoice.lines.data[0].period.end-=86400;await assert.rejects(processStripeEvent(f.env,f.event('evt_annual_bad_end'),'3'.repeat(64),f.client));
+ assert.equal((await f.DB.prepare('SELECT count(*) n FROM annual_credit_periods').first<{n:number}>())!.n,0);
+});
+test('Annuel : remboursement et litige affectent aussi les mois futurs, dette bloquante et revenu sans duplication',async t=>{
+ const f=await fixture(t,'annual-refund'),periods=annual(f);await processStripeEvent(f.env,f.event('evt_annual_refund'),'e'.repeat(64),f.client);
+ await f.DB.prepare('UPDATE financial_receipts SET refunded_cents=27000,reversed_credits=300 WHERE invoice_id=?').bind(f.invoice.id).run();
+ assert.equal((await creditBalance(f.DB,f.agencyId)).available,25);assert.equal((await creditBalance(f.DB,f.agencyId,Date.parse(periods[8].start))).available,25);
+ await f.DB.prepare('UPDATE financial_receipts SET disputed=1 WHERE invoice_id=?').bind(f.invoice.id).run();assert.equal((await creditBalance(f.DB,f.agencyId,Date.parse(periods[8].start))).available,0);
+ await f.DB.prepare('UPDATE financial_receipts SET disputed=0 WHERE invoice_id=?').bind(f.invoice.id).run();assert.equal((await creditBalance(f.DB,f.agencyId)).available,25);
+ await f.DB.prepare('UPDATE allocations SET consumed=26 WHERE id=?').bind('stripe-'+f.invoice.id).run();assert.equal((await creditBalance(f.DB,f.agencyId,Date.parse(periods[8].start))).available,0,'Une dette sur un mois bloque également les prochains');
+ const summary=await commercialSummary(f.DB);assert.equal(summary.revenue.find(r=>r.mode==='test')!.revenueHtCents,27000,'Le reçu annuel est compté une seule fois');
+ await f.DB.prepare('UPDATE financial_receipts SET refunded_cents=54000,reversed_credits=600 WHERE invoice_id=?').bind(f.invoice.id).run();assert.equal((await creditBalance(f.DB,f.agencyId,Date.parse(periods[11].start))).available,0);
+});
+test('Annuel : bonus promotionnel au premier mois seulement, admission et revenu annuel réparti sur tous les crédits',async t=>{
+ const f=await promotionFixture(t,'annual-promo'),periods=annual(f),{intent,session}=await f.open();
+ session.status='complete';session.subscription=f.sub.id;(f.sub.metadata as Record<string,string>).promotionIntentId=intent.id;
+ await processStripeEvent(f.env,f.event('evt_annual_promo'),'f'.repeat(64),f.client);
+ assert.equal((await creditBalance(f.DB,f.agencyId)).available,60);assert.equal((await creditHistory(f.DB,f.agencyId)).bonuses![0].expiresAt,periods[0].end);
+ assert.equal((await creditBalance(f.DB,f.agencyId,Date.parse(periods[1].start))).available,100,'Le bonus n’est pas renouvelé ou reporté');
+ await f.DB.prepare('INSERT INTO hosted_import_budget VALUES(?,0,9000,0)').bind(new Date().toISOString().slice(0,7)).run();
+ const run=await admitGeneration(f.DB,f.agencyId,'annual-promo-run-key001',{listingId:'listing-annual-promo',customization:{...defaultVideoCustomization(),runwayPhotos:[0]}},'true');
+ const listing=JSON.parse((await f.DB.prepare('SELECT result_json data FROM listing_imports WHERE id=?').bind('listing-annual-promo').first<{data:string}>())!.data),photo=listing.photos[0],at=new Date().toISOString();
+ await f.DB.prepare("INSERT INTO photo_animations(id,agency_id,job_id,photo_id,source_sha256,slot,month,mode,model,credits,reserved_cents,state,created_at,updated_at) VALUES(?,?,?,?,?,0,?,'mock','gen4_turbo',25,0,'ready',?,?)").bind('annual-promo-animation',f.agencyId,run.jobId,photo.id,photo.contentHash,at.slice(0,7),at,at).run();
+ await failGeneration(f.DB,run,'FIXTURE');
+ assert.deepEqual(await f.DB.prepare('SELECT used,revenue_micros revenue FROM finance_credit_attribution WHERE job_id=?').bind(run.jobId).first(),{used:1,revenue:Math.floor(540e6/610)});
+});

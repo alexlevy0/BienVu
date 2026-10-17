@@ -77,17 +77,17 @@ async function monthlyCreditGrant(db:Database,agencyId:string,now=Date.now()):Pr
   // Snapshot only after the paid period has begun. Prepaid future invoices must
   // not copy credits which the agency can still spend in the previous period.
   await db.prepare(`INSERT INTO credit_rollover_links(allocation_id,agency_id,previous_allocation_id,base_credits,carried,created_at)
-    SELECT current.id,current.agency_id,previous.id,receipt.credits,
-      IIF(previous.id IS NULL,0,max(0,min(receipt.credits,previous_receipt.credits-previous.reserved-previous.consumed,previous.available))),?
-    FROM allocations current JOIN billing_invoices i ON i.allocation_id=current.id JOIN financial_receipts receipt ON receipt.invoice_id=i.id
-    LEFT JOIN billing_invoices pi ON pi.agency_id=i.agency_id AND pi.subscription_id=i.subscription_id AND pi.mode=i.mode AND pi.period_end=i.period_start
+    SELECT current.id,current.agency_id,previous.id,ar.base_credits,
+      IIF(previous.id IS NULL,0,max(0,min(ar.base_credits,previous_receipt.base_credits-previous.reserved-previous.consumed,previous.available))),?
+    FROM allocations current JOIN subscription_credit_periods i ON i.allocation_id=current.id JOIN allocation_receipts ar ON ar.allocation_id=current.id JOIN financial_receipts receipt ON receipt.id=ar.receipt_id
+    LEFT JOIN subscription_credit_periods pi ON pi.agency_id=i.agency_id AND pi.subscription_id=i.subscription_id AND pi.mode=i.mode AND pi.period_end=i.period_start
     LEFT JOIN base_spendable_credit_sources previous ON previous.id=pi.allocation_id AND previous.enabled=1
-    LEFT JOIN financial_receipts previous_receipt ON previous_receipt.invoice_id=pi.id
+    LEFT JOIN allocation_receipts previous_receipt ON previous_receipt.allocation_id=previous.id
     WHERE current.agency_id=? AND current.valid_from<=? AND current.valid_until>?
       AND i.mode=(SELECT mode FROM credit_payment_policy WHERE id=1) AND i.plan IN ('solo','agence','equipe','reseau')
-      AND receipt.disputed=0 AND receipt.reversed_credits=0 AND NOT EXISTS(SELECT 1 FROM credit_rollover_links l WHERE l.allocation_id=current.id)
+      AND receipt.disputed=0 AND ar.reversed=0 AND NOT EXISTS(SELECT 1 FROM credit_rollover_links l WHERE l.allocation_id=current.id)
     ON CONFLICT(allocation_id) DO NOTHING`).bind(at,agencyId,at,at).run();
-  const paid=await db.prepare(`SELECT a.id,a.kind,max(0,a.quota_limit-a.reserved-a.consumed) AS remaining,a.valid_until AS renewalAt,1 AS enabled FROM allocations a JOIN billing_invoices i ON i.allocation_id=a.id WHERE a.agency_id=? AND a.valid_from<=? AND a.valid_until>? AND i.mode=(SELECT mode FROM credit_payment_policy WHERE id=1) ORDER BY a.valid_from DESC LIMIT 1`).bind(agencyId,at,at).first<CreditGrant>();
+  const paid=await db.prepare(`SELECT a.id,a.kind,max(0,a.quota_limit-a.reserved-a.consumed) AS remaining,a.valid_until AS renewalAt,1 AS enabled FROM allocations a JOIN subscription_credit_periods i ON i.allocation_id=a.id WHERE a.agency_id=? AND a.valid_from<=? AND a.valid_until>? AND i.mode=(SELECT mode FROM credit_payment_policy WHERE id=1) ORDER BY a.valid_from DESC LIMIT 1`).bind(agencyId,at,at).first<CreditGrant>();
   if(paid)return paid;
   const legacy=await db.prepare(`SELECT a.id,a.kind,max(0,a.quota_limit-a.reserved-a.consumed) AS remaining,a.valid_until AS renewalAt,g.enabled
     FROM generation_access g JOIN allocations a ON a.id=g.allocation_id AND a.agency_id=g.agency_id

@@ -41,3 +41,30 @@
 .home-studio .offers-billing-account .offers-billing-error{grid-column:1/-1;color:#9b503e}
 @media(max-width:900px){.offers-billing-account{grid-template-columns:1fr;gap:18px}.offers-billing-actions{padding-left:66px}.offers-billing-actions .offers-action{min-width:0}}
 @media(max-width:540px){.offers-billing-account{padding:19px 16px;margin:22px 0 26px}.offers-billing-copy{gap:12px}.offers-billing-icon{width:40px;height:40px}.home-studio .offers-billing-account h2{font-size:21px}.offers-billing-actions{padding-left:0}.offers-billing-actions .offers-action{width:100%;white-space:normal}}
+
+/* Annual pricing: a quiet sliding selector and explicit upfront totals. */
+.offers-cadence{display:flex;align-items:center;justify-content:space-between;gap:28px;margin:32px 0 27px;padding:26px 28px;background:linear-gradient(115deg,#eaf0e3,#f4f6ef);border:1px solid #d6e0cc;border-radius:18px}
+.offers-cadence-kicker{display:block;text-transform:uppercase;letter-spacing:1.7px;font-size:10px;font-weight:600;color:#617755;margin-bottom:9px}
+.home-studio .offers-cadence h2{font:500 clamp(22px,2.4vw,30px)/1.15 'Inter Tight',Arial,sans-serif;letter-spacing:-.7px;margin:0 0 9px}
+.home-studio .offers-cadence p{font-size:13px;line-height:1.5;color:#64725e;margin:0}
+.offers-cadence-choice{flex:none;text-align:center;min-width:285px}
+.offers-cadence-tabs{isolation:isolate;position:relative;display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:5px;border:1px solid #d3dccb;background:#fdfefa;border-radius:100px;box-shadow:0 3px 8px #24401c08}
+.offers-cadence-tabs::before{content:'';position:absolute;z-index:-1;inset:5px auto 5px 5px;width:calc((100% - 14px)/2);border-radius:100px;background:#203c2d;box-shadow:0 3px 8px #203c2d24;transition:transform 380ms cubic-bezier(.22,1,.36,1)}
+.offers-cadence-tabs[data-annual=true]::before{transform:translateX(calc(100% + 4px))}
+.offers-cadence-tabs button{min-height:44px;border:0;border-radius:100px;background:none;color:#5c6b56;font:500 14px/1.2 'Inter Tight',Arial,sans-serif;padding:10px 14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;transition:color 200ms}
+.offers-cadence-tabs button[aria-selected=true]{color:white}
+.offers-cadence-tabs button span{border-radius:20px;padding:4px 5px;background:#e2ebd7;color:#36532b;font-size:10px;font-weight:700;white-space:nowrap}
+.offers-cadence-tabs button:disabled{cursor:wait;opacity:.65}
+.home-studio .offers-cadence .offers-cadence-note{font-size:11px;margin-top:10px;min-height:17px}
+.offers-price-block{margin:0 0 18px}
+.offers-price-eyebrow{min-height:23px;display:flex;align-items:center;gap:9px;color:#6a7863;font-size:11px;margin-bottom:10px}
+.offers-price-eyebrow s{text-decoration-thickness:1px;color:#7b8478}
+.offers-price-eyebrow>span{background:#dfebd4;border-radius:20px;padding:4px 8px;font-size:10px;color:#375a2c;font-weight:600}
+.offers-price-block .offers-price{margin:0 0 10px;animation:offers-price-in 280ms cubic-bezier(.22,1,.36,1) both}
+.home-studio .offers-price-billing{font-size:11px;line-height:1.7;margin:0;min-height:38px;display:grid;color:#737d6c}
+.offers-price-billing strong{font-weight:500;color:#3b6634}
+.offers-network .offers-price-block{margin:0}.offers-network .offers-price-eyebrow{margin-bottom:8px}.offers-network .offers-price-block .offers-price{margin-bottom:8px}.offers-network{grid-template-columns:1fr 1.15fr 1.05fr 190px}
+@keyframes offers-price-in{from{opacity:.3;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:1100px){.offers-cadence{padding:24px;gap:20px}.offers-cadence-choice{min-width:260px}.offers-network{grid-template-columns:1fr 1fr}.offers-network .offers-price-block{justify-self:start}}
+@media(max-width:700px){.offers-cadence{flex-direction:column;align-items:stretch;padding:22px 20px;gap:22px;margin-top:25px}.offers-cadence-choice{min-width:0;max-width:360px;width:100%;align-self:center}.home-studio .offers-cadence h2{font-size:27px}.offers-cadence-tabs button{min-height:46px}.offers-price-billing{font-size:12px}.offers-price-eyebrow{font-size:12px}}
+@media(prefers-reduced-motion:reduce){.offers-cadence-tabs::before,.offers-cadence-tabs button{transition:none}.offers-price-block .offers-price{animation:none}}

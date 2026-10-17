@@ -18,6 +18,15 @@ export const creditPlans=[
   {code:'equipe',name:'Équipe',description:'Pour un volume soutenu',price:200,credits:200},
   {code:'reseau',name:'Réseau',description:'Pour les agences multi-sites',price:500,credits:500},
 ] as const;
+export const BillingInterval=z.enum(['month','year']);
+export type BillingInterval=z.infer<typeof BillingInterval>;
+export const ANNUAL_DISCOUNT_PERCENT=10;
+/** Prices stay in integer cents; the annual invoice is paid upfront. */
+export function subscriptionPricing(monthlyEuros:number,interval:BillingInterval){
+  const monthlyCents=Math.round(monthlyEuros*100);
+  const amountCents=interval==='year'?monthlyCents*12*(100-ANNUAL_DISCOUNT_PERCENT)/100:monthlyCents;
+  return {amountCents,monthlyEquivalent:amountCents/(interval==='year'?1200:100),annualSaving:interval==='year'?monthlyEuros*12-amountCents/100:0};
+}
 export type PaidCreditPlanCode=Exclude<typeof creditPlans[number]['code'],'gratuit'>;
 export const legacyCreditPacks=[
   {code:'pack10',credits:10,priceCents:700},
