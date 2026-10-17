@@ -3,7 +3,7 @@
 import {useEffect, useRef, useState} from 'react';
 import {HomeIcon} from './home-icons';
 import {HomeVisual, useHomepageMedia, useHomepageHeroPoster, homeClock, type HomeMediaView} from './homepage-media';
-import {imageWidthUrl,previewVideoUrl,heroPosterSizes,heroInlinePosterMedia} from '../lib/home-media-view';
+import {imageWidthUrl,previewVideoUrl,heroPosterSizes} from '../lib/home-media-view';
 import {HeroBacklight} from './hero-backlight';
 
 type PlaybackProps = {paused: boolean; onPlayingChange(playing: boolean): void};
@@ -124,7 +124,7 @@ function HeroPlayer({visual, movie, paused, onPlayingChange,inlinePoster}: Playb
         onError={() => {setError(true); setStarted(false); onPlayingChange(false);}}/>
       {!started && <button type="button" className="home-hero-demo-cover" onClick={() => void play()}
         aria-label={error ? 'Réessayer la lecture de la vidéo de présentation' : 'Lire la vidéo de présentation'}>
-        {inlinePoster?<picture><source media={heroInlinePosterMedia} type={inlinePoster.startsWith('data:image/avif;')?'image/avif':'image/webp'} srcSet={inlinePoster}/>{cover}</picture>:cover}
+        {inlinePoster?<picture><source media="(max-width: 760px)" type={inlinePoster.startsWith('data:image/avif;')?'image/avif':'image/webp'} srcSet={inlinePoster}/>{cover}</picture>:cover}
         <span className="home-hero-demo-shade"/>
         <span className="home-duration">{homeClock(movie.duration ?? 28)}</span>
         {!custom && <span className="home-hero-demo-heading"><strong>Paris</strong><span>Un nouveau regard<br/>sur votre bien</span></span>}
