@@ -340,6 +340,10 @@ test('Annuel : impayé, faux prix et durée incohérente ne donnent aucun crédi
 });
 test('Annuel : remboursement et litige affectent aussi les mois futurs, dette bloquante et revenu sans duplication',async t=>{
  const f=await fixture(t,'annual-refund'),periods=annual(f);await processStripeEvent(f.env,f.event('evt_annual_refund'),'e'.repeat(64),f.client);
+ await f.DB.prepare('UPDATE financial_receipts SET refunded_cents=1,reversed_credits=1 WHERE invoice_id=?').bind(f.invoice.id).run();
+ assert.equal((await creditBalance(f.DB,f.agencyId)).available,49);
+ assert.equal((await f.DB.prepare('SELECT available FROM base_spendable_credit_sources WHERE id=?').bind('stripe-'+f.invoice.id+'-month-9').first<{available:number}>())!.available,50);
+ assert.equal((await f.DB.prepare('SELECT sum(reversed) n FROM allocation_receipts').first<{n:number}>())!.n,1,'Un remboursement minime ne retire pas douze fois un crédit');
  await f.DB.prepare('UPDATE financial_receipts SET refunded_cents=27000,reversed_credits=300 WHERE invoice_id=?').bind(f.invoice.id).run();
  assert.equal((await creditBalance(f.DB,f.agencyId)).available,25);assert.equal((await creditBalance(f.DB,f.agencyId,Date.parse(periods[8].start))).available,25);
  await f.DB.prepare('UPDATE financial_receipts SET disputed=1 WHERE invoice_id=?').bind(f.invoice.id).run();assert.equal((await creditBalance(f.DB,f.agencyId,Date.parse(periods[8].start))).available,0);
