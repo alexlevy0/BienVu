@@ -43,9 +43,12 @@ export function mountHomeScrollMotion(root:HTMLElement,revealed:WeakSet<HTMLElem
    void item.control.then(()=>{if(!disposed)finish(item);},()=>{if(!disposed)finish(item);});
   }catch{finish(item);}
  };
+ // Leave enough room below an entrance for the visitor to see its movement,
+ // rather than finishing while only a sliver is visible at the screen edge.
+ const entranceInset=Math.round(Math.min(220,Math.max(110,innerHeight*.22)));
  const entrances=new IntersectionObserver(entries=>{
   for(const entry of entries)if(entry.isIntersecting){const item=records.get(entry.target as HTMLElement);if(item)play(item);}
- },{rootMargin:'0px 0px -20px 0px',threshold:0});
+ },{rootMargin:`0px 0px -${entranceInset}px 0px`,threshold:0});
  const prepare=(section:HTMLElement)=>{
   const cues=scenes[section.dataset.homeMotion??''];if(!cues)return;
   for(const cue of cues)for(const [index,node] of [...section.querySelectorAll<HTMLElement>(cue.selector)].entries()){
