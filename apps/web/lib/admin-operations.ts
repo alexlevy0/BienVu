@@ -58,11 +58,18 @@ export async function operationsRead(db:D1Database,f:OperationsFilter,now=Date.n
  if(f.section==='agency'){
   if(!f.id)throw new RequestFailure('VALIDATION_ERROR');
   const agency=(await adminPage(db,AdminQuery.parse({section:'agencies',q:f.id}))).rows.find(r=>r.id===f.id);if(!agency)throw new RequestFailure('NOT_FOUND');
-  const [videos,quotas,reports,notes,messages]=await Promise.all([
+  const [videos,quotas,reports,notes,messages,balance]=await Promise.all([
    adminPage(db,AdminQuery.parse({section:'videos',agency:f.id})),adminPage(db,AdminQuery.parse({section:'quotas',agency:f.id})),adminPage(db,AdminQuery.parse({section:'reports',agency:f.id})),
    rows<Entry>(db,entrySelect+" WHERE o.kind='note' AND o.target=? ORDER BY o.created_at DESC,o.id DESC LIMIT 100",[f.id]),
    rows<{id:string;subject:string;at:string}>(db,'SELECT id,subject,last_at AS at FROM mailbox_threads WHERE peer_email=? COLLATE NOCASE ORDER BY last_at DESC LIMIT 30',[String(agency.email??'')]),
-  ]);return {at,agency,videos,quotas,reports,notes,messages};
+   // Observe the existing ledger only. creditBalance() also materializes grants;
+   // an administrative inspection must never allocate credits to a customer.
+   db.prepare(`SELECT coalesce(sum(available),0) AS available,coalesce(sum(reserved),0) AS reserved,
+    coalesce(sum(IIF(purchased=1 AND rollover=0 AND NOT EXISTS(SELECT 1 FROM credit_promotion_redemptions p WHERE p.allocation_id=s.id),available,0)),0) AS purchased,
+    coalesce(sum(IIF(rollover=1,available,0)),0) AS rollover,
+    coalesce(sum(IIF(EXISTS(SELECT 1 FROM credit_promotion_redemptions p WHERE p.allocation_id=s.id),available,0)),0) AS bonus
+    FROM spendable_credit_sources s WHERE agency_id=? AND enabled=1 AND valid_from<=? AND valid_until>?`).bind(f.id,at,at).first<{available:number;reserved:number;purchased:number;rollover:number;bonus:number}>(),
+  ]);return {at,agency,videos,quotas,reports,notes,messages,balance};
  }
  if(f.section==='changes')return {at,changes:await changes(db,from,to)};
  if(f.section==='providers')return {at,queue:await adminGenerationQueue(db),activity:await providerActivity(db,from,to)};

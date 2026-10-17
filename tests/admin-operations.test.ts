@@ -61,7 +61,9 @@ test('Opérations : requêtes D1 réelles, notes privées, incidents concurrents
   const action={action:'note',id:seed.agencyId,body:'Contexte interne de suivi client'};
   assert.equal((await adminOperationsRequest(req('/api/admin/operations',cookies[1],action),env)).status,200);
   const response=await adminOperationsRequest(req('/api/admin/operations?section=notes&id='+seed.agencyId,cookies[1]),env);assert.equal(response.status,200);const body=await response.json() as {notes:{actor:string;body:string}[]};assert.equal(body.notes[0].actor,'staff-ops');assert.ok(!('agency' in body));
-  const agency=await operationsRead(db,OperationsQuery.parse({section:'agency',id:seed.agencyId}));assert.ok('agency' in agency&&agency.agency);assert.ok('notes' in agency&&agency.notes?.length===1);
+  const grantsBefore=await db.prepare('SELECT count(*) AS n FROM allocations').first<{n:number}>();
+  const agency=await operationsRead(db,OperationsQuery.parse({section:'agency',id:seed.agencyId}));assert.ok('agency' in agency&&agency.agency);assert.ok('notes' in agency&&agency.notes?.length===1);assert.ok('balance' in agency&&agency.balance);assert.equal(agency.balance.available,49);
+  assert.equal((await db.prepare('SELECT count(*) AS n FROM allocations').first<{n:number}>())?.n,grantsBefore?.n,'Une lecture admin ne crée aucun crédit gratuit ou payant');
   await assert.rejects(db.prepare("UPDATE admin_operation_entries SET body='edited'").run(),/AUDIT_IMMUTABLE/);
   assert.equal((await adminOperationsRequest(req('/api/admin/operations',cookies[1],{action:'change',title:'Test',body:'Forbidden change'}),env)).status,403);
  });
