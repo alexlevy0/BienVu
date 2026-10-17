@@ -16,9 +16,15 @@ export async function adminTraffic(db:Database,days:7|30,enabled:boolean,now=Dat
     FROM (SELECT day,page,country,views FROM admin_traffic_daily WHERE day>=? AND day<=? ORDER BY day,page,country)`).bind(start,end).first<{data:string}>();
   const all=JSON.parse(stored?.data??'[]') as {day:string;page:string;country:string;views:number}[];
   const daily=new Map<string,number>(),countries=new Map<string,number>(),pages=new Map<string,number>();
+  const dailyPages=new Map<string,Map<string,number>>(),dailyCountries=new Map<string,Map<string,number>>();
   for(let i=0;i<days;i++)daily.set(new Date(Date.parse(start)+i*86400_000).toISOString().slice(0,10),0);
-  let total=0;for(const r of all){total+=r.views;daily.set(r.day,(daily.get(r.day)??0)+r.views);countries.set(r.country,(countries.get(r.country)??0)+r.views);pages.set(r.page,(pages.get(r.page)??0)+r.views);}
+  let total=0;for(const r of all){total+=r.views;daily.set(r.day,(daily.get(r.day)??0)+r.views);countries.set(r.country,(countries.get(r.country)??0)+r.views);pages.set(r.page,(pages.get(r.page)??0)+r.views);
+    const dayPages=dailyPages.get(r.day)??new Map<string,number>(),dayCountries=dailyCountries.get(r.day)??new Map<string,number>();
+    dayPages.set(r.page,(dayPages.get(r.page)??0)+r.views);dayCountries.set(r.country,(dayCountries.get(r.country)??0)+r.views);dailyPages.set(r.day,dayPages);dailyCountries.set(r.day,dayCountries);
+  }
   const first=await db.prepare('SELECT min(day) AS day FROM admin_traffic_daily').first<{day:string|null}>();
   const sorted=(m:Map<string,number>)=>[...m].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]));
-  return {at,days,enabled,firstDay:first?.day??null,total,daily:[...daily].map(([day,views])=>({day,views})),countries:sorted(countries).map(([country,views])=>({country,views})),pages:sorted(pages).map(([page,views])=>({page,views}))};
+  return {at,days,enabled,firstDay:first?.day??null,total,daily:[...daily].map(([day,views])=>({day,views,
+    pages:sorted(dailyPages.get(day)??new Map()).map(([page,views])=>({page,views})),countries:sorted(dailyCountries.get(day)??new Map()).map(([country,views])=>({country,views})),
+  })),countries:sorted(countries).map(([country,views])=>({country,views})),pages:sorted(pages).map(([page,views])=>({page,views}))};
 }

@@ -4,11 +4,12 @@ import {usePathname} from 'next/navigation';
 import {onCLS,onINP,onLCP,type Metric} from 'web-vitals';
 import {seoPage} from '../lib/seo-paths';
 import {trackProductEvent} from '../lib/product-analytics';
+import {automatedAnalyticsAgent} from '../lib/analytics-exclusions';
 export function PublicWebVitals() {
   const path=usePathname(),initial=useRef(path),started=useRef(false),valid=useRef(true);
   if(path!==initial.current)valid.current=false;
   useEffect(()=>{
-    const page=seoPage(initial.current);if(started.current||!page||location.search||/bot|headless/i.test(navigator.userAgent))return;
+    const page=seoPage(initial.current);if(started.current||!page||location.search||automatedAnalyticsAgent(navigator.userAgent))return;
     started.current=true;
     // Measure the initial document only. A SPA navigation is not a new document metric.
     const send=(metric:Metric)=>{if(!valid.current)return;const body=JSON.stringify({page,metric:metric.name,value:metric.value});

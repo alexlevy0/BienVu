@@ -1,4 +1,5 @@
 import {recordPageHit,purgeTraffic,type Database,type PageHit} from '@bienvu/db';
+import {excludedAnalyticsRequest} from './analytics-exclusions';
 const pages:Record<string,PageHit['page']>={'/':'home','/connexion':'login','/explorer':'explorer','/abonnement':'offers','/sources':'sources'};
 // Le pays est fourni exclusivement par request.cf dans le Worker, pas un header.
 export function pageHit(request:Request,response:Response,origin:string,trustedCountry?:string,now=Date.now()):PageHit|null{
@@ -6,7 +7,7 @@ export function pageHit(request:Request,response:Response,origin:string,trustedC
   if(url.origin!==origin||request.method!=='GET'||response.status!==200||!response.headers.get('content-type')?.includes('text/html'))return null;
   const page=pages[url.pathname];if(!page)return null;
   if(request.headers.get('rsc')==='1'||request.headers.has('next-router-prefetch')||/prefetch/i.test((request.headers.get('purpose')??'')+' '+(request.headers.get('sec-purpose')??'')))return null;
-  if(/bot|crawler|spider|headless|curl|wget|python|undici|node|facebookexternalhit/i.test(request.headers.get('user-agent')??''))return null;
+  if(excludedAnalyticsRequest(request))return null;
   const country=trustedCountry&&/^[A-Z]{2}$/.test(trustedCountry)&&trustedCountry!=='T1'?trustedCountry:'XX';
   return {day:new Date(now).toISOString().slice(0,10),page,country};
 }

@@ -1,10 +1,10 @@
 import {z} from 'zod';
 import {seoPage} from './seo-paths';
 import {boundedJson,RequestFailure,respond} from './http';
+import {excludedAnalyticsRequest} from './analytics-exclusions';
 
 type Channel='direct'|'google'|'bing'|'search'|'social'|'internal'|'other';
 type Vital='LCP'|'CLS'|'INP';
-const bots=/bot|crawler|spider|headless|curl|wget|python|undici|node|facebookexternalhit/i;
 export function sourceChannel(referrer:string|null,origin:string):Channel {
   if(!referrer)return 'direct';
   let url:URL;try{url=new URL(referrer);if(!['https:','http:'].includes(url.protocol))return 'other';}catch{return 'other';}
@@ -31,7 +31,7 @@ function privateQuery(url:URL) {return [...url.searchParams.keys()].some(key=>['
 export function seoHit(request:Request,response:Response,origin:string,now=Date.now()) {
   const url=new URL(request.url),page=seoPage(url.pathname);
   if(!page||privateQuery(url)||url.origin!==origin||request.method!=='GET'||response.status!==200||!response.headers.get('content-type')?.includes('text/html'))return null;
-  if(request.headers.get('rsc')==='1'||request.headers.has('next-router-prefetch')||/prefetch/i.test((request.headers.get('purpose')??'')+' '+(request.headers.get('sec-purpose')??''))||bots.test(request.headers.get('user-agent')??''))return null;
+  if(request.headers.get('rsc')==='1'||request.headers.has('next-router-prefetch')||/prefetch/i.test((request.headers.get('purpose')??'')+' '+(request.headers.get('sec-purpose')??''))||excludedAnalyticsRequest(request))return null;
   return {day:new Date(now).toISOString().slice(0,10),page,channel:sourceChannel(request.headers.get('referer'),origin)};
 }
 export function collectSeo(request:Request,response:Response,env:{DB:D1Database;TRAFFIC_ENABLED?:string;BETTER_AUTH_URL:string},ctx:{waitUntil(task:Promise<unknown>):void}) {
@@ -53,7 +53,7 @@ export function vitalBucket(metric:Vital,value:number) {
 const payload=z.object({page:z.string().max(100),metric:z.enum(['LCP','CLS','INP']),value:z.number().finite().nonnegative().max(3600000)}).strict();
 export async function webVitalRequest(request:Request,env:{DB:D1Database;TRAFFIC_ENABLED?:string;BETTER_AUTH_URL:string}) {return respond(async()=>{
   if(request.method!=='POST'||request.headers.get('origin')!==env.BETTER_AUTH_URL||request.headers.get('sec-fetch-site')==='cross-site')throw new RequestFailure('FORBIDDEN');
-  if(env.TRAFFIC_ENABLED!=='true'||bots.test(request.headers.get('user-agent')??''))return new Response(null,{status:204});
+  if(env.TRAFFIC_ENABLED!=='true'||excludedAnalyticsRequest(request))return new Response(null,{status:204});
   const value=payload.safeParse(await boundedJson(request,512));
   if(!value.success)throw new RequestFailure('VALIDATION_ERROR');
   if(!seoPage(value.data.page)&&value.data.page!=='/explorer/video'||value.data.metric==='CLS'&&value.data.value>100)throw new RequestFailure('VALIDATION_ERROR');

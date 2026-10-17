@@ -28,6 +28,9 @@ test('SEO : provenance sans URL conservée, préchargements et parcours privés 
   for(const path of ['/admin','/biens','/?draft=private','/?homePreview=1','/?code=secret'])assert.equal(seoHit(request(path),html,origin,now),null);
   const ignored:Record<string,string>[]=[{rsc:'1'},{'next-router-prefetch':'1'},{purpose:'prefetch'},{'user-agent':'Googlebot'}];
   for(const headers of ignored)assert.equal(seoHit(request('/',headers),html,origin,now),null);
+  assert.equal(seoHit(request('/?bienvu_audit=1'),html,origin,now),null);
+  for(const agent of ['Chrome-Lighthouse','PageSpeed Insights','GTmetrix'])assert.equal(seoHit(request('/',{'user-agent':agent}),html,origin,now),null);
+  assert.equal(seoHit(request('/',{'x-bienvu-audit':'1'}),html,origin,now),null);
   assert.equal(seoHit(request('/'),new Response('',{status:404,headers:{'content-type':'text/html'}}),origin,now),null);
 });
 test('SEO : agrégats atomiques, mesures bornées et purge sans identifiant',async t=>{
@@ -35,8 +38,11 @@ test('SEO : agrégats atomiques, mesures bornées et purge sans identifiant',asy
   const tasks:Promise<unknown>[]=[],env={DB:db,BETTER_AUTH_URL:origin,TRAFFIC_ENABLED:'true'},ctx={waitUntil(task:Promise<unknown>){tasks.push(task);}};
   for(let i=0;i<10;i++)collectSeo(request('/video-immobiliere-ia',{referer:'https://www.google.fr/search?q=secret'}),html,env,ctx);
   collectSeo(request('/'),html,{...env,TRAFFIC_ENABLED:'false'},ctx);await Promise.all(tasks);assert.equal(tasks.length,10);
+  collectSeo(request('/?bienvu_audit=1'),html,env,ctx);assert.equal(tasks.length,10);
   const post=(body:unknown,headers:Record<string,string>={})=>new Request(origin+'/api/metrics/web-vitals',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json','User-Agent':'Mozilla/5.0',...headers},body:JSON.stringify(body)});
   assert.equal((await webVitalRequest(post({page:'/video-immobiliere-ia',metric:'LCP',value:2100}),env)).status,204);
+  assert.equal((await webVitalRequest(post({page:'/',metric:'LCP',value:3000},{'user-agent':'Chrome-Lighthouse'}),env)).status,204);
+  assert.equal((await webVitalRequest(post({page:'/',metric:'LCP',value:3000},{'x-bienvu-audit':'1'}),env)).status,204);
   assert.equal((await webVitalRequest(post({page:'/admin',metric:'LCP',value:100}),env)).status,422);
   assert.equal((await webVitalRequest(post({page:'/?draft=private',metric:'CLS',value:0}),env)).status,422);
   assert.equal((await webVitalRequest(post({page:'/',metric:'INP',value:-1}),env)).status,422);

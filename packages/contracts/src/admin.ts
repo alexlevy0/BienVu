@@ -51,7 +51,7 @@ export const AdminPerformanceQuery=z.object({section:z.literal('performance'),da
 export type AdminPerformanceDay={day:string;ready:number;measuredReady:number;averageSeconds:number|null;minSeconds:number|null;maxSeconds:number|null};
 export type AdminPerformanceTimeline={at:string;from:string;until:string;days:7|30|90;ready:number;measuredReady:number;averageSeconds:number|null;daily:AdminPerformanceDay[]};
 export type AdminTraffic={at:string;days:number;enabled:boolean;firstDay:string|null;total:number;
-  daily:{day:string;views:number}[];countries:{country:string;views:number}[];pages:{page:string;views:number}[]};
+  daily:{day:string;views:number;pages:{page:string;views:number}[];countries:{country:string;views:number}[]}[];countries:{country:string;views:number}[];pages:{page:string;views:number}[]};
 export type AdminVideoDetail = {
   video:AdminRow;events:AdminRow[];reports:AdminRow[];calls:AdminNarrationCall[];animations?:AdminRow[];animationIssue?:string;
 };
