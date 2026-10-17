@@ -83,7 +83,7 @@ export function StudioSidebar({active}: {active: 'create' | 'videos' | 'explore'
       {section === 'editor' && <span className="home-nav-badge"><HomeIcon name="sparkle" size={12} filled/>Nouveau</span>}
     </Link>;
   return <>
-    <header className="home-mobile-header"><Link href="/" aria-label="BienVu, accueil"><HomeWordmark/></Link><button ref={menuButton} type="button" aria-expanded={menuOpen} aria-controls="home-sidebar" aria-label={menuOpen ? 'Fermer la navigation' : 'Ouvrir la navigation'} onClick={() => setMenuOpen(value => !value)}><HomeIcon name={menuOpen ? 'close' : 'menu'}/></button></header>
+    <header style={{viewTransitionName:'bv-mobile-header'}} className="home-mobile-header"><Link href="/" aria-label="BienVu, accueil"><HomeWordmark/></Link><button ref={menuButton} type="button" aria-expanded={menuOpen} aria-controls="home-sidebar" aria-label={menuOpen ? 'Fermer la navigation' : 'Ouvrir la navigation'} onClick={() => setMenuOpen(value => !value)}><HomeIcon name={menuOpen ? 'close' : 'menu'}/></button></header>
     <button type="button" className={`home-menu-backdrop${menuOpen?' home-menu-backdrop-open':''}`} aria-label="Fermer la navigation" aria-hidden={!menuOpen} onClick={closeMenu} tabIndex={-1}/>
     <aside style={{viewTransitionName:'bv-sidebar'}} id="home-sidebar" ref={sidebar} className={`home-sidebar${menuOpen ? ' home-sidebar-open' : ''}`} aria-label="Votre studio BienVu" role={menuOpen?'dialog':undefined} aria-modal={menuOpen?true:undefined}>
       <div className="home-sidebar-header"><Link className="home-brand-link" href="/" aria-label="BienVu, accueil" onClick={closeMenu} {...tips('BienVu, accueil')}><HomeWordmark/></Link>

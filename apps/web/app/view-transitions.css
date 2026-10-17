@@ -15,9 +15,9 @@
 ::view-transition-new(.bv-forward){animation:220ms ease-out both bv-forward-in}
 ::view-transition-old(.bv-back){animation:220ms ease-out both bv-back-out}
 ::view-transition-new(.bv-back){animation:220ms ease-out both bv-back-in}
-::view-transition-group(bv-sidebar),::view-transition-group(bv-header),::view-transition-group(bv-showcase-header){animation:none;z-index:100}
-::view-transition-old(bv-sidebar),::view-transition-old(bv-header),::view-transition-old(bv-showcase-header){display:none}
-::view-transition-new(bv-sidebar),::view-transition-new(bv-header),::view-transition-new(bv-showcase-header){animation:none}
+::view-transition-group(bv-mobile-header),::view-transition-group(bv-sidebar),::view-transition-group(bv-header),::view-transition-group(bv-showcase-header){animation:none;z-index:100}
+::view-transition-old(bv-mobile-header),::view-transition-old(bv-sidebar),::view-transition-old(bv-header),::view-transition-old(bv-showcase-header){display:none}
+::view-transition-new(bv-mobile-header),::view-transition-new(bv-sidebar),::view-transition-new(bv-header),::view-transition-new(bv-showcase-header){animation:none}
 @keyframes bv-fade-in{from{opacity:0}to{opacity:1}}
 @keyframes bv-fade-out{from{opacity:1}to{opacity:0}}
 @keyframes bv-forward-in{from{translate:18px 0}to{translate:0 0}}
