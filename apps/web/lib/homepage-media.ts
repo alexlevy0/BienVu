@@ -6,6 +6,7 @@ import type {AuthEnvironment} from './auth';
 import {requireAdmin} from './admin-access';
 import {assertSameOrigin,boundedJson,RequestFailure,respond} from './http';
 import {contentHash} from './manual-listings';
+import {resolveHomeMedia} from './home-media-view';
 
 type Env={DB:D1Database;MEDIA:Pick<R2Bucket,'get'|'head'|'put'|'delete'>};
 type AdminEnv=Env&AuthEnvironment&{SUPER_ADMIN_EMAIL?:string};
@@ -224,6 +225,21 @@ export async function homepageMediaRequest(request:Request,env:Env,id:string,adm
   response.headers.set('Cache-Control','public, max-age=60, must-revalidate');
   if(new URL(request.url).searchParams.has('w'))response.headers.set('Vary','Accept');
  }return response;
+}
+// The small public hero poster travels with the initial mobile HTML. Reuse the
+// public media handler so publication, revocation and snapshot checks stay the
+// same as for a normal image request. Never inline originals or private previews.
+export async function readHomepageHeroPoster(env:Env,config:HomepageConfig,context?:HomepageCache):Promise<string|null>{
+ const visual=resolveHomeMedia(config,'hero.visual'),match=/^\/api\/homepage\/media\/([a-f0-9-]{36})(\?poster=1)?$/.exec(visual.src);
+ if(!match)return null;
+ try{
+  const url=new URL(visual.src,context?.origin??'https://bienvu.online');url.searchParams.set('w','640');
+  const response=await homepageMediaRequest(new Request(url,{headers:{Accept:'image/avif,image/webp'}}),env,match[1]!,undefined,context);
+  const mime=response.headers.get('Content-Type'),length=Number(response.headers.get('Content-Length'));
+  if(response.status!==200||!['image/avif','image/webp'].includes(mime??'')||!Number.isSafeInteger(length)||length<1||length>48000){await response.body?.cancel();return null;}
+  const bytes=new Uint8Array(await response.arrayBuffer());if(bytes.length!==length)return null;
+  return `data:${mime};base64,${btoa(String.fromCharCode(...bytes))}`;
+ }catch{return null;}
 }
 export async function adminHomepageSourceRequest(request:Request,env:AdminEnv,kind:string,id:string){return respond(async()=>{
  await requireAdmin(request,env);const ref=HomepageSource.safeParse({kind,id});if(!ref.success)throw new RequestFailure('NOT_FOUND');

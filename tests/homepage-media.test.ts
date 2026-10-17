@@ -6,7 +6,7 @@ import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import {migrateNarrationProbe,seedNarrationFixture} from '../scripts/narration-fixtures';
 import {admitGeneration,findImport,beginImport,homepageAsset,homepageSettings,homepageSources} from '../packages/db/src/index';
 import {GeneratableListing,homepageSlots,defaultVideoCustomization,type HomepageAdmin} from '../packages/contracts/src/index';
-import {adminHomepageRequest,adminHomepageSourceRequest as sourceRequest,homepageMediaRequest as mediaRequest,readHomepageConfig,readHomepageAdmin,readHomepageLibrary,changeHomepage,cleanupHomepageAssets,type HomepageCache} from '../apps/web/lib/homepage-media';
+import {adminHomepageRequest,adminHomepageSourceRequest as sourceRequest,homepageMediaRequest as mediaRequest,readHomepageConfig,readHomepageHeroPoster,readHomepageAdmin,readHomepageLibrary,changeHomepage,cleanupHomepageAssets,type HomepageCache} from '../apps/web/lib/homepage-media';
 import {createAuth} from '../apps/web/lib/auth';
 import {createPrivateImport} from '../apps/web/lib/imports';
 import {fixtureImportTransport} from '../scripts/import-fixtures';
@@ -198,7 +198,7 @@ test('Home : banque globale privée, copie indépendante, publication atomique e
   };
   const cache=await openCache('homepage-performance-fixture'),writes:Promise<unknown>[]=[],edge:HomepageCache={cache,origin:'https://bienvu.test',waitUntil:task=>{writes.push(task);}};
   const flush=async()=>{await Promise.all(writes.splice(0));};
-  const photo=Object.values(config.slots).find(asset=>asset.kind==='image')!;assert.ok(photo);
+  const photo=Object.values(config.slots).find(asset=>asset.kind==='image'&&asset.url.endsWith('/'+asset.id))!;assert.ok(photo);
   const imageUrl=photo.url+'?w=640',imageKey=`homepage/${photo.id}/seo/${photo.sha256}-640`,webp=new Uint8Array([20,21,22,23]),avif=new Uint8Array([30,31,32]);
   await bucket.put(imageKey+'.webp',webp,{httpMetadata:{contentType:'image/webp'}});
   const avifRequest=(accept='image/avif,image/webp,*/*')=>req(imageUrl,'',{headers:{accept}});
@@ -209,6 +209,9 @@ test('Home : banque globale privée, copie indépendante, publication atomique e
    const legacy=await homepageMediaRequest(avifRequest(accept),env,photo.id,undefined,edge);assert.equal(legacy.headers.get('content-type'),'image/webp');assert.deepEqual(new Uint8Array(await legacy.arrayBuffer()),webp);await flush();
   }
   const modernCached=await homepageMediaRequest(avifRequest(),env,photo.id,undefined,edge);assert.equal(modernCached.headers.get('content-type'),'image/avif');assert.deepEqual(new Uint8Array(await modernCached.arrayBuffer()),avif);
+  const heroConfig={...config,slots:{...config.slots,'hero.visual':photo}};
+  assert.equal(await readHomepageHeroPoster(env,heroConfig,edge),'data:image/avif;base64,'+Buffer.from(avif).toString('base64'));
+  assert.equal(await readHomepageHeroPoster(env,{...heroConfig,slots:{'hero.visual':{...photo,url:'/api/admin/homepage/assets/'+photo.id}}},edge),null,'Aucun aperçu privé dans le HTML public');
   const cachedEnv={...env,MEDIA:{get:bucket.get.bind(bucket),head:bucket.head.bind(bucket),put:bucket.put.bind(bucket),delete:bucket.delete.bind(bucket)}};
   const reads=t.mock.method(cachedEnv.MEDIA,'get');
   const firstRead=await homepageMediaRequest(req(url,''),cachedEnv,asset.id,undefined,edge);
@@ -251,6 +254,7 @@ test('Home : banque globale privée, copie indépendante, publication atomique e
   assert.equal(await bucket.head(smallerKey),null);
   for(const slot of homepageSlots)if(selected.draft[slot.id]===photo.id)await assign(slot.id,null);await publish();
   assert.equal((await homepageMediaRequest(avifRequest(),env,photo.id,undefined,edge)).status,404,'Une variante AVIF en cache ne contourne pas le retrait public');
+  assert.equal(await readHomepageHeroPoster(env,heroConfig,edge),null,'Une ancienne configuration ne peut pas intégrer un média retiré');
   await cleanupHomepageAssets(env,Date.now()+2*86400_000);assert.equal(await bucket.head(imageKey+'.avif'),null);assert.equal(await bucket.head(imageKey+'.webp'),null);
  });
 });

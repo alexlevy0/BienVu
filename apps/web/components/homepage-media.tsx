@@ -5,7 +5,9 @@ import {resolveHomeMedia,imageWidthUrl,homeImageSrcSet,previewVideoUrl,type Home
 export type {HomeMediaView} from '../lib/home-media-view';
 
 const Context=createContext<HomepageConfig>({version:0,slots:{}});
-export function HomepageMediaProvider({config,children}:{config:HomepageConfig;children:ReactNode}){return <Context.Provider value={config}>{children}</Context.Provider>;}
+const HeroPosterContext=createContext<string|null>(null);
+export function HomepageMediaProvider({config,children,heroPoster=null}:{config:HomepageConfig;children:ReactNode;heroPoster?:string|null}){return <Context.Provider value={config}><HeroPosterContext.Provider value={heroPoster}>{children}</HeroPosterContext.Provider></Context.Provider>;}
+export function useHomepageHeroPoster(){return useContext(HeroPosterContext);}
 export function useHomepageConfig(){return useContext(Context);}
 export function useHomepageMedia(id:HomepageSlot):HomeMediaView {
  return resolveHomeMedia(useContext(Context),id);

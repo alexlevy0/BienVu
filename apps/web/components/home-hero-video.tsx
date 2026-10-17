@@ -2,20 +2,21 @@
 
 import {useEffect, useRef, useState} from 'react';
 import {HomeIcon} from './home-icons';
-import {HomeVisual, useHomepageMedia, homeClock, type HomeMediaView} from './homepage-media';
+import {HomeVisual, useHomepageMedia, useHomepageHeroPoster, homeClock, type HomeMediaView} from './homepage-media';
 import {imageWidthUrl,previewVideoUrl,heroPosterSizes} from '../lib/home-media-view';
 import {HeroBacklight} from './hero-backlight';
 
 type PlaybackProps = {paused: boolean; onPlayingChange(playing: boolean): void};
 
 export function HomeHeroVideo({render,...props}: PlaybackProps & {render?:'standard'|'avatar-ai'}) {
+  const inlinePoster=useHomepageHeroPoster();
   const heroVisual = useHomepageMedia('hero.visual'), heroMovie = useHomepageMedia('hero.video');
   const example=useHomepageMedia(render==='avatar-ai'?'renders.avatar-ai.video':'renders.standard.video');
   const movie=render?example:heroMovie,visual=render?{...example,kind:'image' as const,src:example.poster??`/images/studio-home/renders-${render}.webp`,custom:true}:heroVisual;
-  return <HeroPlayer key={movie.src} visual={visual} movie={movie} {...props}/>;
+  return <HeroPlayer key={movie.src} visual={visual} movie={movie} inlinePoster={render?null:inlinePoster} {...props}/>;
 }
 
-function HeroPlayer({visual, movie, paused, onPlayingChange}: PlaybackProps & {visual: HomeMediaView; movie: HomeMediaView}) {
+function HeroPlayer({visual, movie, paused, onPlayingChange,inlinePoster}: PlaybackProps & {visual: HomeMediaView; movie: HomeMediaView;inlinePoster:string|null}) {
   const video = useRef<HTMLVideoElement>(null),frame=useRef<HTMLDivElement>(null),posterImage=useRef<HTMLImageElement>(null), attempt = useRef(0);
   const [started, setStarted] = useState(false), [error, setError] = useState(false);
   const [muted, setMuted] = useState(true);
@@ -106,6 +107,8 @@ function HeroPlayer({visual, movie, paused, onPlayingChange}: PlaybackProps & {v
     }
   }
 
+  const cover=poster&&<HomeVisual imageRef={posterImage} media={visual.kind === 'image' ? visual : {...visual, kind: 'image', src: poster}}
+    alt={custom ? visual.title ?? 'Vidéo immobilière' : 'Salon lumineux avec moulures et grandes fenêtres ouvertes sur la ville'} sizes={heroPosterSizes} loading="eager" fetchPriority="high"/>;
   return <>
     <div ref={frame} className="home-hero-video-frame">
     <HeroBacklight key={poster??movie.src} video={video} active={started&&!paused&&!error}
@@ -121,8 +124,7 @@ function HeroPlayer({visual, movie, paused, onPlayingChange}: PlaybackProps & {v
         onError={() => {setError(true); setStarted(false); onPlayingChange(false);}}/>
       {!started && <button type="button" className="home-hero-demo-cover" onClick={() => void play()}
         aria-label={error ? 'Réessayer la lecture de la vidéo de présentation' : 'Lire la vidéo de présentation'}>
-        {poster && <HomeVisual imageRef={posterImage} media={visual.kind === 'image' ? visual : {...visual, kind: 'image', src: poster}}
-          alt={custom ? visual.title ?? 'Vidéo immobilière' : 'Salon lumineux avec moulures et grandes fenêtres ouvertes sur la ville'} sizes={heroPosterSizes} loading="eager" fetchPriority="high"/>}
+        {inlinePoster?<picture><source media="(max-width: 760px)" type={inlinePoster.startsWith('data:image/avif;')?'image/avif':'image/webp'} srcSet={inlinePoster}/>{cover}</picture>:cover}
         <span className="home-hero-demo-shade"/>
         <span className="home-duration">{homeClock(movie.duration ?? 28)}</span>
         {!custom && <span className="home-hero-demo-heading"><strong>Paris</strong><span>Un nouveau regard<br/>sur votre bien</span></span>}
