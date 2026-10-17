@@ -21,6 +21,7 @@ test('migration 0065 : 20 essais conservés, imports 21–40 autorisés, derniè
   // The current rights API reads the newer credit ledger; this independent
   // migration keeps the historical import limits and usage unchanged.
   await migrate('0067_subscription_promotions.sql');
+  await migrate('0079_annual_subscriptions.sql');
   assert.deepEqual(await usage(),before);
   assert.deepEqual(URL_IMPORT_QUOTAS,{daily:40,monthly:300});
   assert.equal((await generationRights(DB,'daily-first','true',now)).importRetryAt,null);
