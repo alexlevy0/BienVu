@@ -50,7 +50,8 @@
 .home-studio .home-create-panel .home-composer-modern .home-primary-button {font-size:14px}
 .home-studio .home-create-panel .home-composer-modern .home-url-input input,.home-studio .home-create-panel .home-url-placeholder {font-size:15px}
 .home-studio .home-create-panel .home-composer-modern .home-credit-cost {font-size:13px;line-height:1.5}
-.home-studio .home-create-panel .home-create-note {font-size:13px;line-height:1.6}
+.home-studio .home-create-panel .home-create-note {font-size:13px;line-height:1.6;min-height:1.6em}
+.home-studio .home-create-panel .home-create-note[aria-hidden=true] {visibility:hidden}
 .home-studio .home-create-panel .home-composer-modern .home-setting-toggle,.home-studio .home-create-panel .home-composer-modern .home-duration-pill select {font-size:13px!important}
 .home-studio .home-create-panel .home-composer-modern .home-format-control select {width:151px;font-size:13px}
 .home-studio .home-create-panel .home-composer-modern .home-duration-pill select {width:87px}

@@ -565,9 +565,11 @@ function HomeCreateContent({onLayoutChange,renderChoice,onClearRenderChoice,voic
     ? !manualReady||Boolean(noCredits)||!editingProperty&&activeOtherJob
     : Boolean(noCredits)||Boolean(importPaused&&!estimate.value&&ImportUrl.safeParse(url.trim()).success)||activeOtherJob||screen.kind==='job'&&
       (activeGuestJob||!url.trim()));
-  const contextNote = !me ? estimate.source?'Essai classique gratuit. Connectez-vous pour animer les photos par IA et estimer leur coût en crédits.':'Essayez gratuitement.' : canGenerate
+  const contextNote = loading?'':!me ? estimate.source?'Essai classique gratuit. Connectez-vous pour animer les photos par IA et estimer leur coût en crédits.':'Essayez gratuitement.' : canGenerate
     ? (noCredits?'Crédits insuffisants pour ce montage. Réduisez les animations ou consultez vos crédits.':'')
     : 'Accès anticipé · Préparez votre annonce';
+  const creationNote=loading?'':manual?me?'':'1 crédit offert pour créer votre vidéo sans compte. Connectez-vous pour la télécharger sans filigrane.':
+    screen.kind==='job'&&generationActive(selectedJob)?me?'Votre création sera enregistrée dans Mes biens.':'Votre aperçu avec filigrane sera disponible dans ce navigateur.':contextNote;
   return <div className={`home-create home-create-panel${variant==='beta'?' home-create-beta':''}${inConversation ? ' home-create-conversation' : ''}${customizing||screen.kind==='guest-customizing'?' home-create-customizing':''}`}>
     {(avatarPreparing||avatarIntentNotice||avatarIntentError)&&<p className="home-render-preset-notice" role={avatarIntentError?'alert':'status'}>{avatarPreparing?'Préparation de votre présentateur…':avatarIntentError||avatarIntentNotice}{!manual&&<button type="button" disabled={avatarPreparing} onClick={()=>{try{sessionStorage.removeItem(avatarIntentKey);}catch{}setAvatarIntentError('');setAvatarIntentNotice('');setGuestSettings(current=>current?{...current,avatar:undefined}:current);}}>Continuer sans cet avatar</button>}</p>}
     {renderChoice&&<p className="home-render-preset-notice" role="status">{presetPreparing?'Préparation du rendu…':presetError||`Rendu « ${homeRenderPresets.find(item=>item.id===renderChoice.preset)!.title} » sélectionné.`}
@@ -675,7 +677,7 @@ function HomeCreateContent({onLayoutChange,renderChoice,onClearRenderChoice,voic
     {!me && trial.failure && screen.kind !== 'error' && <p className="home-form-feedback" role="alert">{trial.failure} <Link href="/connexion">Se connecter</Link></p>}
     {importPaused&&!manual && <p className="home-form-note" role="status">La limite des imports par lien est atteinte jusqu’au {new Date(me!.rights.importRetryAt!).toLocaleString('fr-FR')}. Vous pouvez ajouter vos informations et photos en saisie manuelle.</p>}
     {activeOtherJob && <p className="home-form-note">Une vidéo est déjà en cours de création. <Link href="/biens">Suivez-la dans Mes biens</Link>.</p>}
-    <p className="home-create-note" id="home-create-note" hidden={manual?Boolean(me):!(screen.kind==='job'&&generationActive(selectedJob))&&!contextNote}>{manual ? '1 crédit offert pour créer votre vidéo sans compte. Connectez-vous pour la télécharger sans filigrane.' : screen.kind === 'job' && generationActive(selectedJob) ? me?'Votre création sera enregistrée dans Mes biens.':'Votre aperçu avec filigrane sera disponible dans ce navigateur.' : contextNote}</p>
+    <p className="home-create-note" id="home-create-note" aria-hidden={!creationNote}>{creationNote}</p>
     </div></div>
     <HomeImportFeedback source={!inConversation&&!manual&&(!busy||personalizePreparing)&&!loading&&!composerPhotos.length&&!importPaused?estimate.source:''}
       phase={!me?'guest':personalizePreparing||estimate.phase==='ready'?'ready':estimate.phase==='error'?'error':estimate.phase==='loading'?(estimate.reading?'reading':'detected'):'idle'}

@@ -21,7 +21,10 @@ export function CreationMotion({children}:{children:ReactNode}){
 /** Keep fields mounted while collapsing them, preserving values and draft state. */
 export function CreationReveal({open,children,...props}:Pick<HTMLMotionProps<'div'>,'id'|'className'|'style'>&{open:boolean;children:ReactNode}){
  const reduced=useReducedMotion(),ready=useCreationMotionReady(),target={height:open?'auto':0,opacity:open?1:0};
- return <m.div {...props} data-creation-reveal initial={false} animate={ready?target:undefined} style={{...props.style,...(!ready?target:{})}}
+ // Retain the fallback as a fixed baseline when the feature chunk arrives:
+ // removing its height briefly expands a closed panel before Motion takes over.
+ const baseline=useRef(target);if(!ready)baseline.current=target;
+ return <m.div {...props} data-creation-reveal initial={false} animate={ready?target:undefined} style={{...props.style,...baseline.current}}
    transition={reduced?{duration:0}:{height:creationSpring,opacity:{duration:open ? .18 : .12}}} inert={!open} aria-hidden={!open}>
    <div className="creation-reveal-content">{children}</div>
  </m.div>;
