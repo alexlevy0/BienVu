@@ -27,7 +27,7 @@ function ExampleScreen({mobile = false}: {mobile?:boolean}) {
 }
 
 export function HomeVitrineShowcase() {
-  return <section className="home-vitrine" aria-labelledby="home-vitrine-title">
+  return <section className="home-vitrine" data-home-motion="vitrine" aria-labelledby="home-vitrine-title">
     <header className="home-vitrine-heading"><p className="home-vitrine-eyebrow">MA VITRINE</p><h2 id="home-vitrine-title">Une vitrine à votre image.</h2><p>Votre agence, vos biens et vos vidéos. Une page à partager avec vos clients.</p><div className="home-vitrine-actions"><Link className="home-vitrine-create" href="/ma-vitrine" prefetch={false}>Créer ma vitrine <HomeIcon name="arrow" size={22}/></Link><Link className="home-vitrine-example-link" href={showcaseExamplePath} prefetch={false}>Voir un exemple <HomeIcon name="external" size={18}/></Link></div></header>
     <Link className="home-vitrine-devices" href={showcaseExamplePath} prefetch={false} aria-label="Découvrir l’exemple de vitrine Agence Bellevue, sur ordinateur et mobile">
       <span className="home-vitrine-example-label">Exemple de vitrine</span>

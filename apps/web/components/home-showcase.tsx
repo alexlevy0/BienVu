@@ -64,7 +64,7 @@ export function HomeShowcase({paused, onCreate}: {paused: boolean; onCreate(): v
     try {await player.play();} catch (error) {if (!(error instanceof DOMException && error.name === 'AbortError')) setVideoError(true);}
   }
   const voiceLabel = audioActive ? `Arrêter l’extrait de la voix ${sample.name}` : `Écouter un exemple avec la voix ${sample.name}`;
-  return <section className="home-life" aria-labelledby="home-life-title">
+  return <section className="home-life" data-home-motion="photos" aria-labelledby="home-life-title">
     <header className="home-life-heading">
       <p className="home-life-kicker">La différence BienVu</p>
       <h2 id="home-life-title">Vos photos <em>prennent vie.</em></h2>

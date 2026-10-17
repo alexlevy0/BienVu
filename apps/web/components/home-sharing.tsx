@@ -24,7 +24,7 @@ function VideoPreview({context, onPlay}: {context: 'social' | 'client' | 'site';
 
 export function HomeSharing({onPlay, onCreate}: {onPlay(context: 'social'|'client'|'site'): void; onCreate(): void}) {
   const site=useHomepageMedia('share.site.visual'),siteMovie=useHomepageMedia('share.site.video'),customSite=site.custom||siteMovie.custom;
-  return <section className="home-sharing" aria-labelledby="home-sharing-title">
+  return <section className="home-sharing" data-home-motion="sharing" aria-labelledby="home-sharing-title">
     <header className="home-sharing-heading">
       <h2 id="home-sharing-title">Une vidéo. Plusieurs façons <em>de la partager.</em></h2>
       <p>Téléchargez votre vidéo et choisissez où elle fera son effet.</p>

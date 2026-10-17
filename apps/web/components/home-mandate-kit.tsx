@@ -68,7 +68,7 @@ function PublicationText() {
 }
 
 export function HomeMandateKit({onPlay, onCreate}: {onPlay(slot: HomepageSlot): void; onCreate(): void}) {
-  return <CreationMotion><section className="home-kit" aria-labelledby="home-kit-title">
+  return <CreationMotion><section className="home-kit" data-home-motion="kit" aria-labelledby="home-kit-title">
     <div className="home-kit-panel">
       <div className="home-kit-copy">
         <p className="home-kit-kicker">Le kit de votre mandat</p>

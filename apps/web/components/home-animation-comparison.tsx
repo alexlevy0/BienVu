@@ -46,7 +46,7 @@ function ComparisonPlayer({classic,ai,paused,onCreate,onPlayingChange}:Props&{cl
   const expand=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await frame.current?.requestFullscreen?.();}catch{/* Playback stays usable when fullscreen is unavailable. */}};
   const poster=(media:HomeMediaView):HomeMediaView=>({...media,kind:'image',src:media.poster??'/images/studio-home/comparison-classic.webp'});
   const sourceVideo=(ref:typeof first,label:string)=><video ref={ref} muted={ref===second||muted} playsInline preload="none" tabIndex={-1} aria-label={label} className={shown&&!state.error?'is-shown':undefined}/>;
-  return <section className="home-animation-comparison" aria-labelledby="home-comparison-title">
+  return <section className="home-animation-comparison" data-home-motion="comparison" aria-labelledby="home-comparison-title">
     <header className="home-comparison-heading"><p>ANIMATIONS IA</p><h2 id="home-comparison-title">La différence ? <em>Le mouvement.</em></h2><p>Le même bien, avec et sans animations IA.</p></header>
     <div ref={frame} className="home-comparison-frame">
       <div ref={stage} className="home-comparison-stage" role="group" aria-label="Comparer les deux vidéos du même bien" aria-busy={state.loading} style={{'--comparison-split':`${split}%`} as CSSProperties}>

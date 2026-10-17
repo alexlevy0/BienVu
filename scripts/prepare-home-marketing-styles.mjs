@@ -1,7 +1,7 @@
 // Non-critical homepage styles remain authored beside the components. The
 // public bundle is loaded without delaying the composer and hero's first paint.
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
-const files=['home-showcase','home-avatars','home-animation-comparison','home-render-comparison','home-mandate-kit','home-sharing','home-vitrine','home-editor-showcase','home-footer'];
+const files=['home-showcase','home-avatars','home-animation-comparison','home-render-comparison','home-mandate-kit','home-sharing','home-vitrine','home-editor-showcase','home-footer','home-scroll-motion'];
 const root=new URL('../apps/web/',import.meta.url),parts=[];
 for(const name of files){
  const css=await readFile(new URL(`app/${name}.css`,root),'utf8');

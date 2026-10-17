@@ -68,7 +68,7 @@ function RenderPlayers({media,paused,selected,onChoose,onPlayingChange,compact=f
     players.current.forEach((player,i)=>{if(player)player.muted=i!==audible||next;});
   }
   const expand=async(index?:number)=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await(index===undefined?frame.current:players.current[index]?.parentElement)?.requestFullscreen?.();}catch{/* Controls remain usable when fullscreen is unavailable. */}};
-  return <section ref={section} className="home-renders" aria-labelledby="home-renders-title">
+  return <section ref={section} className="home-renders" data-home-motion="renders" aria-labelledby="home-renders-title">
     <header className="home-renders-heading"><h2 id="home-renders-title">Une annonce. <em>Trois rendus.</em></h2><p>Comparez les fonctionnalités et les crédits, sur le même bien.</p>
       <span className="home-renders-example"><HomeIcon name="image" size={16}/>Exemple : 20 s · 4 photos</span></header>
     {compact&&<div className="beta-render-selector" role="group" aria-label="Afficher un rendu">{homeRenderPresets.map((preset,index)=><button key={preset.id} type="button" aria-pressed={visibleCard===index} onClick={()=>showCard(index)}>{preset.title}<small>{homeRenderExampleCredits(preset.id)} crédit{index?'s':''}</small></button>)}</div>}

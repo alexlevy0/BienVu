@@ -17,6 +17,7 @@ import {HomeEditorShowcase} from './home-editor-showcase';
 import {HomeVitrineShowcase} from './home-vitrine-showcase';
 import {HomeHeroVideo} from './home-hero-video';
 import {HomeFooter} from './home-footer';
+import {HomeScrollMotion} from './home-scroll-motion';
 import {HomeMarketingStyles} from './home-marketing-styles';
 import {HomeVisual, useHomepageMedia, useHomepageConfig, homeClock} from './homepage-media';
 import type {HomepageSlot} from '@bienvu/contracts';
@@ -47,7 +48,7 @@ function ExampleCard({example, onPlay}: {example: Example; onPlay(example: Examp
 }
 
 export function LandingPage() {
-  const features=useSiteFeatures();
+  const features=useSiteFeatures(),root=useRef<HTMLDivElement>(null);
   const homepage=useHomepageConfig(),customDiscover=Object.keys(homepage.slots).some(id=>id.startsWith('discover.'));
   const [dialog, setDialog] = useState<Dialog>(null);
   useEffect(()=>{if(!features.explorer&&dialog==='explore')setDialog(null);},[features.explorer,dialog]);
@@ -85,7 +86,8 @@ export function LandingPage() {
     try{if(preset)sessionStorage.setItem(homeRenderPresetKey,preset);else sessionStorage.removeItem(homeRenderPresetKey);}catch{/* The current choice remains usable. */}
     focusComposer();
   },[focusComposer]);
-  return <div className="home-studio home-studio-home">
+  return <div ref={root} className="home-studio home-studio-home">
+    <HomeScrollMotion root={root} active={!conversationActive} revision={features.explorer}/>
     <HomeMarketingStyles/>
     <a className="home-skip" href="#home-content">Aller au contenu</a>
     <StudioSidebar active="create"/>
@@ -99,7 +101,7 @@ export function LandingPage() {
             <HomeHeroVideo paused={modalOpen || conversationActive} onPlayingChange={heroPlayback}/>
           </aside>
         </section>
-        {features.explorer && !conversationActive && <section id="explorer" className="home-discover" aria-labelledby="home-discover-title"><div className="home-discover-heading"><div><h2 id="home-discover-title">À découvrir sur BienVu</h2><p>Des inspirations pour donner une autre dimension à vos biens.</p></div><button type="button" className="home-explore-link" onClick={() => {setCategory('Tous'); setDialog('explore');}}>Tout explorer <HomeIcon name="external" size={17}/></button></div><div className="home-example-grid">{examples.map(example => <ExampleCard key={example.id} example={example} onPlay={play}/>)}</div></section>}
+        {features.explorer && !conversationActive && <section id="explorer" className="home-discover" data-home-motion="discover" aria-labelledby="home-discover-title"><div className="home-discover-heading"><div><h2 id="home-discover-title">À découvrir sur BienVu</h2><p>Des inspirations pour donner une autre dimension à vos biens.</p></div><button type="button" className="home-explore-link" onClick={() => {setCategory('Tous'); setDialog('explore');}}>Tout explorer <HomeIcon name="external" size={17}/></button></div><div className="home-example-grid">{examples.map(example => <ExampleCard key={example.id} example={example} onPlay={play}/>)}</div></section>}
         {!conversationActive && <Suspense fallback={null}><HomeAvatarShowcase paused={modalOpen}/></Suspense>}
         {!conversationActive && <Suspense fallback={null}><HomeRenderComparison paused={modalOpen} selected={renderChoice?.preset} onChoose={chooseRender} onPlayingChange={setRendersPlaying}/></Suspense>}
         {!conversationActive && <Suspense fallback={null}><HomeAnimationComparison paused={modalOpen} onCreate={focusComposer} onPlayingChange={setComparisonPlaying}/></Suspense>}
@@ -108,7 +110,7 @@ export function LandingPage() {
         {!conversationActive && <Suspense fallback={null}><HomeSharing onPlay={playSharing} onCreate={focusComposer}/></Suspense>}
         {!conversationActive && <Suspense fallback={null}><HomeVitrineShowcase/></Suspense>}
         {!conversationActive && <Suspense fallback={null}><HomeEditorShowcase paused={modalOpen || heroPlaying} onCreate={focusComposer}/></Suspense>}
-        {!conversationActive && <section className="home-resource-links" aria-labelledby="home-resources-title"><h2 id="home-resources-title">Le marketing immobilier IA, de l’annonce à la publication.</h2><p>Créez une vidéo à partir de vos annonces et photos, personnalisez-la avec l’identité de votre agence et programmez sa publication sur Instagram et Facebook.</p><nav aria-label="Découvrir les fonctionnalités">{featurePages.map(page=><Link key={page.slug} href={`/${page.slug}`} prefetch={false}>{page.heading}</Link>)}<Link href="/guides" prefetch={false}>Conseils et guides</Link><Link href="/blog" prefetch={false}>Le blog BienVu</Link><Link href="/sources" prefetch={false}>Sources d’import testées</Link></nav></section>}
+        {!conversationActive && <section className="home-resource-links" data-home-motion="resources" aria-labelledby="home-resources-title"><h2 id="home-resources-title">Le marketing immobilier IA, de l’annonce à la publication.</h2><p>Créez une vidéo à partir de vos annonces et photos, personnalisez-la avec l’identité de votre agence et programmez sa publication sur Instagram et Facebook.</p><nav aria-label="Découvrir les fonctionnalités">{featurePages.map(page=><Link key={page.slug} href={`/${page.slug}`} prefetch={false}>{page.heading}</Link>)}<Link href="/guides" prefetch={false}>Conseils et guides</Link><Link href="/blog" prefetch={false}>Le blog BienVu</Link><Link href="/sources" prefetch={false}>Sources d’import testées</Link></nav></section>}
       </main>
       <Suspense fallback={null}><HomeFooter onCreate={focusComposer}/></Suspense>
     </div>

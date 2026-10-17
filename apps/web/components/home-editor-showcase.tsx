@@ -85,7 +85,7 @@ export function HomeEditorShowcase({paused, onCreate}: {paused: boolean; onCreat
   }
   const textStyle = {left: `${doc.x}%`, top: `${doc.y}%`, fontFamily: doc.font, color: doc.color, textAlign: doc.align, '--demo-font-size': `${doc.size / 6}cqw`} as CSSProperties;
   const playbackLabel = playing ? 'Mettre la démonstration en pause' : 'Lire la démonstration de l’éditeur';
-  return <section className="home-editor-demo" aria-labelledby="home-editor-demo-title">
+  return <section className="home-editor-demo" data-home-motion="editor" aria-labelledby="home-editor-demo-title">
     <header className="home-editor-demo-heading"><h2 id="home-editor-demo-title">La vidéo est prête.<br/>Le dernier mot est <em>à vous.</em></h2><p>Ajustez les photos, les textes et le rythme pour créer une vidéo à votre image.</p></header>
     <div className="home-editor-demo-window">
       <div className="home-editor-demo-topbar">

@@ -67,7 +67,7 @@ export function HomeAvatarShowcase({paused}:{paused:boolean}){
     return()=>{observer.disconnect();document.removeEventListener('visibilitychange',hidden);document.removeEventListener('play',other,true);pause();};
   },[]);
   function started(player:HTMLVideoElement|null){for(const media of document.querySelectorAll<HTMLMediaElement>('video,audio'))if(media!==player)media.pause();}
-  return <section ref={section} className="home-avatars" aria-labelledby="home-avatars-title">
+  return <section ref={section} className="home-avatars" data-home-motion="avatars" aria-labelledby="home-avatars-title">
     <div className="home-avatars-main">
       <div className="home-avatars-copy">
         <span className="home-avatars-new"><HomeIcon name="sparkle" filled size={20}/>Nouveau · Avatars IA</span>
