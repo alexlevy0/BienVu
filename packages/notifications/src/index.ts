@@ -34,9 +34,14 @@ export async function sendGenerationNotifications(env:BrowserPushEnvironment,job
       if(!subscription){await expirePushEndpoint(env.DB,delivery.endpointHash);return;}
       const payload=await buildPushPayload({data:{type:'generation-ready',jobId:delivery.jobId,title:'Votre vidéo est prête 🎬',body:'Votre création BienVu vous attend. Cliquez pour découvrir le résultat.',url:`/historique/${delivery.jobId}`},options:{ttl:3600,urgency:'normal',topic:delivery.jobId.replaceAll('-','').slice(0,32)}},subscription,
         {subject:env.WEB_PUSH_SUBJECT!,publicKey:env.WEB_PUSH_PUBLIC_KEY!,privateKey:env.WEB_PUSH_PRIVATE_KEY!});
-      const reply=await fetcher(subscription.endpoint,{...payload,redirect:'error',signal:AbortSignal.timeout(5000)});await reply.body?.cancel();
+      // workerd rejects redirect:'error'. Manual mode also prevents forwarding push credentials to a redirected endpoint.
+      const reply=await fetcher(subscription.endpoint,{...payload,redirect:'manual',signal:AbortSignal.timeout(5000)});await reply.body?.cancel();
       if(reply.status===404||reply.status===410){await expirePushEndpoint(env.DB,delivery.endpointHash);return;}
+      if(!reply.ok)console.warn('browser_push_delivery_rejected',{jobId:delivery.jobId,attempt:claimed.attempts,status:reply.status});
       await finishPushDelivery(env.DB,delivery,lease,reply.ok?'sent':reply.status===429||reply.status>=500?'retry':'failed',claimed.attempts,now);
-    }catch{await finishPushDelivery(env.DB,delivery,lease,'retry',claimed.attempts,now);}
+    }catch(error){
+      console.warn('browser_push_delivery_retry',{jobId:delivery.jobId,attempt:claimed.attempts,error:error instanceof Error?error.name:'unknown'});
+      await finishPushDelivery(env.DB,delivery,lease,'retry',claimed.attempts,now);
+    }
   }));
 }

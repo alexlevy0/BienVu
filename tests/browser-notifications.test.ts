@@ -17,8 +17,8 @@ function subscriber(suffix='fixture'){
   const ecdh=createECDH('prime256v1');ecdh.generateKeys();const auth=crypto.getRandomValues(new Uint8Array(16));
   return {ecdh,auth,subscription:{endpoint:`https://fcm.googleapis.com/fcm/send/${suffix}`,expirationTime:null,keys:{p256dh:ecdh.getPublicKey().toString('base64url'),auth:b64(auth)}}};
 }
-async function setup(t:TestContext){
-  const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:'export default {fetch(){return new Response("fixture")}}',compatibilityDate:'2026-09-27',d1Databases:['DB']}));t.after(()=>mf.dispose());
+async function setup(t:TestContext,script='export default {fetch(){return new Response("fixture")}}'){
+  const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script,compatibilityDate:'2026-09-27',d1Databases:['DB']}));t.after(()=>mf.dispose());
   const db=await mf.getD1Database('DB');await migrateNarrationProbe(db);await db.exec('UPDATE generation_control SET enabled=1; UPDATE trial_policy SET enabled=1,free_enabled=1');
   await db.prepare('INSERT INTO hosted_import_budget VALUES(?,0,9000,0)').bind(new Date().toISOString().slice(0,7)).run();
   for(const label of ['push-a','push-b']){const seed=await seedNarrationFixture(db,label,true);await db.prepare("UPDATE jobs SET status='failed',error_code='FIXTURE' WHERE id=?").bind(seed.jobId).run();
@@ -28,7 +28,7 @@ async function setup(t:TestContext){
     BETTER_AUTH_URL:'https://bienvu.online',BETTER_AUTH_SECRET:'s'.repeat(32),PROBE_MODE:'local',GOOGLE_CLIENT_ID:'',GOOGLE_CLIENT_SECRET:''};
   const finish=async(id:string)=>{const at=new Date().toISOString();await db.prepare('INSERT INTO generation_artifacts VALUES(?,?,?,?)').bind(id,'fixture-'+id,'{}',at).run();
     await db.prepare("UPDATE jobs SET status='ready',lease_until=NULL,updated_at=? WHERE id=?").bind(at,id).run();};
-  return {db,a,b,env,vapid,finish,principal:{kind:'user',id:'owner-push-a'} as PushPrincipal};
+  return {mf,db,a,b,env,vapid,finish,principal:{kind:'user',id:'owner-push-a'} as PushPrincipal};
 }
 test('Web Push : configuration, clés EC réelles et refus des endpoints SSRF ou redirections',async()=>{
   const s=subscriber();assert.ok(await validatePushSubscription(s.subscription));
@@ -60,7 +60,7 @@ test('Web Push : livraison chiffrée RFC 8291, JWT VAPID vérifiable, reprise se
   const request=new Request('https://bienvu.online/api/generations',{headers:{Cookie:browserPushCookie(new Request('https://bienvu.online'),token).split(';')[0]}});
   await watchAcceptedBrowserGeneration(s.env,request,s.a.jobId,s.principal);now=Date.now();let calls=0;
   const send:typeof fetch=async(_url,init)=>{
-    calls++;assert.equal(init?.redirect,'error');const headers=new Headers(init?.headers);assert.equal(headers.get('content-encoding'),'aes128gcm');
+    calls++;assert.equal(init?.redirect,'manual');const headers=new Headers(init?.headers);assert.equal(headers.get('content-encoding'),'aes128gcm');
     const auth=headers.get('authorization')!,match=/^vapid t=([^,]+),\s*k=([\w-]+)$/.exec(auth);assert.ok(match);assert.equal(match[2],s.vapid.publicKey);
     const [head,body,signature]=match[1].split('.');assert.equal(JSON.parse(Buffer.from(body,'base64url').toString()).aud,'https://fcm.googleapis.com');
     assert.ok(await crypto.subtle.verify({name:'ECDSA',hash:'SHA-256'},s.vapid.pair.publicKey,Buffer.from(signature,'base64url'),new TextEncoder().encode(head+'.'+body)));
@@ -99,11 +99,34 @@ test('Web Push : membre révoqué et abonnement expiré ne reçoivent plus de no
   await sendGenerationNotifications(s.env,undefined,Date.now(),gone);assert.equal(calls,1);assert.equal((await s.db.prepare('SELECT enabled FROM browser_push_devices').first<{enabled:number}>())!.enabled,0);
   await sendGenerationNotifications(s.env,undefined,Date.now()+120000,gone);assert.equal(calls,1);
 });
-test('Web Push : chiffrement et signature exécutés dans workerd, sans API Node ni service externe',async t=>{
-  const require=createRequire(import.meta.url),{build}=createRequire(require.resolve('tsx/package.json'))('esbuild'),source=new URL('../packages/notifications/node_modules/@block65/webcrypto-web-push/dist/lib/main.js',import.meta.url).pathname;
-  const result=await build({stdin:{contents:`import{buildPushPayload}from${JSON.stringify(source)};export default{async fetch(request){const{subscription,vapid}=await request.json();const payload=await buildPushPayload({data:{type:'generation-ready',jobId:'fixture'},options:{ttl:3600}},subscription,vapid);return Response.json({length:payload.body.length,encoding:payload.headers['content-encoding'],authorization:payload.headers.authorization})}}`,resolveDir:process.cwd()},bundle:true,write:false,platform:'browser',format:'esm',target:'es2022'});
-  const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:new TextDecoder().decode(result.outputFiles[0].contents),compatibilityDate:'2026-09-27'}));t.after(()=>mf.dispose());
-  const vapid=await keys(),subscription=subscriber().subscription;
-  const response=await mf.dispatchFetch('http://fixture.test/',{method:'POST',body:JSON.stringify({subscription,vapid:{publicKey:vapid.publicKey,privateKey:vapid.privateKey,subject:'mailto:contact@bienvu.online'}})});
-  assert.equal(response.status,200);const value=await response.json() as {length:number;encoding:string;authorization:string};assert.equal(value.length,4096);assert.equal(value.encoding,'aes128gcm');assert.ok(value.authorization.startsWith('vapid t='));
+test('Web Push : envoi complet dans workerd, requête native valide et refus des redirections',async t=>{
+  const require=createRequire(import.meta.url),{build}=createRequire(require.resolve('tsx/package.json'))('esbuild'),source=new URL('../packages/notifications/src/index.ts',import.meta.url).pathname;
+  const result=await build({stdin:{contents:`import{sendGenerationNotifications}from${JSON.stringify(source)};
+    export default{async fetch(request,bindings){
+      const{vapid,jobId,status}=await request.json(),outgoing=[];
+      await sendGenerationNotifications({DB:bindings.DB,WEB_PUSH_ENABLED:'true',WEB_PUSH_PUBLIC_KEY:vapid.publicKey,WEB_PUSH_PRIVATE_KEY:vapid.privateKey,WEB_PUSH_SUBJECT:'mailto:contact@bienvu.online'},jobId,Date.now(),async(url,init)=>{
+        // Native Request validates the production sender's options in workerd before any external dispatch.
+        const push=new Request(url,init);
+        outgoing.push({method:push.method,redirect:push.redirect,length:(await push.arrayBuffer()).byteLength,encoding:push.headers.get('content-encoding'),signed:push.headers.get('authorization')?.startsWith('vapid t=')});
+        return new Response(null,{status,headers:status===307?{Location:'https://attacker.example/collect'}:{}});
+      });
+      const delivery=await bindings.DB.prepare('SELECT status,attempts,sent_at FROM browser_push_deliveries WHERE job_id=?').bind(jobId).first();
+      return Response.json({outgoing,delivery});
+    }}`,resolveDir:process.cwd()},bundle:true,write:false,platform:'browser',format:'esm',target:'es2022'});
+  const s=await setup(t,new TextDecoder().decode(result.outputFiles[0].contents)),token='a'.repeat(43);
+  await savePushDevice(s.db,s.principal,token,subscriber().subscription);
+  await watchPushGeneration(s.db,s.principal,token,s.a.jobId);await s.finish(s.a.jobId);
+  const dispatch=async(status:number)=>{
+    const response=await s.mf.dispatchFetch('http://fixture.test/',{method:'POST',body:JSON.stringify({jobId:s.a.jobId,status,vapid:{publicKey:s.vapid.publicKey,privateKey:s.vapid.privateKey}})});
+    assert.equal(response.status,200);
+    return await response.json() as {outgoing:Array<{method:string;redirect:string;length:number;encoding:string;signed:boolean}>;delivery:{status:string;attempts:number;sent_at:string|null}};
+  };
+  const sent=await dispatch(201);
+  assert.deepEqual(sent.outgoing,[{method:'POST',redirect:'manual',length:4096,encoding:'aes128gcm',signed:true}]);
+  assert.equal(sent.delivery.status,'sent');assert.equal(sent.delivery.attempts,1);assert.ok(sent.delivery.sent_at);
+  assert.equal((await dispatch(201)).outgoing.length,0,'Une livraison réussie reste dédoublonnée dans workerd');
+  await s.db.prepare("UPDATE browser_push_deliveries SET status='pending',attempts=0,sent_at=NULL,retry_at=created_at WHERE job_id=?").bind(s.a.jobId).run();
+  const redirected=await dispatch(307);
+  assert.equal(redirected.outgoing.length,1,'Aucune seconde requête vers la destination de redirection');
+  assert.equal(redirected.delivery.status,'failed');assert.equal(redirected.delivery.attempts,1);assert.equal(redirected.delivery.sent_at,null);
 });
