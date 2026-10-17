@@ -17,7 +17,7 @@ export function clearPropertyNavigation(){epoch++;details.clear();pages.clear();
 export function prepareProperty(owner:string,id:string):Promise<PropertyDetail>{
  const idKey=key(owner,id),ready=cachedProperty(owner,id);if(ready)return Promise.resolve(ready);
  const pending=requests.get(idKey);if(pending)return pending;
- const version=epoch,request=propertyRequest<PropertyDetail>(`/api/properties/${encodeURIComponent(id)}`).then(detail=>{
+ const version=epoch,request=propertyRequest<PropertyDetail>(`/api/properties/${encodeURIComponent(id)}`,{signal:AbortSignal.timeout(5000)}).then(detail=>{
   const value={...detail,jobs:detail.jobs.map(job=>GenerationView.parse(job))};
   if(version===epoch)put(details,idKey,value,12);return value;
  }).finally(()=>{if(requests.get(idKey)===request)requests.delete(idKey);});
