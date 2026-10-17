@@ -10,6 +10,7 @@ import {VideoDuration,ImportUrl, GenerationView,AvatarCatalog,defaultAvatarCusto
 import {useAnonymousTrial, TrialChallenge} from './anonymous-trial';
 import {useAccount} from './account';
 import {HomeIcon} from './home-icons';
+import {CreationMotion,CreationReveal,m,creationSpring,AnimatePresence} from './creation-motion';
 import {HomeCreateButton} from './home-create-button';
 import {BetaSettingsSummary} from './beta-settings-summary';
 import {PhotoDurationAdvice} from './photo-duration-advice';
@@ -545,7 +546,7 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
   const contextNote = !me ? estimate.source?'Essai classique gratuit. Connectez-vous pour animer les photos par IA et estimer leur coût en crédits.':'Essayez gratuitement.' : canGenerate
     ? (noCredits?'Crédits insuffisants pour ce montage. Réduisez les animations ou consultez vos crédits.':'')
     : 'Accès anticipé · Préparez votre annonce';
-  return <div className={`home-create home-create-panel${variant==='beta'?' home-create-beta':''}${inConversation ? ' home-create-conversation' : ''}${customizing||screen.kind==='guest-customizing'?' home-create-customizing':''}`}>
+  return <CreationMotion><div className={`home-create home-create-panel${variant==='beta'?' home-create-beta':''}${inConversation ? ' home-create-conversation' : ''}${customizing||screen.kind==='guest-customizing'?' home-create-customizing':''}`}>
     {(avatarPreparing||avatarIntentNotice||avatarIntentError)&&<p className="home-render-preset-notice" role={avatarIntentError?'alert':'status'}>{avatarPreparing?'Préparation de votre présentateur…':avatarIntentError||avatarIntentNotice}{!manual&&<button type="button" disabled={avatarPreparing} onClick={()=>{try{sessionStorage.removeItem(avatarIntentKey);}catch{}setAvatarIntentError('');setAvatarIntentNotice('');setGuestSettings(current=>current?{...current,avatar:undefined}:current);}}>Continuer sans cet avatar</button>}</p>}
     {renderChoice&&<p className="home-render-preset-notice" role="status">{presetPreparing?'Préparation du rendu…':presetError||`Rendu « ${homeRenderPresets.find(item=>item.id===renderChoice.preset)!.title} » sélectionné.`}
       {presetNeedsLogin&&<>Connectez-vous pour ajouter un avatar. <Link href={variant==='beta'?'/connexion?next=/beta':'/connexion'} onClick={()=>{const source=ImportUrl.safeParse(url.trim());if(source.success)saveListingDraft({kind:'url',url:source.data});}}>Me connecter</Link></>}
@@ -611,12 +612,12 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
         </button>
       </div>
       {me&&estimate.value&&!estimatePending&&!estimateFailed&&<details className="home-credit-details"><summary>Détail des {creditCost} crédit{creditCost>1?'s':''}</summary><dl><div><dt>Création de la vidéo</dt><dd>1 crédit</dd></div><div><dt>{requestedAnimations(estimatedSettings)} photo{requestedAnimations(estimatedSettings)>1?'s':''} animée{requestedAnimations(estimatedSettings)>1?'s':''} par IA</dt><dd>{requestedAnimations(estimatedSettings)} crédit{requestedAnimations(estimatedSettings)!==1?'s':''}</dd></div><div><dt>Présentateur IA</dt><dd>{creditCost-1-requestedAnimations(estimatedSettings)} crédit{creditCost-1-requestedAnimations(estimatedSettings)!==1?'s':''}</dd></div></dl><small>Le coût est confirmé avant le lancement. Vous pouvez ajuster les photos et les options dans Personnaliser.</small></details>}
-      <div id="home-composer-options" className="home-composer-options" inert={!composerExpanded} aria-hidden={!composerExpanded}>
+      <CreationReveal open={composerExpanded} id="home-composer-options" className="home-composer-options">
       <div className="home-composer-options-clip"><div className="home-composer-options-content">
       {me&&estimate.phase==='ready'&&estimate.value&&!busy&&<PhotoDurationAdvice photoCount={urlImportPhotoSlots(estimate.value).length} durationSeconds={durationSeconds} onDuration={setDurationSeconds} disabled={loading||activeOtherJob}/>}
-      {composerPhotos.length>0&&<div className="home-composer-attachments"><ol aria-label="Photos à ajouter à votre annonce">{composerPhotos.map((photo,index)=><li key={photo.id}>
+      {composerPhotos.length>0&&<div className="home-composer-attachments"><m.ol layout layoutDependency={composerPhotos.map(photo=>photo.id).join(',')} aria-label="Photos à ajouter à votre annonce"><AnimatePresence initial={false}>{composerPhotos.map((photo,index)=><m.li layout="position" layoutDependency={composerPhotos.map(photo=>photo.id).join(',')} transition={creationSpring} initial={false} animate={{opacity:1,scale:1}} exit={{opacity:0,scale:.96}} key={photo.id}>
         <img src={photo.preview} alt={`Photo ${index+1} : ${photo.file.name}`}/><button type="button" disabled={photoChecking||Boolean(incomingPhotos)} aria-label={`Retirer ${photo.file.name}`} onClick={()=>removeComposerPhoto(photo.id)}><HomeIcon name="close" size={14}/></button>
-      </li>)}</ol><p role="status">{composerPhotos.length} photo{composerPhotos.length>1?'s':''} · Appuyez sur Entrée pour compléter votre annonce.</p></div>}
+      </m.li>)}</AnimatePresence></m.ol><p role="status">{composerPhotos.length} photo{composerPhotos.length>1?'s':''} · Appuyez sur Entrée pour compléter votre annonce.</p></div>}
       {photoChecking&&<p className="home-photo-status" role="status">Vérification des photos…</p>}
       <div className="home-composer-bottom"><div className="home-format-tags">
         <label className="home-format-control"><span className="home-select-content"><HomeIcon name={aspectRatio==='16:9'?'landscape':'phone'} size={21}/><select aria-label="Format de la vidéo" value={aspectRatio} title="Format de la vidéo"
@@ -630,9 +631,9 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
           title={voiceEnabled?"Afficher ou masquer les sous-titres de la voix off":"Activez la voix off pour ajouter des sous-titres"} disabled={!voiceEnabled||loading||busy||activeGuestJob}
           onClick={()=>setSubtitlesEnabled(!subtitlesEnabled)}><span className="home-option-label">Sous-titres</span><span className="home-toggle-track" aria-hidden="true"/></button>
         <PhotoAnimationToggle enabled={animationsEnabled} selection={animationSelection} requiresLogin={!me} disabled={loading||busy||presetPreparing||photoChecking||activeGuestJob} onChange={changeAnimations}/>
-        </div><button type="button" className="home-customize-button" aria-pressed={customizing||screen.kind==='guest-customizing'} disabled={loading||busy||photoChecking||activeOtherJob||activeGuestJob} onClick={()=>void personalize()}><HomeIcon name="settings" size={21}/>Personnaliser</button>
+        </div><m.button whileTap={{scale:.98}} type="button" className="home-customize-button" aria-pressed={customizing||screen.kind==='guest-customizing'} disabled={loading||busy||photoChecking||activeOtherJob||activeGuestJob} onClick={()=>void personalize()}><HomeIcon name="settings" size={21}/>Personnaliser</m.button>
       </div>
-      </div></div></div>
+      </div></div></CreationReveal>
     </form>
     <div className="home-composer-secondary" inert={composerSticky&&!composerExpanded} aria-hidden={composerSticky&&!composerExpanded}><div className="home-composer-secondary-clip"><button type="button" className={manual?'home-mode-pill is-active':'home-mode-pill'} aria-pressed={manual} disabled={busy || photoChecking || Boolean(incomingPhotos) || activeGuestJob} onClick={()=>{if(manual)void manualForm.current?.cancel();else if(composerPhotos.length)openWithPhotos();else openManual();}}><HomeIcon name="image" size={20}/>Ajouter mes photos</button></div></div>
     </>}
@@ -657,5 +658,5 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
     <HomeImportFeedback source={!inConversation&&!manual&&!busy&&!loading&&!composerPhotos.length&&!importPaused?estimate.source:''}
       phase={!me?'guest':estimate.phase==='ready'?'ready':estimate.phase==='error'?'error':estimate.phase==='loading'?(estimate.reading?'reading':'detected'):'idle'}
       value={estimate.value} message={estimate.message} credits={creditCost} busy={loading||presetPreparing||customizing} onPersonalize={()=>void personalize()} onRetry={estimate.retry}/>
-  </div>;
+  </div></CreationMotion>;
 }

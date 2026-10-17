@@ -1,9 +1,8 @@
 'use client';
 import '../app/customizer.css';
-import {MotionItem,MotionSwap} from './view-motion';
-import {runMotion} from '../lib/view-motion';
+import {CreationMotion,CreationSwap,CreationDisclosure,m,AnimatePresence,creationSpring} from './creation-motion';
 import {trackProductEvent} from '../lib/product-analytics';
-import {useEffect,useRef,useState,type CSSProperties} from 'react';
+import {useEffect,useId,useRef,useState,type CSSProperties} from 'react';
 import {VIDEO_PHOTO_MAXIMUM,catalogAvatarLook,CustomNarration,videoStyles,frenchVoices,requestedAnimations,generationCreditCost,selectedAnimationIndices,mapFrame,mapInterval,mapInk,videoMapFromDefaults,VIDEO_LAYERS,type VideoCustomization,type VideoDuration,type VideoAspectRatio} from '@bienvu/contracts';
 import {suggestedNarration,narrationWordLimit,wordCount} from '@bienvu/narration/suggestion';
 import type {ManualDraftFields} from '../lib/listing-draft';
@@ -27,7 +26,7 @@ export function VideoCustomizer(p:Props){
   const mapDefaults=useVideoMapDefaults(),automaticMap=Boolean(p.settings.mapAutomatic||(!p.settings.map&&!p.settings.mapDisabled&&!p.settings.editor&&mapDefaults?.enabled)),
     automaticLocation=useAutomaticMapLocation(p.fields.locality,automaticMap),mapSettings=p.settings.map??(automaticMap&&mapDefaults?videoMapFromDefaults(mapDefaults):undefined),
     previewMap=mapSettings?{...mapSettings,...(automaticMap?{location:automaticLocation}:{})}:undefined;
-  const duration=p.durationSeconds??20;
+  const duration=p.durationSeconds??20,tabIdentity=useId();
   const [tab,setTab]=useState<'photos'|'style'|'voice'|'music'|'map'|'avatar'>('photos'),[drag,setDrag]=useState<number|null>(null),
     [playing,setPlaying]=useState(false),[time,setTime]=useState(0);
   const secondaryInk=()=>{const rgb=p.settings.secondaryColor.match(/[a-f\d]{2}/gi)!.map(h=>parseInt(h,16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);return rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722>.179?'#101d18':'#ffffff';};
@@ -45,18 +44,18 @@ export function VideoCustomizer(p:Props){
   function toggle(slot:number){
     const selected=order.includes(slot);if(!selected&&order.length>=VIDEO_PHOTO_MAXIMUM)return;
     const keepAllAnimated=order.length>0&&order.every(s=>animated.includes(s));
-    runMotion('bv-list',()=>patch({photoOrder:selected?order.filter(s=>s!==slot):[...order,slot],runwayClips:undefined,
-      runwayPhotos:selected?animated.filter(s=>s!==slot):keepAllAnimated?[...animated,slot]:animated}));
+    patch({photoOrder:selected?order.filter(s=>s!==slot):[...order,slot],runwayClips:undefined,
+      runwayPhotos:selected?animated.filter(s=>s!==slot):keepAllAnimated?[...animated,slot]:animated});
   }
   function animate(slot:number){trackProductEvent('editor_action',{action:'animation_toggled'});patch({runwayClips:undefined,runwayPhotos:animated.includes(slot)?animated.filter(s=>s!==slot):[...animated,slot]});}
-  function move(slot:number,target:number){trackProductEvent('editor_action',{action:'photo_reordered'});const next=order.filter(s=>s!==slot);next.splice(Math.max(0,Math.min(next.length,target)),0,slot);runMotion('bv-list',()=>patch({photoOrder:next}));}
+  function move(slot:number,target:number){trackProductEvent('editor_action',{action:'photo_reordered'});const next=order.filter(s=>s!==slot);next.splice(Math.max(0,Math.min(next.length,target)),0,slot);patch({photoOrder:next});}
   useEffect(()=>{setPlaying(false);setTime(0);},[duration]);
   useEffect(()=>{if(!playing)return;const timer=setInterval(()=>setTime(t=>{if(t>=duration-.2){setPlaying(false);return duration;}return t+.1;}),100);return()=>clearInterval(timer);},[playing,duration]);
   const interval=mapInterval(previewMap,duration*30),mapAt=mapFrame(previewMap,duration*30,Math.min(duration*30-1,Math.round(time*30))),
     photo=chosen[Math.max(0,Math.min(chosen.length-1,Math.floor((time*30-interval.photoStartFrame)/interval.photoFrames*chosen.length)))],line=Math.min(narration.length-1,Math.floor(time/duration*narration.length));
   const money=Number(p.fields.priceCents.replace(/\s/g,'').replace(',','.'));
   const price=money>0?`${new Intl.NumberFormat('fr-FR').format(money)} €${p.fields.transaction==='rent'?' / mois':''}`:'';
-  return <section className="video-customizer" aria-label="Personnaliser votre vidéo">
+  return <CreationMotion><section className="video-customizer" aria-label="Personnaliser votre vidéo">
     <div className="customizer-topline"><button type="button" onClick={p.onBack} disabled={p.busy}><span>←</span> Retour</button>
       <span role="status">{p.saved?'✓ Réglages enregistrés':'Brouillon enregistré sur cet appareil'}</span></div>
     <header className="customizer-heading"><h1>Personnalisez votre vidéo</h1>
@@ -66,19 +65,19 @@ export function VideoCustomizer(p:Props){
       <div className="customizer-tabs" role="tablist" aria-label="Réglages vidéo">{([['photos','Photos','image'],['style','Style','palette'],['voice','Voix et texte','microphone'],['music','Musique','music'],['map','Carte','pin'],['avatar','Avatar IA','user']] as const).map(([id,label,icon])=>
         <button type="button" key={id} role="tab" id={`customizer-tab-${id}`} aria-controls={`customizer-panel-${id}`} aria-selected={tab===id} tabIndex={tab===id?0:-1} disabled={p.busy}
           onKeyDown={event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const ids=['photos','style','voice','music','map','avatar'] as const;
-            const at=ids.indexOf(tab),next=event.key==='Home'?'photos':event.key==='End'?'avatar':ids[(at+(event.key==='ArrowRight'?1:ids.length-1))%ids.length];runMotion('bv-tabs',()=>setTab(next));document.getElementById(`customizer-tab-${next}`)?.focus();}}
-          onClick={()=>runMotion('bv-tabs',()=>setTab(id))}><HomeIcon name={icon} size={21}/>{label}</button>)}</div>
+            const at=ids.indexOf(tab),next=event.key==='Home'?'photos':event.key==='End'?'avatar':ids[(at+(event.key==='ArrowRight'?1:ids.length-1))%ids.length];setTab(next);document.getElementById(`customizer-tab-${next}`)?.focus();}}
+          onClick={()=>setTab(id)}><HomeIcon name={icon} size={21}/>{label}{tab===id&&<m.span className="customizer-tab-indicator" layoutId={`creation-tab-${tabIdentity}`} layoutDependency={tab} transition={creationSpring}/>}</button>)}</div>
       <AvatarWarning avatar={p.settings.avatar} voice={p.settings.voice??voiceCatalog?.defaultVoice??frenchVoices[0].id} catalog={avatarCatalog}/>
-      <MotionSwap identity={tab} kind="bv-tabs"><div role="tabpanel" id={`customizer-panel-${tab}`} aria-labelledby={`customizer-tab-${tab}`}>
+      <CreationSwap identity={tab}><div role="tabpanel" id={`customizer-panel-${tab}`} aria-labelledby={`customizer-tab-${tab}`}>
       {tab==='photos'&&<><div className="customizer-section-title customizer-photo-heading"><div><strong>Photos de la vidéo</strong><p>{p.sourceUrl&&!p.photos.length?'Connectez-vous pour choisir les photos de l’annonce.':`${p.photos.length} disponibles · Choisissez de 3 à 12 photos, puis réordonnez-les.`}</p></div><span className="customizer-count" role="status" aria-label={`${chosen.length} photos sélectionnées sur ${VIDEO_PHOTO_MAXIMUM}`}>{chosen.length} / {VIDEO_PHOTO_MAXIMUM}</span></div>
         {p.photos.length>VIDEO_PHOTO_MAXIMUM&&order.length>=VIDEO_PHOTO_MAXIMUM&&<p className="customizer-selection-help" role="status">Désélectionnez une photo pour en choisir une autre.</p>}
         <PhotoDurationAdvice photoCount={chosen.length} durationSeconds={duration} onDuration={p.onDuration} disabled={p.busy}/>
         {chosen.length>0&&<div className="customizer-photo-toolbar"><div><HomeIcon name="sparkle" size={20}/><span><strong>Animations IA</strong><small>{animationCount?`${animationCount} photo${animationCount>1?'s':''} animée${animationCount>1?'s':''} · +${animationCount} crédit${animationCount>1?'s':''}`:'1 crédit par photo animée'}</small></span></div><label className="customizer-switch"><span>Tout animer</span><input type="checkbox" role="switch" checked={allAnimated} disabled={p.busy||!me||!order.length} title={!me?'Connectez-vous pour animer vos photos':undefined} onChange={event=>patch({runwayClips:undefined,runwayPhotos:event.target.checked?[...order]:[]})}/><span aria-hidden="true"/></label></div>}
         {chosen.length>0&&!me&&<p className="customizer-hint">Connectez-vous pour activer les animations IA.</p>}
-        {p.photos.length?<div className="customizer-photos">{ordered.map((photo,index)=>{const at=order.indexOf(photo.slot),selected=at>=0;return <MotionItem key={photo.id}><div className={`customizer-photo${selected?' is-selected':''}${drag===photo.slot?' is-dragging':''}`}
-          draggable={selected&&!p.busy&&!photo.removing&&photo.state==='ready'} onDragStart={event=>{event.dataTransfer.setData('text/plain',String(photo.slot));event.dataTransfer.effectAllowed='move';setDrag(photo.slot);}}
-          onDragEnd={()=>setDrag(null)} onDragOver={event=>{if(drag!==null&&selected){event.preventDefault();event.dataTransfer.dropEffect='move';}}}
-          onDrop={event=>{if(drag!==null&&selected){event.preventDefault();runMotion('bv-list',()=>{move(drag,at);setDrag(null);});}}}>
+        {p.photos.length?<div className="customizer-photos"><AnimatePresence initial={false} mode="popLayout">{ordered.map((photo,index)=>{const at=order.indexOf(photo.slot),selected=at>=0;return <m.div key={photo.id} layout="position" layoutDependency={`${order.join(',')}:${p.photos.map(item=>item.id).join(',')}`} initial={false} animate={{opacity:drag===photo.slot ? .35 : selected?1:.55,scale:1}} exit={{opacity:0,scale:.96}} transition={{layout:creationSpring,opacity:{duration:.15},scale:{duration:.15}}} className={`customizer-photo${selected?' is-selected':''}${drag===photo.slot?' is-dragging':''}`}
+          draggable={selected&&!p.busy&&!photo.removing&&photo.state==='ready'} onDragStartCapture={event=>{if(event.target instanceof Element&&event.target.closest('button,input,a')){event.preventDefault();return;}event.dataTransfer.setData('text/plain',String(photo.slot));event.dataTransfer.effectAllowed='move';setDrag(photo.slot);}}
+          onDragEndCapture={()=>setDrag(null)} onDragOver={event=>{if(drag!==null&&selected){event.preventDefault();event.dataTransfer.dropEffect='move';}}}
+          onDrop={event=>{if(drag!==null&&selected){event.preventDefault();move(drag,at);setDrag(null);}}}>
           <div className="customizer-photo-visual"><PhotoPreviewImage src={photo.preview} alt={`Photo ${photo.slot+1}`} draggable={false} loading={index<3?'eager':'lazy'} fetchPriority={at===0?'high':'auto'}/></div>{selected&&<span className="customizer-photo-number">{at+1}</span>}
           <button type="button" className="customizer-photo-check" aria-pressed={selected} aria-label={`${selected?'Désélectionner':'Sélectionner'} la photo ${photo.slot+1}`} title={!selected&&order.length>=VIDEO_PHOTO_MAXIMUM?'Désélectionnez une photo pour faire de la place':undefined} onClick={()=>toggle(photo.slot)} disabled={p.busy||photo.removing||photo.state!=='ready'||!selected&&order.length>=VIDEO_PHOTO_MAXIMUM}>{selected?'✓':'+'}</button>
           {selected&&<button type="button" className={`customizer-photo-animate${animated.includes(photo.slot)?' is-active':''}`} aria-pressed={animated.includes(photo.slot)} aria-label={`Animer la photo ${photo.slot+1} avec l’IA`} disabled={!me||p.busy||photo.removing||photo.state!=='ready'} title={!me?'Connectez-vous pour animer vos photos':'1 crédit supplémentaire'} onClick={()=>animate(photo.slot)}>{animated.includes(photo.slot)?'✓ Animée':'Animer'} · 1 crédit</button>}
@@ -88,7 +87,7 @@ export function VideoCustomizer(p:Props){
             {photo.state==='error'&&p.onRetry&&photo.file&&<button type="button" disabled={p.busy||photo.removing} onClick={()=>p.onRetry?.(photo.id)}>Réessayer</button>}
             {p.onRemove&&<button type="button" disabled={p.busy||photo.removing} aria-label={`Retirer la photo ${photo.slot+1}`} onClick={()=>p.onRemove?.(photo.id)}>{photo.removing?'Retrait…':'Retirer'}</button>}
           </div>}
-          {selected&&order.length>1&&<div className="customizer-photo-moves"><button type="button" disabled={at===0||p.busy||photo.removing} aria-label={`Avancer la photo ${photo.slot+1}`} onClick={()=>move(photo.slot,at-1)}>←</button><button type="button" disabled={at===order.length-1||p.busy||photo.removing} aria-label={`Reculer la photo ${photo.slot+1}`} onClick={()=>move(photo.slot,at+1)}>→</button></div>}</div></MotionItem>;})}</div>
+          {selected&&order.length>1&&<div className="customizer-photo-moves"><button type="button" disabled={at===0||p.busy||photo.removing} aria-label={`Avancer la photo ${photo.slot+1}`} onClick={()=>move(photo.slot,at-1)}>←</button><button type="button" disabled={at===order.length-1||p.busy||photo.removing} aria-label={`Reculer la photo ${photo.slot+1}`} onClick={()=>move(photo.slot,at+1)}>→</button></div>}</m.div>;})}</AnimatePresence></div>
           :<div className="customizer-empty"><HomeIcon name="image" size={32}/><p>{p.sourceUrl?'Aperçu des photos disponible après import de l’annonce dans votre compte.':'Ajoutez les photos de votre bien pour composer votre vidéo.'}</p></div>}
         <input ref={upload} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={event=>{p.onAdd(event.target.files);event.target.value='';}}/>
         <button type="button" className="customizer-add" disabled={p.busy||p.photos.length>=12} onClick={()=>upload.current?.click()}><HomeIcon name="plus" size={21}/>Ajouter des photos</button>
@@ -111,10 +110,10 @@ export function VideoCustomizer(p:Props){
         onChange={music=>p.settings.editor?patch({music:undefined,editor:{...p.settings.editor,music:music?musicForTimeline(music,duration*30):null}}):patch({music})}/>}
       {tab==='avatar'&&<AvatarControls catalog={avatarCatalog} avatar={p.settings.avatar} onChange={avatar=>patch({avatar})} voice={p.settings.voice??voiceCatalog?.defaultVoice??frenchVoices[0].id} voiceEnabled={p.voiceEnabled!==false} onEnableVoice={()=>p.onVoice?.(true)} authenticated={Boolean(me?.agency)} durationSeconds={p.durationSeconds??20} busy={p.busy}/>}
       {tab==='map'&&<VideoMapControls map={mapSettings} automatic={automaticMap} defaults={mapDefaults} onChange={(map,automatic=automaticMap)=>patch({map,mapDisabled:map?undefined:true,mapAutomatic:map&&automatic?true:undefined})} onPreview={endpoint=>{setPlaying(false);setTime((interval.startFrame+(endpoint==='end'?interval.durationFrames-1:0))/30);}} locality={p.fields.locality} aspectRatio={p.aspectRatio??'9:16'} busy={p.busy} color={mapInk(p.settings.primaryColor,p.settings.secondaryColor)} duration={duration}/>}
-      {tab==='photos'&&<details className="customizer-advanced"><summary><HomeIcon name="settings" size={21}/>Réglages avancés<HomeIcon name="chevron" size={17}/></summary><div>
+      {tab==='photos'&&<CreationDisclosure className="customizer-advanced" label={<><HomeIcon name="settings" size={21}/>Réglages avancés</>}>
         <label className="customizer-checkbox"><input type="checkbox" checked={p.settings.photoMotion} onChange={event=>patch({photoMotion:event.target.checked})} disabled={p.busy}/>Zooms et translations des photos</label>
-        <label>Transition<select value={p.settings.transition} onChange={event=>patch({transition:event.target.value as 'fade'|'cut'})} disabled={p.busy}><option value="fade">Fondu</option><option value="cut">Coupe franche</option></select></label></div></details>}
-      </div></MotionSwap>
+        <label>Transition<select value={p.settings.transition} onChange={event=>patch({transition:event.target.value as 'fade'|'cut'})} disabled={p.busy}><option value="fade">Fondu</option><option value="cut">Coupe franche</option></select></label></CreationDisclosure>}
+      </div></CreationSwap>
       {!p.ready&&<p className="customizer-incomplete">Votre annonce reste à compléter. <button type="button" onClick={p.onEdit}>Revenir aux informations du bien →</button></p>}
     </div><aside className={`customizer-preview${p.aspectRatio==='16:9'?' is-horizontal':''}`}><div className="customizer-preview-title"><strong>Aperçu de votre vidéo</strong><span>{p.aspectRatio??'9:16'}</span></div>
       <div ref={preview} className={`customizer-poster poster-${p.settings.style}${playing&&p.settings.photoMotion?' is-playing':''}${time>=duration*.8?' is-ending':''}`} style={{'--preview-accent':p.settings.primaryColor,'--preview-secondary':p.settings.secondaryColor,'--preview-ink':secondaryInk()} as CSSProperties}>
@@ -131,5 +130,5 @@ export function VideoCustomizer(p:Props){
       <p className="customizer-preview-caption">Aperçu visuel · Le son est ajouté à la génération.</p>
       <div className="customizer-cost" role="status" aria-live="polite"><div><span>Coût estimé</span><strong>{creditCost} crédit{creditCost>1?'s':''}</strong></div><p>1 vidéo{animationCount?` · ${animationCount} animation${animationCount>1?'s':''} IA`:''}{p.settings.avatar&&!p.settings.avatar.hidden?' · Avatar IA':''}</p>{me&&<small>{me.rights.developmentRemaining} crédits disponibles</small>}</div>
     </aside></div>
-  </section>;
+  </section></CreationMotion>;
 }

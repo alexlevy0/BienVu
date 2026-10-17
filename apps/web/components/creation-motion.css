@@ -1,0 +1,26 @@
+[data-creation-reveal]{overflow:clip;min-width:0}
+.creation-reveal-content,.creation-scene{display:flow-root;min-width:0;width:100%}
+.creation-swap{position:relative;min-width:0;overflow:clip}
+.creation-disclosure-toggle{display:flex;align-items:center;gap:12px;width:100%;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.creation-disclosure-toggle:disabled{opacity:.55;cursor:default}
+.creation-disclosure-toggle:focus-visible{outline:2px solid #76936c;outline-offset:3px;border-radius:6px}
+.creation-disclosure-chevron{display:inline-flex;flex:none;margin-left:auto}
+.home-studio .home-create-panel .home-composer-options[data-creation-reveal]{display:block;grid-template-rows:none;visibility:visible;transition:none}
+.home-studio .home-create-panel .home-composer-options[data-creation-reveal] .home-composer-options-content{transform:none;transition:none}
+.customizer-tabs button{position:relative}
+.customizer-tab-indicator{position:absolute;bottom:2px;left:12px;right:12px;height:2px;border-radius:2px;background:#71915b;pointer-events:none}
+.video-customizer .creation-scene>[role=tabpanel]{min-height:320px}
+.customizer-advanced>.creation-disclosure-toggle{padding:12px 3px;font-size:14px}
+.customizer-advanced>[data-creation-reveal]{display:block;padding:0}
+.customizer-advanced .creation-disclosure-body{display:flex;flex-wrap:wrap;align-items:center;gap:20px;padding:12px 0}
+.manual-sheet-details>.creation-disclosure-toggle{padding:14px 17px;font-size:14px;font-weight:500}
+.manual-sheet-details .creation-disclosure-toggle em{font-size:12px;color:#78816e;font-weight:400;font-style:normal}
+@media(max-width:700px){.video-customizer .creation-scene>[role=tabpanel]{min-height:0}}
+
+/* Motion owns import height changes; the prior grid transitions stay disabled here. */
+.home-studio .home-create-panel .creation-import-swap .home-import-feedback{display:block;opacity:1;visibility:visible;transition:none}
+.home-studio .home-create-panel .creation-import-swap .home-import-feedback[data-active=false]{display:none}
+.home-studio .home-create-panel .creation-import-swap .home-import-card{transform:none;transition:border-color 180ms ease}
+.home-studio .home-create-panel .creation-import-swap .home-import-reveal{display:none;opacity:1;visibility:visible;transition:none}
+.home-studio .home-create-panel .creation-import-swap .home-import-reveal[data-open=true]{display:block}
+.home-conversation-status-motion{align-self:center}

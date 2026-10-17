@@ -1,4 +1,5 @@
 'use client';
+import {CreationMotion,CreationDisclosure,CreationReveal,m,AnimatePresence,creationSpring} from './creation-motion';
 import {analyticsFetch as fetch} from '../lib/product-analytics';
 import dynamic from 'next/dynamic';
 import {useEffect, useImperativeHandle, useRef, useState, type ChangeEvent, type FormEvent, type Ref} from 'react';
@@ -497,7 +498,7 @@ export function ManualListingForm(props: Props) {
   }
   const canAdd=hydrated&&!busy&&!photoChecking&&!props.incomingPhotos&&photos.length<MANUAL_PHOTO_LIMITS.maximum;
   const pendingConfirmation=unresolved();
-  return <>{props.customizing&&hydrated&&voiceLoading&&<p className="home-tool-loading" role="status">Chargement des voix disponibles…</p>}
+  return <CreationMotion>{props.customizing&&hydrated&&voiceLoading&&<p className="home-tool-loading" role="status">Chargement des voix disponibles…</p>}
     {props.customizing&&hydrated&&!voiceLoading&&<VideoCustomizer settings={customization??defaultVideoCustomization(props.brand,defaultVoice)}
     onChange={value=>{animationPolicy.current=undefined;settingsVersion.current++;setSettingsSaved(false);setCustomization(value);}} photos={photos} fields={draftFields()}
     agencyName={props.brand?.name??''} durationSeconds={props.durationSeconds} onDuration={props.onDuration} aspectRatio={props.aspectRatio} voiceEnabled={props.voiceEnabled} onVoice={props.onVoice} subtitlesEnabled={props.subtitlesEnabled!==false} onSubtitles={value=>props.onSubtitles?.(value)}
@@ -534,16 +535,16 @@ export function ManualListingForm(props: Props) {
             <div><label htmlFor="manual-rooms">Pièces</label><div className="manual-sheet-input"><input {...fieldProps('rooms')} inputMode="numeric" placeholder="3"/><span className="manual-sheet-unit">pièces</span></div>{error('rooms')}</div>
             <div><label htmlFor="manual-priceCents">{transaction==='rent'?'Loyer mensuel':'Prix'}</label><div className="manual-sheet-input"><input {...fieldProps('priceCents')} inputMode="decimal" placeholder={transaction==='rent'?'950':'385 000'}/><span className="manual-sheet-unit">€</span></div>{error('priceCents')}</div>
           </div>
-          {transaction==='rent'&&<div className="manual-sheet-charges"><label htmlFor="manual-charges">Charges du loyer</label><select {...fieldProps('charges')}><option value="">Préciser si le loyer est renseigné</option><option value="included">Charges comprises</option><option value="excluded">Charges non comprises</option></select>{error('charges')}</div>}
+          <CreationReveal open={transaction==='rent'}><div className="manual-sheet-charges"><label htmlFor="manual-charges">Charges du loyer</label><select {...fieldProps('charges')}><option value="">Préciser si le loyer est renseigné</option><option value="included">Charges comprises</option><option value="excluded">Charges non comprises</option></select>{error('charges')}</div></CreationReveal>
           <section className={`manual-sheet-gallery${photoDrop?' is-dropping':''}`} aria-labelledby="manual-photos-title" tabIndex={-1}
             onDragOver={event=>{if(Array.from(event.dataTransfer.types).includes('Files')){event.preventDefault();event.dataTransfer.dropEffect=canAdd?'copy':'none';if(canAdd)setPhotoDrop(true);}}}
             onDragLeave={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node|null))setPhotoDrop(false);}}
             onDrop={event=>{if(Array.from(event.dataTransfer.types).includes('Files')){event.preventDefault();setPhotoDrop(false);if(canAdd)void addPhotos(event.dataTransfer.files);}}}>
             <div className="manual-sheet-gallery-title"><h4 id="manual-photos-title">Photos du bien</h4>{photos.length>0&&<span>{photos.length>12?`${photos.length} disponibles · 12 max. par vidéo`:`${photos.length} / 12`}</span>}</div>
             <ol className={`manual-sheet-photos${photos.length?'':' is-empty'}`}>
-              {orderedPhotos.map((photo,index)=><li key={photo.id} className={`manual-sheet-photo${draggedPhoto===photo.id?' is-dragging':''}${photo.state==='error'?' has-error':''}`}
-                draggable={!busy&&!photoChecking&&photo.state==='ready'&&!photo.removing} onDragStart={event=>{event.dataTransfer.setData('application/x-bienvu-manual-photo',photo.id);event.dataTransfer.effectAllowed='move';setDraggedPhoto(photo.id);}}
-                onDragEnd={()=>setDraggedPhoto(null)} onDragOver={event=>{if(draggedPhoto){event.preventDefault();event.dataTransfer.dropEffect='move';}}}
+              <AnimatePresence initial={false} mode="popLayout">{orderedPhotos.map((photo,index)=><m.li layout="position" layoutDependency={orderedPhotos.map(item=>item.id).join(',')} initial={false} animate={{opacity:draggedPhoto===photo.id ? .4 : 1,scale:1}} exit={{opacity:0,scale:.96}} transition={{layout:creationSpring,opacity:{duration:.15},scale:{duration:.15}}} key={photo.id} className={`manual-sheet-photo${draggedPhoto===photo.id?' is-dragging':''}${photo.state==='error'?' has-error':''}`}
+                draggable={!busy&&!photoChecking&&photo.state==='ready'&&!photo.removing} onDragStartCapture={event=>{if(event.target instanceof Element&&event.target.closest('button,input,a')){event.preventDefault();return;}event.dataTransfer.setData('application/x-bienvu-manual-photo',photo.id);event.dataTransfer.effectAllowed='move';setDraggedPhoto(photo.id);}}
+                onDragEndCapture={()=>setDraggedPhoto(null)} onDragOver={event=>{if(draggedPhoto){event.preventDefault();event.dataTransfer.dropEffect='move';}}}
                 onDrop={event=>{if(draggedPhoto){event.preventDefault();event.stopPropagation();movePhoto(draggedPhoto,index);setDraggedPhoto(null);}}}>
                 <div className="manual-sheet-thumbnail"><PhotoPreviewImage src={photo.preview} alt={`Photo ${index+1} du bien`} draggable={false} loading={props.customizing||index>2?'lazy':'eager'}/><span className={`manual-sheet-photo-number${index===0?' is-cover':''}`}>{index+1}</span>
                   <button type="button" className="manual-sheet-animation-toggle" aria-pressed={animatedPhotos.has(photo.slot)} aria-label={`Animer la photo ${index+1} avec l’IA`}
@@ -559,7 +560,7 @@ export function ManualListingForm(props: Props) {
                 </div>
                 {photo.error&&<p className="manual-photo-error" role="alert">{photo.error}</p>}
                 {photo.state==='error'&&photo.file&&<button type="button" className="manual-sheet-retry" disabled={busy||photo.removing} onClick={()=>void uploadSelected(photo)}>Réessayer</button>}
-              </li>)}
+              </m.li>)}</AnimatePresence>
               {photos.length<MANUAL_PHOTO_LIMITS.maximum&&<li className="manual-sheet-photo-add"><label htmlFor="manual-photos"><HomeIcon name={photos.length?'plus':'upload'} size={26}/><span>{photos.length?'Ajouter':'Ajouter vos photos'}</span>
                 {!photos.length&&<small>ou glissez-les ici</small>}<input id="manual-photos" type="file" multiple disabled={!canAdd} accept="image/jpeg,image/png,image/webp" aria-invalid={Boolean(errors.photos||photoIssues.length)} aria-describedby="manual-photos-help manual-photo-feedback"
                   onChange={event=>{void addPhotos(event.target.files);event.target.value='';}}/></label></li>}
@@ -570,12 +571,12 @@ export function ManualListingForm(props: Props) {
             {photoChecking&&<p role="status" className="field-help">Vérification des images…</p>}
             <div id="manual-photo-feedback" className="form-feedback error" role="alert">{errors.photos}{photoIssues.map(issue=><p key={issue}>{issue}</p>)}</div>
           </section>
-          <details className="manual-sheet-details" open={detailsOpen} onToggle={event=>setDetailsOpen(event.currentTarget.open)}><summary>Ajouter des précisions <em>(facultatif)</em><HomeIcon name="chevron" size={17}/></summary>
+          <CreationDisclosure className="manual-sheet-details" open={detailsOpen} onOpenChange={setDetailsOpen} label={<>Ajouter des précisions <em>(facultatif)</em></>}>
             <div className="manual-sheet-details-body"><div><label htmlFor="manual-title">Titre de l’annonce</label><input {...fieldProps('title')} maxLength={200} placeholder={listingTitle('',fields.locality,propertyType,transaction)}/><p className="field-help">Un titre est proposé automatiquement. Vous pouvez le remplacer.</p>{error('title')}</div>
               <div><label htmlFor="manual-description">Description du bien</label><textarea {...attributes('description')} rows={5} maxLength={DESCRIPTION_MAX_CHARACTERS} value={props.guided?.description??fields.description}
                 onChange={event=>props.guided?props.guided.setDescription(event.target.value):setFields(current=>({...current,description:event.target.value}))} placeholder="Décrivez les espaces et les atouts de votre bien…"/>{error('description')}</div>
             </div>
-          </details>
+          </CreationDisclosure>
           {pendingConfirmation.length>0&&<div className="manual-provenance" aria-label="Informations à confirmer">{pendingConfirmation.map(([name,source])=><p key={name}><strong>{labels[name]??name}</strong> · {source!.source==='ai'?'Suggestion IA':'Information importée'}
             {source!.evidence&&<small>« {source!.evidence} »</small>}<button type="button" onClick={()=>void confirmField(name)}>Confirmer cette valeur</button></p>)}</div>}
           {feedback&&<div className="form-feedback error" role="alert"><p>{feedback}</p></div>}
@@ -584,5 +585,5 @@ export function ManualListingForm(props: Props) {
       </div>
       {!props.guided&&<button className="button primary" type="submit" disabled={busy||photoChecking||!hydrated}>{progress?'Préparation en cours…':props.prepareGuest?'Continuer avec mon annonce':generate?'Créer la vidéo de mon annonce':'Enregistrer mon annonce'}</button>}
     </form>
-  </>;
+  </CreationMotion>;
 }

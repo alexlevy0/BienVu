@@ -1,9 +1,9 @@
 'use client';
 import Link from 'next/link';
-import {useDeferredValue,useEffect,useState} from 'react';
+import {useEffect,useState} from 'react';
 import {publicErrors,type GenerationView,type PublicErrorCode,type VideoAspectRatio} from '@bienvu/contracts';
 import {generationActive} from './generation-progress-state';
-import {MotionSwap} from './view-motion';
+import {CreationMotion,CreationSwap,m} from './creation-motion';
 import {HomeIcon} from './home-icons';
 import {ProblemReport} from './problem-report';
 import {generationSteps,generationProgressText,generationMapOmissionText,generationAnimationOmissionText} from '../lib/generation-steps';
@@ -23,8 +23,7 @@ export function ConversationGeneration({job,request,sending,anonymous,unavailabl
   const poster=job&&!['queued','importing','failed'].includes(job.status)
     ?`/api/${anonymous?'trial':'generations'}/${job.id}/source-photo`:null;
   useEffect(()=>setPosterFailed(false),[poster]);
-  const deferredJob=useDeferredValue(job);
-  const statusJob=job?.status==='ready'&&deferredJob?.id===job.id?deferredJob:job;
+  const statusJob=job;
   const stages=generationSteps(sending?null:statusJob,request.kind==='manual');
   const horizontal=(job?.aspectRatio??aspectRatio)==='16:9';
   const ready=statusJob?.status==='ready',active=statusJob&&generationActive(statusJob);
@@ -38,7 +37,7 @@ export function ConversationGeneration({job,request,sending,anonymous,unavailabl
     if(path.endsWith('/login')){window.location.assign('/connexion?trial=1');return;}
     await onRefresh();
   }catch(error){setFeedback(error instanceof Error?error.message:'Réessayez.');}finally{setBusy(false);}}
-  return <section className="home-conversation-job" aria-label="Votre création">
+  return <CreationMotion><section className="home-conversation-job" aria-label="Votre création">
     <GenerationCelebration job={job}/>
     <div className="home-request-bubble"><HomeIcon name={request.kind==='manual'?'pencil':'link'} size={22}/><div>
       <strong>{request.kind==='manual'?'Je souhaite ajouter mon annonce manuellement.':request.text}</strong>
@@ -54,12 +53,12 @@ export function ConversationGeneration({job,request,sending,anonymous,unavailabl
               <strong>{sending?'Envoi en cours':job?.status==='failed'?'Création interrompue':ready?'Vidéo indisponible':job?.mapConfirmation?'En attente de votre choix':'Génération en cours'}</strong>
               {assembling&&<span className="home-poster-percent">Assemblage · {percent} %</span>}</div>
             <small>{horizontal?'Horizontal 16:9':'Vertical 9:16'} · {job?.syntheticVoice===false?'Sans voix off':'Voix française'}</small></div></div>}
-      </div><MotionSwap identity={`${statusJob?.id}:${ready?'ready':statusJob?.status==='failed'?'failed':'progress'}`}><div className="home-conversation-status">
+      </div><CreationSwap className="home-conversation-status-motion" identity={`${statusJob?.id}:${ready?'ready':statusJob?.status==='failed'?'failed':'progress'}`}><div className="home-conversation-status">
         <GenerationQueueNotice job={statusJob}/>
         {active||sending?<ol className="home-conversation-steps" aria-label="Étapes de création">{stages.map(({key,state,label,detail,progress})=>{
           const confirmMap=key==='map'&&statusJob?.mapConfirmation;
           return <li className={`step-${state}${detail||confirmMap?' step-with-detail':''}${confirmMap?' step-needs-confirmation':''}`} key={key} data-animations={key==='animations'&&progress?true:undefined} data-rendering={statusAssembling&&key==='rendering'||undefined} aria-current={state==='current'?'step':undefined}>
-            <span className="home-step-symbol" aria-hidden="true">{state==='done'?'✓':state==='current'?'◌':state==='skipped'?'–':'·'}</span><div className="home-step-label">{label}{detail&&<small className="home-step-detail">{detail}</small>}{confirmMap&&<GenerationMapConfirmation key={statusJob.id} job={statusJob} onRefresh={onRefresh}/>}</div>
+            <m.span key={state} className="home-step-symbol" initial={{opacity:0,scale:.88}} animate={{opacity:1,scale:1}} transition={{duration:.2}} aria-hidden="true">{state==='done'?'✓':state==='current'?'◌':state==='skipped'?'–':'·'}</m.span><div className="home-step-label">{label}{detail&&<small className="home-step-detail">{detail}</small>}{confirmMap&&<GenerationMapConfirmation key={statusJob.id} job={statusJob} onRefresh={onRefresh}/>}</div>
             <GenerationAnimationCounter progress={progress}/>
             {statusAssembling&&key==='rendering'&&statusJob&&<GenerationRenderProgress job={statusJob} unavailable={unavailable} className="home-render-percent"/>}</li>;
         })}</ol>:null}
@@ -80,7 +79,7 @@ export function ConversationGeneration({job,request,sending,anonymous,unavailabl
         {(active||sending)&&<p className="home-stage-note">Vous pouvez revenir plus tard. Retrouvez votre création dans <Link href="/biens">Mes biens</Link>{anonymous?' depuis ce navigateur':''}.</p>}
         {statusJob&&['ready','failed'].includes(statusJob.status)&&<ProblemReport key={statusJob.id} jobId={statusJob.id} anonymous={anonymous&&statusJob.ownership==='anonymous'}/>}
         {feedback&&<p className="home-stage-error" role="alert">{feedback}</p>}
-      </div></MotionSwap></div>
+      </div></CreationSwap></div>
     </div>
-  </section>;
+  </section></CreationMotion>;
 }
