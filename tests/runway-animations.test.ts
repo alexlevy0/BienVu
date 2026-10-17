@@ -51,10 +51,10 @@ async function setup(t:{after(fn:()=>Promise<void>):void},label:string,clips:num
   t.after(()=>mf.dispose());const env=await mf.getBindings<{DB:D1Database;MEDIA:R2Bucket}>();
   if(options.legacySchema){for(const file of (await readdir(new URL('../packages/db/migrations/',import.meta.url))).filter(f=>/^\d{4}_.*\.sql$/.test(f)&&f<'0055').sort())
     await env.DB.exec((await readFile(new URL(`../packages/db/migrations/${file}`,import.meta.url),'utf8')).replace(/^--.*$/gm,'').replace(/\n/g,' '));
-    // Only the animation journal is kept legacy; admission uses current map and avatar settings.
+    // Only the animation journal is kept legacy; admission uses current settings and credit views.
     await env.DB.exec((await readFile(new URL('../packages/db/migrations/0056_default_video_map.sql',import.meta.url),'utf8')).replace(/^--.*$/gm,'').replace(/\n/g,' '));
     await env.DB.exec((await readFile(new URL('../packages/db/migrations/0058_heygen_avatars.sql',import.meta.url),'utf8')).replace(/^--.*$/gm,'').replace(/\n/g,' '));
-    for(const file of ['0061_full_length_avatars.sql','0062_generation_preparation_steps.sql','0063_offers_and_credit_rollover.sql','0069_generation_map_confirmation.sql','0072_generation_queue.sql','0073_legacy_job_serialization.sql'])
+    for(const file of ['0061_full_length_avatars.sql','0062_generation_preparation_steps.sql','0063_offers_and_credit_rollover.sql','0067_subscription_promotions.sql','0069_generation_map_confirmation.sql','0072_generation_queue.sql','0073_legacy_job_serialization.sql','0079_annual_subscriptions.sql','0080_annual_credit_reversals.sql'])
       await env.DB.exec((await readFile(new URL('../packages/db/migrations/'+file,import.meta.url),'utf8')).replace(/^--.*$/gm,'').replace(/\n/g,' '));
     await env.DB.exec((await readFile(new URL('../packages/db/migrations/0064_automatic_import_estimates.sql',import.meta.url),'utf8')).replace(/^--.*$/gm,'').replace(/\n/g,' '));
     await env.DB.exec('ALTER TABLE generation_preparation_steps ADD COLUMN error_code TEXT');
