@@ -1,8 +1,9 @@
 'use client';
 import Link from 'next/link';
-import {useEffect,useState} from 'react';
+import {useDeferredValue,useEffect,useState} from 'react';
 import {publicErrors,type GenerationView,type PublicErrorCode,type VideoAspectRatio} from '@bienvu/contracts';
 import {generationActive} from './generation-progress-state';
+import {MotionSwap} from './view-motion';
 import {HomeIcon} from './home-icons';
 import {ProblemReport} from './problem-report';
 import {generationSteps,generationProgressText,generationMapOmissionText,generationAnimationOmissionText} from '../lib/generation-steps';
@@ -22,10 +23,13 @@ export function ConversationGeneration({job,request,sending,anonymous,unavailabl
   const poster=job&&!['queued','importing','failed'].includes(job.status)
     ?`/api/${anonymous?'trial':'generations'}/${job.id}/source-photo`:null;
   useEffect(()=>setPosterFailed(false),[poster]);
-  const stages=generationSteps(sending?null:job,request.kind==='manual');
+  const deferredJob=useDeferredValue(job);
+  const statusJob=job?.status==='ready'&&deferredJob?.id===job.id?deferredJob:job;
+  const stages=generationSteps(sending?null:statusJob,request.kind==='manual');
   const horizontal=(job?.aspectRatio??aspectRatio)==='16:9';
-  const ready=job?.status==='ready',active=job&&generationActive(job);
-  const mapOmission=generationMapOmissionText(job);
+  const ready=statusJob?.status==='ready',active=statusJob&&generationActive(statusJob);
+  const mapOmission=generationMapOmissionText(statusJob);
+  const statusAssembling=statusJob?.status==='rendering',statusPercent=statusAssembling?statusJob.progressPercent:0;
   const assembling=job?.status==='rendering';
   const percent=assembling?job.progressPercent:0;
   async function act(path:string){setBusy(true);setFeedback('');try{const response=await fetch(path,{method:'POST'});
@@ -50,33 +54,33 @@ export function ConversationGeneration({job,request,sending,anonymous,unavailabl
               <strong>{sending?'Envoi en cours':job?.status==='failed'?'Création interrompue':ready?'Vidéo indisponible':job?.mapConfirmation?'En attente de votre choix':'Génération en cours'}</strong>
               {assembling&&<span className="home-poster-percent">Assemblage · {percent} %</span>}</div>
             <small>{horizontal?'Horizontal 16:9':'Vertical 9:16'} · {job?.syntheticVoice===false?'Sans voix off':'Voix française'}</small></div></div>}
-      </div><div className="home-conversation-status">
-        <GenerationQueueNotice job={job}/>
+      </div><MotionSwap identity={`${statusJob?.id}:${ready?'ready':statusJob?.status==='failed'?'failed':'progress'}`}><div className="home-conversation-status">
+        <GenerationQueueNotice job={statusJob}/>
         {active||sending?<ol className="home-conversation-steps" aria-label="Étapes de création">{stages.map(({key,state,label,detail,progress})=>{
-          const confirmMap=key==='map'&&job?.mapConfirmation;
-          return <li className={`step-${state}${detail||confirmMap?' step-with-detail':''}${confirmMap?' step-needs-confirmation':''}`} key={key} data-animations={key==='animations'&&progress?true:undefined} data-rendering={assembling&&key==='rendering'||undefined} aria-current={state==='current'?'step':undefined}>
-            <span className="home-step-symbol" aria-hidden="true">{state==='done'?'✓':state==='current'?'◌':state==='skipped'?'–':'·'}</span><div className="home-step-label">{label}{detail&&<small className="home-step-detail">{detail}</small>}{confirmMap&&<GenerationMapConfirmation key={job.id} job={job} onRefresh={onRefresh}/>}</div>
+          const confirmMap=key==='map'&&statusJob?.mapConfirmation;
+          return <li className={`step-${state}${detail||confirmMap?' step-with-detail':''}${confirmMap?' step-needs-confirmation':''}`} key={key} data-animations={key==='animations'&&progress?true:undefined} data-rendering={statusAssembling&&key==='rendering'||undefined} aria-current={state==='current'?'step':undefined}>
+            <span className="home-step-symbol" aria-hidden="true">{state==='done'?'✓':state==='current'?'◌':state==='skipped'?'–':'·'}</span><div className="home-step-label">{label}{detail&&<small className="home-step-detail">{detail}</small>}{confirmMap&&<GenerationMapConfirmation key={statusJob.id} job={statusJob} onRefresh={onRefresh}/>}</div>
             <GenerationAnimationCounter progress={progress}/>
-            {assembling&&key==='rendering'&&<GenerationRenderProgress job={job} unavailable={unavailable} className="home-render-percent"/>}</li>;
+            {statusAssembling&&key==='rendering'&&statusJob&&<GenerationRenderProgress job={statusJob} unavailable={unavailable} className="home-render-percent"/>}</li>;
         })}</ol>:null}
-        {(active||sending)&&<div className={`home-stage-track${assembling?' is-measured':''}`} role="progressbar" aria-label="Traitement de la vidéo" aria-valuenow={assembling?percent:undefined} aria-valuemin={assembling?0:undefined} aria-valuemax={assembling?100:undefined} aria-valuetext={sending||!job?'Envoi en cours':assembling?`Assemblage de la vidéo : ${percent} %`:generationProgressText(job)}><span style={assembling?{width:`${percent}%`}:undefined}/></div>}
+        {(active||sending)&&<div className={`home-stage-track${statusAssembling?' is-measured':''}`} role="progressbar" aria-label="Traitement de la vidéo" aria-valuenow={statusAssembling?statusPercent:undefined} aria-valuemin={statusAssembling?0:undefined} aria-valuemax={statusAssembling?100:undefined} aria-valuetext={sending||!statusJob?'Envoi en cours':statusAssembling?`Assemblage de la vidéo : ${statusPercent} %`:generationProgressText(statusJob)}><span style={statusAssembling?{width:`${statusPercent}%`}:undefined}/></div>}
         {unavailable&&<p role="status" className="home-stage-note">Connexion momentanément interrompue. L’état sera actualisé à votre retour.</p>}
-        {job&&['ready','failed'].includes(job.status)&&mapOmission&&<p className="home-stage-note"><strong>Carte non ajoutée.</strong> {mapOmission}</p>}
-        {job&&['ready','failed'].includes(job.status)&&generationAnimationOmissionText(job)&&<p className="home-stage-note" role="status">{generationAnimationOmissionText(job)}</p>}
-        {job?.status==='failed'&&<p role="alert" className="home-stage-error">{publicErrors[job.errorCode as PublicErrorCode]?.[1]??publicErrors.GENERATION_FAILED[1]}</p>}
-        {job?.retryAllowed&&<button type="button" className="text-button" disabled={busy} onClick={()=>void act(`/api/generations/${job.id}/retry`)}>Relancer le démarrage</button>}
-        {ready&&job?.ownership==='owned'&&job.downloadUrl&&<a className="home-primary-button" href={job.downloadUrl} download>Télécharger la vidéo <span aria-hidden="true">↗</span></a>}
-        {ready&&anonymous&&job?.ownership==='anonymous'&&<><button type="button" className="home-primary-button" disabled={busy} onClick={()=>void act(`/api/trial/${job.id}/login`)}>Télécharger sans filigrane <span aria-hidden="true">↗</span></button><p className="home-stage-note">Créez votre compte gratuitement pour récupérer votre vidéo.</p></>}
-        {ready&&job?.ownership==='owned'&&job.masterAccess==='reserved'&&!job.downloadUrl&&<p className="home-stage-note" role="status">La récupération de votre vidéo est en cours. Le téléchargement apparaîtra ici dès qu’elle sera terminée.</p>}
-        {ready&&job?.ownership==='owned'&&job.masterAccess==='locked'&&!job.downloadUrl&&job.videoUrl&&<><p className="home-stage-note">La vidéo est privée. Un crédit est nécessaire pour télécharger le master sans filigrane.</p>
-          {!anonymous&&<button type="button" className="home-primary-button" disabled={busy} onClick={()=>void act(`/api/generations/${job.id}/unlock`)}>Utiliser un crédit</button>}</>}
-        {ready&&job?.ownership==='owned'&&anonymous&&<Link href="/essai/recuperer">Retrouver ma vidéo dans mon compte</Link>}
-        {ready&&!anonymous&&<p className="home-stage-note">{job.creditsUsed} crédit{job.creditsUsed>1?'s':''} utilisé{job.creditsUsed>1?'s':''}.{job.creditsRefunded>0?` ${job.creditsRefunded} crédit(s) restitué(s) pour les animations indisponibles.`:''}</p>}
-        {ready&&!job.videoUrl&&<p className="home-stage-error" role="status">Cette vidéo n’est plus disponible dans votre espace. Consultez Mes biens pour connaître son état.</p>}
+        {statusJob&&['ready','failed'].includes(statusJob.status)&&mapOmission&&<p className="home-stage-note"><strong>Carte non ajoutée.</strong> {mapOmission}</p>}
+        {statusJob&&['ready','failed'].includes(statusJob.status)&&generationAnimationOmissionText(statusJob)&&<p className="home-stage-note" role="status">{generationAnimationOmissionText(statusJob)}</p>}
+        {statusJob?.status==='failed'&&<p role="alert" className="home-stage-error">{publicErrors[statusJob.errorCode as PublicErrorCode]?.[1]??publicErrors.GENERATION_FAILED[1]}</p>}
+        {statusJob?.retryAllowed&&<button type="button" className="text-button" disabled={busy} onClick={()=>void act(`/api/generations/${statusJob.id}/retry`)}>Relancer le démarrage</button>}
+        {ready&&statusJob?.ownership==='owned'&&statusJob.downloadUrl&&<a className="home-primary-button" href={statusJob.downloadUrl} download>Télécharger la vidéo <span aria-hidden="true">↗</span></a>}
+        {ready&&anonymous&&statusJob?.ownership==='anonymous'&&<><button type="button" className="home-primary-button" disabled={busy} onClick={()=>void act(`/api/trial/${statusJob.id}/login`)}>Télécharger sans filigrane <span aria-hidden="true">↗</span></button><p className="home-stage-note">Créez votre compte gratuitement pour récupérer votre vidéo.</p></>}
+        {ready&&statusJob?.ownership==='owned'&&statusJob.masterAccess==='reserved'&&!statusJob.downloadUrl&&<p className="home-stage-note" role="status">La récupération de votre vidéo est en cours. Le téléchargement apparaîtra ici dès qu’elle sera terminée.</p>}
+        {ready&&statusJob?.ownership==='owned'&&statusJob.masterAccess==='locked'&&!statusJob.downloadUrl&&statusJob.videoUrl&&<><p className="home-stage-note">La vidéo est privée. Un crédit est nécessaire pour télécharger le master sans filigrane.</p>
+          {!anonymous&&<button type="button" className="home-primary-button" disabled={busy} onClick={()=>void act(`/api/generations/${statusJob.id}/unlock`)}>Utiliser un crédit</button>}</>}
+        {ready&&statusJob?.ownership==='owned'&&anonymous&&<Link href="/essai/recuperer">Retrouver ma vidéo dans mon compte</Link>}
+        {ready&&!anonymous&&<p className="home-stage-note">{statusJob.creditsUsed} crédit{statusJob.creditsUsed>1?'s':''} utilisé{statusJob.creditsUsed>1?'s':''}.{statusJob.creditsRefunded>0?` ${statusJob.creditsRefunded} crédit(s) restitué(s) pour les animations indisponibles.`:''}</p>}
+        {ready&&!statusJob.videoUrl&&<p className="home-stage-error" role="status">Cette vidéo n’est plus disponible dans votre espace. Consultez Mes biens pour connaître son état.</p>}
         {(active||sending)&&<p className="home-stage-note">Vous pouvez revenir plus tard. Retrouvez votre création dans <Link href="/biens">Mes biens</Link>{anonymous?' depuis ce navigateur':''}.</p>}
-        {job&&['ready','failed'].includes(job.status)&&<ProblemReport key={job.id} jobId={job.id} anonymous={anonymous&&job.ownership==='anonymous'}/>}
+        {statusJob&&['ready','failed'].includes(statusJob.status)&&<ProblemReport key={statusJob.id} jobId={statusJob.id} anonymous={anonymous&&statusJob.ownership==='anonymous'}/>}
         {feedback&&<p className="home-stage-error" role="alert">{feedback}</p>}
-      </div></div>
+      </div></MotionSwap></div>
     </div>
   </section>;
 }

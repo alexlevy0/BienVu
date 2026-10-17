@@ -1,16 +1,18 @@
 'use client';
-import {useCallback,useEffect,useId,useRef,useState} from 'react';
+import {useCallback,useEffect,useId,useLayoutEffect,useRef,useState,ViewTransition} from 'react';
+import {runMotion} from '../lib/view-motion';
+import type {AvatarMotionOrigin} from './avatar-presenter-card';
 import {AvatarGallery,avatarCutoutStatus,type AvatarLook,type AvatarPresenter} from '@bienvu/contracts';
 import {AvatarPortrait} from './avatar-portrait';
 import {useAvatarPreview} from './avatar-presenter-card';
 import {useAvatarFavorites} from './avatar-favorites';
 import {HomeIcon} from './home-icons';
 
-type Props={presenter:AvatarPresenter;selected?:string;busy?:boolean;onClose():void;onChoose(look:AvatarLook):void|Promise<void>;
+type Props={presenter:AvatarPresenter;selected?:string;busy?:boolean;onClose():void;onChoose(look:AvatarLook):void|Promise<void>;motionOrigin?:AvatarMotionOrigin;
   onAddGroup?():Promise<boolean>;
   remote?:'public'|'admin';selectedIds?:ReadonlySet<string>;allowPremium?:boolean;onAvailability?(look:AvatarLook,enabled:boolean):Promise<void>;
   onTransparency?(look:AvatarLook,value:'supported'|'unsupported'|'auto'):Promise<void>};
-export function AvatarVariantsDialog({presenter,selected,busy=false,onClose,onChoose,onAddGroup,remote,selectedIds,allowPremium=false,onAvailability,onTransparency}:Props){
+export function AvatarVariantsDialog({presenter,selected,busy=false,onClose,onChoose,onAddGroup,remote,selectedIds,allowPremium=false,onAvailability,onTransparency,motionOrigin}:Props){
   const dialog=useRef<HTMLDialogElement>(null),heading=useId(),favorites=useAvatarFavorites(),playback=useAvatarPreview(busy);
   const [page,setPage]=useState(()=>({looks:remote?[]:presenter.looks,total:presenter.total,offset:0,hasMore:false,revision:0}));
   const [pending,setPending]=useState(Boolean(remote)),[error,setError]=useState(''),[query,setQuery]=useState(''),[groupAdded,setGroupAdded]=useState(false);
@@ -27,19 +29,21 @@ export function AvatarVariantsDialog({presenter,selected,busy=false,onClose,onCh
     finally{if(!abort.signal.aborted&&version===generation.current)setPending(false);}
   },[presenter.id,remote]);
   useEffect(()=>{if(remote)void load();return()=>{controller.current?.abort();};},[load,remote]);
-  useEffect(()=>{
+  useLayoutEffect(()=>{
     const element=dialog.current,trigger=document.activeElement as HTMLElement|null,previous=document.body.style.overflow;
     element?.showModal();document.body.style.overflow='hidden';return()=>{element?.close();document.body.style.overflow=previous;if(trigger?.isConnected)trigger.focus({preventScroll:true});};
   },[]);
   const normalized=query.trim().toLocaleLowerCase('fr'),visible=page.looks.filter(look=>!normalized||look.name.toLocaleLowerCase('fr').includes(normalized));
+  function close(){runMotion('bv-avatar',()=>{motionOrigin?.restore();onClose();});}
   async function choose(look:AvatarLook){
-    try{const adding=remote==='admin'&&!selectedIds?.has(look.id);playback.stop();await onChoose(look);
+    try{const adding=remote==='admin'&&!selectedIds?.has(look.id);playback.stop();let result:void|Promise<void>=undefined;
+      if(motionOrigin)runMotion('bv-avatar',()=>{motionOrigin.restore();result=onChoose(look);});else result=onChoose(look);await result;
       if(adding)setPage(current=>({...current,looks:current.looks.map(item=>item.id===look.id?{...item,enabled:true}:item)}));
     }catch{setError('La modification n’a pas pu être enregistrée. Réessayez.');}
   }
   function label(look:AvatarLook){return look.name.startsWith(presenter.name+' in ')?look.name.slice(presenter.name.length+4):look.name;}
-  return <dialog ref={dialog} className="avatar-selection-dialog avatar-variants-dialog" aria-labelledby={heading} onCancel={onClose} onClick={event=>{if(event.target===event.currentTarget)onClose();}}>
-    <header><div><span>{remote==='admin'?'CATALOGUE HEYGEN':'LA SÉLECTION BIENVU'} · APPARENCES</span><h2 id={heading}>{presenter.name}<small>{page.total} apparence{page.total>1?'s':''}</small></h2><p>{remote==='admin'?'Choisissez les déclinaisons à proposer à vos clients. Vos ajouts restent en brouillon jusqu’à publication.':'Un même visage, plusieurs styles. Choisissez la tenue et le cadrage de votre vidéo.'}</p></div><button type="button" aria-label={`Fermer les apparences de ${presenter.name}`} onClick={onClose}><HomeIcon name="close" size={23}/></button></header>
+  return <ViewTransition default="none" enter={{'bv-avatar':'bv-fade',default:'none'}} exit={{'bv-avatar':'bv-fade',default:'none'}}><dialog data-motion={motionOrigin?true:undefined} ref={dialog} className="avatar-selection-dialog avatar-variants-dialog" aria-labelledby={heading} onCancel={event=>{event.preventDefault();close();}} onClick={event=>{if(event.target===event.currentTarget)close();}}>
+    <header>{motionOrigin&&<ViewTransition name={motionOrigin.name} share="bv-media" default="none"><div className="avatar-dialog-identity"><AvatarPortrait look={motionOrigin.look} priority/></div></ViewTransition>}<div><span>{remote==='admin'?'CATALOGUE HEYGEN':'LA SÉLECTION BIENVU'} · APPARENCES</span>{motionOrigin?<ViewTransition name={`${motionOrigin.name}-title`} share="bv-text" default="none"><h2 id={heading}>{presenter.name}<small>{page.total} apparence{page.total>1?'s':''}</small></h2></ViewTransition>:<h2 id={heading}>{presenter.name}<small>{page.total} apparence{page.total>1?'s':''}</small></h2>}<p>{remote==='admin'?'Choisissez les déclinaisons à proposer à vos clients. Vos ajouts restent en brouillon jusqu’à publication.':'Un même visage, plusieurs styles. Choisissez la tenue et le cadrage de votre vidéo.'}</p></div><button type="button" aria-label={`Fermer les apparences de ${presenter.name}`} onClick={close}><HomeIcon name="close" size={23}/></button></header>
     <div className="avatar-variants-toolbar"><label><HomeIcon name="search" size={18}/><input type="search" aria-label={`Rechercher une apparence de ${presenter.name}`} placeholder="Rechercher une tenue…" value={query} maxLength={100} onChange={event=>{playback.stop();setQuery(event.target.value);}}/></label><p role="status">{selectedIds?`${page.looks.filter(look=>selectedIds.has(look.id)).length} sélectionnée(s) parmi les apparences affichées`:'Survolez pour découvrir chaque style.'}</p>{onAddGroup&&<button type="button" className="avatar-dialog-add-group" disabled={busy||pending} onClick={()=>{playback.stop();setGroupAdded(false);void onAddGroup().then(async success=>{if(success){setGroupAdded(true);await load();}else setError('Le groupe n’a pas pu être ajouté. Vérifiez la capacité de votre sélection et réessayez.');});}}><HomeIcon name="plus" size={16}/>{busy?'Préparation du groupe…':'Ajouter tout le groupe'}</button>}</div>
     {groupAdded&&<p className="avatar-group-added" role="status">Toutes les apparences compatibles sont dans votre brouillon. Publiez la sélection pour les proposer aux utilisateurs.</p>}
     {error&&<p className="avatar-gallery-error" role="alert">{error} <button type="button" onClick={()=>void load()}>Actualiser</button></p>}
@@ -60,5 +64,5 @@ export function AvatarVariantsDialog({presenter,selected,busy=false,onClose,onCh
     {!pending&&!error&&!visible.length&&<p className="avatar-variants-empty">{query?'Aucune apparence affichée ne correspond à cette recherche.':'Aucune apparence disponible dans cette sélection.'}</p>}
     {page.hasMore&&<div className="avatar-variants-more"><p>{page.looks.length} sur {page.total} apparences chargées</p><button type="button" disabled={pending} onClick={()=>void load(page.offset+32)}>{pending?'Chargement…':'Afficher les apparences suivantes'} <HomeIcon name="arrow" size={16}/></button></div>}
     <footer><HomeIcon name="user" size={17}/>{remote==='admin'?'L’identité HeyGen regroupe automatiquement les tenues. La publication reste sous votre contrôle.':'Votre voix, le placement et la durée restent identiques lorsque vous changez d’apparence.'}</footer>
-  </dialog>;
+  </dialog></ViewTransition>;
 }

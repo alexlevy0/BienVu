@@ -1,5 +1,6 @@
 'use client';
 import {createContext,useCallback,useContext,useEffect,useRef,useState,type ReactNode} from 'react';
+import {runMotion} from '../lib/view-motion';
 import {AvatarFavorites,AvatarFavoriteUpdate} from '@bienvu/contracts';
 
 type FavoritesState={authenticated:boolean;ids:string[];loading:boolean;ready:boolean;busy:ReadonlySet<string>;error:string;
@@ -40,7 +41,7 @@ export function AvatarFavoritesProvider({userId,children}:{userId:string|null;ch
         headers:{'Content-Type':'application/json'},body:JSON.stringify({lookId,favorite})});
       if(!response.ok)throw Error();const result=AvatarFavoriteUpdate.parse(await response.json());
       if(result.lookId!==lookId||result.favorite!==favorite)throw Error();
-      if(!controller.signal.aborted)change(userId,current=>({...current,ids:favorite?[...new Set([...current.ids,lookId])]:current.ids.filter(id=>id!==lookId)}));
+      if(!controller.signal.aborted)runMotion('bv-list',()=>change(userId,current=>({...current,ids:favorite?[...new Set([...current.ids,lookId])]:current.ids.filter(id=>id!==lookId)})));
     }catch{if(!controller.signal.aborted)change(userId,current=>({...current,error:'Ce favori n’a pas pu être enregistré. Réessayez ou actualisez vos favoris.'}));}
     finally{if(!controller.signal.aborted){writes.current.delete(lookId);change(userId,current=>({...current,busy:new Set([...current.busy].filter(id=>id!==lookId))}));}}
   }

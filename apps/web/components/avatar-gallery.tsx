@@ -1,7 +1,8 @@
 'use client';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {AvatarGallery as GallerySchema,avatarPresenters,type AvatarGallery as Gallery,type AvatarLook,type AvatarPresenter,type AvatarGalleryQuery} from '@bienvu/contracts';
-import {AvatarPresenterCard,useAvatarPreview} from './avatar-presenter-card';
+import {AvatarPresenterCard,useAvatarPreview,type AvatarMotionOrigin} from './avatar-presenter-card';
+import {runMotion} from '../lib/view-motion';
 import {AvatarVariantsDialog} from './avatar-variants-dialog';
 import {useAccount} from './account';
 import {avatarIntentKey} from '../lib/avatar-intent';
@@ -14,14 +15,14 @@ import {useAvatarFavorites} from './avatar-favorites';
 export function AvatarGallery({initial}:{initial:Gallery}){
   const favorites=useAvatarFavorites(),{me,loading}=useAccount();
   const [data,setData]=useState(initial),[query,setQuery]=useState(''),[gender,setGender]=useState<AvatarGalleryQuery['gender']>('all');
-  const [group,setGroup]=useState<AvatarPresenter|null>(null);
+  const [group,setGroup]=useState<AvatarPresenter|null>(null),[motionOrigin,setMotionOrigin]=useState<AvatarMotionOrigin|undefined>();
   const [pending,setPending]=useState(false),[error,setError]=useState('');
   const playback=useAvatarPreview(pending),{stop}=playback,publishedRevision=useRef(initial.revision);
   const end=useRef<HTMLDivElement>(null);
   const request=useRef<AbortController|null>(null),revision=useRef(0),filter=useRef('all|'),fetching=useRef(false);
   const failedRequest=useRef<{offset:number;append:boolean}|null>(null);
   const normalizedQuery=query.trim();
-  const load=useCallback(async(offset:number,append:boolean,q:string,g:AvatarGalleryQuery['gender'])=>{
+  const load=useCallback(async(offset:number,append:boolean,q:string,g:AvatarGalleryQuery['gender'],animate=false)=>{
     request.current?.abort();const controller=new AbortController(),version=++revision.current;request.current=controller;
     fetching.current=true;failedRequest.current=null;setPending(true);setError('');if(!append)stop();
     try{
@@ -30,14 +31,15 @@ export function AvatarGallery({initial}:{initial:Gallery}){
       const next=GallerySchema.parse(await response.json());if(version!==revision.current||controller.signal.aborted)return;
       if(append&&next.revision!==publishedRevision.current){fetching.current=false;void load(0,false,q,g);return;}
       publishedRevision.current=next.revision;
-      setData(current=>({...next,looks:append?[...current.looks,...next.looks.filter(look=>!current.looks.some(old=>old.id===look.id))]:next.looks}));
+      const commit=()=>setData(current=>({...next,looks:append?[...current.looks,...next.looks.filter(look=>!current.looks.some(old=>old.id===look.id))]:next.looks}));
+      if(animate)runMotion('bv-list',commit);else commit();
     }catch{if(!controller.signal.aborted&&version===revision.current){failedRequest.current={offset,append};setError('Le catalogue n’a pas pu être chargé. Réessayez dans un instant.');}}
     finally{if(version===revision.current&&!controller.signal.aborted){fetching.current=false;setPending(false);}}
   },[stop]);
   useEffect(()=>{
     const key=gender+'|'+normalizedQuery;if(filter.current===key)return;filter.current=key;
     request.current?.abort();++revision.current;fetching.current=true;setPending(true);setError('');stop();
-    const timeout=setTimeout(()=>void load(0,false,normalizedQuery,gender),300);return()=>clearTimeout(timeout);
+    const timeout=setTimeout(()=>void load(0,false,normalizedQuery,gender,true),300);return()=>clearTimeout(timeout);
   },[normalizedQuery,gender,load,stop]);
   const loadMore=useCallback(()=>{
     if(fetching.current||failedRequest.current||!data.hasMore||error||filter.current!==gender+'|'+normalizedQuery)return;
@@ -76,7 +78,7 @@ export function AvatarGallery({initial}:{initial:Gallery}){
     {favorites.error&&<p className="avatar-gallery-error" role="alert">{favorites.error} <button type="button" onClick={favorites.refresh}>Actualiser les favoris</button></p>}
     {!failedRequest.current?.append&&failure}
     <div className="avatar-gallery-grid avatar-selection-grid" aria-busy={pending}>
-      {presenters.map((presenter,index)=><AvatarPresenterCard key={presenter.id} presenter={presenter} gallery busy={pending||loading} onOpen={presenter=>{stop();setGroup(presenter);}} playback={playback} priority={index<2}/>)}
+      {presenters.map((presenter,index)=><AvatarPresenterCard key={presenter.id} presenter={presenter} gallery busy={pending||loading} motion onOpen={(presenter,origin)=>{stop();setMotionOrigin(origin);setGroup(presenter);}} playback={playback} priority={index<2}/>)}
     </div>
     {!pending&&!error&&!data.looks.length&&<div className="avatar-gallery-empty"><h2>Aucun présentateur ne correspond à votre recherche.</h2><button type="button" onClick={()=>{setQuery('');setGender('all');}}>Voir toute la sélection</button></div>}
     {data.looks.length>0&&<div className="avatar-gallery-more" ref={end}><p>{presenters.length} sur {data.total.toLocaleString('fr-FR')} présentateurs</p>
@@ -84,6 +86,6 @@ export function AvatarGallery({initial}:{initial:Gallery}){
       {failedRequest.current?.append&&failure}
       {!data.hasMore&&!pending&&!error&&<p>Tous les résultats sont affichés.</p>}
     </div>}
-    {group&&<AvatarVariantsDialog key={group.id} presenter={group} remote="public" busy={pending||loading} onClose={()=>setGroup(null)} onChoose={choose}/>}
+    {group&&<AvatarVariantsDialog key={group.id} presenter={group} motionOrigin={motionOrigin} remote="public" busy={pending||loading} onClose={()=>setGroup(null)} onChoose={choose}/>}
   </section>;
 }

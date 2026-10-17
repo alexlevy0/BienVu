@@ -1,0 +1,29 @@
+/* Native snapshots are scoped to deliberate navigation and local state changes. */
+::view-transition{pointer-events:none}
+::view-transition-old(root){display:none}
+::view-transition-new(root){animation:none}
+::view-transition-group(.bv-media),::view-transition-group(.bv-text){animation-duration:260ms;animation-timing-function:cubic-bezier(.22,1,.36,1)}
+::view-transition-image-pair(.bv-media){isolation:isolate;border-radius:inherit;overflow:clip}
+::view-transition-old(.bv-media),::view-transition-new(.bv-media){height:100%;object-fit:cover;mix-blend-mode:normal}
+::view-transition-old(.bv-text){display:none}
+::view-transition-new(.bv-text){animation:none}
+::view-transition-group(.bv-reorder){animation-duration:220ms;animation-timing-function:cubic-bezier(.22,1,.36,1)}
+::view-transition-old(.bv-fade){animation:110ms ease-out both bv-fade-out}
+::view-transition-new(.bv-fade){animation:180ms ease-out both bv-fade-in}
+::view-transition-group(.bv-fade){animation-duration:180ms}
+::view-transition-old(.bv-forward){animation:220ms ease-out both bv-forward-out}
+::view-transition-new(.bv-forward){animation:220ms ease-out both bv-forward-in}
+::view-transition-old(.bv-back){animation:220ms ease-out both bv-back-out}
+::view-transition-new(.bv-back){animation:220ms ease-out both bv-back-in}
+::view-transition-group(bv-sidebar),::view-transition-group(bv-header),::view-transition-group(bv-showcase-header){animation:none;z-index:100}
+::view-transition-old(bv-sidebar),::view-transition-old(bv-header),::view-transition-old(bv-showcase-header){display:none}
+::view-transition-new(bv-sidebar),::view-transition-new(bv-header),::view-transition-new(bv-showcase-header){animation:none}
+@keyframes bv-fade-in{from{opacity:0}to{opacity:1}}
+@keyframes bv-fade-out{from{opacity:1}to{opacity:0}}
+@keyframes bv-forward-in{from{translate:18px 0}to{translate:0 0}}
+@keyframes bv-forward-out{from{translate:0 0}to{translate:-12px 0}}
+@keyframes bv-back-in{from{translate:-18px 0}to{translate:0 0}}
+@keyframes bv-back-out{from{translate:0 0}to{translate:12px 0}}
+@media(prefers-reduced-motion:reduce){
+ ::view-transition-old(*),::view-transition-new(*),::view-transition-group(*){animation-duration:0s!important;animation-delay:0s!important}
+}

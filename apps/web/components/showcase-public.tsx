@@ -1,3 +1,6 @@
+import {ViewTransition} from 'react';
+import {RouteMotion} from './route-motion';
+import {motionName} from '../lib/view-motion-name';
 import Link from 'next/link';
 import {propertyPrice,type ShowcasePublic,type ShowcasePublicProperty} from '@bienvu/contracts';
 import {HomeWordmark,HomeIcon} from './home-icons';
@@ -30,19 +33,19 @@ export function PublicShowcase({data,property,query={},homePath}:{data:ShowcaseP
     for(const[key,value]of Object.entries(values))if(value)params.set(key,value);else params.delete(key);
     return `${home.split('?')[0]}${params.size?'?'+params:''}#catalogue`;
   }
-  return <div className={`showcase-public${data.preview?' is-preview':''}`} style={{'--showcase-accent':c.accent} as React.CSSProperties}>
+  return <RouteMotion><div className={`showcase-public${data.preview?' is-preview':''}`} style={{'--showcase-accent':c.accent} as React.CSSProperties}>
     <a className="showcase-skip" href="#showcase-content">Aller au contenu</a>
-    <header className="showcase-public-header">
-      <Link href={home} prefetch={false} className="showcase-agency-brand">{c.name}</Link>
-      <nav aria-label="Navigation de l’agence"><Link href={home+'#catalogue'} prefetch={false}>Nos biens</Link><a href="#a-propos">À propos</a></nav>
+    <header className="showcase-public-header" style={{viewTransitionName:'bv-showcase-header'}}>
+      <Link href={home} prefetch={false} transitionTypes={property?['bv-back']:undefined} className="showcase-agency-brand">{c.name}</Link>
+      <nav aria-label="Navigation de l’agence"><Link href={home+'#catalogue'} prefetch={false} transitionTypes={property?['bv-back']:undefined}>Nos biens</Link><a href="#a-propos">À propos</a></nav>
       <a data-showcase-contact className="showcase-primary" href="#contact">Contacter l’agence</a>
     </header>
     <main id="showcase-content" tabIndex={-1}>
       {property?<>
-        <nav className="showcase-breadcrumb" aria-label="Fil d’Ariane"><Link href={home} prefetch={false}>Les biens de l’agence</Link><span aria-hidden="true">/</span><span>{property.fields.title}</span></nav>
+        <nav className="showcase-breadcrumb" aria-label="Fil d’Ariane"><Link href={home} prefetch={false} transitionTypes={property?['bv-back']:undefined}>Les biens de l’agence</Link><span aria-hidden="true">/</span><span>{property.fields.title}</span></nav>
         <section className="showcase-property-detail">
           <div className="showcase-property-media">
-            {property.video?<ShowcasePlayer src={property.video.url} poster={property.cover?.url} title={property.fields.title??'ce bien'} aspectRatio={property.video.aspectRatio}/>:property.cover&&<img className="showcase-detail-photo" src={property.cover.url} alt={property.fields.title??'Photo du bien'} width={property.cover.width} height={property.cover.height}/>}
+            <ViewTransition name={motionName('showcase-photo',`${c.slug}:${property.id}`)} default="none" share="bv-media">{property.video?<ShowcasePlayer src={property.video.url} poster={property.cover?.url} title={property.fields.title??'ce bien'} aspectRatio={property.video.aspectRatio}/>:property.cover&&<img className="showcase-detail-photo" src={property.cover.url} alt={property.fields.title??'Photo du bien'} width={property.cover.width} height={property.cover.height}/>}</ViewTransition>
             <div className="showcase-photo-gallery">{property.photos.filter(photo=>photo.id!==property.cover?.id).map((photo,index)=><a key={photo.id} href={photo.url} target="_blank" rel="noopener noreferrer" aria-label={`Ouvrir la photo ${index+2}`}><img src={photo.url} alt={`Photo ${index+2} du bien`} width={photo.width} height={photo.height} loading="lazy" decoding="async"/></a>)}</div>
           </div>
           <div className="showcase-property-information">
@@ -78,12 +81,12 @@ export function PublicShowcase({data,property,query={},homePath}:{data:ShowcaseP
                 <label>Budget maximum (€)<input name="budget" type="number" min={0} max={1000000000} defaultValue={query.budget??''}/></label>
                 <label>Pièces minimum<input name="rooms" type="number" min={0} max={100} defaultValue={query.rooms??''}/></label>
                 <button type="submit" className="showcase-primary">Afficher les biens <HomeIcon name="arrow" size={17}/></button>
-                {isFiltered&&<Link className="showcase-reset" href={home+'#catalogue'} prefetch={false}>Réinitialiser les filtres</Link>}
+                {isFiltered&&<Link className="showcase-reset" href={home+'#catalogue'} prefetch={false} transitionTypes={property?['bv-back']:undefined}>Réinitialiser les filtres</Link>}
               </form>
             </details>
           </div>
           <header className="showcase-section-heading"><h2 id="showcase-catalogue-title">Trouvez votre prochain chez-vous.</h2><span>{data.total} bien{data.total>1?'s':''}</span></header>
-          {gallery.length?<div className="showcase-gallery">{gallery.map(item=><ShowcasePropertyCard key={item.id} property={item} slug={c.slug}/>)}</div>:<div className="showcase-empty"><HomeIcon name="house" size={38}/><h3>Aucun bien ne correspond à votre recherche.</h3><p>Essayez d’autres critères ou parlez-nous de votre projet.</p><Link href={home+'#catalogue'} prefetch={false}>Voir tous nos biens</Link><a data-showcase-contact href="#contact">Contacter l’agence <span aria-hidden="true">→</span></a></div>}
+          {gallery.length?<div className="showcase-gallery">{gallery.map(item=><ShowcasePropertyCard key={item.id} property={item} slug={c.slug}/>)}</div>:<div className="showcase-empty"><HomeIcon name="house" size={38}/><h3>Aucun bien ne correspond à votre recherche.</h3><p>Essayez d’autres critères ou parlez-nous de votre projet.</p><Link href={home+'#catalogue'} prefetch={false} transitionTypes={property?['bv-back']:undefined}>Voir tous nos biens</Link><a data-showcase-contact href="#contact">Contacter l’agence <span aria-hidden="true">→</span></a></div>}
           {data.pages>1&&<nav className="showcase-pagination" aria-label="Pages du catalogue">{data.page>1&&<Link prefetch={false} href={catalogueUrl({page:String(data.page-1)})}>← Précédente</Link>}<span>Page {data.page} sur {data.pages}</span>{data.page<data.pages&&<Link prefetch={false} href={catalogueUrl({page:String(data.page+1)})}>Voir plus de biens →</Link>}</nav>}
         </section>
         <section className="showcase-search-invitation"><span className="showcase-search-symbol" aria-hidden="true"><HomeIcon name="house" size={30}/></span><div><h2>Vous n’avez pas encore trouvé ?</h2><p>Confiez-nous votre recherche.</p></div><a className="showcase-primary" href="#contact" data-showcase-contact>Décrire mon projet <HomeIcon name="arrow" size={18}/></a></section>
@@ -98,8 +101,8 @@ export function PublicShowcase({data,property,query={},homePath}:{data:ShowcaseP
       <ShowcaseContactPanel><ShowcaseContactForm slug={c.slug} propertyId={property?.id} title={property?.fields.title??undefined} preview={data.preview}/></ShowcaseContactPanel>
       {property&&data.properties.some(item=>item.id!==property.id)&&<section className="showcase-related"><h2>D’autres lieux à découvrir.</h2><div className="showcase-gallery">{data.properties.filter(item=>item.id!==property.id).slice(0,3).map(item=><ShowcasePropertyCard key={item.id} property={item} slug={c.slug}/>)}</div></section>}
     </main>
-    <footer className="showcase-public-footer"><Link className="showcase-footer-agency" href={home} prefetch={false}>{c.name}</Link><nav aria-label="Navigation du pied de page"><Link href={home+'#catalogue'} prefetch={false}>Nos biens</Link><a href="#a-propos">À propos</a></nav><span>Créé avec <Link href="/" aria-label="Découvrir BienVu"><HomeWordmark/></Link></span><div className="showcase-footer-legal"><Link href="/confidentialite#vitrines">Confidentialité</Link><Link href="/conditions">Conditions</Link><CookiePreferencesButton/></div></footer>
+    <footer className="showcase-public-footer"><Link className="showcase-footer-agency" href={home} prefetch={false} transitionTypes={property?['bv-back']:undefined}>{c.name}</Link><nav aria-label="Navigation du pied de page"><Link href={home+'#catalogue'} prefetch={false} transitionTypes={property?['bv-back']:undefined}>Nos biens</Link><a href="#a-propos">À propos</a></nav><span>Créé avec <Link href="/" aria-label="Découvrir BienVu"><HomeWordmark/></Link></span><div className="showcase-footer-legal"><Link href="/confidentialite#vitrines">Confidentialité</Link><Link href="/conditions">Conditions</Link><CookiePreferencesButton/></div></footer>
     {property&&<div className="showcase-mobile-contact"><a data-showcase-contact className="showcase-primary" href="#contact">Contacter l’agence <HomeIcon name="arrow" size={18}/></a>{c.phone&&<a data-showcase-contact href={`tel:${c.phone.replace(/[^+\d]/g,'')}`}>Appeler</a>}</div>}
     <ShowcaseTracking key={`${c.slug}:${property?.id??data.page}`} slug={c.slug} propertyId={property?.id} preview={data.preview}/>
-  </div>;
+  </div></RouteMotion>;
 }

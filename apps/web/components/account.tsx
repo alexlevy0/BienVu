@@ -1,6 +1,7 @@
 'use client';
 import {createContext, useCallback, useContext, useEffect, useRef, useState} from 'react';
 import {Me,VoiceCatalog,DEFAULT_VIDEO_VOICE,type VideoCustomization, type AgencyProfile} from '@bienvu/contracts';
+import {clearPropertyNavigation} from '../lib/property-navigation';
 import {clearListingDraft} from '../lib/listing-draft';
 import {clearAgencyDraft} from '../lib/agency-draft';
 import {trackProductEvent,suspendProductAnalytics} from '../lib/product-analytics';
@@ -25,6 +26,7 @@ export function AccountProvider({children}: {children: React.ReactNode}) {
     })();
     voiceRequest.current=pending;return pending;
   },[]);
+  useEffect(()=>{clearPropertyNavigation();},[me?.user.id,me?.agency.id]);
   const refreshVoices=useCallback(async()=>{await readVoices();},[readVoices]);
   const resolveDefaultVoice=useCallback(async()=>
     catalogRef.current?.defaultVoice??(await readVoices())?.defaultVoice??DEFAULT_VIDEO_VOICE,[readVoices]);

@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import {useEffect,useRef,useState} from 'react';
+import {useEffect,useRef,useState,ViewTransition} from 'react';
 import {GenerationView,propertyFacts,propertyPrice,publicErrors,type PropertyDetail as Detail,type PublicErrorCode} from '@bienvu/contracts';
 import {useAccount} from './account';
 import {useGenerationStore} from './generation-store';
@@ -12,23 +12,27 @@ import {ShowcasePropertyAction} from './showcase-property-action';
 import {propertyRequest,downloadBlob} from '../lib/property-client';
 import {boundedDownload,propertyVisual,propertyZip} from '../lib/property-download';
 
+import {cachedProperty,forgetProperty} from '../lib/property-navigation';
+import {motionName} from '../lib/view-motion-name';
+
 type Tab='contents'|'photos'|'information'|'publications';
 const statusLabel=(job:GenerationView)=>job.status==='ready'?job.videoUrl?'Prêt':'Indisponible':job.status==='failed'?'À reprendre':'En préparation';
 const date=(value:string)=>new Date(value).toLocaleString('fr-FR',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
 export function PropertyDetail({id}:{id:string}){
-  const {me,loading}=useAccount(),store=useGenerationStore(),owner=me?.agency.id??'guest',scopeKey=`${owner}:${id}`,scope=useRef(scopeKey);scope.current=scopeKey;
-  const [result,setResult]=useState<{scope:string;detail:Detail}|null>(null),[failure,setFailure]=useState(''),[revision,setRevision]=useState(0);
+  const {me,loading}=useAccount(),store=useGenerationStore(),owner=me?.agency.id??'guest';
+  const navigationOwner=me?JSON.stringify([me.user.id,me.agency.id]):'guest',scopeKey=`${navigationOwner}:${id}`,scope=useRef(scopeKey);scope.current=scopeKey;
+  const [result,setResult]=useState<{scope:string;detail:Detail}|null>(()=>{const detail=me?cachedProperty(navigationOwner,id):null;return detail?{scope:scopeKey,detail}:null;}),[failure,setFailure]=useState(''),[revision,setRevision]=useState(0);
   const [tab,setTab]=useState<Tab>('contents'),[filter,setFilter]=useState('all'),[busy,setBusy]=useState<string|null>(null),[progress,setProgress]=useState('');
   const [preview,setPreview]=useState<GenerationView|null>(null),[confirm,setConfirm]=useState<GenerationView|null>(null),[social,setSocial]=useState<GenerationView|null>(null),[create,setCreate]=useState(false);
   const previewDialog=useRef<HTMLDialogElement>(null),shareDialog=useRef<HTMLDialogElement>(null),createDialog=useRef<HTMLDialogElement>(null),downloadAbort=useRef<AbortController|null>(null),editKey=useRef(crypto.randomUUID());
   const data=result?.scope===scopeKey?result.detail:null,property=data?.property;
-  useEffect(()=>{setResult(null);setFailure('');setPreview(null);setConfirm(null);setSocial(null);setCreate(false);setBusy(null);setProgress('');setTab('contents');setFilter('all');editKey.current=crypto.randomUUID();
+  useEffect(()=>{const cached=me?cachedProperty(navigationOwner,id):null;setResult(cached?{scope:scopeKey,detail:cached}:null);setFailure('');setPreview(null);setConfirm(null);setSocial(null);setCreate(false);setBusy(null);setProgress('');setTab('contents');setFilter('all');editKey.current=crypto.randomUUID();
     if(loading||!me)return;const controller=new AbortController();
     void propertyRequest<Detail>(`/api/properties/${encodeURIComponent(id)}`,{signal:controller.signal}).then(detail=>{
       if(!controller.signal.aborted&&scope.current===scopeKey)setResult({scope:scopeKey,detail:{...detail,jobs:detail.jobs.map(j=>GenerationView.parse(j))}});
-    }).catch(error=>{if(!controller.signal.aborted&&scope.current===scopeKey)setFailure(error.message);});
+    }).catch(error=>{if(!controller.signal.aborted&&scope.current===scopeKey){forgetProperty(navigationOwner,id);setResult(null);setFailure(error.message);}});
     return()=>{controller.abort();downloadAbort.current?.abort();};
-  },[id,owner,loading,revision]);
+  },[id,owner,navigationOwner,loading,revision]);
   useEffect(()=>{if(!data)return;setResult(current=>current?.scope===scopeKey?{scope:scopeKey,detail:{...current.detail,jobs:current.detail.jobs.map(job=>store.jobs.find(j=>j.id===job.id)??job)}}:current);},[store.jobs,owner]);
   useEffect(()=>{const deleted=(event:Event)=>{if((event as CustomEvent<{agencyId:string}>).detail.agencyId===owner)setRevision(n=>n+1);};
     window.addEventListener('bienvu:draft-deleted',deleted);return()=>window.removeEventListener('bienvu:draft-deleted',deleted);},[owner]);
@@ -64,12 +68,12 @@ export function PropertyDetail({id}:{id:string}){
       if(scope.current===scopeKey&&!controller.signal.aborted){downloadBlob(propertyZip(files),`bienvu-${data.property.reference}.zip`);setProgress(`${files.length} contenu${files.length>1?'s':''} téléchargé${files.length>1?'s':''}.`);}
     }catch(error){if(!controller.signal.aborted)report(error);}finally{if(scope.current===scopeKey)setBusy(null);if(downloadAbort.current===controller)downloadAbort.current=null;}}
   if(loading)return <p className="property-notice" role="status">Chargement de votre espace…</p>;
-  if(!me)return <section className="property-empty"><HomeIcon name="house" size={36}/><h1>Retrouvez tous les contenus de votre bien.</h1><p>Connectez-vous pour ouvrir cette fiche dans votre espace privé.</p><Link className="property-primary" href={`/connexion?next=${encodeURIComponent(`/biens/${id}`)}`}>Se connecter <HomeIcon name="arrow" size={18}/></Link><Link href="/biens">Retour à Mes biens</Link></section>;
-  if(!data||!property)return <section className="property-detail"><Link className="property-breadcrumb" href="/biens">← Mes biens</Link>{failure?<p className="property-feedback" role="alert">{failure} <button type="button" onClick={()=>setRevision(n=>n+1)}>Réessayer</button></p>:<p className="property-notice" role="status">Chargement du bien…</p>}</section>;
+  if(!me)return <section className="property-empty"><HomeIcon name="house" size={36}/><h1>Retrouvez tous les contenus de votre bien.</h1><p>Connectez-vous pour ouvrir cette fiche dans votre espace privé.</p><Link className="property-primary" href={`/connexion?next=${encodeURIComponent(`/biens/${id}`)}`}>Se connecter <HomeIcon name="arrow" size={18}/></Link><Link href="/biens" transitionTypes={['bv-back']}>Retour à Mes biens</Link></section>;
+  if(!data||!property)return <section className="property-detail"><Link className="property-breadcrumb" href="/biens" transitionTypes={['bv-back']}>← Mes biens</Link>{failure?<p className="property-feedback" role="alert">{failure} <button type="button" onClick={()=>setRevision(n=>n+1)}>Réessayer</button></p>:<p className="property-notice" role="status">Chargement du bien…</p>}</section>;
   const titleCount=property.videoCount+property.draftCount+property.visualCount+property.textCount,canEdit=me.role!=='viewer',allPrivate=data.shares.length===0;
-  return <section className="property-detail" aria-labelledby="property-title"><nav className="property-breadcrumb" aria-label="Fil d’Ariane"><Link href="/biens">Mes biens</Link><span aria-hidden="true">›</span><span>{property.title}</span></nav>
-    <header className="property-detail-heading"><div className="property-detail-cover">{property.coverUrl?<img src={property.coverUrl} alt={`Photo de ${property.title}`}/>:<HomeIcon name="house" size={42}/>}</div>
-      <div className="property-detail-intro"><h1 id="property-title">{property.title}</h1><div className="property-detail-reference"><span className={`property-badge${property.fields.transaction==='rent'?' is-rent':''}`}>{property.archived?'Archivé':property.fields.transaction==='rent'?'À louer':property.fields.transaction==='sale'?'À vendre':'À compléter'}</span><span>Réf. {property.reference}</span></div>
+  return <section className="property-detail" aria-labelledby="property-title"><nav className="property-breadcrumb" aria-label="Fil d’Ariane"><Link href="/biens" transitionTypes={['bv-back']}>Mes biens</Link><span aria-hidden="true">›</span><span>{property.title}</span></nav>
+    <header className="property-detail-heading"><ViewTransition name={motionName('property-photo',property.id)} default="none" share="bv-media"><div className="property-detail-cover">{property.coverUrl?<img src={property.coverUrl} alt={`Photo de ${property.title}`}/>:<HomeIcon name="house" size={42}/>}</div></ViewTransition>
+      <div className="property-detail-intro"><ViewTransition name={motionName('property-title',property.id)} default="none" share="bv-text"><h1 id="property-title">{property.title}</h1></ViewTransition><div className="property-detail-reference"><span className={`property-badge${property.fields.transaction==='rent'?' is-rent':''}`}>{property.archived?'Archivé':property.fields.transaction==='rent'?'À louer':property.fields.transaction==='sale'?'À vendre':'À compléter'}</span><span>Réf. {property.reference}</span></div>
         <p>{propertyFacts(property.fields)||'Informations à compléter'}</p>{propertyPrice(property.fields)&&<strong>{propertyPrice(property.fields)}</strong>}</div>
       {canEdit&&<div className="property-detail-actions"><button className="property-button" type="button" disabled={Boolean(busy)} onClick={()=>void prepare('edit')}><HomeIcon name="pencil" size={18}/>{busy==='edit'?'Ouverture…':'Modifier le bien'}</button><button type="button" className="property-primary" disabled={Boolean(busy)} onClick={()=>setCreate(true)}><HomeIcon name="plus" size={20}/>Créer un contenu</button></div>}</header>
     <ShowcasePropertyAction key={`${owner}:${id}`} id={id} agencyId={owner}/>

@@ -1,6 +1,7 @@
 import './style.css';
 import './privacy-choice.css';
 import './dialog-backdrop.css';
+import './view-transitions.css';
 import {Suspense} from 'react';
 import {ProductAnalytics} from '../components/product-analytics';
 import {TawkChat} from '../components/tawk-chat';
