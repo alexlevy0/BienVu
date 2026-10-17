@@ -20,7 +20,7 @@
     "@bienvu/notifications": "workspace:*",
     "@bienvu/observability": "workspace:*",
     "@bienvu/voice": "workspace:*",
-    "@opennextjs/cloudflare": "1.20.6",
+    "@opennextjs/cloudflare": "1.20.11",
     "better-auth": "1.7.6",
     "canvas-confetti": "1.9.4",
     "fast-png": "8.0.0",
