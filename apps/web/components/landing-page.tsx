@@ -17,6 +17,7 @@ import {HomeEditorShowcase} from './home-editor-showcase';
 import {HomeVitrineShowcase} from './home-vitrine-showcase';
 import {HomeHeroVideo} from './home-hero-video';
 import {HomeFooter} from './home-footer';
+import {HomeMarketingStyles} from './home-marketing-styles';
 import {HomeVisual, useHomepageMedia, useHomepageConfig, homeClock} from './homepage-media';
 import type {HomepageSlot} from '@bienvu/contracts';
 import {publicFeatureLinks as featurePages} from '../lib/marketing-navigation';
@@ -83,6 +84,7 @@ export function LandingPage() {
     input?.scrollIntoView({block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
   };
   return <div className="home-studio home-studio-home">
+    <HomeMarketingStyles/>
     <a className="home-skip" href="#home-content">Aller au contenu</a>
     <StudioSidebar active="create"/>
     <div className="home-workspace"><header className="home-topbar"><span>Le studio marketing IA de votre agence immobilière.</span><button type="button" onClick={() => setDialog('help')}>Aide</button></header>

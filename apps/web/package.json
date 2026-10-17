@@ -3,9 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "node ../../scripts/prepare-maplibre-assets.mjs && next dev",
-    "build": "node ../../scripts/prepare-maplibre-assets.mjs && next build --webpack",
-    "build:worker": "node ../../scripts/prepare-maplibre-assets.mjs && opennextjs-cloudflare build",
+    "dev": "node ../../scripts/prepare-maplibre-assets.mjs && node ../../scripts/prepare-home-marketing-styles.mjs && next dev",
+    "build": "node ../../scripts/prepare-maplibre-assets.mjs && node ../../scripts/prepare-home-marketing-styles.mjs && next build --webpack",
+    "build:worker": "node ../../scripts/prepare-maplibre-assets.mjs && node ../../scripts/prepare-home-marketing-styles.mjs && opennextjs-cloudflare build",
     "preview": "wrangler dev --port 8787 --local",
     "typegen": "wrangler types --strict-vars false --env-interface CloudflareEnv cloudflare-env.d.ts",
     "typecheck": "tsc --noEmit"

@@ -45,3 +45,5 @@ apps/mail/wrangler.staging*.jsonc
 
 # Rebuilt from the pinned MapLibre dependency before dev/build.
 apps/web/public/maplibre/
+# Rebuilt from the authored homepage CSS before dev/build.
+apps/web/public/media/ui/home-marketing.css
