@@ -10,8 +10,8 @@ export function trialCookie(request:Request,env:TrialEnv){const name=cookieName(
 export const sessionFromRequest=(request:Request,env:TrialEnv)=>anonymousSession(env.DB,trialCookie(request,env));
 export async function requireTrial(request:Request,env:TrialEnv){const session=await sessionFromRequest(request,env);if(!session)throw new RequestFailure('NOT_FOUND');return session;}
 export async function trialResponse(action:()=>Promise<Response>){try{return await action();}catch(e){if(e instanceof GenerationFailure)throw new RequestFailure(e.code);throw e;}}
-function configured(env:TrialEnv){return env.ANONYMOUS_TRIALS_ENABLED==='true'&&env.GENERATIONS_ENABLED==='true'&&Boolean(env.TURNSTILE_SITE_KEY&&env.TURNSTILE_SECRET_KEY&&(env.TRIAL_IP_HMAC_SECRET?.length??0)>=32);}
-export function assertTrialEnabled(env:TrialEnv){if(!configured(env))throw new RequestFailure('ANONYMOUS_UNAVAILABLE');}
+export function anonymousTrialsConfigured(env:TrialEnv){return env.ANONYMOUS_TRIALS_ENABLED==='true'&&env.GENERATIONS_ENABLED==='true'&&Boolean(env.TURNSTILE_SITE_KEY&&env.TURNSTILE_SECRET_KEY&&(env.TRIAL_IP_HMAC_SECRET?.length??0)>=32);}
+export function assertTrialEnabled(env:TrialEnv){if(!anonymousTrialsConfigured(env))throw new RequestFailure('ANONYMOUS_UNAVAILABLE');}
 export async function trialHistoryResponse(request:Request,env:TrialEnv) {
   if(new URL(request.url).origin!==authOrigin(env)||request.headers.get('sec-fetch-site')==='cross-site')throw new RequestFailure('FORBIDDEN');
   const session=await sessionFromRequest(request,env);
@@ -23,13 +23,13 @@ export async function trialHistoryResponse(request:Request,env:TrialEnv) {
 export async function trialSessionResponse(request:Request,env:TrialEnv) {
   if(new URL(request.url).origin!==authOrigin(env)||request.headers.get('sec-fetch-site')==='cross-site')throw new RequestFailure('FORBIDDEN');
   let session=await sessionFromRequest(request,env),cookie:string|undefined;const policy=await trialPolicy(env.DB);
-  if(!session&&configured(env)&&policy.enabled===1){
+  if(!session&&anonymousTrialsConfigured(env)&&policy.enabled===1){
     const created=await createAnonymousSession(env.DB);session=created.session;
     cookie=`${cookieName(env)}=${created.proof}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${policy.session_days*86400}${authOrigin(env).startsWith('https://')?'; Secure':''}`;
   }
   const row=session?await trialForSession(env.DB,session):null;
   const intent=session?await env.DB.prepare('SELECT claim_job_id AS id FROM anonymous_sessions WHERE id=?').bind(session.id).first<{id:string|null}>():null;
-  return Response.json({enabled:configured(env)&&policy.enabled===1,siteKey:configured(env)?env.TURNSTILE_SITE_KEY:null,
+  return Response.json({enabled:anonymousTrialsConfigured(env)&&policy.enabled===1,siteKey:anonymousTrialsConfigured(env)?env.TURNSTILE_SITE_KEY:null,
     hasIntent:Boolean(intent?.id),creditsRemaining:session?Math.max(0,(session.creditsGranted??1)-(session.creditsReserved??0)-(session.creditsConsumed??session.successes)):1,
     used:session?session.successes>=policy.successes:false,job:row?generationView(row,Date.now(),'anonymous'):null},
     {headers:cookie?{'Set-Cookie':cookie}:{}});
