@@ -20,6 +20,11 @@
  .home-url-input input:disabled+.home-url-placeholder {opacity:.5;animation-play-state:paused}
 }
 @keyframes home-placeholder-shimmer {0%,18% {background-position:100% 50%}62%,100% {background-position:0% 50%}}
+/* Touch screens stay quiet until the visitor engages with the form. */
+@media(hover:none) and (pointer:coarse){
+ .home-studio-home .home-composer-dock:not(:focus-within) :is(.home-url-placeholder,.home-rainbow-button),
+ .home-studio-home .home-composer-dock:not(:focus-within) .home-rainbow-button::before {animation-play-state:paused}
+}
 .home-studio .home-composer-modern .home-composer-actions {display:flex;flex-direction:column;align-items:stretch;gap:8px;width:auto;min-width:0;padding:0;margin:0;border:0}
 .home-studio .home-composer-modern .home-primary-button {grid-area:auto;min-width:205px;min-height:58px;padding:13px 20px;border-radius:10px;font-size:16px;gap:17px}
 .home-studio .home-composer-modern .home-credit-cost {grid-area:auto;align-self:center;justify-self:auto;min-height:18px;width:auto;white-space:normal;text-align:center;color:#697665;font-size:12px;line-height:1.5}

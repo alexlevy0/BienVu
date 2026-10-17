@@ -244,6 +244,7 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
     autoFocusHandled.current=true;
     if(screen.kind!=='landing'||window.location.hash||new URLSearchParams(window.location.search).has('draft')||
       remembered()||readListingDraft()?.kind==='manual')return;
+    if(!matchMedia('(min-width: 761px) and (hover: hover) and (pointer: fine)').matches)return;
     const active=document.activeElement;
     if(active&&active!==document.body&&active!==document.documentElement)return;
     composerInput.current?.focus({preventScroll:true});
