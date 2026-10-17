@@ -3,6 +3,8 @@
 import type {HomepageSlot} from '@bienvu/contracts';
 import {HomeIcon} from './home-icons';
 import {HomeVisual, useHomepageMedia, homeClock} from './homepage-media';
+import {CreationMotion,m} from './creation-motion';
+import {HomeMandateBoard,useMandateCardMotion} from './home-mandate-motion';
 
 const contents = ['Reel Instagram', 'Story Instagram', 'TikTok', 'Vidéo horizontale', 'Post Facebook', 'Visuel prix / surface', 'Texte de publication'];
 type PreviewKind = 'reel' | 'story' | 'tiktok' | 'landscape';
@@ -15,11 +17,12 @@ function PlatformMark({kind}: {kind: PreviewKind}) {
 }
 
 function Preview({kind, onPlay}: {kind: PreviewKind; onPlay(slot: HomepageSlot): void}) {
+  const motion=useMandateCardMotion(['reel','story','tiktok','landscape'].indexOf(kind));
   const visual = useHomepageMedia(`kit.${kind}.visual`), movie = useHomepageMedia(`kit.${kind}.video`);
   const custom = visual.custom || movie.custom, locality = movie.locality ?? visual.locality;
   const title = movie.custom ? movie.title : visual.custom ? visual.title : null;
   const label = kind === 'landscape' ? 'Vidéo' : kind === 'tiktok' ? 'TikTok' : 'Instagram';
-  return <button type="button" className={`home-kit-card home-kit-preview home-kit-${kind}`} aria-label={`Lire l’aperçu : ${contents[['reel', 'story', 'tiktok', 'landscape'].indexOf(kind)]}`} aria-haspopup="dialog" onClick={() => onPlay(`kit.${kind}.video`)}>
+  return <m.button {...motion} type="button" className={`home-kit-card home-kit-preview home-kit-${kind}`} aria-label={`Lire l’aperçu : ${contents[['reel', 'story', 'tiktok', 'landscape'].indexOf(kind)]}`} aria-haspopup="dialog" onClick={() => onPlay(`kit.${kind}.video`)}>
     <HomeVisual media={visual} alt={title ?? (kind === 'tiktok' ? 'Loft lumineux aux grandes fenêtres' : 'Appartement lumineux aux moulures et grandes fenêtres')}/>
     <span className="home-kit-image-shade" aria-hidden="true"/>
     <span className="home-kit-platform"><PlatformMark kind={kind}/>{label}</span>
@@ -33,36 +36,39 @@ function Preview({kind, onPlay}: {kind: PreviewKind; onPlay(slot: HomepageSlot):
     </span>}
     {kind === 'tiktok' && <span className="home-kit-social-actions" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 21 3 12a6 6 0 0 1 9-8 6 6 0 0 1 9 8Z"/></svg><HomeIcon name="subtitles" size={21}/><HomeIcon name="document" size={21}/><HomeIcon name="send" size={21}/></span>}
     {kind === 'landscape' && <span className="home-kit-video-controls" aria-hidden="true"><span className="home-kit-progress"><i/></span><span>0:00 / {homeClock(movie.duration ?? 28)}</span><HomeIcon name="fullscreen" size={15}/></span>}
-  </button>;
+  </m.button>;
 }
 
 function FacebookPost() {
+  const motion=useMandateCardMotion(4);
   const media = useHomepageMedia('kit.facebook.visual');
-  return <article className="home-kit-card home-kit-facebook" aria-label="Exemple de post Facebook">
+  return <m.article {...motion} className="home-kit-card home-kit-facebook" aria-label="Exemple de post Facebook">
     <header><span className="home-kit-facebook-mark" aria-hidden="true">f</span><strong>Facebook</strong><HomeIcon name="more" size={18}/></header>
     <div className="home-kit-facebook-agency"><span className="home-kit-agency-avatar"><HomeVisual media={media}/></span><div><strong>{media.agency ?? 'Votre Agence Immobilière'}</strong><span>{media.custom ? media.locality ?? 'Présentation du bien' : 'Lyon 6e'} · <HomeIcon name="globe" size={10}/></span></div></div>
     <p>{media.custom ? media.title ?? 'Découvrez notre bien en images.' : 'À vendre — Appartement 3 pièces à Lyon 6e. 65 m² de lumière et de caractère, dans un quartier recherché.'}</p>
     <div className="home-kit-facebook-photo"><HomeVisual media={media} alt={media.title ?? 'Photo de l’appartement pour une publication Facebook'}/></div>
-  </article>;
+  </m.article>;
 }
 
 function PriceVisual() {
+  const motion=useMandateCardMotion(5);
   const media = useHomepageMedia('kit.price.visual');
-  return <figure className="home-kit-card home-kit-price" aria-label="Exemple de visuel prix et surface">
+  return <m.figure {...motion} className="home-kit-card home-kit-price" aria-label="Exemple de visuel prix et surface">
     <HomeVisual media={media} alt={media.title ?? 'Appartement mis en valeur dans un visuel immobilier'}/>
     <span className="home-kit-image-shade" aria-hidden="true"/>
     <span className="home-kit-price-locality">{media.custom ? media.locality ?? media.agency ?? 'Votre bien' : 'Lyon 6e'}</span>
     <figcaption>{media.custom ? <strong className="home-kit-custom-title">{media.title ?? 'Votre annonce'}</strong> : <><strong>385 000 €</strong><span>65 m² · 3 pièces</span></>}</figcaption>
-  </figure>;
+  </m.figure>;
 }
 
 function PublicationText() {
+  const motion=useMandateCardMotion(6);
   const media = useHomepageMedia('kit.facebook.visual');
-  return <article className="home-kit-card home-kit-publication" aria-label="Exemple de texte de publication"><header><span><HomeIcon name="alignLeft" size={20}/>Publication</span><HomeIcon name="more" size={20}/></header><p>{media.custom ? <>{media.title ?? 'Un nouveau bien à découvrir.'}{media.locality && <><br/>{media.locality}.</>}</> : <>À découvrir à Lyon 6e.<br/>65 m² de lumière et de caractère.</>}<br/><span>Contactez votre agence pour une visite.</span></p></article>;
+  return <m.article {...motion} className="home-kit-card home-kit-publication" aria-label="Exemple de texte de publication"><header><span><HomeIcon name="alignLeft" size={20}/>Publication</span><HomeIcon name="more" size={20}/></header><p>{media.custom ? <>{media.title ?? 'Un nouveau bien à découvrir.'}{media.locality && <><br/>{media.locality}.</>}</> : <>À découvrir à Lyon 6e.<br/>65 m² de lumière et de caractère.</>}<br/><span>Contactez votre agence pour une visite.</span></p></m.article>;
 }
 
 export function HomeMandateKit({onPlay, onCreate}: {onPlay(slot: HomepageSlot): void; onCreate(): void}) {
-  return <section className="home-kit" aria-labelledby="home-kit-title">
+  return <CreationMotion><section className="home-kit" aria-labelledby="home-kit-title">
     <div className="home-kit-panel">
       <div className="home-kit-copy">
         <p className="home-kit-kicker">Le kit de votre mandat</p>
@@ -71,12 +77,12 @@ export function HomeMandateKit({onPlay, onCreate}: {onPlay(slot: HomepageSlot): 
         <ol className="home-kit-content-list">{contents.map((label, index) => <li key={label}><span aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>{label}</li>)}</ol>
         <button type="button" className="home-kit-create" onClick={onCreate}>Créer mes contenus <HomeIcon name="arrow" size={23}/></button>
       </div>
-      <div className="home-kit-board" role="group" aria-label="Un aperçu des sept contenus de votre mandat">
+      <HomeMandateBoard>
         <Preview kind="reel" onPlay={onPlay}/><Preview kind="story" onPlay={onPlay}/><Preview kind="tiktok" onPlay={onPlay}/><Preview kind="landscape" onPlay={onPlay}/>
         <FacebookPost/><PriceVisual/>
         <PublicationText/>
-      </div>
+      </HomeMandateBoard>
     </div>
     <p className="home-kit-caption">Une annonce, déclinée pour chaque canal.</p>
-  </section>;
+  </section></CreationMotion>;
 }

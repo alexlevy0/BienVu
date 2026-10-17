@@ -1,6 +1,8 @@
 'use client';
 import '../app/customizer.css';
 import {CreationMotion,CreationSwap,CreationDisclosure,m,AnimatePresence,creationSpring} from './creation-motion';
+import {CreationCreditAmount} from './creation-credit-amount';
+import {CreationPhotoDestination} from './creation-photo-handoff';
 import {trackProductEvent} from '../lib/product-analytics';
 import {useEffect,useId,useRef,useState,type CSSProperties} from 'react';
 import {VIDEO_PHOTO_MAXIMUM,catalogAvatarLook,CustomNarration,videoStyles,frenchVoices,requestedAnimations,generationCreditCost,selectedAnimationIndices,mapFrame,mapInterval,mapInk,videoMapFromDefaults,VIDEO_LAYERS,type VideoCustomization,type VideoDuration,type VideoAspectRatio} from '@bienvu/contracts';
@@ -78,7 +80,7 @@ export function VideoCustomizer(p:Props){
           draggable={selected&&!p.busy&&!photo.removing&&photo.state==='ready'} onDragStartCapture={event=>{if(event.target instanceof Element&&event.target.closest('button,input,a')){event.preventDefault();return;}event.dataTransfer.setData('text/plain',String(photo.slot));event.dataTransfer.effectAllowed='move';setDrag(photo.slot);}}
           onDragEndCapture={()=>setDrag(null)} onDragOver={event=>{if(drag!==null&&selected){event.preventDefault();event.dataTransfer.dropEffect='move';}}}
           onDrop={event=>{if(drag!==null&&selected){event.preventDefault();move(drag,at);setDrag(null);}}}>
-          <div className="customizer-photo-visual"><PhotoPreviewImage src={photo.preview} alt={`Photo ${photo.slot+1}`} draggable={false} loading={index<3?'eager':'lazy'} fetchPriority={at===0?'high':'auto'}/></div>{selected&&<span className="customizer-photo-number">{at+1}</span>}
+          <CreationPhotoDestination slot={photo.slot}><PhotoPreviewImage src={photo.preview} alt={`Photo ${photo.slot+1}`} draggable={false} loading={index<3?'eager':'lazy'} fetchPriority={at===0?'high':'auto'}/></CreationPhotoDestination>{selected&&<span className="customizer-photo-number">{at+1}</span>}
           <button type="button" className="customizer-photo-check" aria-pressed={selected} aria-label={`${selected?'Désélectionner':'Sélectionner'} la photo ${photo.slot+1}`} title={!selected&&order.length>=VIDEO_PHOTO_MAXIMUM?'Désélectionnez une photo pour faire de la place':undefined} onClick={()=>toggle(photo.slot)} disabled={p.busy||photo.removing||photo.state!=='ready'||!selected&&order.length>=VIDEO_PHOTO_MAXIMUM}>{selected?'✓':'+'}</button>
           {selected&&<button type="button" className={`customizer-photo-animate${animated.includes(photo.slot)?' is-active':''}`} aria-pressed={animated.includes(photo.slot)} aria-label={`Animer la photo ${photo.slot+1} avec l’IA`} disabled={!me||p.busy||photo.removing||photo.state!=='ready'} title={!me?'Connectez-vous pour animer vos photos':'1 crédit supplémentaire'} onClick={()=>animate(photo.slot)}>{animated.includes(photo.slot)?'✓ Animée':'Animer'} · 1 crédit</button>}
           {at===0&&<span className="customizer-first-photo">Première image</span>}{photo.state!=='ready'&&<span className="customizer-photo-state">{photo.state==='error'?'Envoi interrompu':'Envoi…'}</span>}
@@ -128,7 +130,7 @@ export function VideoCustomizer(p:Props){
         <input type="range" min="0" max={duration} step=".1" value={time} aria-label="Position de l’aperçu" onChange={event=>{setPlaying(false);setTime(Number(event.target.value));}}/>
         <button type="button" aria-label="Aperçu en plein écran" onClick={()=>void preview.current?.requestFullscreen?.()}>⛶</button></div>
       <p className="customizer-preview-caption">Aperçu visuel · Le son est ajouté à la génération.</p>
-      <div className="customizer-cost" role="status" aria-live="polite"><div><span>Coût estimé</span><strong>{creditCost} crédit{creditCost>1?'s':''}</strong></div><p>1 vidéo{animationCount?` · ${animationCount} animation${animationCount>1?'s':''} IA`:''}{p.settings.avatar&&!p.settings.avatar.hidden?' · Avatar IA':''}</p>{me&&<small>{me.rights.developmentRemaining} crédits disponibles</small>}</div>
+      <div className="customizer-cost" role="status" aria-live="polite"><div><span>Coût estimé</span><strong><CreationCreditAmount value={creditCost}/></strong></div><p>1 crédit vidéo{animationCount?` · IA +${animationCount} crédit${animationCount>1?'s':''}`:''}{p.settings.avatar&&!p.settings.avatar.hidden?` · Avatar +${creditCost-1-animationCount}`:''}</p>{me&&<small>{me.rights.developmentRemaining} crédits disponibles</small>}</div>
     </aside></div>
   </section></CreationMotion>;
 }

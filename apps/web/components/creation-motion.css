@@ -24,3 +24,8 @@
 .home-studio .home-create-panel .creation-import-swap .home-import-reveal{display:none;opacity:1;visibility:visible;transition:none}
 .home-studio .home-create-panel .creation-import-swap .home-import-reveal[data-open=true]{display:block}
 .home-conversation-status-motion{align-self:center}
+.creation-credit-amount{display:inline-flex;vertical-align:baseline;font-variant-numeric:tabular-nums}
+.creation-credit-window{display:inline-grid;position:relative;overflow:clip;vertical-align:baseline;line-height:inherit}
+.creation-credit-window>span{display:block;grid-area:1/1;white-space:nowrap}
+.creation-photo-flight{z-index:140;pointer-events:none;overflow:hidden;will-change:transform,width,height}
+.creation-photo-flight img{display:block;width:100%;height:100%;object-fit:cover}

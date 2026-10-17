@@ -11,6 +11,8 @@ import {useAnonymousTrial, TrialChallenge} from './anonymous-trial';
 import {useAccount} from './account';
 import {HomeIcon} from './home-icons';
 import {CreationMotion,CreationReveal,m,creationSpring,AnimatePresence} from './creation-motion';
+import {CreationCreditAmount} from './creation-credit-amount';
+import {CreationPhotoHandoff,useCreationPhotoHandoff} from './creation-photo-handoff';
 import {HomeCreateButton} from './home-create-button';
 import {BetaSettingsSummary} from './beta-settings-summary';
 import {PhotoDurationAdvice} from './photo-duration-advice';
@@ -55,8 +57,9 @@ function requestFor(job: GenerationView, url: string): RequestMessage {
     : {kind: 'url', text: url || job.title || 'Votre annonce immobilière'};
 }
 
-export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voiceChoice,variant='default'}: {onLayoutChange(active: boolean): void;renderChoice?:HomeRenderChoice|null;onClearRenderChoice?():void;voiceChoice?:BetaVoiceChoice|null;variant?:'default'|'beta'}) {
+function HomeCreateContent({onLayoutChange,renderChoice,onClearRenderChoice,voiceChoice,variant='default'}: {onLayoutChange(active: boolean): void;renderChoice?:HomeRenderChoice|null;onClearRenderChoice?():void;voiceChoice?:BetaVoiceChoice|null;variant?:'default'|'beta'}) {
   const {me, loading,defaultVoice,resolveDefaultVoice} = useAccount();
+  const photoHandoff=useCreationPhotoHandoff(),[personalizePreparing,setPersonalizePreparing]=useState(false);
   const {subtitlesEnabled,setSubtitlesEnabled,voiceEnabled,setVoiceEnabled,durationSeconds,setDurationSeconds,aspectRatio,setAspectRatio,animationPreference,setAnimationPreference}=useSubtitlePreference();
   const [screen, setScreen] = useState<Screen>({kind: 'landing'});
   const [manualCredits,setManualCredits]=useState(1);
@@ -141,7 +144,7 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
   const activeOtherJob = Boolean(!me && currentJob && generationActive(currentJob) && screen.kind !== 'job');
   const activeGuestJob = Boolean(!me && screen.kind === 'job' && generationActive(selectedJob));
   const guestManualBusy=trial.preparingManual||Boolean(trial.pendingManual);
-  const busy = screen.kind === 'sending' || screen.kind==='extracting' || manualBusy||guestManualBusy;
+  const busy = screen.kind === 'sending' || screen.kind==='extracting' || manualBusy||guestManualBusy||personalizePreparing;
   const canGenerate = Boolean(me?.rights.generationEnabled);
   const importPaused = Boolean(me?.rights.importRetryAt);
   const manual = screen.kind === 'manual';
@@ -227,6 +230,7 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
   useEffect(()=>{
     if(loading)return;const owner=me?.agency.id??'guest';
     if(lastOwner.current&&lastOwner.current!=='guest'&&lastOwner.current!==owner){
+      setPersonalizePreparing(false);photoHandoff.cancel();
       clearComposerPhotos();setCustomizing(false);setGuestSettings(undefined);
       interactionVersion.current++;
       forget();guestPending.current=null;setScreen({kind:'landing'});setUrl('');setDescription('');
@@ -345,6 +349,7 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
   useEffect(() => {
     const fresh = () => {
       if(trial.preparingManual)return;
+      setPersonalizePreparing(false);photoHandoff.cancel();
       interactionVersion.current++;lock.current=false;startFresh.current = true; forget(); setFeedback('');guestPending.current=null;
       trial.cancelManual();
       if (screen.kind !== 'manual') {setScreen({kind: 'landing'});setUrl('');setDescription('');}
@@ -402,6 +407,7 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
       trial.setToken('');trial.setChallenge(false);trial.setWidgetVersion(n=>n+1);}}
   }
   function closeCustomization(){
+    photoHandoff.cancel();
     previousComposer.current=composerDock.current?.getBoundingClientRect()??null;
     setCustomizing(false);
     if(screen.kind==='guest-customizing')setScreen({kind:'landing'});
@@ -432,9 +438,12 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
       const voice=await resolveCreationVoice();if(interactionVersion.current!==version||currentOwner.current)return;
       setGuestSettings(current=>current??defaultVideoCustomization(undefined,voice));setScreen({kind:'guest-customizing',url:parsed.data});return;}
     const owner=me.agency.id,version=interactionVersion.current;
-    lock.current=true;setFeedback('');startFresh.current=true;forget();setScreen({kind:'extracting',text:parsed.data});
+    lock.current=true;setFeedback('');startFresh.current=true;forget();
+    const keepPreview=estimate.phase==='ready'&&Boolean(estimate.value)&&estimate.source===parsed.data;
+    if(keepPreview)setPersonalizePreparing(true);else setScreen({kind:'extracting',text:parsed.data});
+    const toolsReady=Promise.all([import('./manual-listing-form'),import('./video-customizer')]).catch(()=>{/* The regular tool loader handles a failed download. */});
     try{
-      const [imported,voice]=await Promise.all([estimate.prepare(parsed.data,true),resolveCreationVoice()]);
+      const [imported,voice]=await Promise.all([estimate.prepare(parsed.data,true),resolveCreationVoice(),toolsReady]);
       let draft=imported.draft;
       if(imported.status==='ready'&&imported.id){
         if(pendingCustomization.current?.id!==imported.id){
@@ -449,13 +458,15 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
       if(!draft)throw new Error('Ce site ne permet pas de préparer cette annonce. Vous pouvez saisir ses informations et ajouter vos photos manuellement.');
       if(interactionVersion.current!==version||currentOwner.current!==owner)return;
       const settings=(renderChoice||avatarIntentNotice)?settingsForImport(imported,voice):draft.data.videoCustomization??settingsForImport(imported,voice);
-      setImportDraft({...draft,data:{...draft.data,videoCustomization:withBetaVoice(animationPreference===undefined?settings:
-        withPhotoAnimationChoice(settings,settings.photoOrder??urlImportPhotoSlots(imported),animationPreference),chosenVoice.current)}});
+      const customizedSettings=withBetaVoice(animationPreference===undefined?settings:
+        withPhotoAnimationChoice(settings,settings.photoOrder??urlImportPhotoSlots(imported),animationPreference),chosenVoice.current);
+      photoHandoff.capture();setManualCredits(generationCreditCost(customizedSettings,durationSeconds));
+      setImportDraft({...draft,data:{...draft.data,videoCustomization:customizedSettings}});
       setGuestExtraction(null);setDescription(draft.data.fields.description??'');setScreen({kind:'manual'});setCustomizing(true);
       void refreshDrafts();
     }catch(error){if(interactionVersion.current===version&&currentOwner.current===owner)
       setScreen({kind:'error',request:{kind:'url',text:parsed.data},message:error instanceof Error?error.message:'Préparation interrompue.'});}
-    finally{if(interactionVersion.current===version)lock.current=false;}
+    finally{if(interactionVersion.current===version){lock.current=false;setPersonalizePreparing(false);}}
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -546,7 +557,7 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
   const contextNote = !me ? estimate.source?'Essai classique gratuit. Connectez-vous pour animer les photos par IA et estimer leur coût en crédits.':'Essayez gratuitement.' : canGenerate
     ? (noCredits?'Crédits insuffisants pour ce montage. Réduisez les animations ou consultez vos crédits.':'')
     : 'Accès anticipé · Préparez votre annonce';
-  return <CreationMotion><div className={`home-create home-create-panel${variant==='beta'?' home-create-beta':''}${inConversation ? ' home-create-conversation' : ''}${customizing||screen.kind==='guest-customizing'?' home-create-customizing':''}`}>
+  return <div className={`home-create home-create-panel${variant==='beta'?' home-create-beta':''}${inConversation ? ' home-create-conversation' : ''}${customizing||screen.kind==='guest-customizing'?' home-create-customizing':''}`}>
     {(avatarPreparing||avatarIntentNotice||avatarIntentError)&&<p className="home-render-preset-notice" role={avatarIntentError?'alert':'status'}>{avatarPreparing?'Préparation de votre présentateur…':avatarIntentError||avatarIntentNotice}{!manual&&<button type="button" disabled={avatarPreparing} onClick={()=>{try{sessionStorage.removeItem(avatarIntentKey);}catch{}setAvatarIntentError('');setAvatarIntentNotice('');setGuestSettings(current=>current?{...current,avatar:undefined}:current);}}>Continuer sans cet avatar</button>}</p>}
     {renderChoice&&<p className="home-render-preset-notice" role="status">{presetPreparing?'Préparation du rendu…':presetError||`Rendu « ${homeRenderPresets.find(item=>item.id===renderChoice.preset)!.title} » sélectionné.`}
       {presetNeedsLogin&&<>Connectez-vous pour ajouter un avatar. <Link href={variant==='beta'?'/connexion?next=/beta':'/connexion'} onClick={()=>{const source=ImportUrl.safeParse(url.trim());if(source.success)saveListingDraft({kind:'url',url:source.data});}}>Me connecter</Link></>}
@@ -585,7 +596,7 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
           <button type="button" className="home-manual-personalize" disabled={photoChecking||activeOtherJob} onClick={event=>{event.currentTarget.closest('details')!.open=false;void personalize();}}>{customizing?'Revenir à la fiche du bien':'Personnaliser la vidéo'}<HomeIcon name="arrow" size={17}/></button>
         </fieldset></details></div>
       <p className="home-manual-settings-summary">{aspectRatio==='16:9'?'Horizontal':'Vertical'} · {durationSeconds} s{voiceEnabled?' · Voix off':''}{subtitlesEnabled?' · Sous-titres':''}</p>
-      <span className="home-credit-cost" aria-live="polite">{editingProperty?'Sans crédit':`${creditCost} crédit${creditCost>1?'s':''}`}</span>
+      <span className="home-credit-cost" aria-live="polite" aria-atomic="true">{editingProperty?'Sans crédit':<CreationCreditAmount value={creditCost}/>}</span>
       <HomeCreateButton disabled={composerDisabled} aria-describedby={!manualReady?'home-manual-action-note':undefined}>{trial.preparingManual?'Envoi des photos…':manualBusy?'Enregistrement…':editingProperty?'Enregistrer le bien':me&&!canGenerate?'Enregistrer mon annonce':'Créer ma vidéo'}<HomeIcon name="arrow" size={19}/></HomeCreateButton>
     </form>:<><form className={`home-composer home-composer-modern${feedback || screen.kind === 'error' ? ' home-composer-invalid' : ''}${dropActive?' home-composer-dropping':''}`} onSubmit={submit} noValidate aria-label="Créer une vidéo depuis une annonce"
       onDragEnter={event=>{if(draggingFiles(event)&&canDropPhotos){event.preventDefault();dropDepth.current++;setDropActive(true);}}}
@@ -595,15 +606,15 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
       {dropActive&&<div className="home-drop-overlay" aria-hidden="true"><HomeIcon name="upload" size={30}/><strong>Déposez vos photos ici</strong><span>JPEG, PNG ou WebP · Jusqu’à 12 photos</span></div>}
       <div className="home-composer-main"><div className="home-url-row"><HomeIcon name="link" size={28}/><label htmlFor="home-listing-url" className="sr-only">{manual?'Précisions sur votre bien':'Lien ou description de votre annonce'}</label>
         <span className="home-url-input"><input ref={composerInput} id="home-listing-url" name="url" type="text" autoComplete="off" spellCheck={false} placeholder={composerPlaceholder}
-          readOnly={customizing} value={manual?customizing?importDraft?.sourceUrl??importDraft?.data.canonicalUrl??importDraft?.data.fields.title??description:description:screen.kind==='sending'?'':url} onChange={event=>{if(manual)setDescription(event.target.value);
+          readOnly={customizing||personalizePreparing} value={manual?customizing?importDraft?.sourceUrl??importDraft?.data.canonicalUrl??importDraft?.data.fields.title??description:description:screen.kind==='sending'?'':url} onChange={event=>{if(manual)setDescription(event.target.value);
             else {if(me&&screen.kind==='job'){startFresh.current=true;forget();setScreen({kind:'landing'});}if(screen.kind==='extracting'){interactionVersion.current++;lock.current=false;guestPending.current=null;
               trial.setToken('');trial.setChallenge(false);trial.setWidgetVersion(n=>n+1);setScreen({kind:'landing'});}setUrl(event.target.value);}
             setFeedback('');}} disabled={screen.kind==='sending'} aria-invalid={Boolean(feedback || screen.kind==='error')} aria-describedby="home-url-error home-create-note"/>
           <span className="home-url-placeholder" aria-hidden="true">{composerPlaceholder}</span></span></div>
         <div className="home-composer-actions"><HomeCreateButton disabled={composerDisabled} aria-describedby={manual&&!manualReady?'home-manual-action-note':undefined}>
           {incomingPhotos?'Ajout des photos…':composerPhotos.length?'Compléter mon annonce':screen.kind==='sending'||manualBusy?'Envoi en cours':activeGuestJob?'Génération en cours':manual&&me&&!canGenerate?'Enregistrer mon annonce':'Créer ma vidéo'}<HomeIcon name="arrow" size={20}/></HomeCreateButton>
-          <span className="home-credit-cost" aria-live="polite">{estimatePending?'Estimation en cours…':estimateFailed?'Estimation indisponible':presetNeedsLogin?'Options payantes · connexion requise':!me&&!loading&&!trial.used?'Essai classique offert':`${!manual&&!estimate.value?'À partir de ':''}${creditCost} crédit${creditCost>1?'s':''}${me&&estimate.value?` estimé${creditCost>1?'s':''}`:''}`}
-            {me&&estimate.value&&<small className="home-credit-estimate-detail">{urlImportPhotoSlots(estimate.value).length} photos · {requestedAnimations(estimatedSettings)?'Animations IA activées':'Mouvements classiques'}{estimatedSettings?.avatar&&!estimatedSettings.avatar.hidden?' · Avatar inclus':''}</small>}
+          <span className="home-credit-cost" aria-live="polite" aria-atomic="true">{estimatePending?'Estimation en cours…':estimateFailed?'Estimation indisponible':presetNeedsLogin?'Options payantes · connexion requise':!me&&!loading&&!trial.used?'Essai classique offert':<>{!manual&&!estimate.value?'À partir de ':''}<CreationCreditAmount value={creditCost}/>{me&&estimate.value?` estimé${creditCost>1?'s':''}`:''}</>}
+            {me&&estimate.value&&<small className="home-credit-estimate-detail">{urlImportPhotoSlots(estimate.value).length} photos · {requestedAnimations(estimatedSettings)?`IA +${requestedAnimations(estimatedSettings)} crédit${requestedAnimations(estimatedSettings)>1?'s':''}`:'Mouvements inclus'}{estimatedSettings?.avatar&&!estimatedSettings.avatar.hidden?` · Avatar +${creditCost-1-requestedAnimations(estimatedSettings)}`:''}</small>}
           </span></div>
         <button type="button" className={`home-composer-tools-toggle${variant==='beta'?' beta-settings-toggle':''}`} title="Réglages de création" aria-label="Réglages de création" aria-describedby={variant==='beta'?'home-settings-summary':undefined} aria-expanded={composerExpanded} aria-controls="home-composer-options" onClick={()=>setComposerExpanded(current=>!current)}>
           {variant==='beta'?<><BetaSettingsSummary aspectRatio={aspectRatio} durationSeconds={durationSeconds} voiceEnabled={voiceEnabled} subtitlesEnabled={subtitlesEnabled} animations={me?requestedAnimations(estimatedSettings):0} avatar={Boolean(me&&estimatedSettings?.avatar&&!estimatedSettings.avatar.hidden)}/>
@@ -655,8 +666,12 @@ export function HomeCreate({onLayoutChange,renderChoice,onClearRenderChoice,voic
     {activeOtherJob && <p className="home-form-note">Une vidéo est déjà en cours de création. <Link href="/biens">Suivez-la dans Mes biens</Link>.</p>}
     <p className="home-create-note" id="home-create-note" hidden={manual?Boolean(me):!(screen.kind==='job'&&generationActive(selectedJob))&&!contextNote}>{manual ? '1 crédit offert pour créer votre vidéo sans compte. Connectez-vous pour la télécharger sans filigrane.' : screen.kind === 'job' && generationActive(selectedJob) ? me?'Votre création sera enregistrée dans Mes biens.':'Votre aperçu avec filigrane sera disponible dans ce navigateur.' : contextNote}</p>
     </div></div>
-    <HomeImportFeedback source={!inConversation&&!manual&&!busy&&!loading&&!composerPhotos.length&&!importPaused?estimate.source:''}
-      phase={!me?'guest':estimate.phase==='ready'?'ready':estimate.phase==='error'?'error':estimate.phase==='loading'?(estimate.reading?'reading':'detected'):'idle'}
-      value={estimate.value} message={estimate.message} credits={creditCost} busy={loading||presetPreparing||customizing} onPersonalize={()=>void personalize()} onRetry={estimate.retry}/>
-  </div></CreationMotion>;
+    <HomeImportFeedback source={!inConversation&&!manual&&(!busy||personalizePreparing)&&!loading&&!composerPhotos.length&&!importPaused?estimate.source:''}
+      phase={!me?'guest':personalizePreparing||estimate.phase==='ready'?'ready':estimate.phase==='error'?'error':estimate.phase==='loading'?(estimate.reading?'reading':'detected'):'idle'}
+      value={estimate.value} message={estimate.message} credits={creditCost} busy={busy||loading||presetPreparing||customizing} onPersonalize={()=>void personalize()} onRetry={estimate.retry}/>
+  </div>;
+}
+
+export function HomeCreate(props:Parameters<typeof HomeCreateContent>[0]){
+  return <CreationMotion><CreationPhotoHandoff><HomeCreateContent {...props}/></CreationPhotoHandoff></CreationMotion>;
 }
