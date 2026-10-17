@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import {useEffect, useRef, useState} from 'react';
+import {Suspense,startTransition,useCallback,useEffect, useRef, useState} from 'react';
 import {HomeCreate} from './home-create';
 import {AgencySeal, HomeIcon} from './home-icons';
 import {StudioSidebar} from './studio-sidebar';
@@ -60,12 +60,8 @@ export function LandingPage() {
   const [heroPlaying, setHeroPlaying] = useState(false);
   const [comparisonPlaying,setComparisonPlaying]=useState(false);
   const [rendersPlaying,setRendersPlaying]=useState(false),[renderChoice,setRenderChoice]=useState<HomeRenderChoice|null>(null);
-  useEffect(()=>{try{const preset=parseHomeRenderPreset(sessionStorage.getItem(homeRenderPresetKey));if(preset)setRenderChoice({preset,revision:1});}catch{/* Optional choice persistence. */}},[]);
-  function chooseRender(preset:HomeRenderPreset|null){
-    setRenderChoice(current=>preset?{preset,revision:(current?.revision??0)+1}:null);
-    try{if(preset)sessionStorage.setItem(homeRenderPresetKey,preset);else sessionStorage.removeItem(homeRenderPresetKey);}catch{/* The current choice remains usable. */}
-    focusComposer();
-  }
+  useEffect(()=>{try{const preset=parseHomeRenderPreset(sessionStorage.getItem(homeRenderPresetKey));if(preset)startTransition(()=>setRenderChoice({preset,revision:1}));}catch{/* Optional choice persistence. */}},[]);
+  const heroPlayback=useCallback((playing:boolean)=>startTransition(()=>setHeroPlaying(playing)),[]);
   const modal = useRef<HTMLDialogElement>(null);
   const modalOpen = dialog !== null;
   useEffect(() => {
@@ -75,14 +71,20 @@ export function LandingPage() {
     const previous = document.body.style.overflow; document.body.style.overflow = 'hidden';
     return () => {element?.close(); document.body.style.overflow = previous; trigger?.focus();};
   }, [modalOpen]);
-  const play = (example: Example) => {setSelected(example); setSelectedSlot(`discover.${example.id}.video`); setDialog('example');};
-  const playSlot=(slot:HomepageSlot)=>{setSelected(examples[0]);setSelectedSlot(slot);setDialog('example');};
-  const focusComposer = () => {
+  const play = useCallback((example: Example) => {setSelected(example); setSelectedSlot(`discover.${example.id}.video`); setDialog('example');},[]);
+  const playSlot=useCallback((slot:HomepageSlot)=>{setSelected(examples[0]);setSelectedSlot(slot);setDialog('example');},[]);
+  const playSharing=useCallback((context:'social'|'client'|'site')=>playSlot(`share.${context}.video`),[playSlot]);
+  const focusComposer = useCallback(() => {
     const input = document.getElementById('home-listing-url');
     input?.focus({preventScroll: true});
     if(input?.closest('[data-floating]'))return;
     input?.scrollIntoView({block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
-  };
+  },[]);
+  const chooseRender=useCallback((preset:HomeRenderPreset|null)=>{
+    setRenderChoice(current=>preset?{preset,revision:(current?.revision??0)+1}:null);
+    try{if(preset)sessionStorage.setItem(homeRenderPresetKey,preset);else sessionStorage.removeItem(homeRenderPresetKey);}catch{/* The current choice remains usable. */}
+    focusComposer();
+  },[focusComposer]);
   return <div className="home-studio home-studio-home">
     <HomeMarketingStyles/>
     <a className="home-skip" href="#home-content">Aller au contenu</a>
@@ -94,21 +96,21 @@ export function LandingPage() {
           <HomeCreate onLayoutChange={setConversationActive} renderChoice={renderChoice} onClearRenderChoice={()=>chooseRender(null)}/>
           <aside className="home-hero-showcase" hidden={conversationActive} aria-label="Un aperçu de votre prochaine vidéo">
             <p>Votre prochain coup de cœur, en vidéo.</p>
-            <HomeHeroVideo paused={modalOpen || conversationActive} onPlayingChange={setHeroPlaying}/>
+            <HomeHeroVideo paused={modalOpen || conversationActive} onPlayingChange={heroPlayback}/>
           </aside>
         </section>
         {features.explorer && !conversationActive && <section id="explorer" className="home-discover" aria-labelledby="home-discover-title"><div className="home-discover-heading"><div><h2 id="home-discover-title">À découvrir sur BienVu</h2><p>Des inspirations pour donner une autre dimension à vos biens.</p></div><button type="button" className="home-explore-link" onClick={() => {setCategory('Tous'); setDialog('explore');}}>Tout explorer <HomeIcon name="external" size={17}/></button></div><div className="home-example-grid">{examples.map(example => <ExampleCard key={example.id} example={example} onPlay={play}/>)}</div></section>}
-        {!conversationActive && <HomeAvatarShowcase paused={modalOpen}/>}
-        {!conversationActive && <HomeRenderComparison paused={modalOpen} selected={renderChoice?.preset} onChoose={chooseRender} onPlayingChange={setRendersPlaying}/>}
-        {!conversationActive && <HomeAnimationComparison paused={modalOpen} onCreate={focusComposer} onPlayingChange={setComparisonPlaying}/>}
-        {!conversationActive && <HomeShowcase paused={modalOpen || heroPlaying || comparisonPlaying || rendersPlaying} onCreate={focusComposer}/>}
-        {!conversationActive && <HomeMandateKit onPlay={playSlot} onCreate={focusComposer}/>}
-        {!conversationActive && <HomeSharing onPlay={context => playSlot(`share.${context}.video`)} onCreate={focusComposer}/>}
-        {!conversationActive && <HomeVitrineShowcase/>}
-        {!conversationActive && <HomeEditorShowcase paused={modalOpen || heroPlaying} onCreate={focusComposer}/>}
+        {!conversationActive && <Suspense fallback={null}><HomeAvatarShowcase paused={modalOpen}/></Suspense>}
+        {!conversationActive && <Suspense fallback={null}><HomeRenderComparison paused={modalOpen} selected={renderChoice?.preset} onChoose={chooseRender} onPlayingChange={setRendersPlaying}/></Suspense>}
+        {!conversationActive && <Suspense fallback={null}><HomeAnimationComparison paused={modalOpen} onCreate={focusComposer} onPlayingChange={setComparisonPlaying}/></Suspense>}
+        {!conversationActive && <Suspense fallback={null}><HomeShowcase paused={modalOpen || heroPlaying || comparisonPlaying || rendersPlaying} onCreate={focusComposer}/></Suspense>}
+        {!conversationActive && <Suspense fallback={null}><HomeMandateKit onPlay={playSlot} onCreate={focusComposer}/></Suspense>}
+        {!conversationActive && <Suspense fallback={null}><HomeSharing onPlay={playSharing} onCreate={focusComposer}/></Suspense>}
+        {!conversationActive && <Suspense fallback={null}><HomeVitrineShowcase/></Suspense>}
+        {!conversationActive && <Suspense fallback={null}><HomeEditorShowcase paused={modalOpen || heroPlaying} onCreate={focusComposer}/></Suspense>}
         {!conversationActive && <section className="home-resource-links" aria-labelledby="home-resources-title"><h2 id="home-resources-title">Le marketing immobilier IA, de l’annonce à la publication.</h2><p>Créez une vidéo à partir de vos annonces et photos, personnalisez-la avec l’identité de votre agence et programmez sa publication sur Instagram et Facebook.</p><nav aria-label="Découvrir les fonctionnalités">{featurePages.map(page=><Link key={page.slug} href={`/${page.slug}`} prefetch={false}>{page.heading}</Link>)}<Link href="/guides" prefetch={false}>Conseils et guides</Link><Link href="/blog" prefetch={false}>Le blog BienVu</Link><Link href="/sources" prefetch={false}>Sources d’import testées</Link></nav></section>}
       </main>
-      <HomeFooter onCreate={focusComposer}/>
+      <Suspense fallback={null}><HomeFooter onCreate={focusComposer}/></Suspense>
     </div>
     {dialog && <dialog ref={modal} className={`home-dialog${dialog === 'example' ? ' home-video-dialog' : dialog === 'explore' ? ' home-explore-dialog' : ''}`} aria-labelledby="home-dialog-title" onCancel={() => setDialog(null)} onClick={event => {if (event.target === event.currentTarget) setDialog(null);}}><button className="home-dialog-close" type="button" aria-label="Fermer" onClick={() => setDialog(null)}><HomeIcon name="close" size={21}/></button>
       {dialog === 'example' ? <><div className="home-video-heading"><p className="home-dialog-kicker">L’IMMOBILIER, EN MOUVEMENT</p><h2 id="home-dialog-title">{movieTitle}</h2><p>{customMovie?(movie.agency??selectedVisual.agency??'BienVu'):`${selected.agency} · Agence fictive`}</p></div><video key={movie.src} src={movie.src} poster={selectedVisual.kind==='image'?selectedVisual.src:movie.poster??undefined} controls autoPlay playsInline preload="metadata" aria-label={`Vidéo : ${movieTitle}`}/>{!customMovie&&<p className="home-dialog-footnote">Animation d’un visuel généré, sans voix off. Vos vidéos utilisent les photos de votre bien et votre identité d’agence.</p>}</>
