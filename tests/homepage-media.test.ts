@@ -211,6 +211,7 @@ test('Home : banque globale privée, copie indépendante, publication atomique e
   const modernCached=await homepageMediaRequest(avifRequest(),env,photo.id,undefined,edge);assert.equal(modernCached.headers.get('content-type'),'image/avif');assert.deepEqual(new Uint8Array(await modernCached.arrayBuffer()),avif);
   const heroConfig={...config,slots:{...config.slots,'hero.visual':photo}};
   assert.equal(await readHomepageHeroPoster(env,heroConfig,edge),'data:image/avif;base64,'+Buffer.from(avif).toString('base64'));
+  assert.equal(await readHomepageHeroPoster(env,{...heroConfig,slots:{...heroConfig.slots,'hero.visual':{...asset,posterUrl:photo.url}}},edge),'data:image/avif;base64,'+Buffer.from(avif).toString('base64'),'Un visuel configuré comme vidéo utilise son affiche');
   assert.equal(await readHomepageHeroPoster(env,{...heroConfig,slots:{'hero.visual':{...photo,url:'/api/admin/homepage/assets/'+photo.id}}},edge),null,'Aucun aperçu privé dans le HTML public');
   const cachedEnv={...env,MEDIA:{get:bucket.get.bind(bucket),head:bucket.head.bind(bucket),put:bucket.put.bind(bucket),delete:bucket.delete.bind(bucket)}};
   const reads=t.mock.method(cachedEnv.MEDIA,'get');

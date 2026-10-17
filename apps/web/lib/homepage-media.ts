@@ -230,10 +230,11 @@ export async function homepageMediaRequest(request:Request,env:Env,id:string,adm
 // public media handler so publication, revocation and snapshot checks stay the
 // same as for a normal image request. Never inline originals or private previews.
 export async function readHomepageHeroPoster(env:Env,config:HomepageConfig,context?:HomepageCache):Promise<string|null>{
- const visual=resolveHomeMedia(config,'hero.visual'),match=/^\/api\/homepage\/media\/([a-f0-9-]{36})(\?poster=1)?$/.exec(visual.src);
+ const visual=resolveHomeMedia(config,'hero.visual'),source=visual.kind==='image'?visual.src:visual.poster??resolveHomeMedia(config,'hero.video').poster;
+ const match=source&&/^\/api\/homepage\/media\/([a-f0-9-]{36})(\?poster=1)?$/.exec(source);
  if(!match)return null;
  try{
-  const url=new URL(visual.src,context?.origin??'https://bienvu.online');url.searchParams.set('w','640');
+  const url=new URL(source!,context?.origin??'https://bienvu.online');url.searchParams.set('w','640');
   const response=await homepageMediaRequest(new Request(url,{headers:{Accept:'image/avif,image/webp'}}),env,match[1]!,undefined,context);
   const mime=response.headers.get('Content-Type'),length=Number(response.headers.get('Content-Length'));
   if(response.status!==200||!['image/avif','image/webp'].includes(mime??'')||!Number.isSafeInteger(length)||length<1||length>48000){await response.body?.cancel();return null;}
