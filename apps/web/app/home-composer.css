@@ -111,8 +111,8 @@
    floating bar spans the workspace, leaving the sidebar and dialogs accessible. */
 .home-hero-dashboard:has(.home-composer-dock[data-floating]) {z-index:20}
 .home-hero-dashboard>.home-create:has(.home-composer-dock[data-floating]) {z-index:21}
-.home-studio .home-composer-dock[data-floating=true] {position:fixed;top:var(--home-composer-top,0px);left:var(--home-composer-left,0px);width:var(--home-composer-width,100%);z-index:20}
-.home-studio .home-composer-dock[data-floating] {max-height:calc(100dvh - 12px);overflow-y:auto;overscroll-behavior:contain;background:#fffefa;box-shadow:0 12px 34px #2936201a,0 1px 0 #cbd7c4;border-radius:0 0 16px 16px}
+.home-studio .home-composer-dock[data-floating=true] {position:fixed;top:var(--home-composer-top,var(--home-studio-inset,12px));left:var(--home-composer-left,0px);width:var(--home-composer-width,100%);z-index:20}
+.home-studio .home-composer-dock[data-floating] {max-height:calc(100dvh - var(--home-composer-top,var(--home-studio-inset,12px)) - var(--home-studio-inset,12px));overflow-y:auto;overscroll-behavior:contain;background:#fffefa;border:1px solid #d9e1d2;box-shadow:0 12px 34px -12px #29362026,0 3px 10px -4px #29362014;border-radius:18px}
 .home-studio .home-composer-dock[data-floating] .home-composer-modern {padding:max(12px,env(safe-area-inset-top)) 20px 10px;gap:10px;border:0;border-radius:0;background:#fffefa;box-shadow:none}
 .home-studio .home-composer-dock[data-floating] .home-composer-main {grid-template-columns:minmax(0,1fr) auto auto;gap:12px;align-items:start}
 .home-studio .home-composer-dock[data-floating] .home-url-row {min-height:50px}

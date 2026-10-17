@@ -9,6 +9,9 @@ export function useStickyHomeComposer(dockRef:RefObject<HTMLDivElement|null>,ena
     const slot=slotRef.current,dock=dockRef.current,workspace=slot?.closest('.home-workspace');
     if(!enabled||!slot||!dock||!workspace){setSticky(false);return;}
     const reduced=matchMedia('(prefers-reduced-motion: reduce)'),desktop=matchMedia('(min-width: 901px)');
+    const panelInset=parseFloat(getComputedStyle(workspace).getPropertyValue('--home-studio-inset'));
+    const inset=Number.isFinite(panelInset)?Math.max(0,panelInset):12;
+    const viewportTop=()=> (window.visualViewport?.offsetTop??0)+inset;
     let floating=false,frame=0,animation:Animation|null=null,lastWidth=slot.getBoundingClientRect().width;
     let normalHeight=dock.getBoundingClientRect().height;
     const cancel=()=>{animation?.cancel();animation=null;};
@@ -26,9 +29,9 @@ export function useStickyHomeComposer(dockRef:RefObject<HTMLDivElement|null>,ena
     };
     const place=()=>{
       const bounds=workspace.getBoundingClientRect();
-      dock.style.setProperty('--home-composer-left',`${Math.max(0,bounds.left)}px`);
-      dock.style.setProperty('--home-composer-width',`${bounds.width}px`);
-      dock.style.setProperty('--home-composer-top',`${window.visualViewport?.offsetTop??0}px`);
+      dock.style.setProperty('--home-composer-left',`${Math.max(0,bounds.left)+inset}px`);
+      dock.style.setProperty('--home-composer-width',`${Math.max(0,bounds.width-inset*2)}px`);
+      dock.style.setProperty('--home-composer-top',`${viewportTop()}px`);
     };
     const animate=(frames:Keyframe[],done?:()=>void)=>{
       if(reduced.matches){done?.();return;}
@@ -39,7 +42,7 @@ export function useStickyHomeComposer(dockRef:RefObject<HTMLDivElement|null>,ena
     const update=()=>{
       frame=0;
       if(!desktop.matches){cancel();floating=false;release();return;}
-      const bounds=slot.getBoundingClientRect(),top=window.visualViewport?.offsetTop??0;
+      const bounds=slot.getBoundingClientRect(),top=viewportTop();
       if(Math.abs(bounds.width-lastWidth)>.5){
         lastWidth=bounds.width;cancel();measureNormal();
         if(floating){slot.style.minHeight=`${normalHeight}px`;place();}

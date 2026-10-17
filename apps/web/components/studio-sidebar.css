@@ -1,7 +1,7 @@
 /* A floating panel shared by every studio route. The reserved width also drives
    the editor and the desktop composer, so all three move together. */
-.home-studio:has(>.home-sidebar){--home-sidebar-width:276px;--home-sidebar-panel-width:252px;--sidebar-motion:340ms;--sidebar-ease:cubic-bezier(.22,.75,.25,1)}
-.home-studio .home-sidebar{inset:12px auto 12px 12px;width:var(--home-sidebar-panel-width);padding:16px 12px 14px;border:1px solid #e6e8df;border-radius:23px;background:#fffefa;box-shadow:0 16px 40px -16px #23382725,0 4px 12px -5px #23382714,inset 0 1px 0 #fff;overflow:visible;transition:width var(--sidebar-motion) var(--sidebar-ease),padding var(--sidebar-motion) var(--sidebar-ease)}
+.home-studio:has(>.home-sidebar){--home-studio-inset:12px;--home-sidebar-width:276px;--home-sidebar-panel-width:252px;--sidebar-motion:340ms;--sidebar-ease:cubic-bezier(.22,.75,.25,1)}
+.home-studio .home-sidebar{inset:var(--home-studio-inset) auto var(--home-studio-inset) var(--home-studio-inset);width:var(--home-sidebar-panel-width);padding:16px 12px 14px;border:1px solid #e6e8df;border-radius:23px;background:#fffefa;box-shadow:0 16px 40px -16px #23382725,0 4px 12px -5px #23382714,inset 0 1px 0 #fff;overflow:visible;transition:width var(--sidebar-motion) var(--sidebar-ease),padding var(--sidebar-motion) var(--sidebar-ease)}
 .home-sidebar-header{flex:none;position:relative;height:76px}
 .home-studio .home-sidebar .home-brand-link{display:flex;align-items:center;justify-content:flex-start;min-height:45px;margin:0;padding:0 10px}
 .home-sidebar .home-wordmark{gap:13px;font-size:40px;letter-spacing:-2.7px}
