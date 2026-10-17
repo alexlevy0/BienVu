@@ -1,7 +1,7 @@
 .home-studio .home-composer-dock {container-type:inline-size}
 .home-composer-slot {position:relative;flex:none;min-width:0;width:100%}
 .home-composer-tools-toggle {display:none}
-/* The form stays opaque when the floating dock releases its own background. */
+/* The form regains its opaque surface when the floating dock returns home. */
 .home-studio .home-composer-modern {min-height:0;padding:20px;gap:22px;border:1px solid #d3ddce;border-radius:16px;background:#fffefa;box-shadow:0 10px 30px #2936200c,0 1px 4px #29362008;transition:border-color .2s,box-shadow .2s}
 .home-studio .home-composer-modern:focus-within {border-color:#c5d2bc;box-shadow:0 10px 30px #29362012,0 1px 5px #2936200c}
 .home-studio .home-composer-modern.home-composer-invalid {border-color:#ad6953}
@@ -113,7 +113,7 @@
 .home-hero-dashboard>.home-create:has(.home-composer-dock[data-floating]) {z-index:21}
 .home-studio .home-composer-dock[data-floating=true] {position:fixed;top:var(--home-composer-top,var(--home-studio-inset,12px));left:var(--home-composer-left,0px);width:var(--home-composer-width,100%);z-index:20}
 .home-studio .home-composer-dock[data-floating] {max-height:calc(100dvh - var(--home-composer-top,var(--home-studio-inset,12px)) - var(--home-studio-inset,12px));overflow-y:auto;overscroll-behavior:contain;background:#fffefa;border:1px solid #d9e1d2;box-shadow:0 12px 34px -12px #29362026,0 3px 10px -4px #29362014;border-radius:18px}
-.home-studio .home-composer-dock[data-floating] .home-composer-modern {padding:max(12px,env(safe-area-inset-top)) 20px 10px;gap:10px;border:0;border-radius:0;background:#fffefa;box-shadow:none}
+.home-studio .home-composer-dock[data-floating] .home-composer-modern {padding:max(12px,env(safe-area-inset-top)) 20px 10px;gap:10px;border:0;border-radius:0;background:transparent;box-shadow:none}
 .home-studio .home-composer-dock[data-floating] .home-composer-main {grid-template-columns:minmax(0,1fr) auto auto;gap:12px;align-items:start}
 .home-studio .home-composer-dock[data-floating] .home-url-row {min-height:50px}
 .home-studio .home-composer-dock[data-floating] .home-primary-button {min-height:50px;min-width:190px;padding:10px 18px}
@@ -123,6 +123,14 @@
 .home-studio .home-composer-dock[data-floating] .home-composer-tools-toggle:hover,.home-studio .home-composer-dock[data-floating] .home-composer-tools-toggle[aria-expanded=true] {background:#e1e9da}
 .home-studio .home-composer-dock[data-floating]>.home-create-note {display:none}
 .home-studio .home-composer-dock[data-floating]>.home-form-feedback,.home-studio .home-composer-dock[data-floating]>.home-form-note {margin:0;padding:0 20px 12px;font-size:12px}
+@supports (backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px)) {
+ .home-studio .home-composer-dock[data-floating] {background:#fffefacc;border-color:#fffefabf;-webkit-backdrop-filter:blur(18px) saturate(115%);backdrop-filter:blur(18px) saturate(115%)}
+ .home-studio .home-composer-dock[data-floating] .home-url-row {background:#fffefabf}
+}
+@media(prefers-reduced-transparency:reduce),(forced-colors:active) {
+ .home-studio .home-composer-dock[data-floating] {background:#fffefa;-webkit-backdrop-filter:none;backdrop-filter:none}
+ .home-studio .home-composer-dock[data-floating] .home-url-row {background:#fffefa}
+}
 @media(prefers-reduced-motion:reduce) {
  .home-toggle-track,.home-toggle-track::after,.home-studio .home-composer-modern .home-url-row {transition:none}
  .home-url-input input:placeholder-shown+.home-url-placeholder {animation:none;background:none;color:#71777a}
