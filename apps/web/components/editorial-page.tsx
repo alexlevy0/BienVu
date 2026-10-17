@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import {ExplorerLink} from './explorer-link';
 import {StructuredData} from './structured-data';
 import {StudioFrame} from './studio-frame';
 import {breadcrumbs, absoluteUrl, editorialDate} from '../lib/seo';
@@ -13,7 +14,7 @@ export function EditorialPage({page, guide = false}: {page: Content; guide?: boo
       author: {'@type': 'Organization', name: 'BienVu', url: absoluteUrl('/')}, publisher: {'@id': `${absoluteUrl('/')}#organization`}, mainEntityOfPage: absoluteUrl(path), inLanguage: 'fr'}}/>}
     <nav className="marketing-breadcrumb" aria-label="Fil d’Ariane"><Link href="/">BienVu</Link><span aria-hidden="true">/</span>{guide && <><Link href="/guides">Guides</Link><span aria-hidden="true">/</span></>}<span>{guide ? 'Guide' : page.kicker.toLocaleLowerCase('fr-FR')}</span></nav>
     <header className="marketing-hero"><div><p className="marketing-kicker">{page.kicker}</p><h1>{page.heading}</h1><p className="marketing-intro">{page.intro}</p>
-      <div className="marketing-actions"><Link href="/" className="marketing-button">Créer ma vidéo <span aria-hidden="true">→</span></Link><Link href={page.slug === 'editeur-video-immobilier' ? '/editeur' : '/explorer'} prefetch={false}>{page.slug === 'editeur-video-immobilier' ? 'Essayer l’éditeur' : 'Voir les exemples'} <span aria-hidden="true">↗</span></Link></div>
+      <div className="marketing-actions"><Link href="/" className="marketing-button">Créer ma vidéo <span aria-hidden="true">→</span></Link>{page.slug==='editeur-video-immobilier'?<Link href="/editeur" prefetch={false}>Essayer l’éditeur <span aria-hidden="true">↗</span></Link>:<ExplorerLink>Voir les exemples <span aria-hidden="true">↗</span></ExplorerLink>}</div>
       {guide && <p className="marketing-date">Par BienVu · Mis à jour le <time dateTime={editorialDate}>5 octobre 2026</time></p>}
     </div><figure><img src={`/images/studio-home/${page.image}-640.webp`} srcSet={[320,640,960].map(width=>`/images/studio-home/${page.image}-${width}.webp ${width}w`).join(', ')} sizes="(max-width:760px) 90vw, 32vw" width="768" height="1024" alt={`Présentation immobilière : ${page.image === 'sud' ? 'maison et piscine' : page.image === 'lyon' ? 'intérieur d’un loft' : page.image === 'bordeaux' ? 'maison avec jardin' : 'salon lumineux'}`} decoding="async"/><figcaption><Link href={`/exemples/${page.image}`}>Voir la présentation en vidéo →</Link></figcaption></figure></header>
     <div className="marketing-body"><aside className="marketing-toc"><h2>Dans cette page</h2><ol>{page.sections.map((section, index) => <li key={section.title}><a href={`#section-${index + 1}`}>{section.title}</a></li>)}</ol><Link href="/abonnement">Offres et crédits →</Link></aside>

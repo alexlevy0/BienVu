@@ -1,5 +1,5 @@
 import {EntityId, VideoManifest, VideoReport} from '@bienvu/contracts';
-import {findOwnedGeneration,generationRetained, type Database} from '@bienvu/db';
+import {siteFeatures,findOwnedGeneration,generationRetained, type Database} from '@bienvu/db';
 import {RequestFailure} from './http';
 import {generationVideo, ownGeneration} from './generations';
 
@@ -45,6 +45,7 @@ export async function ownerShares(db: Database, agencyId: string) {
 export async function publishGeneration(env: Env, agencyId: string, jobId: string) {
   const row = await ownGeneration(env, agencyId, jobId);
   if (row.status !== 'ready' || !generationRetained(row)) throw new RequestFailure('NOT_FOUND');
+  if(!(await siteFeatures(env.DB)).features.explorer)throw new RequestFailure('CONFLICT');
   // Verify the owned master before making an explicit public share.
   await generationVideo(new Request('https://bienvu.invalid/video', {method: 'HEAD'}), env, agencyId, jobId);
   const existing = await env.DB.prepare('SELECT id FROM generation_shares WHERE agency_id=? AND job_id=? AND revoked_at IS NULL')

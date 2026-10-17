@@ -4,8 +4,8 @@ import {mapFrame,VIDEO_LAYERS,type VideoManifest} from '@bienvu/contracts';
 
 // Fades create stacking contexts: keep each scene's imagery and text in
 // separate fills so the global avatar can sit between them during transitions.
-export function SceneLayers({manifest,index,background,children,audio,style,...attributes}:{
-  manifest:VideoManifest;index:number;background:ReactNode;children:ReactNode;audio?:ReactNode;style?:CSSProperties;
+export function SceneLayers({manifest,index,background,children,audio,style,frame:_previewFrame,...attributes}:{
+  manifest:VideoManifest;index:number;background:ReactNode;children:ReactNode;audio?:ReactNode;style?:CSSProperties;frame?:number;
   'data-bienvu-style'?:string;'data-bienvu-orientation'?:string;
 }){
   const frame=useCurrentFrame(),start=manifest.scenes.slice(0,index).reduce((n,s)=>n+s.durationFrames,0),

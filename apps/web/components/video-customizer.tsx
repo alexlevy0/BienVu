@@ -1,19 +1,20 @@
 'use client';
 import '../app/customizer.css';
 import {CreationMotion,CreationSwap,CreationDisclosure,m,AnimatePresence,creationSpring} from './creation-motion';
+import {CustomizerPreview,type CustomizerPreviewHandle} from './customizer-preview';
 import {CreationCreditAmount} from './creation-credit-amount';
 import {CreationPhotoDestination} from './creation-photo-handoff';
 import {trackProductEvent} from '../lib/product-analytics';
-import {useEffect,useId,useRef,useState,type CSSProperties} from 'react';
-import {VIDEO_PHOTO_MAXIMUM,catalogAvatarLook,CustomNarration,videoStyles,frenchVoices,requestedAnimations,generationCreditCost,selectedAnimationIndices,mapFrame,mapInterval,mapInk,videoMapFromDefaults,VIDEO_LAYERS,type VideoCustomization,type VideoDuration,type VideoAspectRatio} from '@bienvu/contracts';
+import {useId,useRef,useState,type CSSProperties} from 'react';
+import {VIDEO_PHOTO_MAXIMUM,catalogAvatarLook,CustomNarration,videoStyles,frenchVoices,requestedAnimations,generationCreditCost,selectedAnimationIndices,mapInterval,mapInk,videoMapFromDefaults,type VideoCustomization,type VideoDuration,type VideoAspectRatio} from '@bienvu/contracts';
 import {suggestedNarration,narrationWordLimit,wordCount} from '@bienvu/narration/suggestion';
 import type {ManualDraftFields} from '../lib/listing-draft';
 import {HomeIcon} from './home-icons';
 import {PhotoDurationAdvice} from './photo-duration-advice';
 import {VoicePreview} from './voice-preview';
 import {useAccount} from './account';
-import {MapScenePreview,VideoMapControls,useVideoMapDefaults,useAutomaticMapLocation} from './video-map';
-import {AvatarControls,AvatarWarning,AvatarPoster,useAvatarCatalog} from './avatar-controls';
+import {VideoMapControls,useVideoMapDefaults,useAutomaticMapLocation} from './video-map';
+import {AvatarControls,AvatarWarning,useAvatarCatalog} from './avatar-controls';
 import {PhotoPreviewImage} from './photo-preview-image';
 import {CustomizerMusic} from './customizer-music';
 import {musicForTimeline,type VideoMusic} from '@bienvu/contracts';
@@ -29,12 +30,8 @@ export function VideoCustomizer(p:Props){
     automaticLocation=useAutomaticMapLocation(p.fields.locality,automaticMap),mapSettings=p.settings.map??(automaticMap&&mapDefaults?videoMapFromDefaults(mapDefaults):undefined),
     previewMap=mapSettings?{...mapSettings,...(automaticMap?{location:automaticLocation}:{})}:undefined;
   const duration=p.durationSeconds??20,tabIdentity=useId();
-  const [tab,setTab]=useState<'photos'|'style'|'voice'|'music'|'map'|'avatar'>('photos'),[drag,setDrag]=useState<number|null>(null),
-    [playing,setPlaying]=useState(false),[time,setTime]=useState(0);
-  const secondaryInk=()=>{const rgb=p.settings.secondaryColor.match(/[a-f\d]{2}/gi)!.map(h=>parseInt(h,16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);return rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722>.179?'#101d18':'#ffffff';};
-  const upload=useRef<HTMLInputElement>(null),preview=useRef<HTMLDivElement>(null);
-  const [previewSize,setPreviewSize]=useState({width:300,height:533});
-  useEffect(()=>{const element=preview.current;if(!element)return;const measure=()=>setPreviewSize({width:element.clientWidth,height:element.clientHeight});measure();const observer=new ResizeObserver(measure);observer.observe(element);return()=>observer.disconnect();},[]);
+  const [tab,setTab]=useState<'photos'|'style'|'voice'|'music'|'map'|'avatar'>('photos'),[drag,setDrag]=useState<number|null>(null);
+  const upload=useRef<HTMLInputElement>(null),preview=useRef<CustomizerPreviewHandle>(null);
   const order=p.settings.photoOrder??p.photos.slice(0,VIDEO_PHOTO_MAXIMUM).map(photo=>photo.slot);
   const ordered=[...order.map(slot=>p.photos.find(photo=>photo.slot===slot)).filter((photo):photo is CustomizerPhoto=>!!photo),
     ...p.photos.filter(photo=>!order.includes(photo.slot))];
@@ -51,12 +48,9 @@ export function VideoCustomizer(p:Props){
   }
   function animate(slot:number){trackProductEvent('editor_action',{action:'animation_toggled'});patch({runwayClips:undefined,runwayPhotos:animated.includes(slot)?animated.filter(s=>s!==slot):[...animated,slot]});}
   function move(slot:number,target:number){trackProductEvent('editor_action',{action:'photo_reordered'});const next=order.filter(s=>s!==slot);next.splice(Math.max(0,Math.min(next.length,target)),0,slot);patch({photoOrder:next});}
-  useEffect(()=>{setPlaying(false);setTime(0);},[duration]);
-  useEffect(()=>{if(!playing)return;const timer=setInterval(()=>setTime(t=>{if(t>=duration-.2){setPlaying(false);return duration;}return t+.1;}),100);return()=>clearInterval(timer);},[playing,duration]);
-  const interval=mapInterval(previewMap,duration*30),mapAt=mapFrame(previewMap,duration*30,Math.min(duration*30-1,Math.round(time*30))),
-    photo=chosen[Math.max(0,Math.min(chosen.length-1,Math.floor((time*30-interval.photoStartFrame)/interval.photoFrames*chosen.length)))],line=Math.min(narration.length-1,Math.floor(time/duration*narration.length));
   const money=Number(p.fields.priceCents.replace(/\s/g,'').replace(',','.'));
   const price=money>0?`${new Intl.NumberFormat('fr-FR').format(money)} €${p.fields.transaction==='rent'?' / mois':''}`:'';
+  const interval=mapInterval(previewMap,duration*30);
   return <CreationMotion><section className="video-customizer" aria-label="Personnaliser votre vidéo">
     <div className="customizer-topline"><button type="button" onClick={p.onBack} disabled={p.busy}><span>←</span> Retour</button>
       <span role="status">{p.saved?'✓ Réglages enregistrés':'Brouillon enregistré sur cet appareil'}</span></div>
@@ -92,7 +86,7 @@ export function VideoCustomizer(p:Props){
           {selected&&order.length>1&&<div className="customizer-photo-moves"><button type="button" disabled={at===0||p.busy||photo.removing} aria-label={`Avancer la photo ${photo.slot+1}`} onClick={()=>move(photo.slot,at-1)}>←</button><button type="button" disabled={at===order.length-1||p.busy||photo.removing} aria-label={`Reculer la photo ${photo.slot+1}`} onClick={()=>move(photo.slot,at+1)}>→</button></div>}</m.div>;})}</AnimatePresence></div>
           :<div className="customizer-empty"><HomeIcon name="image" size={32}/><p>{p.sourceUrl?'Aperçu des photos disponible après import de l’annonce dans votre compte.':'Ajoutez les photos de votre bien pour composer votre vidéo.'}</p></div>}
         <input ref={upload} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={event=>{p.onAdd(event.target.files);event.target.value='';}}/>
-        <button type="button" className="customizer-add" disabled={p.busy||p.photos.length>=12} onClick={()=>upload.current?.click()}><HomeIcon name="plus" size={21}/>Ajouter des photos</button>
+        <p id="customizer-add-help" className="customizer-hint" hidden={p.photos.length<12}>Pour ajouter un nouveau fichier, retirez une photo. Les photos importées restent sélectionnables ci-dessus.</p><button type="button" className="customizer-add" disabled={p.busy||p.photos.length>=12} aria-describedby={p.photos.length>=12?'customizer-add-help':undefined} onClick={()=>upload.current?.click()}><HomeIcon name="plus" size={21}/>Ajouter des photos</button>
       </>}
       {tab==='style'&&<><div className="customizer-section-title"><strong>Style de la vidéo</strong></div>
         <div className="customizer-styles">{videoStyles.map(style=><button type="button" key={style.id} aria-pressed={p.settings.style===style.id} onClick={()=>patch({style:style.id})} disabled={p.busy}>
@@ -100,8 +94,8 @@ export function VideoCustomizer(p:Props){
           <strong>{style.name}<span>{p.settings.style===style.id?'✓':''}</span></strong><small>{style.id==='editorial'?'Titres en grand':style.id==='minimal'?'Texte discret':'Infos à la fin'}</small></button>)}</div>
         <div className="customizer-style-colors"><div className="customizer-section-title"><strong>Couleurs</strong><p>Pour cette vidéo uniquement.</p></div><div className="customizer-colors">{([['primaryColor','Principale'],['secondaryColor','Secondaire']] as const).map(([key,label])=><label key={key}>{label}<span><input type="color" aria-label={`Couleur ${label.toLowerCase()}`} value={p.settings[key]} onChange={event=>patch({[key]:event.target.value})} disabled={p.busy}/>{p.settings[key].toUpperCase()}</span></label>)}</div></div>
       </>}
-      {tab==='voice'&&<><div className="customizer-voice-toggles"><label className="customizer-switch"><span>Voix off</span><input type="checkbox" role="switch" aria-label="Activer la voix off" checked={p.voiceEnabled!==false} onChange={event=>{p.onVoice?.(event.target.checked);if(!event.target.checked&&p.settings.avatar)patch({avatar:{...p.settings.avatar,hidden:true}});}} disabled={p.busy}/><span aria-hidden="true"/></label><label className="customizer-switch"><span>Sous-titres</span><input type="checkbox" role="switch" aria-label="Afficher les sous-titres" checked={p.subtitlesEnabled} onChange={event=>p.onSubtitles(event.target.checked)} disabled={p.busy||p.voiceEnabled===false}/><span aria-hidden="true"/></label></div>
-        {p.voiceEnabled!==false&&<><div className="customizer-voice-options"><div className="customizer-voice-choice"><label htmlFor="customizer-selected-voice">Voix française</label><div className="customizer-voice-choice-row"><select id="customizer-selected-voice" value={p.settings.voice} onChange={event=>patch({voice:event.target.value as VideoCustomization['voice']})} disabled={p.busy}>{frenchVoices.map(voice=><option key={voice.id} value={voice.id} disabled={voiceCatalog?.voices.find(v=>v.id===voice.id)?.available===false}>{voice.name} · {voice.provider}</option>)}</select><VoicePreview key={p.settings.voice} voice={p.settings.voice} disabled={p.busy}/></div></div></div>
+      {tab==='voice'&&<><div className="customizer-voice-toggles"><label className="customizer-switch"><span>Voix off</span><input type="checkbox" role="switch" aria-label="Activer la voix off" checked={p.voiceEnabled!==false} onChange={event=>{p.onVoice?.(event.target.checked);if(!event.target.checked&&p.settings.avatar)patch({avatar:{...p.settings.avatar,hidden:true}});}} disabled={p.busy}/><span aria-hidden="true"/></label><label className="customizer-switch"><span>Sous-titres</span><input type="checkbox" role="switch" aria-label="Afficher les sous-titres" checked={p.subtitlesEnabled} onChange={event=>p.onSubtitles(event.target.checked)} disabled={p.busy||p.voiceEnabled===false} aria-describedby={p.voiceEnabled===false?'customizer-subtitle-help':undefined}/><span aria-hidden="true"/></label></div>
+        {p.voiceEnabled===false&&<p id="customizer-subtitle-help" className="customizer-hint">Activez la voix off pour ajouter des sous-titres.</p>}{p.voiceEnabled!==false&&<><div className="customizer-voice-options"><div className="customizer-voice-choice"><label htmlFor="customizer-selected-voice">Voix française</label><div className="customizer-voice-choice-row"><select id="customizer-selected-voice" value={p.settings.voice} onChange={event=>patch({voice:event.target.value as VideoCustomization['voice']})} disabled={p.busy}>{frenchVoices.map(voice=><option key={voice.id} value={voice.id} disabled={voiceCatalog?.voices.find(v=>v.id===voice.id)?.available===false}>{voice.name} · {voice.provider}</option>)}</select><VoicePreview key={p.settings.voice} voice={p.settings.voice} disabled={p.busy}/></div></div></div>
         <div className="customizer-section-title"><strong>Narration</strong><p>{p.settings.narration?'Votre texte sera lu tel quel.':`Texte proposé pour ${duration} secondes, modifiable à votre guise.`}</p></div>
         {p.sourceUrl&&!p.settings.narration?<div className="customizer-empty"><HomeIcon name="microphone" size={26}/><p>Texte rédigé automatiquement à partir de l’annonce.</p><button type="button" className="customizer-add" disabled={p.busy} onClick={()=>patch({narration:['','','','']})}>Écrire mon texte</button></div>:narration.map((text,index)=><label className="customizer-narration" key={index}><span>{index===0?'Ouverture':index===narration.length-1?'Conclusion':`Passage ${index+1}`}</span><textarea value={text} rows={2} maxLength={500} disabled={p.busy}
           onChange={event=>patch({narration:narration.map((line,at)=>at===index?event.target.value:line)})}/></label>)}
@@ -111,25 +105,14 @@ export function VideoCustomizer(p:Props){
       {tab==='music'&&<CustomizerMusic music={p.settings.music??p.settings.editor?.music??undefined} authenticated={Boolean(me?.agency)} voiceEnabled={p.voiceEnabled!==false} busy={p.busy} onPick={p.onMusicPick}
         onChange={music=>p.settings.editor?patch({music:undefined,editor:{...p.settings.editor,music:music?musicForTimeline(music,duration*30):null}}):patch({music})}/>}
       {tab==='avatar'&&<AvatarControls catalog={avatarCatalog} avatar={p.settings.avatar} onChange={avatar=>patch({avatar})} voice={p.settings.voice??voiceCatalog?.defaultVoice??frenchVoices[0].id} voiceEnabled={p.voiceEnabled!==false} onEnableVoice={()=>p.onVoice?.(true)} authenticated={Boolean(me?.agency)} durationSeconds={p.durationSeconds??20} busy={p.busy}/>}
-      {tab==='map'&&<VideoMapControls map={mapSettings} automatic={automaticMap} defaults={mapDefaults} onChange={(map,automatic=automaticMap)=>patch({map,mapDisabled:map?undefined:true,mapAutomatic:map&&automatic?true:undefined})} onPreview={endpoint=>{setPlaying(false);setTime((interval.startFrame+(endpoint==='end'?interval.durationFrames-1:0))/30);}} locality={p.fields.locality} aspectRatio={p.aspectRatio??'9:16'} busy={p.busy} color={mapInk(p.settings.primaryColor,p.settings.secondaryColor)} duration={duration}/>}
+      {tab==='map'&&<VideoMapControls map={mapSettings} automatic={automaticMap} defaults={mapDefaults} onChange={(map,automatic=automaticMap)=>patch({map,mapDisabled:map?undefined:true,mapAutomatic:map&&automatic?true:undefined})} onPreview={endpoint=>preview.current?.seek((interval.startFrame+(endpoint==='end'?interval.durationFrames-1:0))/30)} locality={p.fields.locality} aspectRatio={p.aspectRatio??'9:16'} busy={p.busy} color={mapInk(p.settings.primaryColor,p.settings.secondaryColor)} duration={duration}/>}
       {tab==='photos'&&<CreationDisclosure className="customizer-advanced" label={<><HomeIcon name="settings" size={21}/>Réglages avancés</>}>
         <label className="customizer-checkbox"><input type="checkbox" checked={p.settings.photoMotion} onChange={event=>patch({photoMotion:event.target.checked})} disabled={p.busy}/>Zooms et translations des photos</label>
         <label>Transition<select value={p.settings.transition} onChange={event=>patch({transition:event.target.value as 'fade'|'cut'})} disabled={p.busy}><option value="fade">Fondu</option><option value="cut">Coupe franche</option></select></label></CreationDisclosure>}
       </div></CreationSwap>
       {!p.ready&&<p className="customizer-incomplete">Votre annonce reste à compléter. <button type="button" onClick={p.onEdit}>Revenir aux informations du bien →</button></p>}
     </div><aside className={`customizer-preview${p.aspectRatio==='16:9'?' is-horizontal':''}`}><div className="customizer-preview-title"><strong>Aperçu de votre vidéo</strong><span>{p.aspectRatio??'9:16'}</span></div>
-      <div ref={preview} className={`customizer-poster poster-${p.settings.style}${playing&&p.settings.photoMotion?' is-playing':''}${time>=duration*.8?' is-ending':''}`} style={{'--preview-accent':p.settings.primaryColor,'--preview-secondary':p.settings.secondaryColor,'--preview-ink':secondaryInk()} as CSSProperties}>
-        {photo?<PhotoPreviewImage key={photo.id} src={photo.preview} alt="Aperçu de la photo sélectionnée" fetchPriority="high"/>:<div className="customizer-preview-empty"><HomeIcon name="image" size={40}/></div>}
-        <div className="customizer-poster-location" style={{zIndex:VIDEO_LAYERS.content,visibility:previewMap&&mapAt!==null?'hidden':undefined}}>⌖ {p.fields.locality||'Votre localisation'}</div><button type="button" className="customizer-play" style={{zIndex:VIDEO_LAYERS.controls}} aria-label={playing?'Mettre l’aperçu en pause':'Lire l’aperçu visuel'} disabled={!chosen.length} onClick={()=>{if(time>=duration)setTime(0);setPlaying(!playing);}}>{playing?'Ⅱ':'▶'}</button>
-        {p.subtitlesEnabled&&!p.sourceUrl&&<div className="customizer-preview-subtitle" style={{zIndex:VIDEO_LAYERS.subtitles}}>{narration[line]}</div>}
-        <div className="customizer-poster-copy" style={{zIndex:VIDEO_LAYERS.content,visibility:previewMap&&mapAt!==null?'hidden':undefined}}><h2>{p.settings.style==='cinematic'?p.fields.title||'Une nouvelle adresse':time>=duration*.8?p.agencyName||'Découvrez le bien':p.fields.title||'Une nouvelle adresse'}</h2><p>{[p.fields.area?`${p.fields.area} m²`:'',p.fields.rooms?`${p.fields.rooms} pièces`:''].filter(Boolean).join(' · ')}</p><strong>{price}</strong></div>
-        <div className="customizer-poster-agency" style={{zIndex:VIDEO_LAYERS.content,visibility:previewMap&&mapAt!==null?'hidden':undefined}}>{p.agencyName||'BienVu'}</div>
-        {previewMap&&mapAt!==null&&<MapScenePreview map={previewMap} automatic={automaticMap} aspectRatio={p.aspectRatio??'9:16'} frame={mapAt} primaryColor={p.settings.primaryColor} secondaryColor={p.settings.secondaryColor} agencyName={p.agencyName}/>}
-      <AvatarPoster avatar={p.settings.avatar} look={catalogAvatarLook(avatarCatalog,p.settings.avatar?.lookId)} frame={time*30} total={duration*30} width={previewSize.width} height={previewSize.height}/>
-      </div><div className="customizer-player-controls"><button type="button" aria-label={playing?'Pause':'Lecture'} disabled={!chosen.length} onClick={()=>{if(time>=duration)setTime(0);setPlaying(!playing);}}>{playing?'Ⅱ':'▶'}</button><span>0:{String(Math.floor(time)).padStart(2,'0')} / 0:{duration}</span>
-        <input type="range" min="0" max={duration} step=".1" value={time} aria-label="Position de l’aperçu" onChange={event=>{setPlaying(false);setTime(Number(event.target.value));}}/>
-        <button type="button" aria-label="Aperçu en plein écran" onClick={()=>void preview.current?.requestFullscreen?.()}>⛶</button></div>
-      <p className="customizer-preview-caption">Aperçu visuel · Le son est ajouté à la génération.</p>
+      <CustomizerPreview ref={preview} settings={p.settings} fields={p.fields} agencyName={p.agencyName} duration={duration} aspectRatio={p.aspectRatio??'9:16'} narration={narration} subtitles={p.subtitlesEnabled} voice={p.voiceEnabled!==false} photos={chosen} brand={me?.agency} map={previewMap} automaticMap={automaticMap} look={catalogAvatarLook(avatarCatalog,p.settings.avatar?.lookId)} busy={p.busy} animationCount={animationCount}/>
       <div className="customizer-cost" role="status" aria-live="polite"><div><span>Coût estimé</span><strong><CreationCreditAmount value={creditCost}/></strong></div><p>1 crédit vidéo{animationCount?` · IA +${animationCount} crédit${animationCount>1?'s':''}`:''}{p.settings.avatar&&!p.settings.avatar.hidden?` · Avatar +${creditCost-1-animationCount}`:''}</p>{me&&<small>{me.rights.developmentRemaining} crédits disponibles</small>}</div>
     </aside></div>
   </section></CreationMotion>;

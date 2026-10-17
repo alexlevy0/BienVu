@@ -46,6 +46,7 @@ export function AvatarControls(p:{avatar?:AvatarCustomization;onChange(value:Ava
     <label className="customizer-checkbox"><input type="checkbox" checked={active} disabled={p.busy||!p.authenticated||!active&&(!catalog?.enabled||!catalog.looks.length&&!catalog.current)} onChange={enable}/>Ajouter un avatar IA</label>
     {!p.authenticated&&<p className="customizer-hint">Connectez-vous pour ajouter un avatar.</p>}
     {loaded.error&&!catalog&&<p className="customizer-error" role="alert">{loaded.error}</p>}
+    {catalog?.enabled&&!catalog.looks.length&&!catalog.current&&<p className="customizer-hint">Aucun présentateur n’est disponible pour le moment. Réessayez plus tard.</p>}
     {catalog&&!catalog.enabled&&<p className="customizer-hint">Les présentateurs seront disponibles prochainement.</p>}
     {active&&p.avatar&&<>
       {!look&&catalog&&<p className="avatar-warning" role="status">Ce présentateur n’est plus disponible. Choisissez-en un autre ou désactivez l’avatar.</p>}

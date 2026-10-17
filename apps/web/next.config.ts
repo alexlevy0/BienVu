@@ -5,7 +5,7 @@ const config: NextConfig = {
   env:{NEXT_PUBLIC_BIENVU_RELEASE:release},
   poweredByHeader: false,
   experimental:{cssChunking:false,inlineCss:true},
-  transpilePackages: ['@bienvu/contracts', '@bienvu/db', '@bienvu/observability', '@bienvu/importers', '@bienvu/maps', '@bienvu/notifications'],
+  transpilePackages: ['@bienvu/presentation', '@bienvu/contracts', '@bienvu/db', '@bienvu/observability', '@bienvu/importers', '@bienvu/maps', '@bienvu/notifications'],
   async redirects() {return [{source:'/studio',destination:'/',permanent:true},{source:'/generer',destination:'/',permanent:true}];},
   async headers() {
     return [{source: '/:path*', headers: [

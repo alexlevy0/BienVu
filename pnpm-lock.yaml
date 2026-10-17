@@ -207,6 +207,9 @@ importers:
       '@bienvu/observability':
         specifier: workspace:*
         version: link:../../packages/observability
+      '@bienvu/presentation':
+        specifier: workspace:*
+        version: link:../../packages/presentation
       '@bienvu/voice':
         specifier: workspace:*
         version: link:../../packages/voice
@@ -347,6 +350,15 @@ importers:
         specifier: workspace:*
         version: link:../db
 
+  packages/presentation:
+    dependencies:
+      '@bienvu/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      react:
+        specifier: 19.3.0
+        version: 19.3.0
+
   packages/video:
     dependencies:
       '@bienvu/contracts':
@@ -355,6 +367,9 @@ importers:
       '@bienvu/maps':
         specifier: workspace:*
         version: link:../maps
+      '@bienvu/presentation':
+        specifier: workspace:*
+        version: link:../presentation
       maplibre-gl:
         specifier: 6.12.0
         version: 6.12.0

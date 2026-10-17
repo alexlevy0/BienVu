@@ -29,7 +29,7 @@ export function AdminSiteFeatureSettings(){
   <p className="admin-muted">Réactivez Explorer et les exemples de vidéos quand vous le souhaitez, sans redéploiement.</p>
   {loading?<p role="status">Chargement des fonctionnalités…</p>:data&&<form onSubmit={save}>
    <label className="admin-budget-pause"><input type="checkbox" checked={explorer} disabled={saving} onChange={event=>{setExplorer(event.target.checked);setMessage('');}}/>Afficher Explorer et « À découvrir sur BienVu »</label>
-   <p className="admin-muted">Un même réglage contrôle le lien dans la navigation, le footer et la section d’inspirations de l’accueil. Les pages et vidéos déjà partagées restent accessibles par leurs liens. Les visiteurs voient le nouvel état au prochain chargement de page.</p>
+   <p className="admin-muted">Un même réglage contrôle le lien dans la navigation, le footer, les liens de découverte et la publication depuis les fiches de biens. Les pages et vidéos déjà partagées restent accessibles par leurs liens. Les visiteurs voient le nouvel état au prochain chargement de page.</p>
    <div className="admin-video-map-actions"><button type="submit" className="admin-button admin-button-dark" disabled={saving||explorer===data.features.explorer}>{saving?'Enregistrement…':'Enregistrer la visibilité'}</button>
     <button type="button" className="admin-button" disabled={saving} onClick={()=>{setReload(n=>n+1);setMessage('');}}>Recharger</button></div>
   </form>}

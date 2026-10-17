@@ -13,6 +13,7 @@ COPY packages/contracts packages/contracts
 COPY packages/db packages/db
 COPY packages/maps packages/maps
 COPY packages/video packages/video
+COPY packages/presentation packages/presentation
 COPY packages/voice packages/voice
 COPY apps/web/public/fonts/inter-tight.woff2 apps/web/public/fonts/inter-tight.woff2
 COPY apps/web/public/fonts/anton-regular.ttf apps/web/public/fonts/anton-regular.ttf

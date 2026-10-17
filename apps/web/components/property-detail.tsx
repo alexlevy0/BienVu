@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import {startTransition,useEffect,useRef,useState,ViewTransition} from 'react';
 import {GenerationView,propertyFacts,propertyPrice,publicErrors,type PropertyDetail as Detail,type PublicErrorCode} from '@bienvu/contracts';
+import {useSiteFeatures} from './site-features';
 import {useAccount} from './account';
 import {useGenerationStore} from './generation-store';
 import {HomeIcon} from './home-icons';
@@ -19,6 +20,7 @@ type Tab='contents'|'photos'|'information'|'publications';
 const statusLabel=(job:GenerationView)=>job.status==='ready'?job.videoUrl?'Prêt':'Indisponible':job.status==='failed'?'À reprendre':'En préparation';
 const date=(value:string)=>new Date(value).toLocaleString('fr-FR',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
 export function PropertyDetail({id}:{id:string}){
+  const features=useSiteFeatures();
   const {me,loading}=useAccount(),store=useGenerationStore(),owner=me?.agency.id??'guest';
   const navigationOwner=me?JSON.stringify([me.user.id,me.agency.id]):'guest',scopeKey=`${navigationOwner}:${id}`,scope=useRef(scopeKey);scope.current=scopeKey;
   const [result,setResult]=useState<{scope:string;detail:Detail}|null>(()=>{const detail=me?cachedProperty(navigationOwner,id):null;return detail?{scope:scopeKey,detail}:null;}),[failure,setFailure]=useState(''),[revision,setRevision]=useState(0);
@@ -43,8 +45,9 @@ export function PropertyDetail({id}:{id:string}){
   useEffect(()=>{const deleted=(event:Event)=>{if((event as CustomEvent<{agencyId:string}>).detail.agencyId===owner)setRevision(n=>n+1);};
     window.addEventListener('bienvu:draft-deleted',deleted);return()=>window.removeEventListener('bienvu:draft-deleted',deleted);},[owner]);
   useEffect(()=>{if(!preview)return;const trigger=document.activeElement as HTMLElement|null;previewDialog.current?.showModal();return()=>{previewDialog.current?.close();trigger?.focus();};},[preview]);
-  useEffect(()=>{if(!confirm)return;const trigger=document.activeElement as HTMLElement|null;shareDialog.current?.showModal();return()=>{shareDialog.current?.close();trigger?.focus();};},[confirm]);
+  useEffect(()=>{if(!confirm||!features.explorer)return;const trigger=document.activeElement as HTMLElement|null;shareDialog.current?.showModal();return()=>{shareDialog.current?.close();trigger?.focus();};},[confirm,features.explorer]);
   useEffect(()=>{if(!create)return;const trigger=document.activeElement as HTMLElement|null;createDialog.current?.showModal();return()=>{createDialog.current?.close();trigger?.focus();};},[create]);
+  useEffect(()=>{if(!features.explorer)setConfirm(null);},[features.explorer]);
   async function more(){if(!data?.nextCursor||busy)return;setBusy('more');setFailure('');try{
     const next=await propertyRequest<Detail>(`/api/properties/${encodeURIComponent(id)}?cursor=${encodeURIComponent(data.nextCursor)}`);
     if(scope.current!==scopeKey)return;setResult(old=>old?.scope===scopeKey?{scope:scopeKey,detail:{...next,jobs:[...old.detail.jobs,...next.jobs.filter(j=>!old.detail.jobs.some(v=>v.id===j.id))].map(j=>GenerationView.parse(j))}}:old);
@@ -54,7 +57,7 @@ export function PropertyDetail({id}:{id:string}){
     try{const value=await propertyRequest<{draftId:string}>(`/api/properties/${encodeURIComponent(id)}`,{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':editKey.current},body:JSON.stringify({action:'edit'})});
       if(scope.current===scopeKey)window.location.assign(destination==='edit'?`/?draft=${encodeURIComponent(value.draftId)}&fiche=1`:`/editeur?draft=${encodeURIComponent(value.draftId)}`);
     }catch(error){report(error);if(scope.current===scopeKey)setBusy(null);}}
-  async function sharing(job:GenerationView,remove=false){if(busy)return;setBusy(job.id);setConfirm(null);setFailure('');
+  async function sharing(job:GenerationView,remove=false){if(busy||!remove&&!features.explorer)return;setBusy(job.id);setConfirm(null);setFailure('');
     try{const shared=await propertyRequest<{id:string}>(`/api/generations/${job.id}/share`,{method:remove?'DELETE':'POST'});
       if(scope.current!==scopeKey)return;setResult(old=>old?.scope===scopeKey?{scope:scopeKey,detail:{...old.detail,shares:remove?old.detail.shares.filter(s=>s.jobId!==job.id):[...old.detail.shares.filter(s=>s.jobId!==job.id),{id:shared.id,jobId:job.id}]}}:old);
     }catch(error){report(error);}finally{if(scope.current===scopeKey)setBusy(null);}}
@@ -100,8 +103,8 @@ export function PropertyDetail({id}:{id:string}){
               {job.durationSeconds&&<small>{`${Math.floor(job.durationSeconds/60)}:${String(Math.round(job.durationSeconds%60)).padStart(2,'0')}`}</small>}</div>
             {canEdit&&ready&&job.videoUrl&&<Link className="property-content-edit" href={`/editeur?video=${job.id}`}><HomeIcon name="clapper" size={19}/>Modifier dans l’Éditeur</Link>}
             {canEdit&&job.status==='failed'&&job.stage==='rendering'&&job.retention==='available'&&<Link className="property-content-edit" href={`/editeur?video=${job.id}`}><HomeIcon name="clapper" size={19}/>Reprendre dans l’Éditeur</Link>}
-            {canEdit&&job.downloadUrl&&!shared&&<button type="button" className="property-content-share" disabled={Boolean(busy)} onClick={()=>setConfirm(job)}><HomeIcon name="compass" size={19}/>Publier dans Explorer</button>}
-            {shared&&<Link className="property-content-share" href={`/explorer/${shared.id}`}><HomeIcon name="compass" size={19}/>Voir dans Explorer</Link>}
+            {features.explorer&&canEdit&&job.downloadUrl&&!shared&&<button type="button" className="property-content-share" disabled={Boolean(busy)} onClick={()=>setConfirm(job)}><HomeIcon name="compass" size={19}/>Publier dans Explorer</button>}
+            {features.explorer&&shared&&<Link className="property-content-share" href={`/explorer/${shared.id}`}><HomeIcon name="compass" size={19}/>Voir dans Explorer</Link>}
             {!ready&&<Link className="property-content-share" href={`/historique/${job.id}`}>Voir le suivi <HomeIcon name="arrow" size={17}/></Link>}
             {job.status==='failed'&&<p className="property-content-error">{publicErrors[job.errorCode as PublicErrorCode]?.[1]??'La création a été interrompue.'}</p>}
             {canEdit&&job.retryAllowed&&<button className="property-content-edit" disabled={Boolean(busy)} type="button" onClick={()=>void retry(job)}>Relancer le démarrage</button>}
@@ -134,7 +137,7 @@ export function PropertyDetail({id}:{id:string}){
         <div className="property-empty"><HomeIcon name="calendar" size={34}/><h2>Votre bien attend sa première publication.</h2><p>Choisissez « Publier sur mes réseaux » sur une vidéo prête, puis une diffusion immédiate ou programmée.</p><button className="property-button" type="button" onClick={()=>{setTab('contents');setFilter('videos');}}>Choisir une vidéo <HomeIcon name="arrow" size={17}/></button></div>}</>}
     </div>
     {preview&&result?.scope===scopeKey&&<dialog ref={previewDialog} className={`property-dialog property-preview-dialog${preview.aspectRatio==='16:9'?' is-landscape':''}`} aria-label="Aperçu de la vidéo" onCancel={()=>setPreview(null)}><button className="property-dialog-close" type="button" aria-label="Fermer l’aperçu" onClick={()=>setPreview(null)}><HomeIcon name="close" size={20}/></button><h2>{property.title}</h2><video controls autoPlay playsInline preload="metadata" src={preview.videoUrl!}/></dialog>}
-    {confirm&&canEdit&&<dialog ref={shareDialog} className="property-dialog" onCancel={()=>setConfirm(null)} aria-labelledby="property-share-title"><h2 id="property-share-title">Publier dans Explorer ?</h2><p>Cette vidéo et les coordonnées de votre agence deviendront visibles par tous sur BienVu. Vous pourrez retirer cette publication à tout moment.</p><div className="property-dialog-actions"><button className="property-button" type="button" onClick={()=>setConfirm(null)}>Annuler</button><button className="property-primary" type="button" onClick={()=>void sharing(confirm)}>Publier dans Explorer</button></div></dialog>}
+    {features.explorer&&confirm&&canEdit&&<dialog ref={shareDialog} className="property-dialog" onCancel={()=>setConfirm(null)} aria-labelledby="property-share-title"><h2 id="property-share-title">Publier dans Explorer ?</h2><p>Cette vidéo et les coordonnées de votre agence deviendront visibles par tous sur BienVu. Vous pourrez retirer cette publication à tout moment.</p><div className="property-dialog-actions"><button className="property-button" type="button" onClick={()=>setConfirm(null)}>Annuler</button><button className="property-primary" type="button" onClick={()=>void sharing(confirm)}>Publier dans Explorer</button></div></dialog>}
     {create&&canEdit&&<dialog ref={createDialog} className="property-dialog" onCancel={()=>setCreate(false)} aria-labelledby="property-create-title"><button className="property-dialog-close" type="button" aria-label="Fermer" disabled={Boolean(busy)} onClick={()=>setCreate(false)}><HomeIcon name="close" size={20}/></button><h2 id="property-create-title">Un nouveau contenu pour votre bien.</h2><p>Retrouvez les photos et les informations de « {property.title} » dans l’Éditeur. Choisissez le format et ajustez votre montage avant de lancer l’export.</p><p className="property-notice">L’ouverture ne consomme aucun crédit. Le coût est affiché avant la création de la vidéo.</p><button className="property-primary" type="button" disabled={Boolean(busy)} onClick={()=>void prepare('create')}><HomeIcon name="clapper" size={20}/>{busy==='create'?'Ouverture…':'Créer une vidéo dans l’Éditeur'}</button><div className="property-create-shortcuts">{property.visualCount>0&&<button className="property-button" type="button" onClick={()=>{setCreate(false);setTab('contents');setFilter('visuals');}}>Utiliser le visuel</button>}{property.textCount>0&&<button className="property-button" type="button" onClick={()=>{setCreate(false);setTab('contents');setFilter('texts');}}>Utiliser le texte</button>}</div>{failure&&<p className="property-feedback" role="alert">{failure}</p>}</dialog>}
     {social&&canEdit&&result?.scope===scopeKey&&<SocialPublishDialog key={`${owner}:${social.id}`} job={social} onClose={()=>setSocial(null)} onPublished={()=>{setSocial(null);setRevision(n=>n+1);}}/>}
     </>:<p className="property-notice" role="status">Chargement des contenus du bien…</p>}

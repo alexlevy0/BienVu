@@ -1,18 +1,21 @@
 'use client';
-import {useEffect,useRef,useState} from 'react';
+import {useEffect,useId,useRef,useState} from 'react';
 import {frenchVoices,type VideoCustomization} from '@bienvu/contracts';
 import {voicePreviews} from '../lib/voice-previews';
+import {claimPreviewAudio,previewAudioEvent} from '../lib/preview-audio';
 import {HomeIcon} from './home-icons';
 
 export function VoicePreview({voice,disabled}: {voice:VideoCustomization['voice'];disabled:boolean}) {
+  const id=useId();
   const sample=voicePreviews[voice]??{name:frenchVoices.find(v=>v.id===voice)?.name??'Voix française',src:`/audio/voice-previews/cartesia-v1/${voice.slice(9)}.mp3`},audio=useRef<HTMLAudioElement>(null),attempt=useRef(0);
   const [state,setState]=useState<'idle'|'loading'|'playing'>('idle'),[error,setError]=useState(false);
   useEffect(()=>{const player=audio.current;player?.setAttribute('src',sample.src);return()=>{attempt.current++;player?.pause();player?.removeAttribute('src');player?.load();};},[sample.src]);
   useEffect(()=>{if(disabled){attempt.current++;audio.current?.pause();setState('idle');}},[disabled]);
+  useEffect(()=>{const other=(event:Event)=>{if((event as CustomEvent).detail!==id){attempt.current++;audio.current?.pause();setState('idle');}};window.addEventListener(previewAudioEvent,other);return()=>window.removeEventListener(previewAudioEvent,other);},[id]);
   async function toggle() {
     const player=audio.current;if(!player||disabled)return;
     if(state!=='idle'){attempt.current++;player.pause();player.currentTime=0;setState('idle');return;}
-    const current=++attempt.current;setError(false);setState('loading');
+    claimPreviewAudio(id);const current=++attempt.current;setError(false);setState('loading');
     if(player.error)player.load();player.currentTime=0;
     try{await player.play();if(attempt.current===current)setState('playing');}
     catch{if(attempt.current===current){setState('idle');setError(true);}}

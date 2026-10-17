@@ -101,6 +101,8 @@ test('admission D1 atomique : idempotence, budget, isolation, quota et résultat
   assert.deepEqual(await publicSitemapVideos(env.DB),[]);
   await assert.rejects(publishGeneration(env,'another-agency',ready.jobId),/NOT_FOUND/);
   await assert.rejects(publishGeneration(env,agencyId,a.jobId),/NOT_FOUND/);
+  await assert.rejects(publishGeneration(env,agencyId,ready.jobId),/CONFLICT/,'Explorer désactivé bloque les nouvelles publications');
+  await env.DB.exec("UPDATE site_feature_settings SET features_json='{\"explorer\":true}'");
   const shared=await publishGeneration(env,agencyId,ready.jobId);
   assert.equal((await publishGeneration(env,agencyId,ready.jobId)).id,shared.id);
   assert.deepEqual(await ownerShares(env.DB,agencyId),[{jobId:ready.jobId,id:shared.id}]);
@@ -123,7 +125,11 @@ test('admission D1 atomique : idempotence, budget, isolation, quota et résultat
     (await findPublic(env.DB,shared.id)).row.agencyId,(await findPublic(env.DB,shared.id)).row.jobId);
   assert.equal(publicFile.status,206);assert.deepEqual([...new Uint8Array(await publicFile.arrayBuffer())],[2,3,4]);
   await assert.rejects(revokeGeneration(env.DB,'another-agency',ready.jobId),/NOT_FOUND/);
+  await env.DB.exec("UPDATE site_feature_settings SET features_json='{\"explorer\":false}'");
+  assert.equal((await findPublic(env.DB,shared.id)).view.id,shared.id,'Un lien existant reste accessible');
+  await assert.rejects(publishGeneration(env,agencyId,ready.jobId),/CONFLICT/);
   await revokeGeneration(env.DB,agencyId,ready.jobId);
+  await env.DB.exec("UPDATE site_feature_settings SET features_json='{\"explorer\":true}'");
   assert.deepEqual(await publicSitemapVideos(env.DB),[]);
   assert.deepEqual((await listPublic(env.DB)).videos,[]);
   await assert.rejects(findPublic(env.DB,shared.id),/NOT_FOUND/);

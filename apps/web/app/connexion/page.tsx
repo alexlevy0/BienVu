@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import {ExplorerLink} from '../../components/explorer-link';
 import {HomeWordmark} from '../../components/home-icons';
 import {Login} from '../../components/login';
 import {LoginDemo} from '../../components/login-demo';
@@ -20,7 +21,7 @@ export default function Page() {
         <p className="login-studio-intro">Connectez-vous pour retrouver votre agence, vos créations et vos prochaines idées.</p>
         <Login/>
       </div>
-      <footer className="login-studio-footer"><span>© BienVu</span><nav aria-label="Informations"><Link href="/confidentialite">Confidentialité</Link><Link href="/conditions">Conditions d’utilisation</Link><Link href="/explorer">Explorer <span aria-hidden="true">↗</span></Link></nav></footer>
+      <footer className="login-studio-footer"><span>© BienVu</span><nav aria-label="Informations"><Link href="/confidentialite">Confidentialité</Link><Link href="/conditions">Conditions d’utilisation</Link><ExplorerLink>Explorer <span aria-hidden="true">↗</span></ExplorerLink></nav></footer>
     </section>
     <LoginDemo/>
   </main>;
