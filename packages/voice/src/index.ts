@@ -4,5 +4,7 @@ export * from './fish-tts';
 export * from './cartesia-tts';
 export * from './providers';
 export * from './speech';
+export * from './french-numbers';
+export * from './surface-speech';
 
 export * from './audio';

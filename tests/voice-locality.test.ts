@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import {CartesiaVoiceConfig,CARTESIA_DEFAULT_VOICE,defaultVideoCustomization,createEditorDocument,GenerationRequest,type EditorVoiceSource} from '../packages/contracts/src/index';
-import {cartesiaTts,localitySpeechText,LOCALITY_SPEECH_VERSION,voiceCacheKey} from '../packages/voice/src/index';
+import {cartesiaTts,localitySpeechText,LOCALITY_SPEECH_VERSION,SURFACE_SPEECH_VERSION,voiceCacheKey} from '../packages/voice/src/index';
 import {findNarration,narrationJobInput,startNarration,releaseNarration,admitGeneration} from '../packages/db/src/index';
 import {DEFAULT_SCRIPT_MODEL,hashJson,scriptContext,scriptPromptVersion} from '../packages/narration/src/index';
 import {prepareJobNarration,type NarrationProviders} from '../apps/pipeline/src/narration';
@@ -51,6 +51,7 @@ test('Cartesia : transcript réellement envoyé et cache D1/R2 normalisés, anci
   async function seed(label:string){
     const scope=await seedNarrationFixture(env.DB,label),job=await narrationJobInput(env.DB,scope.agencyId,scope.jobId);
     job.listing.facts.locality.value='SAINT-ÉTIENNE';
+    job.listing.facts.area.value=291.27;
     await env.DB.prepare('UPDATE listing_imports SET result_json=? WHERE id=?').bind(JSON.stringify(job.listing),job.listing.id).run();
     return scope;
   }
@@ -59,8 +60,11 @@ test('Cartesia : transcript réellement envoyé et cache D1/R2 normalisés, anci
   assert.equal(transcripts.length,result.script.scenes.length);assert.ok(transcripts.some(text=>text.includes('Saint-étienne')));
   assert.ok(transcripts.every(text=>!text.includes('SAINT-ÉTIENNE')));
   assert.match(result.script.scenes[0].captionText,/SAINT-ÉTIENNE/);
+  assert.ok(transcripts.some(text=>text.includes('deux cent quatre-vingt-onze virgule vingt-sept mètres carrés')));
+  assert.match(result.script.scenes.find(scene=>scene.kind==='area')!.captionText,/291,27 m²/);
   for(const [index,asset] of result.audio.entries())assert.equal(asset.cacheKey,await voiceCacheKey(config,transcripts[index]));
   assert.equal(JSON.parse((await findNarration(env.DB,scope.agencyId,scope.jobId))!.snapshot).localitySpeechVersion,LOCALITY_SPEECH_VERSION);
+  assert.equal(JSON.parse((await findNarration(env.DB,scope.agencyId,scope.jobId))!.snapshot).surfaceSpeechVersion,SURFACE_SPEECH_VERSION);
   const calls=transcripts.length;
   assert.deepEqual(await prepareJobNarration(env,scope.agencyId,scope.jobId,providers),result);assert.equal(transcripts.length,calls);
 
@@ -74,8 +78,23 @@ test('Cartesia : transcript réellement envoyé et cache D1/R2 normalisés, anci
   await releaseNarration(env.DB,lease);
   const legacy=await prepareJobNarration(env,oldScope.agencyId,oldScope.jobId,providers);
   assert.ok(transcripts.slice(calls).some(text=>text.includes('SAINT-ÉTIENNE')));
+  assert.ok(transcripts.slice(calls).some(text=>text.includes('virgule deux sept mètres carrés')));
   const after=transcripts.length;
   assert.deepEqual(await prepareJobNarration(env,oldScope.agencyId,oldScope.jobId,providers),legacy);assert.equal(transcripts.length,after);
+
+  // Jobs started with the previous city fix also keep their fractional policy.
+  const previousScope=await seed('surface-legacy'),previousJob=await narrationJobInput(env.DB,previousScope.agencyId,previousScope.jobId);
+  const previousContext=await scriptContext(previousJob.listing,previousJob.brand),previousConfigHash=await hashJson({voice:config,
+    scriptModel:providers.script.model,promptVersion:scriptPromptVersion(previousContext),mode:providers.mode,localitySpeechVersion:LOCALITY_SPEECH_VERSION});
+  const previousRun=await startNarration(env.DB,{...previousScope,inputHash:previousContext.inputHash,configHash:previousConfigHash,
+    snapshot:JSON.stringify({listing:previousContext.listing,brand:previousContext.brand,contact:previousContext.contact,
+      copyVersion:previousContext.copyVersion,localitySpeechVersion:LOCALITY_SPEECH_VERSION}),mode:'mock',attempt:1});
+  await releaseNarration(env.DB,previousRun.lease);
+  const beforePrevious=transcripts.length,previousResult=await prepareJobNarration(env,previousScope.agencyId,previousScope.jobId,providers);
+  assert.ok(transcripts.slice(beforePrevious).some(text=>text.includes('Saint-étienne')));
+  assert.ok(transcripts.slice(beforePrevious).some(text=>text.includes('virgule deux sept mètres carrés')));
+  assert.deepEqual(await prepareJobNarration(env,previousScope.agencyId,previousScope.jobId,
+    {...providers,voice:{config,synthesize:async()=>{throw Error('NO_NEW_TTS');}}}),previousResult);
 
   // An editor export replaces the old spelling-out tracks once, then reuses the
   // corrected tracks even though the visible captions retain their capitals.
@@ -107,6 +126,7 @@ test('Cartesia : transcript réellement envoyé et cache D1/R2 normalisés, anci
   const corrected=await prepareJobNarration(env,oldScope.agencyId,exportId,providers);
   assert.equal(transcripts.length-beforeExport,corrected.audio.length);
   assert.ok(transcripts.slice(beforeExport).some(text=>text.includes('Saint-étienne')));
+  assert.ok(transcripts.slice(beforeExport).some(text=>text.includes('virgule vingt-sept mètres carrés')));
   const cachedExport=await exportVoice(corrected,'corrected-voice-source'),beforeReuse=transcripts.length;
   const reused=await prepareJobNarration(env,oldScope.agencyId,cachedExport,{...providers,voice:{config,synthesize:async()=>{throw Error('NO_NEW_TTS');}}});
   assert.deepEqual(reused.audio.map(audio=>audio.sha256),corrected.audio.map(audio=>audio.sha256));

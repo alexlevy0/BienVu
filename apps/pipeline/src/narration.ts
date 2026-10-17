@@ -3,7 +3,7 @@ import {assertNarrationLease, checkpointNarrationScript, claimNarrationCall, fai
   finishNarrationCall, narrationJobInput, releaseNarration, startNarration,findEditorVoiceSource, type Database, type NarrationLease} from '@bienvu/db';
 import {generateScript, hashJson, scriptContext,scriptPromptVersion,customScript, shortenScript, fitNarrationDuration,fitCachedNarration, validateScript,
   DESCRIPTION_SEGMENTATION_VERSION,LEGACY_DESCRIPTION_SEGMENTATION_VERSION,type DescriptionSegmentationVersion,type ScriptContext, type ScriptProvider, type ScriptReply} from '@bienvu/narration';
-import {googleTts,fishTts,cartesiaTts, measureVoiceWav, voiceCacheKey, voiceSceneTiming,compactVoiceSceneTiming,localitySpeechText,LOCALITY_SPEECH_VERSION} from '@bienvu/voice';
+import {googleTts,fishTts,cartesiaTts, measureVoiceWav, voiceCacheKey, voiceSceneTiming,compactVoiceSceneTiming,localitySpeechText,LOCALITY_SPEECH_VERSION,surfaceSpeechText,SURFACE_SPEECH_VERSION} from '@bienvu/voice';
 
 type VoiceReply = Awaited<ReturnType<ReturnType<typeof googleTts>['synthesize']>>|Awaited<ReturnType<ReturnType<typeof fishTts>['synthesize']>>|Awaited<ReturnType<ReturnType<typeof cartesiaTts>['synthesize']>>;
 export type NarrationProviders = {mode: 'real' | 'mock'; script: ScriptProvider;
@@ -26,7 +26,7 @@ export async function prepareJobNarration(env: {DB: Database; MEDIA: NarrationBu
   const now = options.now ?? Date.now;
   const job = await narrationJobInput(env.DB, agencyId, jobId);
   const existing = await findNarration(env.DB, agencyId, jobId);
-  const snapshot = existing ? parseJson(existing.snapshot) as {listing: unknown; brand: unknown; contact: ScriptContext['contact']; copyVersion?: ScriptContext['copyVersion'];customNarration?:string[];localitySpeechVersion?:string;descriptionSegmentationVersion?:DescriptionSegmentationVersion} : null;
+  const snapshot = existing ? parseJson(existing.snapshot) as {listing: unknown; brand: unknown; contact: ScriptContext['contact']; copyVersion?: ScriptContext['copyVersion'];customNarration?:string[];localitySpeechVersion?:string;surfaceSpeechVersion?:string;descriptionSegmentationVersion?:DescriptionSegmentationVersion} : null;
   const input=job.generationInput?GenerationRequest.parse(JSON.parse(job.generationInput)):undefined;
   const customization=input?.customization,voiceEnabled=input?.voiceEnabled!==false,durationSeconds=input?.durationSeconds;
   const source=customization?.voiceSourceId?await findEditorVoiceSource(env.DB,agencyId,job.listing.id,customization.voiceSourceId):null;
@@ -44,18 +44,23 @@ export async function prepareJobNarration(env: {DB: Database; MEDIA: NarrationBu
   // runs hash the exact normalized text sent to TTS, including on crash/retry.
   const localitySpeechVersion = config.provider==='cartesia'&&voiceEnabled&&(!snapshot||snapshot.localitySpeechVersion===LOCALITY_SPEECH_VERSION)
     ? LOCALITY_SPEECH_VERSION : undefined;
-  const spokenText = (text:string) => localitySpeechVersion ? localitySpeechText(text,context.listing.facts.locality.value) : text;
+  const surfaceSpeechVersion = voiceEnabled&&(!snapshot||snapshot.surfaceSpeechVersion===SURFACE_SPEECH_VERSION)
+    ? SURFACE_SPEECH_VERSION : undefined;
+  const spokenText = (text:string) => {
+    const localized=localitySpeechVersion ? localitySpeechText(text,context.listing.facts.locality.value) : text;
+    return surfaceSpeechVersion ? surfaceSpeechText(localized) : localized;
+  };
   let reuse=requestedReuse;
-  // Reuse corrected audio, but regenerate an older track whose city was spelled
-  // out. Compare its actual cache key instead of guessing from the caption case.
-  if(reuse&&localitySpeechVersion&&source)for(const [index,clip] of source.preview.clips.entries()){
+  // Reuse corrected audio; an editor export replaces older tracks whose city
+  // or fractional surface was spelled out. Compare the actual spoken cache key.
+  if(reuse&&(localitySpeechVersion||surfaceSpeechVersion)&&source)for(const [index,clip] of source.preview.clips.entries()){
     const text=spokenText(clip.text);
     if(text!==clip.text&&source.audio[index]?.cacheKey!==await voiceCacheKey(config,text)){reuse=false;break;}
   }
-  const configHash = await hashJson({voice: config, scriptModel: providers.script.model, promptVersion: scriptPromptVersion(context), mode: providers.mode,...(!voiceEnabled?{voiceEnabled:false}:{}),...(durationSeconds!==undefined?{durationSeconds}:{}),...(reuse?{reusedVoiceHash:await hashJson(source)}:{}),...(localitySpeechVersion?{localitySpeechVersion}:{})});
+  const configHash = await hashJson({voice: config, scriptModel: providers.script.model, promptVersion: scriptPromptVersion(context), mode: providers.mode,...(!voiceEnabled?{voiceEnabled:false}:{}),...(durationSeconds!==undefined?{durationSeconds}:{}),...(reuse?{reusedVoiceHash:await hashJson(source)}:{}),...(localitySpeechVersion?{localitySpeechVersion}:{}),...(surfaceSpeechVersion?{surfaceSpeechVersion}:{})});
   const {row, lease} = await startNarration(env.DB, {agencyId, jobId, inputHash: context.inputHash, configHash,
     snapshot: JSON.stringify({listing: {...context.listing, description: context.copyVersion.startsWith('description-copy/')?context.listing.description:null}, brand: context.brand, contact: context.contact, copyVersion: context.copyVersion,
-      ...(context.customNarration?{customNarration:context.customNarration}:{}),...(localitySpeechVersion?{localitySpeechVersion}:{}),
+      ...(context.customNarration?{customNarration:context.customNarration}:{}),...(localitySpeechVersion?{localitySpeechVersion}:{}),...(surfaceSpeechVersion?{surfaceSpeechVersion}:{}),
       ...(context.descriptionSegmentationVersion?{descriptionSegmentationVersion:context.descriptionSegmentationVersion}:{})}),
     mode: providers.mode, attempt: job.attempt}, now());
   let failure: string | undefined;

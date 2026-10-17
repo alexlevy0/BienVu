@@ -13,7 +13,7 @@ import {propertyDescription} from '../fixtures/listing-description';
 import {getJobVideo} from '../apps/pipeline/src/video-manifest';
 import {CartesiaVoiceConfig,CARTESIA_DEFAULT_VOICE,DEFAULT_AVATAR_SETTINGS,defaultAvatarCustomization,defaultVideoCustomization,generationRendererName} from '../packages/contracts/src/index';
 import {hashJson,DEFAULT_SCRIPT_MODEL} from '../packages/narration/src/index';
-import {LOCALITY_SPEECH_VERSION} from '../packages/voice/src/index';
+import {LOCALITY_SPEECH_VERSION,SURFACE_SPEECH_VERSION} from '../packages/voice/src/index';
 
 for(const {voiceEnabled,invalidScript,avatarFallback,animationRecovery=false} of [{voiceEnabled:true,invalidScript:false,avatarFallback:false},{voiceEnabled:false,invalidScript:false,avatarFallback:false},{voiceEnabled:true,invalidScript:true,avatarFallback:false},{voiceEnabled:true,invalidScript:false,avatarFallback:true},{voiceEnabled:true,invalidScript:false,avatarFallback:false,animationRecovery:true}])test(`Workflow workerd réel ${animationRecovery?'animation lente récupérée':avatarFallback?'avatar indisponible et supplément rendu':invalidScript?'narration invalide et crédit libéré':voiceEnabled?'avec voix':'sans voix ni sous-titres'}, fournisseurs simulés : reprise et erreur publique`,async t=>{
   const directory=await mkdtemp(path.join(tmpdir(),'bienvu-generation-'));t.after(()=>rm(directory,{recursive:true,force:true}));
@@ -83,7 +83,7 @@ for(const {voiceEnabled,invalidScript,avatarFallback,animationRecovery=false} of
   }
   const narration=(await findNarration(env.DB,scope.agencyId,job.id))!;
   assert.equal(narration.configHash,await hashJson({voice:CartesiaVoiceConfig.parse({voice:CARTESIA_DEFAULT_VOICE}),
-    scriptModel:DEFAULT_SCRIPT_MODEL,promptVersion:JSON.parse(narration.script!).promptVersion,mode:'mock',...(!voiceEnabled?{voiceEnabled:false}:{}),durationSeconds:40,...(voiceEnabled?{localitySpeechVersion:LOCALITY_SPEECH_VERSION}:{})}));
+    scriptModel:DEFAULT_SCRIPT_MODEL,promptVersion:JSON.parse(narration.script!).promptVersion,mode:'mock',...(!voiceEnabled?{voiceEnabled:false}:{}),durationSeconds:40,...(voiceEnabled?{localitySpeechVersion:LOCALITY_SPEECH_VERSION,surfaceSpeechVersion:SURFACE_SPEECH_VERSION}:{})}));
   assert.equal(JSON.parse(narration.script!).copyVersion,'description-copy/2');
   assert.equal((await getJobVideo(env.DB,scope.agencyId,job.id))!.manifest.scenes.reduce((n,s)=>n+s.durationFrames,0),1200);
   const voiceCalls=await env.DB.prepare("SELECT DISTINCT provider FROM narration_calls WHERE job_id=? AND provider!='openai'")
