@@ -21,6 +21,14 @@
 .home-studio-home .home-hero-dashboard h1 em{font-family:inherit;font-weight:inherit;letter-spacing:inherit}
 .home-studio-home .home-hero-dashboard h1 strong{font-weight:650}
 .home-studio-home .home-hero-dashboard h1 em::after{bottom:-.08em;height:clamp(5px,.075em,9px)}
+/* Play at first paint, without waiting for hydration or hiding the headline.
+   The individual scale preserves the underline's existing hand-drawn angle. */
+@media(prefers-reduced-motion:no-preference){
+ .home-studio-home #home-title:not([data-intro-complete]){animation:home-headline-arrive .72s cubic-bezier(.22,1,.36,1) both}
+ .home-studio-home #home-title:not([data-intro-complete]) em::after{transform-origin:left center;animation:home-headline-underline .82s cubic-bezier(.45,0,.2,1) .72s both}
+}
+@keyframes home-headline-arrive{from{opacity:.35;translate:0 7px}to{opacity:1;translate:0 0}}
+@keyframes home-headline-underline{from{scale:0 1}to{scale:1 1}}
 .home-studio-home .home-hero-dashboard .home-intro{font-size:clamp(18px,3.25cqw,25px);line-height:1.5}
 .home-studio-home .home-hero-dashboard .home-intro strong{font-weight:500}
 

@@ -58,6 +58,8 @@ export function LandingPage() {
   const selectedVisual=useHomepageMedia(selectedSlot.replace(/\.video$/,'.visual') as HomepageSlot);
   const customMovie=movie.custom||selectedVisual.custom, movieTitle=movie.custom?movie.title:selectedVisual.custom?selectedVisual.title:kitTitles[selectedSlot]??selected.title;
   const [conversationActive, setConversationActive] = useState(false);
+  const [headlineEntered,setHeadlineEntered]=useState(false);
+  const changeLayout=useCallback((active:boolean)=>{if(active)setHeadlineEntered(true);setConversationActive(active);},[]);
   const [heroPlaying, setHeroPlaying] = useState(false);
   const [comparisonPlaying,setComparisonPlaying]=useState(false);
   const [rendersPlaying,setRendersPlaying]=useState(false),[renderChoice,setRenderChoice]=useState<HomeRenderChoice|null>(null);
@@ -94,8 +96,8 @@ export function LandingPage() {
     <div className="home-workspace"><header className="home-topbar"><span>Le studio marketing IA de votre agence immobilière.</span><button type="button" onClick={() => setDialog('help')}>Aide</button></header>
       <main className={`home-content${conversationActive ? ' home-content-conversation' : ''}`} id="home-content" tabIndex={-1}>
         <section className={`home-hero${conversationActive?'':' home-hero-dashboard'}`} aria-label={conversationActive?'Créer votre vidéo':undefined} aria-labelledby={conversationActive?undefined:'home-title'}>
-          <div className={`home-hero-intro${conversationActive?' home-hero-intro-leaving':''}`} inert={conversationActive}><h1 id="home-title"><span>Vos annonces,</span> en version <em><strong>vidéo</strong></em>{'\u202f'}!</h1><p className="home-intro"><strong>Transformez un lien en vidéo, avec voix off, avatar et animations IA.</strong></p></div>
-          <HomeCreate onLayoutChange={setConversationActive} renderChoice={renderChoice} onClearRenderChoice={()=>chooseRender(null)}/>
+          <div className={`home-hero-intro${conversationActive?' home-hero-intro-leaving':''}`} inert={conversationActive}><h1 id="home-title" data-intro-complete={headlineEntered||undefined} onAnimationEnd={event=>{if(event.animationName==='home-headline-underline')setHeadlineEntered(true);}}><span>Vos annonces,</span> en version <em><strong>vidéo</strong></em>{'\u202f'}!</h1><p className="home-intro"><strong>Transformez un lien en vidéo, avec voix off, avatar et animations IA.</strong></p></div>
+          <HomeCreate onLayoutChange={changeLayout} renderChoice={renderChoice} onClearRenderChoice={()=>chooseRender(null)}/>
           <aside className="home-hero-showcase" hidden={conversationActive} aria-label="Un aperçu de votre prochaine vidéo">
             <p>Votre prochain coup de cœur, en vidéo.</p>
             <HomeHeroVideo paused={modalOpen || conversationActive} onPlayingChange={heroPlayback}/>
