@@ -63,6 +63,7 @@ export async function recordCost(db: Database, input: CostEvent): Promise<void> 
 }
 
 export * from './credits';
+export {visibleImportSql} from './draft-content';
 export * from './anonymous';
 export * from './anonymous-manual';
 export * from './admin';

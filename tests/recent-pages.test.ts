@@ -40,10 +40,10 @@ test('brouillons paginés : dates égales, isolation, expiration et suppression'
     .bind(id,'owner-'+id,id,at,at).run();
   // Historical, metadata-only fixtures with extended expiry exercise multiple
   // pages while preserving the real admission triggers and daily/monthly caps.
-  async function seed(id:string,owner:string,created:string,expiry=future){
+  async function seed(id:string,owner:string,created:string,expiry=future,empty=false){
     await DB.prepare(`INSERT INTO listing_imports(id,agency_id,idempotency_key,source_url,status,created_at,lease_until,expires_at,source_kind,input_json,input_hash)
       VALUES(?,?,?,'','importing',?,?,?,'manual','{"draft":1}',?)`).bind(id,owner,'key-'+id,created,expiry,expiry,'a'.repeat(64)).run();
-    await startCreationDraft(DB,owner,id,blankCreationDraft());
+    await startCreationDraft(DB,owner,id,blankCreationDraft(empty?null:'Informations du bien '+id));
   }
   const times=['2026-07-30','2026-07-31','2026-08-01','2026-08-02','2026-08-03'];
   const ids=Array.from({length:37},(_,i)=>'recent-draft-'+String(i).padStart(3,'0'));
@@ -52,6 +52,9 @@ test('brouillons paginés : dates égales, isolation, expiration et suppression'
   await seed('expired-draft','recent-a',times[0]+'T10:00:00.000Z','2026-08-01T00:00:00.000Z');
   await seed('deleted-draft','recent-a',times[1]+'T10:00:00.000Z');
   await DB.prepare("UPDATE listing_imports SET status='deleting' WHERE id='deleted-draft'").run();
+  // Empty historical drafts must be excluded before the page limit, so they
+  // cannot hide real drafts or produce an empty page with a next cursor.
+  for(let i=0;i<35;i++)await seed('empty-draft-'+i,'recent-a','2026-08-04T10:00:00.000Z',future,true);
   const first=await listImportPage(DB,'recent-a',undefined,true);assert.equal(first.imports.length,30);assert.ok(first.nextCursor);
   const second=await listImportPage(DB,'recent-a',first.nextCursor!,true);assert.equal(second.imports.length,7);assert.equal(second.nextCursor,null);
   assert.deepEqual([...first.imports,...second.imports].map(row=>row.id).sort(),ids);

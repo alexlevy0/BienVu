@@ -1,4 +1,4 @@
-import {ListingUrl,VideoCustomization} from '@bienvu/contracts';
+import {ListingUrl,VideoCustomization,hasManualDraftContent} from '@bienvu/contracts';
 
 type ListingDraft = {kind: 'url'; url: string; savedAt: number} | {kind: 'manual'; savedAt: number;agencyId?:string;serverDraftId?:string};
 const key = 'bienvu:listing-draft';
@@ -78,6 +78,7 @@ export function saveListingDraft(value: {kind: 'url'; url: string} | {kind: 'man
 export async function saveManualListingDraft(fields: ManualDraftFields, photos: File[], step = 0, agencyId?:string, serverDraftId?:string,
   serverDraftVersion?:number,videoCustomization?:VideoCustomization,photoSlots?:number[]) {
   if(serverDraftId&&discardedServerDrafts.has(`${agencyId}:${serverDraftId}`))return false;
+  if(!hasManualDraftContent(fields,Math.max(photos.length,photoSlots?.length??0))){clearListingDraft();return true;}
   try {
     const savedAt = Date.now();
     await manualRecord('write', {fields, photos: photos.map(file => ({name: file.name, type: file.type, lastModified: file.lastModified, blob: file})), savedAt,
@@ -123,6 +124,7 @@ export async function readManualListingDraft(agencyId?:string): Promise<ManualDr
       clearListingDraft(); return null;
     }
     if(record.agencyId && record.agencyId!==agencyId)return null;
+    if(!hasManualDraftContent(record.fields,Math.max(record.photos.length,record.photoSlots?.length??0))){clearListingDraft();return null;}
     const photos = record.photos.map(photo => new File([photo.blob], photo.name, {type: photo.type, lastModified: photo.lastModified}));
     const customization=VideoCustomization.safeParse(record.videoCustomization);
     const slots=record.photoSlots;

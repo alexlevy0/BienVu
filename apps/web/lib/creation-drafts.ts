@@ -1,4 +1,4 @@
-import {IMPORT_PHOTO_MAXIMUM,VIDEO_PHOTO_MAXIMUM,VideoCustomization,CreationDraftData, CreationFields, GeneratableListing, ManualListingInput, NormalizedListing, PhotoAsset,
+import {IMPORT_PHOTO_MAXIMUM,VIDEO_PHOTO_MAXIMUM,VideoCustomization,ManualDraftInput,CreationDraftData, CreationFields, GeneratableListing, ManualListingInput, NormalizedListing, PhotoAsset,
   type CreationFieldName, type CreationDraftView, type NormalizedListing as Listing} from '@bienvu/contracts';
 import {beginManualImport, completeImport, findImport, findCreationDraft, startCreationDraft, blankCreationDraft,markCreationDraftDeleting,importObjectKeys,
   draftFromListing,updateCreationDraft, ImportStateFailure, type ImportRow, type Database} from '@bienvu/db';
@@ -24,7 +24,7 @@ export async function startManualCreationDraft(db:Database,agencyId:string,key:s
 }
 export async function patchCreationDraft(db:Database,agencyId:string,id:string,body:unknown){
   if(!body||typeof body!=='object'||Array.isArray(body))throw new RequestFailure('VALIDATION_ERROR');
-  const input=body as {version?:unknown;changes?:unknown;confirm?:unknown;videoCustomization?:unknown};
+  const input=body as {version?:unknown;changes?:unknown;confirm?:unknown;videoCustomization?:unknown;manualInput?:unknown};
   if(!Number.isSafeInteger(input.version)||!input.changes||typeof input.changes!=='object'||Array.isArray(input.changes)||
     !Array.isArray(input.confirm))throw new RequestFailure('VALIDATION_ERROR');
   const before=required(await findImport(db,agencyId,id));
@@ -45,7 +45,10 @@ export async function patchCreationDraft(db:Database,agencyId:string,id:string,b
   }
   const settings=input.videoCustomization===undefined?undefined:VideoCustomization.safeParse(input.videoCustomization);
   if(settings&&!settings.success)throw new RequestFailure('VALIDATION_ERROR');
+  const manualInput=input.manualInput===undefined?undefined:ManualDraftInput.safeParse(input.manualInput);
+  if(manualInput&&!manualInput.success)throw new RequestFailure('VALIDATION_ERROR');
   const data=CreationDraftData.parse({...before.data,fields:fields.data,provenance,
+    manualInput:manualInput?.success?manualInput.data:Object.keys(changes).length?undefined:before.data.manualInput,
     ...(settings?.success?{videoCustomization:settings.data}:{})});
   if(await updateCreationDraft(db,agencyId,id,before.version,data)===null)throw new RequestFailure('CONFLICT');
   return required(await findImport(db,agencyId,id));

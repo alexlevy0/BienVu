@@ -1,5 +1,6 @@
 import {EntityId, Timestamp, GeneratableListing, type NormalizedListing, type ImportErrorCode} from '@bienvu/contracts';
 import type {Database} from './index';
+import {visibleImportSql} from './draft-content';
 export type ImportRow = {id: string; agencyId: string; sourceKind: 'url' | 'manual'; sourceUrl: string | null; input: string | null; inputHash: string | null; status: 'importing' | 'ready' | 'failed' | 'deleting';
   draftPending:number; draftData:string|null; draftVersion:number|null; draftPhotos:string;
   errorCode: ImportErrorCode | null; result: string | null; createdAt: string; expiresAt: string; leaseUntil: string;estimateOnly?:number};
@@ -83,7 +84,8 @@ export async function listImportPage(db:Database,agencyId:string,cursor?:string,
     'transaction',coalesce(json_extract(i.result_json,'$.transaction'),json_extract((SELECT data_json FROM creation_drafts WHERE id=i.id),'$.fields.transaction')),
     'previewPhotoId',(SELECT o.id FROM import_objects o WHERE o.import_id=i.id AND o.agency_id=i.agency_id
       ORDER BY json_extract(o.photo_json,'$.sourceOrder') LIMIT 1))) AS items
-    FROM (SELECT * FROM listing_imports WHERE agency_id=? AND estimate_only=0 AND status!='deleting' AND expires_at>?${draftFilter}
+    FROM (SELECT * FROM listing_imports i WHERE agency_id=? AND estimate_only=0 AND status!='deleting' AND expires_at>?${draftFilter}
+      AND ${visibleImportSql}
       AND (created_at<? OR (created_at=? AND id<?)) ORDER BY created_at DESC,id DESC LIMIT 31) AS i`)
     .bind(agencyId,new Date().toISOString(),time,time,id).first<{items:string}>();
   const rows=JSON.parse(row?.items??'[]') as ImportSummary[],imports=rows.slice(0,30),last=imports.at(-1);

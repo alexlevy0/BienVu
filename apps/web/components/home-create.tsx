@@ -6,7 +6,7 @@ import {analyticsFetch as fetch,trackProductEvent} from '../lib/product-analytic
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import {useEffect, useLayoutEffect, useRef, useState, type DragEvent, type FormEvent} from 'react';
-import {VideoDuration,ImportUrl, GenerationView,AvatarCatalog,defaultAvatarCustomization,avatarVoiceWarning,requestedAnimations, defaultVideoCustomization,GenerationCustomization,generationCreditCost, type VideoCustomization, type CreationDraftData, type CreationDraftView, type GenerationRequest} from '@bienvu/contracts';
+import {VideoDuration,ImportUrl, GenerationView,AvatarCatalog,defaultAvatarCustomization,avatarVoiceWarning,requestedAnimations, defaultVideoCustomization,GenerationCustomization,generationCreditCost,hasCreationDraftContent, type VideoCustomization, type CreationDraftData, type CreationDraftView, type GenerationRequest} from '@bienvu/contracts';
 import {useAnonymousTrial, TrialChallenge} from './anonymous-trial';
 import {useAccount} from './account';
 import {HomeIcon} from './home-icons';
@@ -21,7 +21,7 @@ import {withPhotoAnimationChoice,type PhotoAnimationSelection} from '../lib/phot
 import type {ManualListingFormHandle,PreparedManualListing} from './manual-listing-form';
 import {generationActive, useGenerationProgress} from './generation-progress-state';
 import {requestGeneration} from '../lib/generation-client';
-import {clearListingDraft, readListingDraft, saveListingDraft} from '../lib/listing-draft';
+import {clearListingDraft, readListingDraft, readManualListingDraft,saveListingDraft} from '../lib/listing-draft';
 import {inspectManualPhotos} from '../lib/manual-photos';
 import {useSubtitlePreference} from './video-settings';
 import {useUrlImportEstimate,urlImportPhotoSlots,type PreparedUrlImport} from './url-import-estimate';
@@ -240,10 +240,15 @@ function HomeCreateContent({onLayoutChange,renderChoice,onClearRenderChoice,voic
   },[loading,me?.agency.id]);
 
   useEffect(() => {
+    if(loading)return;
+    let active=true;const version=interactionVersion.current;
     const draft = readListingDraft();
     if (draft?.kind === 'url') setUrl(draft.url);
-    if (draft?.kind === 'manual'&&!remembered()) setScreen({kind: 'manual'});
-  }, []);
+    if (draft?.kind === 'manual'&&!remembered()) void readManualListingDraft(me?.agency.id).then(saved=>{
+      if(active&&saved&&interactionVersion.current===version)setScreen(current=>current.kind==='landing'?{kind:'manual'}:current);
+    });
+    return()=>{active=false;};
+  }, [loading,me?.agency.id]);
   useEffect(()=>{
     if(loading||autoFocusHandled.current)return;
     autoFocusHandled.current=true;
@@ -261,6 +266,12 @@ function HomeCreateContent({onLayoutChange,renderChoice,onClearRenderChoice,voic
     void fetch(`/api/imports/${encodeURIComponent(id)}`,{cache:'no-store',signal:controller.signal}).then(async response=>{
       if(!response.ok)return;const value=await response.json() as {status:string;draft?:CreationDraftView|null};
       if(controller.signal.aborted||interactionVersion.current!==version||value.status!=='needs_input'||!value.draft)return;
+      if(!hasCreationDraftContent(value.draft.data,value.draft.photos.length)){
+        const local=await readManualListingDraft(me.agency.id);
+        if(controller.signal.aborted||interactionVersion.current!==version)return;
+        if(local?.serverDraftId!==id){const location=new URL(window.location.href);location.searchParams.delete('draft');location.searchParams.delete('fiche');
+          window.history.replaceState(window.history.state,'',location.pathname+location.search+location.hash);return;}
+      }
       if(value.draft.data.videoCustomization?.editor&&new URLSearchParams(window.location.search).get('fiche')!=='1'){window.location.replace(`/editeur?draft=${encodeURIComponent(value.draft.id)}`);return;}
       interactionVersion.current++;
       startFresh.current=true;setEditingProperty(new URLSearchParams(window.location.search).get('fiche')==='1');setImportDraft(value.draft);setGuestExtraction(null);

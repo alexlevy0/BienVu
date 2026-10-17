@@ -10,7 +10,9 @@ export async function GET(request:Request,context:Context){return respond(async(
 });}
 export async function PATCH(request:Request,context:Context){return respond(async()=>{
   const {env,agency}=await requireOwner(request);assertSameOrigin(request,env);
-  return Response.json(await patchCreationDraft(env.DB,agency.id,(await context.params).id,await boundedJson(request,64_000)));
+  // The draft contains validated facts and the unfinished form input. Allow
+  // both copies of a long UTF-8 description alongside video settings.
+  return Response.json(await patchCreationDraft(env.DB,agency.id,(await context.params).id,await boundedJson(request,256_000)));
 });}
 export async function DELETE(request:Request,context:Context){return respond(async()=>{
   const {env,agency}=await requireOwner(request);assertSameOrigin(request,env);
