@@ -226,3 +226,5 @@ export function VerticalBrand(props:{manifest:VideoManifest;frame:number;media:R
         transformOrigin:'left center',transform:`scaleX(${f / Math.max(1,at-1)})`}}/></>}
     </AbsoluteFill>;
 }
+
+export {DesignedPhotoScene,isDesignedStyle,photoStage,canvasColor,galleryMotion,galleryPhotoIndex} from './new-styles';

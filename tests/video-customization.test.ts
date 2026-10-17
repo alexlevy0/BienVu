@@ -63,7 +63,7 @@ test('copie de personnalisation : isolation, replay R2, brouillon et aucun débi
   for(const table of ['reservations','hosted_import_costs','generation_runs'])assert.equal((await env.DB.prepare('SELECT count(*) n FROM '+table).first<{n:number}>())?.n,0);
 });
 
-test('pipeline personnalisé : zéro OpenAI, voix choisie, texte exact, manifeste figé et reprise',async t=>{
+for(const style of ['minimal','signature','mosaic','dynamic'] as const)test(`pipeline personnalisé ${style} : zéro OpenAI, voix choisie, texte exact, manifeste figé et reprise`,async t=>{
   const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:'export default {fetch(){return new Response("fixture")}}',compatibilityDate:'2026-09-27',d1Databases:['DB'],r2Buckets:['MEDIA']}));
   t.after(()=>mf.dispose());const env=await mf.getBindings<{DB:D1Database;MEDIA:R2Bucket}>();await migrateNarrationProbe(env.DB);
   const {agencyId,jobId}=await seedNarrationFixture(env.DB,'custom-flow',true);
@@ -81,7 +81,7 @@ test('pipeline personnalisé : zéro OpenAI, voix choisie, texte exact, manifest
   // A missing unselected image must not prevent the chosen images from rendering.
   listing.photos.push({...listing.photos[0],id:'unused-custom-flow',objectKey:`agencies/${agencyId}/imports/${listing.id}/unused.jpg`,contentHash:'f'.repeat(64),sourceOrder:3});
   await env.DB.prepare('UPDATE listing_imports SET result_json=? WHERE id=?').bind(JSON.stringify(listing),listing.id).run();
-  const settings={...defaultVideoCustomization(),voice:'fr-FR-Chirp3-HD-Kore' as const,photoOrder:[2,0,1],narration:lines,style:'minimal' as const,photoMotion:false,transition:'cut' as const};
+  const settings={...defaultVideoCustomization(),voice:'fr-FR-Chirp3-HD-Kore' as const,photoOrder:[2,0,1],narration:lines,style,photoMotion:false,transition:'cut' as const};
   await assert.rejects(admitGeneration(env.DB,agencyId,'custom-invalid-order-001',{listingId:listing.id,customization:{...settings,photoOrder:[0,1,11]}},'true'),/VALIDATION_ERROR/);
   assert.equal((await env.DB.prepare('SELECT baseline_cents n FROM hosted_import_budget').first<{n:number}>())?.n,0);
   const row=await admitGeneration(env.DB,agencyId,'custom-generation-key-01',{listingId:listing.id,customization:settings,subtitlesEnabled:false},'true');
@@ -95,7 +95,7 @@ test('pipeline personnalisé : zéro OpenAI, voix choisie, texte exact, manifest
   assert.equal((await env.DB.prepare("SELECT count(*) n FROM narration_calls WHERE provider='openai'").first<{n:number}>())?.n,0);
   const saved=await findNarration(env.DB,agencyId,row.jobId);assert.deepEqual(JSON.parse(saved!.snapshot).listing.photos.map((p:{id:string})=>p.id),[listing.photos[2].id,listing.photos[0].id,listing.photos[1].id]);
   assert.deepEqual(await prepareJobNarration(env,agencyId,row.jobId,providers),prepared);assert.equal(syntheses,4);
-  const frozen=await prepareJobVideo(env,agencyId,row.jobId);assert.equal(frozen.manifest.visualStyle,'minimal');assert.equal(frozen.manifest.photoMotion,false);assert.equal(frozen.manifest.photoTransition,'cut');assert.equal(frozen.manifest.subtitlesEnabled,false);
+  const frozen=await prepareJobVideo(env,agencyId,row.jobId);assert.equal(frozen.manifest.visualStyle,style);assert.equal(frozen.manifest.photoMotion,false);assert.equal(frozen.manifest.photoTransition,'cut');assert.equal(frozen.manifest.subtitlesEnabled,false);
   assert.deepEqual(frozen.manifest.photos.map(p=>p.id),[listing.photos[2].id,listing.photos[0].id,listing.photos[1].id]);
   assert.equal((await prepareJobVideo(env,agencyId,row.jobId)).hash,frozen.hash);
   await failGeneration(env.DB,row,'FIXTURE');

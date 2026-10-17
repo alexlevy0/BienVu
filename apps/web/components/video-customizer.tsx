@@ -2,10 +2,11 @@
 import '../app/customizer.css';
 import {CreationMotion,CreationSwap,CreationDisclosure,m,AnimatePresence,creationSpring} from './creation-motion';
 import {CustomizerPreview,type CustomizerPreviewHandle} from './customizer-preview';
+import {VideoStyleSample} from './video-style-sample';
 import {CreationCreditAmount} from './creation-credit-amount';
 import {CreationPhotoDestination} from './creation-photo-handoff';
 import {trackProductEvent} from '../lib/product-analytics';
-import {useId,useRef,useState,type CSSProperties} from 'react';
+import {useId,useRef,useState} from 'react';
 import {VIDEO_PHOTO_MAXIMUM,catalogAvatarLook,CustomNarration,videoStyles,frenchVoices,requestedAnimations,generationCreditCost,selectedAnimationIndices,mapInterval,mapInk,videoMapFromDefaults,type VideoCustomization,type VideoDuration,type VideoAspectRatio} from '@bienvu/contracts';
 import {suggestedNarration,narrationWordLimit,wordCount} from '@bienvu/narration/suggestion';
 import type {ManualDraftFields} from '../lib/listing-draft';
@@ -90,8 +91,8 @@ export function VideoCustomizer(p:Props){
       </>}
       {tab==='style'&&<><div className="customizer-section-title"><strong>Style de la vidéo</strong></div>
         <div className="customizer-styles">{videoStyles.map(style=><button type="button" key={style.id} aria-pressed={p.settings.style===style.id} onClick={()=>patch({style:style.id})} disabled={p.busy}>
-          <div className={`customizer-style-sample sample-${style.id}`} style={{'--preview-accent':p.settings.primaryColor} as CSSProperties}>{chosen[0]&&<PhotoPreviewImage src={chosen[0].preview} alt=""/>}<span>{style.id==='editorial'?'LYON':style.id==='minimal'?'Une nouvelle adresse':'La visite'}</span></div>
-          <strong>{style.name}<span>{p.settings.style===style.id?'✓':''}</span></strong><small>{style.id==='editorial'?'Titres en grand':style.id==='minimal'?'Texte discret':'Infos à la fin'}</small></button>)}</div>
+          <VideoStyleSample settings={{...p.settings,style:style.id}} photos={chosen} fields={p.fields} agencyName={p.agencyName} brand={me?.agency}/>
+          <strong>{style.name}{p.settings.style===style.id&&<span className="customizer-style-selected" aria-hidden="true">✓</span>}</strong><small>{style.summary}</small></button>)}</div>
         <div className="customizer-style-colors"><div className="customizer-section-title"><strong>Couleurs</strong><p>Pour cette vidéo uniquement.</p></div><div className="customizer-colors">{([['primaryColor','Principale'],['secondaryColor','Secondaire']] as const).map(([key,label])=><label key={key}>{label}<span><input type="color" aria-label={`Couleur ${label.toLowerCase()}`} value={p.settings[key]} onChange={event=>patch({[key]:event.target.value})} disabled={p.busy}/>{p.settings[key].toUpperCase()}</span></label>)}</div></div>
       </>}
       {tab==='voice'&&<><div className="customizer-voice-toggles"><label className="customizer-switch"><span>Voix off</span><input type="checkbox" role="switch" aria-label="Activer la voix off" checked={p.voiceEnabled!==false} onChange={event=>{p.onVoice?.(event.target.checked);if(!event.target.checked&&p.settings.avatar)patch({avatar:{...p.settings.avatar,hidden:true}});}} disabled={p.busy}/><span aria-hidden="true"/></label><label className="customizer-switch"><span>Sous-titres</span><input type="checkbox" role="switch" aria-label="Afficher les sous-titres" checked={p.subtitlesEnabled} onChange={event=>p.onSubtitles(event.target.checked)} disabled={p.busy||p.voiceEnabled===false} aria-describedby={p.voiceEnabled===false?'customizer-subtitle-help':undefined}/><span aria-hidden="true"/></label></div>

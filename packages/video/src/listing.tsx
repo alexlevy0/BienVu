@@ -1,4 +1,4 @@
-import {VerticalBrand,EditorialPhotoScene as SharedEditorialPhotoScene,StyledPhotoScene as SharedStyledPhotoScene,CinematicPhotoScene as SharedCinematicPhotoScene} from '@bienvu/presentation';
+import {DesignedPhotoScene as SharedDesignedPhotoScene,isDesignedStyle,photoStage,canvasColor,galleryMotion,VerticalBrand,EditorialPhotoScene as SharedEditorialPhotoScene,StyledPhotoScene as SharedStyledPhotoScene,CinematicPhotoScene as SharedCinematicPhotoScene} from '@bienvu/presentation';
 import React, {useEffect, useState} from 'react';
 import {AbsoluteFill, Audio, Img, OffthreadVideo, Freeze, Sequence, cancelRender, continueRender, delayRender, interpolate, useCurrentFrame} from 'remotion';
 import {VideoManifest, mapFrame, VIDEO_LAYERS, type VideoPresentation,type AvatarContentBounds} from '@bienvu/contracts';
@@ -53,15 +53,16 @@ function PhotoScene({manifest: m, media, index}: {manifest: VideoManifest; media
 }
 function GalleryBackground({manifest:m,media}: {manifest:VideoManifest;media:Record<string,string>}) {
   let at=m.map?.settings.position==='start'?m.map.settings.durationSeconds*30:0;
+  const stage=photoStage(m.visualStyle,m.width,m.height);
   return <AbsoluteFill style={{overflow:'hidden'}}>
-    {m.photoTimeline!.map((photo,index)=>{const from=at;at+=photo.durationFrames;
+    <div style={{position:'absolute',inset:0,...stage??{},overflow:'hidden'}}>{m.photoTimeline!.map((photo,index)=>{const from=at;at+=photo.durationFrames;
       return <Sequence key={photo.photoAssetId} from={from} durationInFrames={photo.durationFrames+(m.photoTransition==='cut'?0:12)} premountFor={30}>
         <GalleryPhoto manifest={m} media={media} photoId={photo.photoAssetId} index={index} duration={photo.durationFrames}/>
-      </Sequence>;})}
+      </Sequence>;})}</div>
   </AbsoluteFill>;
 }
 function GalleryPhoto({manifest:m,media,photoId,index,duration}:{manifest:VideoManifest;media:Record<string,string>;photoId:string;index:number;duration:number}){
-  const frame=useCurrentFrame(),motion=cameraMotion(frame,duration,index,m.photoMotion!==false,m.visualStyle==='cinematic');
+  const frame=useCurrentFrame(),motion=galleryMotion(frame,duration,index,m.photoMotion!==false,m.visualStyle,m.width,m.height);
   const animation=m.photoAnimations?.find(a=>a.photoAssetId===photoId);
   const opacity=index&&m.photoTransition!=='cut'?interpolate(frame,[0,12],[0,1],{extrapolateLeft:'clamp',extrapolateRight:'clamp'}):1;
   const style={position:'absolute' as const,width:'100%',height:'100%',objectFit:'cover' as const,objectPosition:'center'};
@@ -85,6 +86,10 @@ function CinematicPhotoScene({manifest,media,index}:{manifest:VideoManifest;medi
  const frame=useCurrentFrame(),asset=manifest.audio.find(a=>a.id===manifest.scenes[index].audioAssetId);
  return <SharedCinematicPhotoScene manifest={manifest} media={media} index={index} frame={frame} Layers={SceneLayers} Image={Img} audio={manifest.voiceEnabled!==false&&asset&&<Audio src={media[asset.id]} volume={1}/>}/>;
 }
+function DesignedPhotoScene({manifest,media,index,logoBackground}:{manifest:VideoManifest;media:Record<string,string>;index:number;logoBackground:string}){
+ const frame=useCurrentFrame(),asset=manifest.audio.find(a=>a.id===manifest.scenes[index].audioAssetId);
+ return <SharedDesignedPhotoScene manifest={manifest} media={media} index={index} frame={frame} logoBackground={logoBackground} Layers={SceneLayers} Image={Img} audio={manifest.voiceEnabled!==false&&asset&&<Audio src={media[asset.id]} volume={1}/>}/>;
+}
 export function ListingFilm(props: ListingVideoProps) {
   const m = VideoManifest.parse(props.manifest), f = useCurrentFrame();
   const [fontWait] = useState(() => delayRender('Chargement de la police locale'));
@@ -92,23 +97,23 @@ export function ListingFilm(props: ListingVideoProps) {
   useEffect(() => {
     const faces=[new FontFace('BienVu Video', `url('${props.fontUrl}')`, {weight:'100 900'})];
     if(m.templateVersion!=='bienvu-vertical/1')faces.push(new FontFace('BienVu Display',`url('${props.displayFontUrl}')`,{weight:'400'}));
-    if(m.editor&&props.serifFontUrl)faces.push(new FontFace('BienVu Serif',`url('${props.serifFontUrl}')`,{weight:'400'}));
+    if((m.editor||m.visualStyle==='signature')&&props.serifFontUrl)faces.push(new FontFace('BienVu Serif',`url('${props.serifFontUrl}')`,{weight:'400'}));
     Promise.all(faces.map(face=>face.load())).then(loaded=>{for(const face of loaded)document.fonts.add(face);
       setFontLoaded(true);requestAnimationFrame(()=>continueRender(fontWait));}).catch(cancelRender);
-  }, [fontWait, props.fontUrl, props.displayFontUrl,props.serifFontUrl, m.templateVersion,Boolean(m.editor)]);
+  }, [fontWait, props.fontUrl, props.displayFontUrl,props.serifFontUrl, m.templateVersion,Boolean(m.editor),m.visualStyle]);
   if(m.editor)return <EditorFilm manifest={m} media={props.media} moduleUrl={props.maplibreModuleUrl} workerUrl={props.maplibreWorkerUrl} bounds={props.avatarBounds}/>;
   let at = 0;
   const scenes = m.scenes.map((s, index) => {const from = at; at += s.durationFrames; return {s,index,from};});
   const horizontal=m.templateVersion==='bienvu-horizontal/1';
   const editorial=m.templateVersion!=='bienvu-vertical/1',cinematic=editorial&&m.visualStyle==='cinematic';
   const compactBrand=m.brand.name.length<=28?m.brand.name:null;
-  return <AbsoluteFill style={{background:editorial?'#151b16':paper,fontFamily:'BienVu Video, DejaVu Sans, sans-serif',color:editorial?'#fff':dark}}>
+  return <AbsoluteFill style={{background:editorial?canvasColor(m.visualStyle):paper,fontFamily:'BienVu Video, DejaVu Sans, sans-serif',color:editorial?'#fff':dark}}>
     <BackgroundMusic manifest={m} media={props.media}/>
     {m.photoTimeline&&<GalleryBackground manifest={m} media={props.media}/>}
     {scenes.map(({s,index,from}) => <Sequence key={s.id} from={from} durationInFrames={s.durationFrames}>
-      {horizontal?<HorizontalPhotoScene manifest={m} media={props.media} logoBackground={props.logoBackground} index={index}/>:editorial?cinematic?<CinematicPhotoScene manifest={m} media={props.media} index={index}/>:m.visualStyle==='minimal'?<StyledPhotoScene manifest={m} media={props.media} index={index}/>:<EditorialPhotoScene manifest={m} media={props.media} index={index}/>:<PhotoScene manifest={m} media={props.media} index={index}/>}
+      {isDesignedStyle(m.visualStyle)?<DesignedPhotoScene manifest={m} media={props.media} index={index} logoBackground={props.logoBackground}/>:horizontal?<HorizontalPhotoScene manifest={m} media={props.media} logoBackground={props.logoBackground} index={index}/>:editorial?cinematic?<CinematicPhotoScene manifest={m} media={props.media} index={index}/>:m.visualStyle==='minimal'?<StyledPhotoScene manifest={m} media={props.media} index={index}/>:<EditorialPhotoScene manifest={m} media={props.media} index={index}/>:<PhotoScene manifest={m} media={props.media} index={index}/>}
     </Sequence>)}
-    {!horizontal&&<VerticalBrand manifest={m} frame={f} media={props.media} logoBackground={props.logoBackground} Image={Img}/>}
+    {!horizontal&&!isDesignedStyle(m.visualStyle)&&<VerticalBrand manifest={m} frame={f} media={props.media} logoBackground={props.logoBackground} Image={Img}/>}
     <MapOverlay manifest={m} media={props.media} moduleUrl={props.maplibreModuleUrl} workerUrl={props.maplibreWorkerUrl}/>
     <AvatarOverlay manifest={m} media={props.media} bounds={props.avatarBounds}/>
     {m.rights.watermarked && (!horizontal||mapFrame(m.map?.settings,at,f)!==null) && <div style={{position:'absolute',zIndex:VIDEO_LAYERS.watermark,left:editorial?235:262,top:editorial?785:f >= scenes.at(-1)!.from ? 540 : 780,transform:'rotate(-14deg)',

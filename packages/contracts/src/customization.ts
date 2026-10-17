@@ -9,16 +9,20 @@ import {VideoMusic} from './music-library';
 
 export const DEFAULT_VIDEO_VOICE='fish-manon' as const;
 
-export const videoStyles=[{id:'editorial',name:'Éditorial',description:'Des repères affirmés, en grand.'},
-  {id:'minimal',name:'Minimal',description:'Des informations sobres, au fil des photos.'},
-  {id:'cinematic',name:'Cinéma',description:'Les images à l’honneur, les informations à la fin.'}] as const;
+export const videoStyles=[{id:'editorial',summary:'Titres en grand',name:'Éditorial',description:'Des repères affirmés, en grand.'},
+  {id:'minimal',summary:'Texte discret',name:'Minimal',description:'Des informations sobres, au fil des photos.'},
+  {id:'cinematic',summary:'Infos à la fin',name:'Cinéma',description:'Les images à l’honneur, les informations à la fin.'},
+  {id:'signature',summary:'Élégant et encadré',name:'Signature',description:'Une brochure élégante, avec des photos encadrées.'},
+  {id:'mosaic',summary:'Trois vues à l’écran',name:'Mosaïque',description:'Trois vues réunies dans une composition graphique.'},
+  {id:'dynamic',summary:'Cartes animées',name:'Dynamique',description:'Des cartes colorées et des apparitions rythmées.'}] as const;
 export const frenchVoices=[{id:'fr-FR-Chirp3-HD-Aoede',name:'Aoede',provider:'Google · Chirp 3 HD'},
   {id:'fr-FR-Chirp3-HD-Kore',name:'Kore',provider:'Google · Chirp 3 HD'},
   {id:'fr-FR-Chirp3-HD-Charon',name:'Charon',provider:'Google · Chirp 3 HD'},
   ...fishFrenchVoices.map(voice=>({...voice,provider:'Fish Audio · S2.1 Pro'})),
   ...cartesiaParisianVoices.map(voice=>({...voice,provider:'Cartesia · Sonic 3.6'}))] as const;
 export const VideoVoice=z.union([z.enum(['fr-FR-Chirp3-HD-Aoede','fr-FR-Chirp3-HD-Kore','fr-FR-Chirp3-HD-Charon','fish-manon','fish-lucas','fish-camille']),CartesiaVoiceId]);
-export const VideoStyle=z.enum(['editorial','minimal','cinematic']);
+export const VideoStyle=z.enum(['editorial','minimal','cinematic','signature','mosaic','dynamic']);
+export type VideoStyle=z.infer<typeof VideoStyle>;
 const photoOrder=z.array(z.number().int().min(0).max(IMPORT_PHOTO_MAXIMUM-1)).max(VIDEO_PHOTO_MAXIMUM)
   .refine(values=>new Set(values).size===values.length,'Une photo ne peut être sélectionnée deux fois.');
 export const CustomNarration=z.array(z.string().trim().min(1).max(500)
