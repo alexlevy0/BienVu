@@ -94,7 +94,7 @@ export function LandingPage() {
     <div className="home-workspace"><header className="home-topbar"><span>Le studio marketing IA de votre agence immobilière.</span><button type="button" onClick={() => setDialog('help')}>Aide</button></header>
       <main className={`home-content${conversationActive ? ' home-content-conversation' : ''}`} id="home-content" tabIndex={-1}>
         <section className={`home-hero${conversationActive?'':' home-hero-dashboard'}`} aria-label={conversationActive?'Créer votre vidéo':undefined} aria-labelledby={conversationActive?undefined:'home-title'}>
-          <div className={`home-hero-intro${conversationActive?' home-hero-intro-leaving':''}`} inert={conversationActive}><h1 id="home-title"><span>Vos annonces,</span> en version <em><strong>vidéo</strong></em>.</h1><p className="home-intro"><strong>Transformez un lien en vidéo, avec voix off, avatar et animations IA.</strong></p></div>
+          <div className={`home-hero-intro${conversationActive?' home-hero-intro-leaving':''}`} inert={conversationActive}><h1 id="home-title"><span>Vos annonces,</span> en version <em><strong>vidéo</strong></em>{'\u202f'}!</h1><p className="home-intro"><strong>Transformez un lien en vidéo, avec voix off, avatar et animations IA.</strong></p></div>
           <HomeCreate onLayoutChange={setConversationActive} renderChoice={renderChoice} onClearRenderChoice={()=>chooseRender(null)}/>
           <aside className="home-hero-showcase" hidden={conversationActive} aria-label="Un aperçu de votre prochaine vidéo">
             <p>Votre prochain coup de cœur, en vidéo.</p>
