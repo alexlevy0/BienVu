@@ -6,6 +6,8 @@ Sur mobile (760 px et moins), le lecteur et la vidéo complète d’origine rest
 
 Le mouvement de souris utilise des ressorts Motion et des amplitudes distinctes pour le décor, les textes et le présentateur. L’encart « Avatar IA » et sa flèche suivent le présentateur avec une amplitude légèrement réduite et une petite rotation. Il se désactive sur tactile, en plein écran, hors champ, pendant une interaction avec les commandes et avec la réduction des animations. Le lecteur suspend tous les calques si un des trois attend des données. Une seule piste sonore, une horloge et des commandes communes gèrent lecture, pause, recherche et boucle.
 
+Avec une souris, les commandes et l’icône de lecture apparaissent en fondu au survol du cadre. Le focus clavier les révèle également, sans conserver la barre affichée après un simple clic suivi d’une sortie de souris. Sur un écran tactile, les commandes restent visibles. Le fondu respecte la réduction des animations.
+
 ## Sources et export
 
 Les sources du film existant sont récupérées depuis son manifeste et vérifiées par SHA-256 avant export. Aucun appel à Runway, à HeyGen ou à la synthèse vocale n’est nécessaire. Les fichiers du client et son résultat initial ne sont pas modifiés.
