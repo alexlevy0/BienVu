@@ -11,15 +11,17 @@
  overflow-x:clip;
 }
 .home-studio-home :is(.home-topbar,.home-content,.home-premium-footer){font-family:var(--home-font-text)}
+/* Let the headline fill its own column as the sidebar and viewport resize. */
+.home-studio-home .home-hero-dashboard .home-hero-intro{container-type:inline-size}
 .home-studio-home .home-hero-dashboard h1{
  font-family:var(--home-font-heading);font-synthesis:none;
- font-size:clamp(48px,4.65vw,76px);font-weight:400;
- line-height:1.03;letter-spacing:-.045em;margin-bottom:28px;
+ font-size:clamp(56px,15cqw,140px);font-weight:400;
+ line-height:.98;letter-spacing:-.04em;margin-bottom:32px;
 }
 .home-studio-home .home-hero-dashboard h1 em{font-family:inherit;font-weight:inherit;letter-spacing:inherit}
 .home-studio-home .home-hero-dashboard h1 strong{font-weight:650}
-.home-studio-home .home-hero-dashboard h1 em::after{bottom:-7px;height:5px}
-.home-studio-home .home-hero-dashboard .home-intro{font-size:var(--home-type-copy);line-height:1.55}
+.home-studio-home .home-hero-dashboard h1 em::after{bottom:-.08em;height:clamp(5px,.075em,9px)}
+.home-studio-home .home-hero-dashboard .home-intro{font-size:clamp(18px,3.25cqw,25px);line-height:1.5}
 .home-studio-home .home-hero-dashboard .home-intro strong{font-weight:500}
 
 .home-studio-home :is(.home-avatars,.home-life,.home-sharing,.home-editor-demo) h2{
@@ -59,13 +61,11 @@
 .home-studio-home .home-premium-footer-column h3{font-family:var(--home-font-text);font-size:16px;font-weight:600;line-height:1.35;letter-spacing:0}
 .home-studio-home .home-premium-footer-signature>p{font-family:var(--home-font-heading);font-weight:400;line-height:1.16;letter-spacing:-.03em}
 
-@media(max-width:1200px) and (min-width:761px){
- .home-studio-home .home-hero-dashboard h1{font-size:clamp(43px,4.6vw,58px)}
-}
 @media(max-width:760px){
  .home-studio-home{--home-type-title:clamp(36px,7.4vw,52px);--home-type-copy:16px}
- .home-studio-home .home-hero-dashboard h1{font-size:clamp(36px,7.8vw,54px);line-height:1.08;letter-spacing:-.04em;margin-bottom:22px}
- .home-studio-home .home-hero-dashboard h1 em::after{height:4px;bottom:-4px}
+ .home-studio-home .home-hero-dashboard h1{font-size:clamp(38px,15cqw,78px);line-height:1.02;margin-bottom:26px}
+ .home-studio-home .home-hero-dashboard h1 em::after{height:5px;bottom:-5px}
+ .home-studio-home .home-hero-dashboard .home-intro{font-size:18px}
  .home-studio-home .home-kit-description{font-size:17px}
  .home-studio-home .home-avatar-preview figcaption{font-size:14px}
 }
