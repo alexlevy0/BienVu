@@ -47,6 +47,7 @@ function MailboxInbox({revision,mailbox,draftStore,onBusy}:{revision:number;mail
   draftRef.current=draft;
   useEffect(()=>{onBusy(sending||uploading);},[sending,uploading,onBusy]);
   useEffect(()=>()=>{drafts.current.set(active.current??'new',draftRef.current);},[]);
+  useEffect(()=>{const q=new URLSearchParams(location.search).get('q');if(q){setQuery(q.slice(0,100));setSearch(q.slice(0,100));}},[]);
   useEffect(()=>{const timer=setTimeout(()=>setSearch(query.trim()),250);return()=>clearTimeout(timer);},[query]);
   useEffect(()=>{const timer=setInterval(()=>{if(document.visibilityState==='visible')setTick(n=>n+1);},15000);return()=>clearInterval(timer);},[]);
   const params=(cursor?:string)=>new URLSearchParams({folder,q:search,...(cursor?{cursor}:{})});
