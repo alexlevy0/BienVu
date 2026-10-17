@@ -19,6 +19,8 @@ export function imageWidthUrl(src: string, width: number) {
   return src;
 }
 export const heroPosterSizes='(max-width: 760px) 310px, (max-width: 1250px) 250px, (max-width: 1600px) 330px, 440px';
+export const heroInlinePosterMedia='(max-width: 760px) and (max-resolution: 1.1dppx)';
+export const heroRemotePosterMedia=`not all and ${heroInlinePosterMedia}`;
 export function homeImageSrcSet(src:string){return imageWidthUrl(src,320)!==src?[320,640,960].map(width=>`${imageWidthUrl(src,width)} ${width}w`).join(', '):undefined;}
 export function previewVideoUrl(src: string,width:540|720=720) {
   if (!src.startsWith('/api/homepage/media/')) return src;
