@@ -30,7 +30,7 @@ const questions = [
 
 export function HomeShowcase({paused, onCreate}: {paused: boolean; onCreate(): void}) {
   const photo=useHomepageMedia('life.photo'),visual=useHomepageMedia('life.visual'),movie=useHomepageMedia('life.video'),editor=useHomepageMedia('life.editor');
-  const video = useRef<HTMLVideoElement>(null), audio = useRef<HTMLAudioElement>(null), attempt = useRef(0);
+  const video = useRef<HTMLVideoElement>(null), posterImage=useRef<HTMLImageElement>(null), audio = useRef<HTMLAudioElement>(null), attempt = useRef(0);
   const [videoPlaying, setVideoPlaying] = useState(false), [videoStarted, setVideoStarted] = useState(false), [videoError, setVideoError] = useState(false);
   const [voice, setVoice] = useState<VideoCustomization['voice']>(CARTESIA_DEFAULT_VOICE);
   const [audioState, setAudioState] = useState<'idle' | 'loading' | 'playing'>('idle'), [audioError, setAudioError] = useState(false);
@@ -78,11 +78,12 @@ export function HomeShowcase({paused, onCreate}: {paused: boolean; onCreate(): v
       <svg className="home-life-arrow" viewBox="0 0 64 50" fill="none" aria-hidden="true"><path d="M4 31C19 10 38 12 56 31m-1-12 1 12-12-2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
       <figure className="home-life-video">
         <figcaption className="home-life-badge home-life-video-badge"><HomeIcon name="play" size={17}/>Votre vidéo BienVu</figcaption>
-        <VideoBacklight video={video} active={!paused} poster={poster?imageWidthUrl(poster,640):null} posterLoading="lazy" className="home-life-backlight"/>
+        <VideoBacklight video={video} active={!paused} posterImage={posterImage} className="home-life-backlight"/>
         <div className="home-life-video-frame">
-        <video ref={video} src={previewVideoUrl(movie.src)} poster={poster?imageWidthUrl(poster,640):undefined} controls={videoStarted} playsInline preload={visual.kind==='image'||movie.poster?'none':'metadata'} aria-label={movie.custom?movie.title??'Vidéo BienVu':'Exemple de vidéo BienVu : un appartement à Paris'}
+        <video ref={video} src={previewVideoUrl(movie.src)} poster={videoStarted&&poster?imageWidthUrl(poster,640):undefined} controls={videoStarted} playsInline preload={visual.kind==='image'||movie.poster?'none':'metadata'} aria-label={movie.custom?movie.title??'Vidéo BienVu':'Exemple de vidéo BienVu : un appartement à Paris'}
           onPlay={() => {attempt.current++; audio.current?.pause(); setAudioState('idle'); setVideoError(false); setVideoStarted(true); setVideoPlaying(true);}}
           onPause={() => setVideoPlaying(false)} onEnded={() => setVideoPlaying(false)} onError={() => {setVideoPlaying(false); setVideoError(true);}}/>
+        {!videoStarted&&poster&&<HomeVisual imageRef={posterImage} media={{...visual,kind:'image',src:poster}} alt="" sizes="(max-width: 760px) 240px, 280px" className="home-life-video-poster"/>}
         {!movie.custom&&!visual.custom&&<div className="home-life-video-facts" aria-hidden="true"><strong>Paris</strong><span>65 m² · 3 pièces</span><b>385 000 €</b></div>}
         {!videoPlaying && <button type="button" className="home-life-video-play" aria-label="Lire la vidéo de démonstration" onClick={() => void playVideo()}><HomeIcon name="play" size={28}/></button>}
         </div>

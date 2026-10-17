@@ -72,3 +72,15 @@
 @media(max-width:700px){
  .home-studio-home .home-kit h2{font-size:clamp(46px,15cqw,70px)}
 }
+/* Keep off-screen demonstrations in the document, but defer their layout and
+   paint until scrolling brings them near. Remember measured heights thereafter. */
+@media(max-width:760px){
+ .home-studio-home .home-content>section:not(.home-hero){content-visibility:auto;contain-intrinsic-block-size:auto var(--home-section-height,1100px);overflow-clip-margin:64px}
+ .home-studio-home .home-renders{--home-section-height:1320px}
+ .home-studio-home .home-animation-comparison{--home-section-height:480px}
+ .home-studio-home .home-life{--home-section-height:2100px}
+ .home-studio-home .home-kit{--home-section-height:950px}
+ .home-studio-home .home-sharing{--home-section-height:2200px}
+ .home-studio-home .home-editor-demo{--home-section-height:2030px}
+ .home-studio-home .home-resource-links{--home-section-height:455px}
+}

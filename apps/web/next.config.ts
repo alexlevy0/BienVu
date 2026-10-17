@@ -4,6 +4,7 @@ const release=process.env.BIENVU_RELEASE??process.env.GITHUB_SHA??'development';
 const config: NextConfig = {
   env:{NEXT_PUBLIC_BIENVU_RELEASE:release},
   poweredByHeader: false,
+  experimental:{cssChunking:false},
   transpilePackages: ['@bienvu/contracts', '@bienvu/db', '@bienvu/observability', '@bienvu/importers', '@bienvu/maps', '@bienvu/notifications'],
   async redirects() {return [{source:'/studio',destination:'/',permanent:true},{source:'/generer',destination:'/',permanent:true}];},
   async headers() {
