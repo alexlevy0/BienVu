@@ -2,6 +2,8 @@ import Link from 'next/link';
 import {StudioFrame} from './studio-frame';
 import {StructuredData} from './structured-data';
 import {BlogCard} from './blog-card';
+import {BlogCoverTransition,BlogTitleTransition} from './blog-transition';
+import {RouteMotion} from './route-motion';
 import {blogArticleDates, blogArticlePath, blogArticleSchema, blogDateLabel, blogReadingMinutes, findBlogArticle} from '../lib/blog-content';
 import {blogCategories, type BlogArticle} from '../lib/blog/types';
 import {breadcrumbs} from '../lib/seo';
@@ -9,16 +11,16 @@ import {breadcrumbs} from '../lib/seo';
 export function BlogArticlePage({article}: {article: BlogArticle}) {
   const related = article.related.map(findBlogArticle).filter((item): item is BlogArticle => !!item);
   const dates = blogArticleDates(article);
-  return <StudioFrame active="create"><article className="blog-page blog-article">
+  return <StudioFrame active="create"><RouteMotion key={article.slug}><article className="blog-page blog-article">
     <StructuredData data={breadcrumbs([{name: 'BienVu', path: '/'}, {name: 'Blog', path: '/blog'}, {name: article.heading, path: blogArticlePath(article)}])}/>
     <StructuredData data={blogArticleSchema(article)}/>
-    <nav className="blog-breadcrumb" aria-label="Fil d’Ariane"><Link href="/">BienVu</Link><span aria-hidden="true">/</span><Link href="/blog">Le blog</Link><span aria-hidden="true">/</span><span>{blogCategories.find(category => category.id === article.category)?.label}</span></nav>
+    <nav className="blog-breadcrumb" aria-label="Fil d’Ariane"><Link href="/">BienVu</Link><span aria-hidden="true">/</span><Link href="/blog" transitionTypes={['bv-back']}>Le blog</Link><span aria-hidden="true">/</span><span>{blogCategories.find(category => category.id === article.category)?.label}</span></nav>
     <header className="blog-article-header"><p className="blog-eyebrow">{blogCategories.find(category => category.id === article.category)?.label}</p>
-      <h1>{article.heading.replace(/ :/g, '\u00a0:')}</h1><p className="blog-lead">{article.excerpt}</p>
+      <BlogTitleTransition key={`title:${article.slug}`} slug={article.slug}><h1>{article.heading.replace(/ :/g, '\u00a0:')}</h1></BlogTitleTransition><p className="blog-lead">{article.excerpt}</p>
       <p className="blog-byline"><Link href="/blog#redaction-bienvu">Rédaction BienVu</Link><span aria-hidden="true">·</span><time dateTime={dates.publishedAt}>{blogDateLabel(dates.publishedAt)}</time><span aria-hidden="true">·</span><span>{blogReadingMinutes(article)} min de lecture</span></p>
-      <img className="blog-article-cover" src={`/images/studio-home/${article.image}-960.webp`}
+      <BlogCoverTransition key={`cover:${article.slug}`} slug={article.slug}><img className="blog-article-cover" src={`/images/studio-home/${article.image}-960.webp`}
         srcSet={[320, 640, 960].map(width => `/images/studio-home/${article.image}-${width}.webp ${width}w`).join(', ')}
-        sizes="(max-width:760px) 90vw, 75vw" width="960" height="450" alt={article.imageAlt} decoding="async"/>
+        sizes="(max-width:760px) 90vw, 75vw" width="960" height="450" alt={article.imageAlt} decoding="async"/></BlogCoverTransition>
     </header>
     <div className="blog-reading-layout">
       <aside className="blog-toc"><nav aria-label="Sommaire de l’article"><h2>Dans cet article</h2><ol>{article.sections.map(section => <li key={section.id}><a href={`#${section.id}`}>{section.title}</a></li>)}</ol><a href="#questions-frequentes">Questions fréquentes</a></nav><Link className="blog-toc-cta" href="/">Essayer BienVu <span aria-hidden="true">→</span></Link></aside>
@@ -37,6 +39,6 @@ export function BlogArticlePage({article}: {article: BlogArticle}) {
       </div>
     </div>
     <section className="blog-cta"><div><p className="blog-eyebrow">DE LA LECTURE À LA CRÉATION</p><h2>Votre prochain mandat,<br/>en version vidéo.</h2><p>Préparez vos informations et vos photos, puis essayez BienVu gratuitement.</p></div><Link href="/" className="blog-button">Créer ma vidéo <span aria-hidden="true">→</span></Link></section>
-    <section className="blog-related" aria-labelledby="blog-related-title"><div className="blog-section-heading"><h2 id="blog-related-title">Pour aller plus loin</h2><Link href="/blog">Tous les articles <span aria-hidden="true">↗</span></Link></div><div className="blog-grid">{related.map(item => <BlogCard key={item.slug} article={item}/>)}</div></section>
-  </article></StudioFrame>;
+    <section className="blog-related" aria-labelledby="blog-related-title"><div className="blog-section-heading"><h2 id="blog-related-title">Pour aller plus loin</h2><Link href="/blog" transitionTypes={['bv-back']}>Tous les articles <span aria-hidden="true">↗</span></Link></div><div className="blog-grid">{related.map(item => <BlogCard key={item.slug} article={item} origin={`related:${article.slug}`}/>)}</div></section>
+  </article></RouteMotion></StudioFrame>;
 }
