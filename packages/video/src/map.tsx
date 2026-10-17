@@ -4,9 +4,10 @@ import {mapFrame,mapInk,mapRasterScale,mapRasterOpacity,mapZoomAt,editorCaptionS
 import {subtitleGroups} from './layout';
 import {MapBuildingsScene} from './map-buildings';
 import {SatelliteMapPlate} from './satellite-map';
+import {useMarketingLayer} from './marketing-layer';
 
 export function MapOverlay({manifest:m,media,moduleUrl,workerUrl}:{manifest:VideoManifest;media:Record<string,string>;moduleUrl?:string;workerUrl?:string}){
-  const globalFrame=useCurrentFrame(),total=m.scenes.reduce((n,s)=>n+s.durationFrames,0),frame=mapFrame(m.map?.settings,total,globalFrame);
+  const layer=useMarketingLayer(),globalFrame=useCurrentFrame(),total=m.scenes.reduce((n,s)=>n+s.durationFrames,0),frame=mapFrame(m.map?.settings,total,globalFrame);
   if(!m.map||frame===null)return null;
   const settings=m.map.settings,location=settings.location,approximate=location.precision==='approximate',ink=mapInk(m.brand.primaryColor,m.brand.secondaryColor);
   const Raster=m.map.settings.view==='satellite'?SatelliteMapPlate:Img;
@@ -17,12 +18,15 @@ export function MapOverlay({manifest:m,media,moduleUrl,workerUrl}:{manifest:Vide
       if(elapsed<voiceFrames){const groups=subtitleGroups(scene.narrationText,65),sum=groups.reduce((n,s)=>n+s.length,0);let threshold=0;
         caption=groups.find(g=>{threshold+=g.length/Math.max(1,sum)*voiceFrames;return elapsed<threshold;})??groups.at(-1);}}
   }
-  return <AbsoluteFill data-bienvu-map="true" style={{overflow:'hidden',background:m.brand.primaryColor,color:ink,fontFamily:'"BienVu Video", Arial, sans-serif'}}>
+  return <AbsoluteFill data-bienvu-map="true" style={{overflow:'hidden',background:layer==='foreground'?'transparent':m.brand.primaryColor,color:ink,fontFamily:'"BienVu Video", Arial, sans-serif'}}>
+    {layer!=='foreground'&&<>
     {settings.view==='buildings-3d'?<MapBuildingsScene manifest={m} media={media} frame={frame} moduleUrl={moduleUrl} workerUrl={workerUrl}/>:
       [{asset:m.map.asset,zoom:m.map.rasterZoom},...m.map.details??[]].map((layer,i)=><Raster key={layer.asset.id} src={media[layer.asset.id]} style={{position:'absolute',left:'50%',top:'50%',width:m.width*2,height:m.height*2,
         opacity:i?mapRasterOpacity(settings.view,mapZoomAt(settings,frame,settings.durationSeconds*30,location.precision),layer.zoom!):1,
         transform:`translate(-50%,-50%) scale(${mapRasterScale(settings,frame,layer.zoom)})`}}/>)}
     <AbsoluteFill style={{background:'linear-gradient(180deg,#ffffff55,transparent 30%,transparent 60%,#ffffff99)'}}/>
+    </>}
+    {layer!=='background'&&<>
     {m.logo&&<Img src={media[m.logo.id]} style={{position:'absolute',zIndex:VIDEO_LAYERS.content,right:'6%',top:'7%',width:80,height:80,objectFit:'contain',background:'#fff',borderRadius:12}}/>}
     {approximate&&<div style={{position:'absolute',left:'50%',top:'50%',width:220,height:220,transform:'translate(-50%,-50%)',borderRadius:'50%',
       background:m.brand.primaryColor,opacity:.45,border:`5px solid ${ink}`}}/>}
@@ -34,5 +38,6 @@ export function MapOverlay({manifest:m,media,moduleUrl,workerUrl}:{manifest:Vide
       {settings.position==='end'&&m.contact!=='none'&&<div style={{fontSize:30,marginTop:12}}>{m.brand[m.contact]}</div>}
     </div>
     {caption&&<div data-bienvu-subtitle="true" style={{...editorCaptionStyle(m.width),top:'27%'}}>{caption}</div>}
+    </>}
   </AbsoluteFill>;
 }

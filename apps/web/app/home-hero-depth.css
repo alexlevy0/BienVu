@@ -1,0 +1,57 @@
+.home-hero-desktop-player{display:none}
+.home-hero-mobile-player{display:contents}
+@media(min-width:761px){
+ .home-hero-mobile-player{display:none}
+ .home-hero-desktop-player{display:block;padding:0 30px 24px 0;min-width:0}
+ .home-hero-depth{position:relative;isolation:isolate;perspective:1200px}
+ .home-hero-depth-stage{position:relative;width:100%;aspect-ratio:9/16;outline-offset:8px;isolation:isolate}
+ .home-hero-depth-plane{position:absolute;inset:0;perspective:1000px}
+ .home-hero-depth-screen{position:absolute;inset:0;overflow:hidden;border-radius:15px;background:#dfe6d8;border:1px solid #ffffff8c;box-shadow:0 18px 40px -18px #152e2866,0 3px 9px #152e281a}
+ .home-hero-depth-imagery,.home-hero-depth-imagery>picture,.home-hero-depth-imagery>picture>img,.home-hero-depth-imagery>video,.home-hero-depth-lettering,.home-hero-depth-lettering>picture,.home-hero-depth-lettering>picture>img,.home-hero-depth-lettering>video{display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+ .home-hero-depth-imagery>video,.home-hero-depth-presenter>video,.home-hero-depth-lettering>video{opacity:0;transition:opacity .3s ease}
+ .home-hero-depth-stage.has-played video{opacity:1}
+ .home-hero-depth-stage.has-played .home-hero-depth-presenter>picture,.home-hero-depth-stage.has-played .home-hero-depth-lettering>picture{visibility:hidden}
+ .home-hero-depth-presenter{position:absolute;z-index:3;right:-20%;bottom:-11%;width:94%;pointer-events:none;filter:drop-shadow(-10px 10px 15px #152e2826);mask-image:linear-gradient(to bottom,#000 0%,#000 84%,transparent 100%);-webkit-mask-image:linear-gradient(to bottom,#000 0%,#000 84%,transparent 100%)}
+ .home-hero-depth-presenter>picture,.home-hero-depth-presenter>picture>img{display:block;width:100%;height:auto}
+ .home-hero-depth-presenter>video{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:contain}
+ .home-hero-depth-foreground{position:absolute;inset:0;z-index:4;border-radius:15px;overflow:hidden;pointer-events:none}
+ .home-hero-depth-badge{position:absolute;left:-19%;top:45%;z-index:4;pointer-events:none;color:#426548}
+ .home-hero-depth-badge>span{display:flex;align-items:center;gap:7px;padding:9px 12px;border:1px solid #c1cfb4;border-radius:13px;color:#204638;background:#f6faefed;font-size:10px;font-weight:650;white-space:nowrap;box-shadow:0 4px 15px #1a422012}
+ .home-hero-depth-badge>svg{display:block;margin:4px 0 0 27px;opacity:.6}
+ .home-hero-depth-cover{position:absolute;inset:0;z-index:2;background:none;border:0;cursor:pointer;color:white;border-radius:15px}
+ .home-hero-depth-cover>span{display:grid;place-items:center;position:absolute;left:50%;top:45%;transform:translate(-50%,-50%);width:57px;height:57px;border:1px solid #ffffffad;border-radius:50%;background:#152e286e;backdrop-filter:blur(8px);box-shadow:0 5px 18px #13281e26;transition:background .2s,scale .2s}
+ .home-hero-depth-cover:hover>span{background:#152e2899;scale:1.04}
+ .home-hero-depth-controls{position:absolute;left:1px;right:1px;bottom:1px;z-index:7;color:white;background:linear-gradient(transparent,#10271cc9);padding:28px 11px 10px;border-radius:0 0 14px 14px;pointer-events:auto}
+ .home-hero-depth-toolbar{display:flex;align-items:center;gap:5px}
+ .home-hero-depth-toolbar>button{width:29px;height:30px;display:grid;place-items:center;padding:0;border:0;border-radius:7px;background:transparent;color:inherit;cursor:pointer;flex-shrink:0;transition:background .2s}
+ .home-hero-depth-toolbar>button:hover{background:#ffffff26}
+ .home-hero-depth-toolbar>.home-hero-depth-sound{margin-left:auto}
+ .home-hero-depth-time{font-size:11px;white-space:nowrap;font-variant-numeric:tabular-nums;letter-spacing:-.1px}
+ .home-hero-depth-controls>input{appearance:none;-webkit-appearance:none;display:block;width:100%;height:16px;margin:1px 0 0;cursor:pointer;background:transparent;accent-color:white;border:0;padding:0}
+ .home-hero-depth-controls>input::-webkit-slider-runnable-track{height:3px;border-radius:3px;background:linear-gradient(to right,#fff var(--hero-progress),#ffffff52 var(--hero-progress))}
+ .home-hero-depth-controls>input::-moz-range-track{height:3px;border-radius:3px;background:#ffffff52}
+ .home-hero-depth-controls>input::-moz-range-progress{height:3px;background:#fff;border-radius:3px}
+ .home-hero-depth-controls>input::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:9px;height:9px;margin-top:-3px;background:white;border-radius:50%;border:0;box-shadow:0 1px 4px #0003}
+ .home-hero-depth-controls>input::-moz-range-thumb{width:9px;height:9px;background:white;border-radius:50%;border:0}
+ .home-hero-depth-loading{position:absolute;z-index:4;top:31%;left:50%;transform:translateX(-50%);color:white;text-shadow:0 1px 4px #152e28;display:flex;align-items:center;gap:7px;font-size:11px;white-space:nowrap;pointer-events:none}
+ .home-hero-depth-loading>span{width:13px;height:13px;border:1.5px solid #ffffff52;border-top-color:white;border-radius:50%;animation:hero-depth-spin .85s linear infinite}
+ .home-hero-depth-retry{position:absolute;z-index:6;top:40%;left:50%;transform:translateX(-50%);border:1px solid #fff9;border-radius:999px;background:#fffefaf2;color:#163328;display:flex;align-items:center;gap:8px;padding:10px 14px;font-size:12px;white-space:nowrap;cursor:pointer}
+ .home-hero-depth:fullscreen{width:100vw;height:100dvh;display:grid;place-items:center;padding:30px 10vw 60px 0;background:radial-gradient(ellipse at 50% 55%,#243c32,#0c1712)}
+ .home-hero-depth:fullscreen>.home-hero-depth-stage{width:min(calc((100dvh - 120px)*9/16),65vw);max-height:calc(100dvh - 120px)}
+ .home-hero-depth:fullscreen .home-hero-depth-time{font-size:13px}
+ .home-hero-depth:fullscreen .home-hero-depth-toolbar>button{width:37px;height:36px}
+ .home-hero-depth:fullscreen .home-hero-depth-badge{left:-22%}
+}
+@media(min-width:761px) and (max-width:1100px){
+ .home-hero-desktop-player{padding-right:20px;padding-bottom:17px}
+ .home-hero-depth-presenter{right:-16%;bottom:-10%;width:87%}
+ .home-hero-depth-badge{display:none}
+ .home-hero-depth-time{font-size:10px}
+ .home-hero-depth-controls{padding-inline:7px}
+ .home-hero-depth-toolbar{gap:1px}
+}
+@keyframes hero-depth-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){
+ .home-hero-depth video,.home-hero-depth-cover>span{transition:none}
+ .home-hero-depth-loading>span{animation:none}
+}

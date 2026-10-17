@@ -10,10 +10,11 @@ import {BackgroundMusic} from './background-music';
 import {AvatarOverlay} from './avatar';
 import {MapOverlay} from './map';
 import {SceneLayers} from './scene-layers';
+import {MarketingLayerContext} from './marketing-layer';
 
 // Ces URL sont résolues uniquement par le renderer Node vers son serveur
 // loopback privé. Le manifeste serveur n'accepte jamais d'URL d'asset cliente.
-export type ListingVideoProps = {manifest: VideoManifest | null; media: Record<string, string>; logoBackground: string; fontUrl: string; displayFontUrl: string;serifFontUrl?:string;maplibreModuleUrl?:string;maplibreWorkerUrl?:string;avatarBounds?:Record<string,AvatarContentBounds>};
+export type ListingVideoProps = {manifest: VideoManifest | null; media: Record<string, string>; logoBackground: string; fontUrl: string; displayFontUrl: string;serifFontUrl?:string;maplibreModuleUrl?:string;maplibreWorkerUrl?:string;avatarBounds?:Record<string,AvatarContentBounds>;marketingLayer?:'background'|'foreground'};
 const dark = '#132a23', paper = '#f5f7f0';
 function PhotoScene({manifest: m, media, index}: {manifest: VideoManifest; media: Record<string,string>; index: number}) {
   const f = useCurrentFrame(), scene = m.scenes[index], photo = m.photos.find(a => a.id === scene.photoAssetId)!;
@@ -107,17 +108,17 @@ export function ListingFilm(props: ListingVideoProps) {
   const horizontal=m.templateVersion==='bienvu-horizontal/1';
   const editorial=m.templateVersion!=='bienvu-vertical/1',cinematic=editorial&&m.visualStyle==='cinematic';
   const compactBrand=m.brand.name.length<=28?m.brand.name:null;
-  return <AbsoluteFill style={{background:editorial?canvasColor(m.visualStyle):paper,fontFamily:'BienVu Video, DejaVu Sans, sans-serif',color:editorial?'#fff':dark}}>
-    <BackgroundMusic manifest={m} media={props.media}/>
-    {m.photoTimeline&&<GalleryBackground manifest={m} media={props.media}/>}
+  return <MarketingLayerContext.Provider value={props.marketingLayer}><AbsoluteFill style={{background:props.marketingLayer==='foreground'?'transparent':editorial?canvasColor(m.visualStyle):paper,fontFamily:'BienVu Video, DejaVu Sans, sans-serif',color:editorial?'#fff':dark}}>
+    {props.marketingLayer!=='foreground'&&<BackgroundMusic manifest={m} media={props.media}/>}
+    {props.marketingLayer!=='foreground'&&m.photoTimeline&&<GalleryBackground manifest={m} media={props.media}/>}
     {scenes.map(({s,index,from}) => <Sequence key={s.id} from={from} durationInFrames={s.durationFrames}>
       {isDesignedStyle(m.visualStyle)?<DesignedPhotoScene manifest={m} media={props.media} index={index} logoBackground={props.logoBackground}/>:horizontal?<HorizontalPhotoScene manifest={m} media={props.media} logoBackground={props.logoBackground} index={index}/>:editorial?cinematic?<CinematicPhotoScene manifest={m} media={props.media} index={index}/>:m.visualStyle==='minimal'?<StyledPhotoScene manifest={m} media={props.media} index={index}/>:<EditorialPhotoScene manifest={m} media={props.media} index={index}/>:<PhotoScene manifest={m} media={props.media} index={index}/>}
     </Sequence>)}
-    {!horizontal&&!isDesignedStyle(m.visualStyle)&&<VerticalBrand manifest={m} frame={f} media={props.media} logoBackground={props.logoBackground} Image={Img}/>}
+    {props.marketingLayer!=='background'&&!horizontal&&!isDesignedStyle(m.visualStyle)&&<VerticalBrand manifest={m} frame={f} media={props.media} logoBackground={props.logoBackground} Image={Img}/>}
     <MapOverlay manifest={m} media={props.media} moduleUrl={props.maplibreModuleUrl} workerUrl={props.maplibreWorkerUrl}/>
-    <AvatarOverlay manifest={m} media={props.media} bounds={props.avatarBounds}/>
-    {m.rights.watermarked && (!horizontal||mapFrame(m.map?.settings,at,f)!==null) && <div style={{position:'absolute',zIndex:VIDEO_LAYERS.watermark,left:editorial?235:262,top:editorial?785:f >= scenes.at(-1)!.from ? 540 : 780,transform:'rotate(-14deg)',
+    {!props.marketingLayer&&<AvatarOverlay manifest={m} media={props.media} bounds={props.avatarBounds}/>}
+    {props.marketingLayer!=='background'&&m.rights.watermarked && (!horizontal||mapFrame(m.map?.settings,at,f)!==null) && <div style={{position:'absolute',zIndex:VIDEO_LAYERS.watermark,left:editorial?235:262,top:editorial?785:f >= scenes.at(-1)!.from ? 540 : 780,transform:'rotate(-14deg)',
       background:'#132a23d9',border:'2px solid #ffffffa0',borderRadius:12,padding:'18px 30px',color:'#fff',
       fontWeight:750,fontSize:35,letterSpacing:2}}>BIENVU · VIDÉO D’ESSAI</div>}
-  </AbsoluteFill>;
+  </AbsoluteFill></MarketingLayerContext.Provider>;
 }

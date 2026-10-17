@@ -77,3 +77,13 @@ test('Trois rendus : fin au plus court, erreur et annulation pendant une lecture
   group.play();group.pause();await flush();assert.ok(players.every(p=>p.paused));assert.equal(states.at(-1)?.playing,false);
   assert.throws(()=>synchronizeVideoGroup([],()=>{}),/INVALID_VIDEO_GROUP/);assert.throws(()=>synchronizeVideoGroup([players[0],players[0]],()=>{}),/INVALID_VIDEO_GROUP/);
 });
+test('Hero : boucle synchronisée, son unique et arrêt définitif après une pause ou destruction',async t=>{
+ const left=new Video(),right=new Video(),states:VideoPairState[]=[];
+ const pair=synchronizeVideos(left,right,state=>states.push(state),0,40,{loop:true});t.after(()=>pair.destroy());
+ left.ready();right.ready();pair.play();await flush();left.currentTime=39.99;right.currentTime=39.99;left.frame();await flush();
+ assert.equal(left.currentTime,0);assert.equal(right.currentTime,0);assert.equal(states.at(-1)?.playing,true);assert.equal(left.muted,false);assert.equal(right.muted,true);
+ left.readyState=2;left.dispatchEvent(new Event('waiting'));assert.equal(left.paused,true);assert.equal(right.paused,true);
+ pair.pause();left.readyState=4;left.dispatchEvent(new Event('canplay'));left.dispatchEvent(new Event('ended'));await flush();
+ assert.equal(states.at(-1)?.requested,false);assert.equal(left.paused,true);assert.equal(right.paused,true);
+ pair.destroy();const count=states.length;left.dispatchEvent(new Event('ended'));await flush();assert.equal(states.length,count);assert.equal(left.frames.size,0);
+});

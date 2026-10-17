@@ -4,6 +4,7 @@ import {BetaLandingPage} from '../../components/beta-landing-page';
 import {readHomepageConfig,homepageEdgeCache} from '../../lib/homepage-media';
 import {seoMetadata} from '../../lib/seo';
 import '../landing.css';
+import '../home-hero-depth.css';
 import '../home-avatars.css';
 import '../home-render-comparison.css';
 import '../home-editor-showcase.css';

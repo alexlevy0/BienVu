@@ -1,10 +1,12 @@
 'use client';
 
-import {useEffect, useRef, useState} from 'react';
+import {useCallback,useEffect, useRef, useState} from 'react';
 import {HomeIcon} from './home-icons';
 import {HomeVisual, useHomepageMedia, useHomepageHeroPoster, homeClock, type HomeMediaView} from './homepage-media';
 import {imageWidthUrl,previewVideoUrl,heroPosterSizes} from '../lib/home-media-view';
 import {HeroBacklight} from './hero-backlight';
+import {HomeHeroDepthVideo} from './home-hero-depth-video';
+import {emptyHeroImage,hasHeroDepth} from '../lib/home-hero-depth';
 
 type PlaybackProps = {paused: boolean; onPlayingChange(playing: boolean): void};
 
@@ -13,10 +15,21 @@ export function HomeHeroVideo({render,...props}: PlaybackProps & {render?:'stand
   const heroVisual = useHomepageMedia('hero.visual'), heroMovie = useHomepageMedia('hero.video');
   const example=useHomepageMedia(render==='avatar-ai'?'renders.avatar-ai.video':'renders.standard.video');
   const movie=render?example:heroMovie,visual=render?{...example,kind:'image' as const,src:example.poster??`/images/studio-home/renders-${render}.webp`,custom:true}:heroVisual;
-  return <HeroPlayer key={movie.src} visual={visual} movie={movie} inlinePoster={render?null:inlinePoster} {...props}/>;
+  return <ResponsiveHeroPlayer key={movie.src} visual={visual} movie={movie} inlinePoster={render?null:inlinePoster} depth={!render&&hasHeroDepth(movie)} {...props}/>;
 }
 
-function HeroPlayer({visual, movie, paused, onPlayingChange,inlinePoster}: PlaybackProps & {visual: HomeMediaView; movie: HomeMediaView;inlinePoster:string|null}) {
+function ResponsiveHeroPlayer({depth,...props}:PlaybackProps&{visual:HomeMediaView;movie:HomeMediaView;inlinePoster:string|null;depth:boolean}){
+ const [desktop,setDesktop]=useState(false),[unavailable,setUnavailable]=useState(false);
+ const fallback=useCallback(()=>setUnavailable(true),[]);
+ useEffect(()=>{const query=matchMedia('(min-width: 761px)'),change=()=>setDesktop(query.matches);change();query.addEventListener('change',change);return()=>query.removeEventListener('change',change);},[]);
+ if(!depth||unavailable)return <HeroPlayer {...props}/>;
+ return <>
+  <div className="home-hero-mobile-player"><HeroPlayer {...props} mobileOnly paused={props.paused||desktop}/></div>
+  <div className="home-hero-desktop-player"><HomeHeroDepthVideo paused={props.paused} onPlayingChange={props.onPlayingChange} onUnavailable={fallback}/></div>
+ </>;
+}
+
+function HeroPlayer({visual, movie, paused, onPlayingChange,inlinePoster,mobileOnly=false}: PlaybackProps & {visual: HomeMediaView; movie: HomeMediaView;inlinePoster:string|null;mobileOnly?:boolean}) {
   const video = useRef<HTMLVideoElement>(null),frame=useRef<HTMLDivElement>(null),posterImage=useRef<HTMLImageElement>(null), attempt = useRef(0);
   const [started, setStarted] = useState(false), [error, setError] = useState(false);
   const [muted, setMuted] = useState(true);
@@ -79,6 +92,7 @@ function HeroPlayer({visual, movie, paused, onPlayingChange,inlinePoster}: Playb
     const pause = () => {attempt.current++; player?.pause(); onPlayingChange(false);};
     const visibility = () => {if (document.hidden) pause();};
     const otherPlayback = (event: Event) => {
+      if(mobileOnly&&matchMedia('(min-width: 761px)').matches)return;
       if (event.target instanceof HTMLMediaElement && event.target !== player && !event.target.muted) pause();
     };
     document.addEventListener('visibilitychange', visibility);
@@ -88,7 +102,7 @@ function HeroPlayer({visual, movie, paused, onPlayingChange,inlinePoster}: Playb
       document.removeEventListener('play', otherPlayback, true);
       pause();
     };
-  }, [onPlayingChange]);
+  }, [onPlayingChange,mobileOnly]);
 
   async function play() {
     const player = video.current; if (!player || paused) return;
@@ -124,7 +138,7 @@ function HeroPlayer({visual, movie, paused, onPlayingChange,inlinePoster}: Playb
         onError={() => {setError(true); setStarted(false); onPlayingChange(false);}}/>
       {!started && <button type="button" className="home-hero-demo-cover" onClick={() => void play()}
         aria-label={error ? 'Réessayer la lecture de la vidéo de présentation' : 'Lire la vidéo de présentation'}>
-        {inlinePoster?<picture><source media="(max-width: 760px)" type={inlinePoster.startsWith('data:image/avif;')?'image/avif':'image/webp'} srcSet={inlinePoster}/>{cover}</picture>:cover}
+        {inlinePoster||mobileOnly?<picture>{mobileOnly&&<source media="(min-width: 761px)" srcSet={emptyHeroImage}/>} {inlinePoster&&<source media="(max-width: 760px)" type={inlinePoster.startsWith('data:image/avif;')?'image/avif':'image/webp'} srcSet={inlinePoster}/>} {cover}</picture>:cover}
         <span className="home-hero-demo-shade"/>
         <span className="home-duration">{homeClock(movie.duration ?? 28)}</span>
         {!custom && <span className="home-hero-demo-heading"><strong>Paris</strong><span>Un nouveau regard<br/>sur votre bien</span></span>}

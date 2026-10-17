@@ -7,11 +7,11 @@ export type VideoPairState={requested:boolean;playing:boolean;loading:boolean;re
 // One clock and one audio track. Buffering or seeking either film stops both;
 // becoming ready resumes the pair only if the visitor still wants to play.
 export function synchronizeVideos(primary:PairVideo,secondary:PairVideo,onChange:(state:VideoPairState)=>void,
-  initialTime=0,fallbackDuration=0){
-  return synchronizeVideoGroup([primary,secondary],onChange,initialTime,fallbackDuration);
+  initialTime=0,fallbackDuration=0,options:{loop?:boolean}={}){
+  return synchronizeVideoGroup([primary,secondary],onChange,initialTime,fallbackDuration,options);
 }
 export function synchronizeVideoGroup(players:readonly PairVideo[],onChange:(state:VideoPairState)=>void,
-  initialTime=0,fallbackDuration=0){
+  initialTime=0,fallbackDuration=0,options:{loop?:boolean}={}){
   if(!players.length||players.length>3||new Set(players).size!==players.length)throw Error('INVALID_VIDEO_GROUP');
   const [primary,...followers]=players;
   let requested=false,loading=false,error=false,disposed=false,epoch=0,starting:number|null=null;
@@ -29,7 +29,8 @@ export function synchronizeVideoGroup(players:readonly PairVideo[],onChange:(sta
     for(const player of players)if(player.readyState>=1&&Math.abs(player.currentTime-next)>.02)player.currentTime=next;
     if(players.every(p=>p.readyState>=1))target=null;
   };
-  const finish=()=>{requested=false;loading=false;stopPlayers();target=null;
+  const finish=()=>{if(options.loop&&requested&&!disposed){seek(initialTime);return;}
+    requested=false;loading=false;stopPlayers();target=null;
     const end=duration();if(end>0)for(const player of players)if(player.readyState>=1)player.currentTime=end;
     report();};
   const tick=()=>{

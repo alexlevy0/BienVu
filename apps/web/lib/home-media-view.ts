@@ -1,13 +1,13 @@
 import {homepageSlots, type HomepageConfig, type HomepageSlot} from '@bienvu/contracts';
 import {homeComparisonAssets} from './home-comparison-assets';
-export type HomeMediaView = {src:string;poster:string|null;kind:'image'|'video';custom:boolean;title:string|null;agency:string|null;locality:string|null;duration:number|null;width:number|null;height:number|null};
+export type HomeMediaView = {src:string;poster:string|null;kind:'image'|'video';custom:boolean;title:string|null;agency:string|null;locality:string|null;duration:number|null;width:number|null;height:number|null;sha256?:string};
 export function resolveHomeMedia(config: HomepageConfig, id: HomepageSlot): HomeMediaView {
   const slot = homepageSlots.find(item => item.id === id)!;
   let asset = config.slots[id], cover = false;
   if (!asset && id.endsWith('.visual')) {const partner = config.slots[id.replace(/\.visual$/, '.video') as HomepageSlot]; if (partner) {asset = partner; cover = true;}}
   if (!asset && id.endsWith('.video')) {const partner = config.slots[id.replace(/\.video$/, '.visual') as HomepageSlot]; if (partner?.kind === 'video') asset = partner;}
   if (asset) return {src: cover && asset.posterUrl ? asset.posterUrl : asset.url, poster: asset.posterUrl, kind: cover && asset.posterUrl ? 'image' : asset.kind,
-    custom: true, title: asset.title, agency: asset.agency, locality: asset.locality, duration: asset.durationMs ? asset.durationMs / 1000 : null, width: asset.width, height: asset.height};
+    custom: true, title: asset.title, agency: asset.agency, locality: asset.locality, duration: asset.durationMs ? asset.durationMs / 1000 : null, width: asset.width, height: asset.height,sha256:asset.sha256};
   const comparison=homeComparisonAssets.find(item=>item.src===slot.src);
   return {src: comparison?`/api/homepage/comparison/${comparison.id}`:slot.src, poster: slot.kind === 'video' ? slot.src.replace('/videos/', '/images/').replace(/\.mp4$/, '.webp') : null,
     kind: slot.kind === 'video' ? 'video' : 'image', custom: false, title: null, agency: null, locality: null,
