@@ -1,9 +1,24 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {emptyCreationFields,type PropertyDetail,type PropertySummary} from '../packages/contracts/src/index';
-import {cachedProperty,cachedPropertyPage,clearPropertyNavigation,forgetProperty,prepareProperty,rememberPropertyPage} from '../apps/web/lib/property-navigation';
+import {cachedProperty,cachedPropertyPage,cachedPropertySummary,clearPropertyNavigation,forgetProperty,prepareProperty,rememberPropertyPage,rememberPropertySummary} from '../apps/web/lib/property-navigation';
 const property:PropertySummary={id:'listing:sample',title:'Maison de démonstration',reference:'BV-01',fields:emptyCreationFields(),archived:false,createdAt:'2026-10-17T10:00:00Z',updatedAt:'2026-10-17T10:00:00Z',coverUrl:null,thumbnails:[],photoCount:0,videoCount:0,draftCount:0,visualCount:0,textCount:0,attentionCount:0,projectId:null};
 const detail:PropertyDetail={property,photos:[],drafts:[],jobs:[],nextCursor:null,shares:[],caption:'',publications:[]};
+
+test('La carte fournit immédiatement la photo et le titre pendant une lecture lente, sans partager le cache entre comptes',async t=>{
+ clearPropertyNavigation();t.after(clearPropertyNavigation);let resolve!:(value:Response)=>void,now=1000;
+ t.mock.method(Date,'now',()=>now);t.mock.method(globalThis,'fetch',()=>new Promise<Response>(done=>{resolve=done;}));
+ rememberPropertySummary('alice:agency',property);const pending=prepareProperty('alice:agency',property.id);
+ assert.equal(cachedProperty('alice:agency',property.id),null);
+ assert.equal(cachedPropertySummary('alice:agency',property.id),property);
+ assert.equal(cachedPropertySummary('bob:agency',property.id),null);
+ resolve(Response.json(detail));await pending;
+ forgetProperty('alice:agency',property.id);assert.equal(cachedPropertySummary('alice:agency',property.id),null);
+ rememberPropertySummary('alice:agency',property);now+=30_001;assert.equal(cachedPropertySummary('alice:agency',property.id),null);
+ for(let i=0;i<14;i++)rememberPropertySummary('alice:agency',{...property,id:'listing:'+i});
+ assert.equal(cachedPropertySummary('alice:agency','listing:0'),null);assert.ok(cachedPropertySummary('alice:agency','listing:13'));
+ clearPropertyNavigation();assert.equal(cachedPropertySummary('alice:agency','listing:13'),null);
+});
 
 test('Navigation privée : déduplication, séparation des comptes, expiration et oubli',async t=>{
  clearPropertyNavigation();t.after(clearPropertyNavigation);let calls=0,now=1000;

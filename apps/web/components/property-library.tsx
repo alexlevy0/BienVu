@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import {useEffect,useRef,useState,ViewTransition} from 'react';
+import {startTransition,useEffect,useRef,useState,ViewTransition} from 'react';
 import {propertyFacts,propertyPrice,type PropertySummary} from '@bienvu/contracts';
 import {useAccount} from './account';
 import {useGenerationStore} from './generation-store';
@@ -22,9 +22,9 @@ export function PropertyLibrary(){
   const [archive,setArchive]=useState<PropertySummary|null>(null),dialog=useRef<HTMLDialogElement>(null);
   useEffect(()=>{const timer=setTimeout(()=>setSearch(query.trim()),250);return()=>clearTimeout(timer);},[query]);
   const parameters=()=>new URLSearchParams({q:search,filter,sort});
-  useEffect(()=>{const cached=me?cachedPropertyPage(navigationOwner,scopeKey):null;setData(cached?{scope:scopeKey,page:cached}:null);setFeedback('');setArchive(null);setPending(null);setBusy(false);if(loading||!me)return;
+  useEffect(()=>{setFeedback('');setArchive(null);setPending(null);setBusy(false);if(loading||!me)return;
     const controller=new AbortController();void propertyRequest<Page>(`/api/properties?${parameters()}`,{signal:controller.signal})
-      .then(page=>{if(!controller.signal.aborted&&scope.current===scopeKey){rememberPropertyPage(navigationOwner,scopeKey,page);setData({scope:scopeKey,page});}})
+      .then(page=>{if(!controller.signal.aborted&&scope.current===scopeKey){rememberPropertyPage(navigationOwner,scopeKey,page);startTransition(()=>setData({scope:scopeKey,page}));}})
       .catch(error=>{if(!controller.signal.aborted&&scope.current===scopeKey){setData(null);setFeedback(error.message);}});
     return()=>controller.abort();
   },[owner,navigationOwner,loading,search,filter,sort,revision]);
@@ -32,7 +32,7 @@ export function PropertyLibrary(){
   useEffect(()=>{const ready=store.jobs.map(j=>`${j.id}:${j.status}`).join('|');if(previousJobs.current&&previousJobs.current!==ready)setRevision(n=>n+1);previousJobs.current=ready;},[store.jobs]);
   useEffect(()=>{const deleted=(event:Event)=>{if((event as CustomEvent<{agencyId:string}>).detail.agencyId===owner)setRevision(n=>n+1);};
     window.addEventListener('bienvu:draft-deleted',deleted);return()=>window.removeEventListener('bienvu:draft-deleted',deleted);},[owner]);
-  const page=data?.scope===scopeKey?data.page:null;
+  const page=data?.scope===scopeKey?data.page:!feedback&&me?cachedPropertyPage(navigationOwner,scopeKey):null;
   async function more(){if(!page?.nextCursor||busy)return;setBusy(true);setFeedback('');const params=parameters();params.set('cursor',page.nextCursor);
     try{const next=await propertyRequest<Page>(`/api/properties?${params}`);if(scope.current!==scopeKey)return;
       setData(old=>old?.scope===scopeKey?{scope:scopeKey,page:{...next,properties:[...old.page.properties,...next.properties.filter(p=>!old.page.properties.some(o=>o.id===p.id))]}}:old);
@@ -60,16 +60,16 @@ export function PropertyLibrary(){
     {me&&page&&<>{page.properties.length===0?<div className="property-empty"><HomeIcon name={filter==='archived'?'archive':'house'} size={34}/><h2>{search||filter!=='all'?'Aucun bien dans cette sélection.':'Votre premier bien vous attend.'}</h2><p>{search||filter!=='all'?'Essayez une autre recherche ou un autre filtre.':'Importez votre annonce ou ajoutez vos informations et vos photos.'}</p>{me.role!=='viewer'&&filter==='all'&&!search&&<Link className="property-primary" href="/?manuel=1">Ajouter un bien <HomeIcon name="plus" size={18}/></Link>}</div>:
       <div className={`property-grid${layout==='list'?' is-list':''}`}>{page.properties.map(property=>{
         const count=property.videoCount+property.visualCount+property.textCount;
-        return <article className="property-card" key={property.id}><div className="property-cover"><PropertyLink owner={navigationOwner} propertyId={property.id} aria-label={`Ouvrir ${property.title}`}><ViewTransition name={motionName('property-photo',property.id)} default="none" share="bv-media">{property.coverUrl?<img src={property.coverUrl} alt="" loading="lazy" onError={event=>{event.currentTarget.style.visibility='hidden';}}/>:<span className="property-cover-empty"><HomeIcon name="house" size={38}/></span>}</ViewTransition></PropertyLink>
+        return <article className="property-card" key={property.id}><div className="property-cover"><PropertyLink owner={navigationOwner} summary={property} aria-label={`Ouvrir ${property.title}`}><ViewTransition name={motionName('property-photo',property.id)} default="none" share="bv-media">{property.coverUrl?<img src={property.coverUrl} alt="" loading="lazy" onError={event=>{event.currentTarget.style.visibility='hidden';}}/>:<span className="property-cover-empty"><HomeIcon name="house" size={38}/></span>}</ViewTransition></PropertyLink>
           <span className={`property-badge${property.fields.transaction==='rent'?' is-rent':''}`}>{property.archived?'Archivé':property.fields.transaction==='rent'?'À louer':property.fields.transaction==='sale'?'À vendre':'À compléter'}</span>
-          <details className="property-card-menu"><summary aria-label={`Actions pour ${property.title}`}><HomeIcon name="more" size={19}/></summary><div><PropertyLink owner={navigationOwner} propertyId={property.id}>Ouvrir le bien</PropertyLink>{me.role!=='viewer'&&<button type="button" disabled={pending===property.id} onClick={()=>setArchive(property)}><HomeIcon name="archive" size={16}/>{property.archived?'Restaurer le bien':'Archiver le bien'}</button>}</div></details></div>
-          <div className="property-card-body"><ViewTransition name={motionName('property-title',property.id)} default="none" share="bv-text"><h2><PropertyLink owner={navigationOwner} propertyId={property.id}>{property.title}</PropertyLink></h2></ViewTransition><p className="property-card-facts">{propertyFacts(property.fields)||'Informations à compléter'}</p>
+          <details className="property-card-menu"><summary aria-label={`Actions pour ${property.title}`}><HomeIcon name="more" size={19}/></summary><div><PropertyLink owner={navigationOwner} summary={property}>Ouvrir le bien</PropertyLink>{me.role!=='viewer'&&<button type="button" disabled={pending===property.id} onClick={()=>setArchive(property)}><HomeIcon name="archive" size={16}/>{property.archived?'Restaurer le bien':'Archiver le bien'}</button>}</div></details></div>
+          <div className="property-card-body"><ViewTransition name={motionName('property-title',property.id)} default="none" share="bv-text"><h2><PropertyLink owner={navigationOwner} summary={property}>{property.title}</PropertyLink></h2></ViewTransition><p className="property-card-facts">{propertyFacts(property.fields)||'Informations à compléter'}</p>
             {propertyPrice(property.fields)&&<strong className="property-card-price">{propertyPrice(property.fields)}</strong>}
             <p className="property-card-counts">{[property.videoCount?`${property.videoCount} vidéo${property.videoCount>1?'s':''}`:null,
               property.visualCount?`${property.visualCount} visuel`:null,property.textCount?`${property.textCount} texte`:null,property.draftCount?`${property.draftCount} brouillon${property.draftCount>1?'s':''}`:null].filter(Boolean).join(' · ')||'Vos contenus apparaîtront ici'}</p>
             {property.attentionCount>0&&<p className="property-attention"><span aria-hidden="true">!</span>{property.attentionCount} contenu{property.attentionCount>1?'s':''} à reprendre</p>}
             {property.thumbnails.length>0&&<div className="property-thumbnails" aria-hidden="true">{property.thumbnails.map(photo=><img key={photo.id} src={photo.url} alt="" loading="lazy"/>)}{property.photoCount>3&&<span>+{property.photoCount-3}</span>}</div>}
-            <PropertyLink className="property-open" owner={navigationOwner} propertyId={property.id}>Ouvrir le bien <HomeIcon name="arrow" size={17}/></PropertyLink><span className="sr-only">{count} contenus · {property.reference}</span>
+            <PropertyLink className="property-open" owner={navigationOwner} summary={property}>Ouvrir le bien <HomeIcon name="arrow" size={17}/></PropertyLink><span className="sr-only">{count} contenus · {property.reference}</span>
           </div></article>;
       })}</div>}
       {page.nextCursor&&<button className="property-more" type="button" disabled={busy} onClick={()=>void more()}>{busy?'Chargement…':'Afficher plus de biens'}</button>}</>}

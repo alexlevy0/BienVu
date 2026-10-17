@@ -2,7 +2,8 @@
 ::view-transition{pointer-events:none}
 ::view-transition-old(root){display:none}
 ::view-transition-new(root){animation:none}
-::view-transition-group(.bv-media),::view-transition-group(.bv-text){animation-duration:260ms;animation-timing-function:cubic-bezier(.22,1,.36,1)}
+/* Shared snapshots stay above the entering and leaving page surfaces. */
+::view-transition-group(.bv-media),::view-transition-group(.bv-text){z-index:2;animation-duration:360ms;animation-timing-function:cubic-bezier(.22,1,.36,1)}
 ::view-transition-image-pair(.bv-media){isolation:isolate;border-radius:inherit;overflow:clip}
 ::view-transition-old(.bv-media),::view-transition-new(.bv-media){height:100%;object-fit:cover;mix-blend-mode:normal}
 ::view-transition-old(.bv-text){display:none}
@@ -12,6 +13,7 @@
 ::view-transition-new(.bv-fade){animation:180ms ease-out both bv-fade-in}
 ::view-transition-group(.bv-fade){animation-duration:180ms}
 ::view-transition-old(.bv-forward){animation:220ms ease-out both bv-forward-out}
+::view-transition-group(.bv-forward),::view-transition-group(.bv-back){z-index:1}
 ::view-transition-new(.bv-forward){animation:220ms ease-out both bv-forward-in}
 ::view-transition-old(.bv-back){animation:220ms ease-out both bv-back-out}
 ::view-transition-new(.bv-back){animation:220ms ease-out both bv-back-in}

@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import {useEffect,useRef,useState,ViewTransition} from 'react';
+import {startTransition,useEffect,useRef,useState,ViewTransition} from 'react';
 import {GenerationView,propertyFacts,propertyPrice,publicErrors,type PropertyDetail as Detail,type PublicErrorCode} from '@bienvu/contracts';
 import {useAccount} from './account';
 import {useGenerationStore} from './generation-store';
@@ -12,7 +12,7 @@ import {ShowcasePropertyAction} from './showcase-property-action';
 import {propertyRequest,downloadBlob} from '../lib/property-client';
 import {boundedDownload,propertyVisual,propertyZip} from '../lib/property-download';
 
-import {cachedProperty,forgetProperty} from '../lib/property-navigation';
+import {cachedProperty,cachedPropertySummary,forgetProperty} from '../lib/property-navigation';
 import {motionName} from '../lib/view-motion-name';
 
 type Tab='contents'|'photos'|'information'|'publications';
@@ -25,15 +25,21 @@ export function PropertyDetail({id}:{id:string}){
   const [tab,setTab]=useState<Tab>('contents'),[filter,setFilter]=useState('all'),[busy,setBusy]=useState<string|null>(null),[progress,setProgress]=useState('');
   const [preview,setPreview]=useState<GenerationView|null>(null),[confirm,setConfirm]=useState<GenerationView|null>(null),[social,setSocial]=useState<GenerationView|null>(null),[create,setCreate]=useState(false);
   const previewDialog=useRef<HTMLDialogElement>(null),shareDialog=useRef<HTMLDialogElement>(null),createDialog=useRef<HTMLDialogElement>(null),downloadAbort=useRef<AbortController|null>(null),editKey=useRef(crypto.randomUUID());
-  const data=result?.scope===scopeKey?result.detail:null,property=data?.property;
-  useEffect(()=>{const cached=me?cachedProperty(navigationOwner,id):null;setResult(cached?{scope:scopeKey,detail:cached}:null);setFailure('');setPreview(null);setConfirm(null);setSocial(null);setCreate(false);setBusy(null);setProgress('');setTab('contents');setFilter('all');editKey.current=crypto.randomUUID();
+  // A prefetched route may render before its request completes. Keep the clicked
+  // card's header in the navigation commit so photo and title can actually pair.
+  const data=result?.scope===scopeKey?result.detail:!failure&&me?cachedProperty(navigationOwner,id):null,property=data?.property??(!failure&&me?cachedPropertySummary(navigationOwner,id):null);
+  useEffect(()=>{setFailure('');setPreview(null);setConfirm(null);setSocial(null);setCreate(false);setBusy(null);setProgress('');setTab('contents');setFilter('all');editKey.current=crypto.randomUUID();
     if(loading||!me)return;const controller=new AbortController();
     void propertyRequest<Detail>(`/api/properties/${encodeURIComponent(id)}`,{signal:controller.signal}).then(detail=>{
-      if(!controller.signal.aborted&&scope.current===scopeKey)setResult({scope:scopeKey,detail:{...detail,jobs:detail.jobs.map(j=>GenerationView.parse(j))}});
+      if(!controller.signal.aborted&&scope.current===scopeKey)startTransition(()=>setResult({scope:scopeKey,detail:{...detail,jobs:detail.jobs.map(j=>GenerationView.parse(j))}}));
     }).catch(error=>{if(!controller.signal.aborted&&scope.current===scopeKey){forgetProperty(navigationOwner,id);setResult(null);setFailure(error.message);}});
     return()=>{controller.abort();downloadAbort.current?.abort();};
   },[id,owner,navigationOwner,loading,revision]);
-  useEffect(()=>{if(!data)return;setResult(current=>current?.scope===scopeKey?{scope:scopeKey,detail:{...current.detail,jobs:current.detail.jobs.map(job=>store.jobs.find(j=>j.id===job.id)??job)}}:current);},[store.jobs,owner]);
+  useEffect(()=>{if(!data)return;startTransition(()=>setResult(current=>{
+    if(current?.scope!==scopeKey)return current;
+    const jobs=current.detail.jobs.map(job=>store.jobs.find(j=>j.id===job.id)??job);
+    return jobs.every((job,index)=>job===current.detail.jobs[index])?current:{scope:scopeKey,detail:{...current.detail,jobs}};
+  }));},[store.jobs,owner]);
   useEffect(()=>{const deleted=(event:Event)=>{if((event as CustomEvent<{agencyId:string}>).detail.agencyId===owner)setRevision(n=>n+1);};
     window.addEventListener('bienvu:draft-deleted',deleted);return()=>window.removeEventListener('bienvu:draft-deleted',deleted);},[owner]);
   useEffect(()=>{if(!preview)return;const trigger=document.activeElement as HTMLElement|null;previewDialog.current?.showModal();return()=>{previewDialog.current?.close();trigger?.focus();};},[preview]);
@@ -69,14 +75,14 @@ export function PropertyDetail({id}:{id:string}){
     }catch(error){if(!controller.signal.aborted)report(error);}finally{if(scope.current===scopeKey)setBusy(null);if(downloadAbort.current===controller)downloadAbort.current=null;}}
   if(loading)return <p className="property-notice" role="status">Chargement de votre espace…</p>;
   if(!me)return <section className="property-empty"><HomeIcon name="house" size={36}/><h1>Retrouvez tous les contenus de votre bien.</h1><p>Connectez-vous pour ouvrir cette fiche dans votre espace privé.</p><Link className="property-primary" href={`/connexion?next=${encodeURIComponent(`/biens/${id}`)}`}>Se connecter <HomeIcon name="arrow" size={18}/></Link><Link href="/biens" transitionTypes={['bv-back']}>Retour à Mes biens</Link></section>;
-  if(!data||!property)return <section className="property-detail"><Link className="property-breadcrumb" href="/biens" transitionTypes={['bv-back']}>← Mes biens</Link>{failure?<p className="property-feedback" role="alert">{failure} <button type="button" onClick={()=>setRevision(n=>n+1)}>Réessayer</button></p>:<p className="property-notice" role="status">Chargement du bien…</p>}</section>;
-  const titleCount=property.videoCount+property.draftCount+property.visualCount+property.textCount,canEdit=me.role!=='viewer',allPrivate=data.shares.length===0;
+  if(!property)return <section className="property-detail"><Link className="property-breadcrumb" href="/biens" transitionTypes={['bv-back']}>← Mes biens</Link>{failure?<p className="property-feedback" role="alert">{failure} <button type="button" onClick={()=>setRevision(n=>n+1)}>Réessayer</button></p>:<p className="property-notice" role="status">Chargement du bien…</p>}</section>;
+  const titleCount=property.videoCount+property.draftCount+property.visualCount+property.textCount,canEdit=me.role!=='viewer',allPrivate=data?.shares.length===0;
   return <section className="property-detail" aria-labelledby="property-title"><nav className="property-breadcrumb" aria-label="Fil d’Ariane"><Link href="/biens" transitionTypes={['bv-back']}>Mes biens</Link><span aria-hidden="true">›</span><span>{property.title}</span></nav>
     <header className="property-detail-heading"><ViewTransition name={motionName('property-photo',property.id)} default="none" share="bv-media"><div className="property-detail-cover">{property.coverUrl?<img src={property.coverUrl} alt={`Photo de ${property.title}`}/>:<HomeIcon name="house" size={42}/>}</div></ViewTransition>
       <div className="property-detail-intro"><ViewTransition name={motionName('property-title',property.id)} default="none" share="bv-text"><h1 id="property-title">{property.title}</h1></ViewTransition><div className="property-detail-reference"><span className={`property-badge${property.fields.transaction==='rent'?' is-rent':''}`}>{property.archived?'Archivé':property.fields.transaction==='rent'?'À louer':property.fields.transaction==='sale'?'À vendre':'À compléter'}</span><span>Réf. {property.reference}</span></div>
         <p>{propertyFacts(property.fields)||'Informations à compléter'}</p>{propertyPrice(property.fields)&&<strong>{propertyPrice(property.fields)}</strong>}</div>
-      {canEdit&&<div className="property-detail-actions"><button className="property-button" type="button" disabled={Boolean(busy)} onClick={()=>void prepare('edit')}><HomeIcon name="pencil" size={18}/>{busy==='edit'?'Ouverture…':'Modifier le bien'}</button><button type="button" className="property-primary" disabled={Boolean(busy)} onClick={()=>setCreate(true)}><HomeIcon name="plus" size={20}/>Créer un contenu</button></div>}</header>
-    <ShowcasePropertyAction key={`${owner}:${id}`} id={id} agencyId={owner}/>
+      {canEdit&&<div className="property-detail-actions"><button className="property-button" type="button" disabled={!data||Boolean(busy)} onClick={()=>void prepare('edit')}><HomeIcon name="pencil" size={18}/>{busy==='edit'?'Ouverture…':'Modifier le bien'}</button><button type="button" className="property-primary" disabled={!data||Boolean(busy)} onClick={()=>setCreate(true)}><HomeIcon name="plus" size={20}/>Créer un contenu</button></div>}</header>
+    {data?<><ShowcasePropertyAction key={`${owner}:${id}`} id={id} agencyId={owner}/>
     <div className="property-tabs" role="tablist" aria-label="Rubriques du bien">{([['contents',`Contenus (${titleCount})`],['photos',`Photos (${property.photoCount})`],['information','Informations'],['publications',`Publications${data.publications.length?` (${data.publications.length})`:''}`]] as [Tab,string][]).map(([value,label])=>
       <button key={value} id={`property-tab-${value}`} role="tab" aria-selected={tab===value} aria-controls={`property-panel-${value}`} type="button" onClick={()=>setTab(value)} onKeyDown={event=>{
         const tabs:Tab[]=['contents','photos','information','publications'],i=tabs.indexOf(value),next=event.key==='ArrowRight'?tabs[(i+1)%4]:event.key==='ArrowLeft'?tabs[(i+3)%4]:event.key==='Home'?tabs[0]:event.key==='End'?tabs[3]:null;
@@ -131,5 +137,6 @@ export function PropertyDetail({id}:{id:string}){
     {confirm&&canEdit&&<dialog ref={shareDialog} className="property-dialog" onCancel={()=>setConfirm(null)} aria-labelledby="property-share-title"><h2 id="property-share-title">Publier dans Explorer ?</h2><p>Cette vidéo et les coordonnées de votre agence deviendront visibles par tous sur BienVu. Vous pourrez retirer cette publication à tout moment.</p><div className="property-dialog-actions"><button className="property-button" type="button" onClick={()=>setConfirm(null)}>Annuler</button><button className="property-primary" type="button" onClick={()=>void sharing(confirm)}>Publier dans Explorer</button></div></dialog>}
     {create&&canEdit&&<dialog ref={createDialog} className="property-dialog" onCancel={()=>setCreate(false)} aria-labelledby="property-create-title"><button className="property-dialog-close" type="button" aria-label="Fermer" disabled={Boolean(busy)} onClick={()=>setCreate(false)}><HomeIcon name="close" size={20}/></button><h2 id="property-create-title">Un nouveau contenu pour votre bien.</h2><p>Retrouvez les photos et les informations de « {property.title} » dans l’Éditeur. Choisissez le format et ajustez votre montage avant de lancer l’export.</p><p className="property-notice">L’ouverture ne consomme aucun crédit. Le coût est affiché avant la création de la vidéo.</p><button className="property-primary" type="button" disabled={Boolean(busy)} onClick={()=>void prepare('create')}><HomeIcon name="clapper" size={20}/>{busy==='create'?'Ouverture…':'Créer une vidéo dans l’Éditeur'}</button><div className="property-create-shortcuts">{property.visualCount>0&&<button className="property-button" type="button" onClick={()=>{setCreate(false);setTab('contents');setFilter('visuals');}}>Utiliser le visuel</button>}{property.textCount>0&&<button className="property-button" type="button" onClick={()=>{setCreate(false);setTab('contents');setFilter('texts');}}>Utiliser le texte</button>}</div>{failure&&<p className="property-feedback" role="alert">{failure}</p>}</dialog>}
     {social&&canEdit&&result?.scope===scopeKey&&<SocialPublishDialog key={`${owner}:${social.id}`} job={social} onClose={()=>setSocial(null)} onPublished={()=>{setSocial(null);setRevision(n=>n+1);}}/>}
+    </>:<p className="property-notice" role="status">Chargement des contenus du bien…</p>}
   </section>;
 }
