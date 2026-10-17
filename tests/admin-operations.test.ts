@@ -43,7 +43,7 @@ test('Opérations : requêtes D1 réelles, notes privées, incidents concurrents
   }
  });
  await t.test('autorisation avant lecture, sans extension des droits support aux finances',async()=>{
-  for(const [cookie,status] of [['',401],[cookies[1],403],[cookies[2],403]])for(const section of ['performance','incidents','retention','profit','providers','changes','agency','video'])assert.equal((await adminOperationsRequest(req('/api/admin/operations?section='+section,cookie),env)).status,status);
+  for(const [cookie,status] of [['',401],[cookies[1],403],[cookies[2],403]] as const)for(const section of ['performance','incidents','retention','profit','providers','changes','agency','video'])assert.equal((await adminOperationsRequest(req('/api/admin/operations?section='+section,cookie),env)).status,status);
   assert.equal((await adminOperationsRequest(req('/api/admin/operations',cookies[0],{action:'change',title:'Test release',body:'Version locale uniquement'},'https://evil.example'),env)).status,403);
  });
  await db.exec('UPDATE generation_control SET enabled=1; UPDATE trial_policy SET enabled=1,free_enabled=1');
