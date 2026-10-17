@@ -5,6 +5,7 @@
 .video-backlight:has(>canvas[data-painted],>img[data-loaded])>.video-backlight-fallback{opacity:0}
 .video-backlight>canvas{opacity:0;transition:opacity .65s ease}
 .video-backlight>canvas[data-painted]{opacity:1}
+.video-backlight:has(>canvas:not(.video-backlight-poster)[data-painted])>.video-backlight-poster{opacity:0}
 .video-backlight>img{transition:opacity .65s ease}
 .video-backlight:has(>canvas[data-painted])>img{opacity:0}
 @media(max-width:760px){
@@ -13,6 +14,7 @@
 }
 @media(prefers-reduced-motion:reduce){
  .video-backlight>canvas{display:none;transition:none}
+ .video-backlight>.video-backlight-poster[data-painted]{display:block;opacity:1;transition:none}
  .video-backlight:has(>canvas[data-painted])>img{opacity:1;transition:none}
  .video-backlight:has(>canvas[data-painted])>.video-backlight-fallback{opacity:1;transition:none}
 }

@@ -3,9 +3,21 @@
 import {useEffect,useRef,type ReactNode,type RefObject} from 'react';
 import './video-backlight.css';
 
-export function VideoBacklight({video,active=true,poster,posterLoading='eager',children,className=''}:{
-  video?:RefObject<HTMLVideoElement|null>;active?:boolean;poster?:string|null;posterLoading?:'eager'|'lazy';children?:ReactNode;className?:string}){
-  const canvas=useRef<HTMLCanvasElement>(null);
+export function VideoBacklight({video,active=true,poster,posterLoading='eager',posterImage,children,className=''}:{
+  video?:RefObject<HTMLVideoElement|null>;active?:boolean;poster?:string|null;posterLoading?:'eager'|'lazy';posterImage?:RefObject<HTMLImageElement|null>;children?:ReactNode;className?:string}){
+  const canvas=useRef<HTMLCanvasElement>(null),posterCanvas=useRef<HTMLCanvasElement>(null);
+  useEffect(()=>{
+    const image=posterImage?.current,surface=posterCanvas.current;if(!image||!surface)return;
+    // Reuse the foreground image's decoded pixels. The decorative halo never
+    // starts another image request or competes with the meaningful LCP image.
+    const paint=()=>{
+      if(!image.naturalWidth||!image.naturalHeight)return;
+      const scale=96/Math.max(image.naturalWidth,image.naturalHeight);
+      surface.width=Math.max(1,Math.round(image.naturalWidth*scale));surface.height=Math.max(1,Math.round(image.naturalHeight*scale));
+      try{const context=surface.getContext('2d',{alpha:false});if(!context)return;context.drawImage(image,0,0,surface.width,surface.height);surface.dataset.painted='true';}catch{delete surface.dataset.painted;}
+    };
+    if(image.complete)paint();image.addEventListener('load',paint);return()=>image.removeEventListener('load',paint);
+  },[posterImage]);
   useEffect(()=>{
     const player=video?.current,surface=canvas.current;
     if(!active||!player||!surface)return;
@@ -65,6 +77,7 @@ export function VideoBacklight({video,active=true,poster,posterLoading='eager',c
       onLoad={event=>{event.currentTarget.dataset.loaded='true';}}
       onError={event=>{delete event.currentTarget.dataset.loaded;event.currentTarget.style.visibility='hidden';}}/>}
     {children}
+    {posterImage&&<canvas ref={posterCanvas} className="video-backlight-poster" width="54" height="96"/>}
     <canvas ref={canvas} width="54" height="96"/>
   </div>;
 }

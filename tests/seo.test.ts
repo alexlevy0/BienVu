@@ -6,7 +6,7 @@ import {schemaJson,seoMetadata,videoSchema} from '../apps/web/lib/seo';
 import {featurePages,guidePages} from '../apps/web/lib/marketing-content';
 import {publicSeoPaths,seoPage} from '../apps/web/lib/seo-paths';
 import {sourceChannel,seoHit,collectSeo,webVitalRequest,seoSummary,purgeSeo,vitalBucket} from '../apps/web/lib/seo-analytics';
-import {resolveHomeMedia,imageWidthUrl,previewVideoUrl} from '../apps/web/lib/home-media-view';
+import {resolveHomeMedia,imageWidthUrl,homeImageSrcSet,previewVideoUrl} from '../apps/web/lib/home-media-view';
 const origin='https://bienvu.online',now=Date.parse('2026-10-05T12:00:00Z');
 const request=(path:string,headers:Record<string,string>={})=>new Request(origin+path,{headers:{'User-Agent':'Mozilla/5.0',...headers}});
 const html=new Response('public',{headers:{'Content-Type':'text/html'}});
@@ -53,4 +53,8 @@ test('Médias SEO : affichage de la sélection et variantes sans nouvelle URL ex
   assert.equal(imageWidthUrl('/api/homepage/media/id?poster=1',640),'/api/homepage/media/id?poster=1&w=640');
   assert.equal(imageWidthUrl('/images/studio-home/paris.webp',320),'/images/studio-home/paris-320.webp');
   assert.equal(imageWidthUrl('/private/logo',640),'/private/logo');assert.equal(previewVideoUrl('/api/homepage/media/id'),'/api/homepage/media/id?preview=1');
+  const variants=homeImageSrcSet('/api/homepage/media/id?poster=1')!.split(', ').map(item=>item.split(' '));
+  assert.deepEqual(variants.map(([src])=>new URL(src,origin).searchParams.get('poster')),['1','1','1']);
+  assert.deepEqual(variants.map(([src,width])=>[new URL(src,origin).searchParams.get('w'),width]),[['320','320w'],['640','640w'],['960','960w']]);
+  assert.equal(homeImageSrcSet('/api/admin/homepage/assets/private?poster=1'),undefined);
 });

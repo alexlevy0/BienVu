@@ -3,7 +3,7 @@
 import {useEffect, useRef, useState} from 'react';
 import {HomeIcon} from './home-icons';
 import {HomeVisual, useHomepageMedia, homeClock, type HomeMediaView} from './homepage-media';
-import {imageWidthUrl,previewVideoUrl} from '../lib/home-media-view';
+import {imageWidthUrl,previewVideoUrl,heroPosterSizes} from '../lib/home-media-view';
 import {HeroBacklight} from './hero-backlight';
 
 type PlaybackProps = {paused: boolean; onPlayingChange(playing: boolean): void};
@@ -16,7 +16,7 @@ export function HomeHeroVideo({render,...props}: PlaybackProps & {render?:'stand
 }
 
 function HeroPlayer({visual, movie, paused, onPlayingChange}: PlaybackProps & {visual: HomeMediaView; movie: HomeMediaView}) {
-  const video = useRef<HTMLVideoElement>(null),frame=useRef<HTMLDivElement>(null), attempt = useRef(0);
+  const video = useRef<HTMLVideoElement>(null),frame=useRef<HTMLDivElement>(null),posterImage=useRef<HTMLImageElement>(null), attempt = useRef(0);
   const [started, setStarted] = useState(false), [error, setError] = useState(false);
   const [muted, setMuted] = useState(true);
   const [aspectRatio, setAspectRatio] = useState(movie.width && movie.height ? `${movie.width} / ${movie.height}` : '9 / 16');
@@ -109,9 +109,9 @@ function HeroPlayer({visual, movie, paused, onPlayingChange}: PlaybackProps & {v
   return <>
     <div ref={frame} className="home-hero-video-frame">
     <HeroBacklight key={poster??movie.src} video={video} active={started&&!paused&&!error}
-      poster={poster?(visual.kind==='image'?visual:{...visual,kind:'image',src:poster}):null}/>
+      posterImage={posterImage}/>
     <div className={`home-hero-demo${started ? ' is-started' : ''}`} style={{aspectRatio}}>
-      <video ref={video} src={previewVideoUrl(movie.src,540)} poster={poster ? imageWidthUrl(poster,640) : undefined} controls={started} muted={muted} playsInline loop
+      <video ref={video} src={previewVideoUrl(movie.src,540)} poster={started&&poster ? imageWidthUrl(poster,640) : undefined} controls={started} muted={muted} playsInline loop
         preload={poster ? 'none' : 'metadata'} tabIndex={started ? 0 : -1} aria-hidden={!started}
         aria-label={movie.title ? `Vidéo de présentation : ${movie.title}` : 'Vidéo de présentation BienVu'}
         onLoadedMetadata={event => {const player = event.currentTarget; if (player.videoWidth && player.videoHeight) setAspectRatio(`${player.videoWidth} / ${player.videoHeight}`);}}
@@ -121,8 +121,8 @@ function HeroPlayer({visual, movie, paused, onPlayingChange}: PlaybackProps & {v
         onError={() => {setError(true); setStarted(false); onPlayingChange(false);}}/>
       {!started && <button type="button" className="home-hero-demo-cover" onClick={() => void play()}
         aria-label={error ? 'Réessayer la lecture de la vidéo de présentation' : 'Lire la vidéo de présentation'}>
-        {poster && <HomeVisual media={visual.kind === 'image' ? visual : {...visual, kind: 'image', src: poster}}
-          alt={custom ? visual.title ?? 'Vidéo immobilière' : 'Salon lumineux avec moulures et grandes fenêtres ouvertes sur la ville'} sizes="(max-width: 760px) 310px, (max-width: 1250px) 250px, (max-width: 1600px) 330px, 440px" loading="eager" fetchPriority="high"/>}
+        {poster && <HomeVisual imageRef={posterImage} media={visual.kind === 'image' ? visual : {...visual, kind: 'image', src: poster}}
+          alt={custom ? visual.title ?? 'Vidéo immobilière' : 'Salon lumineux avec moulures et grandes fenêtres ouvertes sur la ville'} sizes={heroPosterSizes} loading="eager" fetchPriority="high"/>}
         <span className="home-hero-demo-shade"/>
         <span className="home-duration">{homeClock(movie.duration ?? 28)}</span>
         {!custom && <span className="home-hero-demo-heading"><strong>Paris</strong><span>Un nouveau regard<br/>sur votre bien</span></span>}

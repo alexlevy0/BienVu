@@ -12,7 +12,7 @@ const root=fileURLToPath(new URL('../',import.meta.url)),require=createRequire(n
 const rendererRequire=createRequire(require.resolve('@remotion/renderer'));
 const binaries=dirname(rendererRequire.resolve(`@remotion/compositor-${process.platform==='darwin'?'darwin':'linux'}-${process.arch}/package.json`));
 const ffmpeg=join(binaries,'ffmpeg');
-const apply=process.argv.includes('--upload'),heroOnly=process.argv.includes('--hero-preview'),work=await mkdtemp(join(tmpdir(),'bienvu-home-seo-')),report=[];
+const apply=process.argv.includes('--upload'),heroOnly=process.argv.includes('--hero-preview'),imagesOnly=process.argv.includes('--images-only'),work=await mkdtemp(join(tmpdir(),'bienvu-home-seo-')),report=[];
 const run=(command,args)=>new Promise((resolve,reject)=>{const child=spawn(command,args,{cwd:root,env:command===ffmpeg?{...process.env,DYLD_LIBRARY_PATH:binaries}:process.env,stdio:['ignore','ignore','pipe']});let error='';child.stderr.on('data',chunk=>{error+=chunk;});child.on('error',reject);child.on('exit',code=>code===0?resolve():reject(new Error(`OPTIMIZATION_COMMAND_FAILED_${code}: ${error.slice(-500)}`)));});
 // Same R2 endpoint as Wrangler, without starting a CLI for every derivative.
 async function upload(key,bytes,type){
@@ -36,7 +36,7 @@ try{
  const files=new Map(),outputs=new Map();
  for(const row of rows){if(!/^[a-f0-9-]{36}$/.test(row.id))throw Error('PUBLIC_ASSET_ID_INVALID');const media=JSON.parse(row.metadata_json),poster=row.poster_json?JSON.parse(row.poster_json):null;
   for(const item of [{...media,url:`https://bienvu.online/api/homepage/media/${row.id}`},...(poster?[{...poster,url:`https://bienvu.online/api/homepage/media/${row.id}?poster=1`}]:[])]){
-   if(heroOnly&&item.mime!=='video/mp4')continue;
+   if(heroOnly&&item.mime!=='video/mp4'||imagesOnly&&item.mime==='video/mp4')continue;
    let bytes=files.get(item.sha256);if(!bytes){const response=await fetch(item.url,{redirect:'error',signal:AbortSignal.timeout(60000)});
     const length=response.headers.get('content-length');if(!response.ok||length!==null&&Number(length)!==item.sizeBytes)throw Error(`PUBLIC_SNAPSHOT_UNAVAILABLE_${response.status}`);bytes=Buffer.from(await response.arrayBuffer());
     if(bytes.length!==item.sizeBytes||createHash('sha256').update(bytes).digest('hex')!==item.sha256)throw Error('PUBLIC_SNAPSHOT_HASH_MISMATCH');files.set(item.sha256,bytes);}
