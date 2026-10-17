@@ -20,6 +20,11 @@ function claimNotification(id){
 }
 self.addEventListener('push',event=>event.waitUntil((async()=>{
   let data;try{data=event.data?.json();}catch{return;}
+  if(data?.type==='admin-alert'){
+    if(!validJob(data.id)||typeof data.title!=='string'||typeof data.body!=='string'||typeof data.href!=='string'||!/^\/admin(?:\?|\/|$)/.test(data.href)||data.href.includes('\\'))return;
+    const tag=`bienvu-admin-${data.id}`;if(!await claimNotification(tag))return;
+    await self.registration.showNotification('BienVu · '+data.title.slice(0,100),{body:data.body.slice(0,300),icon:'/notifications/icon-192.png',badge:'/notifications/badge-72.png',tag,renotify:false,data:{adminHref:data.href}});return;
+  }
   if(data?.type!=='generation-ready'||!validJob(data.jobId))return;
   const tag=`bienvu-video-${data.jobId}`;
   if(!await claimNotification(tag))return;
@@ -32,7 +37,9 @@ self.addEventListener('push',event=>event.waitUntil((async()=>{
 self.addEventListener('notificationclick',event=>{
   event.notification.close();
   event.waitUntil((async()=>{
-    const id=event.notification.data?.jobId,url=new URL(validJob(id)?`/historique/${id}`:'/',self.location.origin).href;
+    const id=event.notification.data?.jobId,href=event.notification.data?.adminHref;
+    const path=typeof href==='string'&&/^\/admin(?:\?|\/|$)/.test(href)&&!href.includes('\\')?href:validJob(id)?`/historique/${id}`:'/';
+    const url=new URL(path,self.location.origin).href;
     const windows=await self.clients.matchAll({type:'window',includeUncontrolled:true});
     const existing=windows.find(client=>client.url===url);
     if(existing){await existing.focus();return;}

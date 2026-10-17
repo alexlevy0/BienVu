@@ -4,12 +4,13 @@ import {adminPage,adminVideoDetail,adminGenerationQueue} from '@bienvu/db';
 import {requireStaff,isSuperAdmin} from './admin-access';
 import type {AuthEnvironment} from './auth';
 import {assertSameOrigin,boundedJson,respond,RequestFailure} from './http';
+import {adminAudienceSql,staffEmails} from './admin-audience';
 
 const day=z.iso.date();
 export const OperationsQuery=z.object({section:z.enum(['dashboard','performance','incidents','retention','profit','providers','changes','video','agency','notes']).default('dashboard'),
  days:z.enum(['7','30','90']).default('30'),audience:z.enum(['account','anonymous','internal','all']).default('account'),
  duration:z.enum(['all','20','30','40']).default('all'),avatar:z.enum(['all','yes','no']).default('all'),animations:z.enum(['all','yes','no']).default('all'),
- mode:z.enum(['live','test']).default('live'),id:EntityId.optional(),from:day.optional(),to:day.optional()}).strict().refine(v=>!v.from||!v.to||v.from<=v.to);
+ mode:z.enum(['live','test']).default('live'),compare:z.enum(['yes','no']).default('yes'),id:EntityId.optional(),from:day.optional(),to:day.optional()}).strict().refine(v=>!v.from||!v.to||v.from<=v.to);
 export type OperationsFilter=z.infer<typeof OperationsQuery>;
 export const OperationAction=z.discriminatedUnion('action',[
  z.object({action:z.literal('note'),id:EntityId,body:z.string().trim().min(3).max(2000)}).strict(),
@@ -20,7 +21,7 @@ type Entry={id:string;kind:string;target:string;body:string;state:string|null;at
 type Sample={id:string;agencyId:string|null;agency:string|null;status:string;stage:string;error:string|null;at:string;updatedAt:string;seconds:number|null;waitSeconds:number|null;render:string;duration:number|null};
 type Incident={key:string;code:string;stage:string;count:number;agencies:number;firstAt:string;lastAt:string;recent:number;previous:number;review:Entry|null;reopened:boolean;jobs:{id:string;at:string;agency:string|null;reports:number}[]};
 const owner="coalesce(g.owner_agency_id,j.agency_id)";
-const audience=`CASE WHEN g.anonymous_session_id IS NOT NULL AND g.owner_agency_id IS NULL THEN 'anonymous' WHEN u.id IS NOT NULL THEN 'account' ELSE 'internal' END`;
+const audience=adminAudienceSql;
 const render="CASE WHEN coalesce(g.animations_requested,0)>0 THEN IIF(coalesce(g.avatar_credits+g.avatar_extra_credits,0)>0,'avatar_ai','ai') WHEN coalesce(g.avatar_credits+g.avatar_extra_credits,0)>0 THEN 'avatar' ELSE 'standard' END";
 const joins=`FROM jobs j LEFT JOIN generation_runs g ON g.job_id=j.id LEFT JOIN agencies a ON a.id=${owner} LEFT JOIN auth_user u ON u.id=a.owner_user_id`;
 const rows=async<T>(db:D1Database,sql:string,binds:(string|number|null)[]=[]) => (await db.prepare(sql).bind(...binds).all<T>()).results;
@@ -29,15 +30,15 @@ export function percentiles(values:number[]){
  const sorted=values.filter(v=>Number.isFinite(v)&&v>=0).sort((a,b)=>a-b),n=sorted.length;
  return {measured:n,average:n?sorted.reduce((a,b)=>a+b,0)/n:null,median:n?(sorted[Math.floor((n-1)/2)]+sorted[Math.floor(n/2)])/2:null,p95:n?sorted[Math.ceil(n*.95)-1]:null};
 }
-function filter(f:OperationsFilter,now:number){
+function filter(f:OperationsFilter,now:number,emails:string[]=[]){
  const at=new Date(now).toISOString(),from=f.from??new Date(Date.UTC(new Date(now).getUTCFullYear(),new Date(now).getUTCMonth(),new Date(now).getUTCDate())-(Number(f.days)-1)*86400_000).toISOString().slice(0,10),to=f.to??at.slice(0,10);
  // Limit expensive time-series queries, including manually supplied dates.
- if(Date.parse(to)-Date.parse(from)>366*86400_000||to>at.slice(0,10))throw new RequestFailure('VALIDATION_ERROR');
+ if(from>to||Date.parse(to)-Date.parse(from)>366*86400_000||to>at.slice(0,10))throw new RequestFailure('VALIDATION_ERROR');
  const where=`j.created_at>=? AND j.created_at<=? AND (?='all' OR ${audience}=?) AND (?='all' OR json_extract(g.input_json,'$.durationSeconds')=CAST(? AS INTEGER)) AND (?='all' OR IIF(coalesce(g.avatar_credits+g.avatar_extra_credits,0)>0,'yes','no')=?) AND (?='all' OR IIF(coalesce(g.animations_requested,0)>0,'yes','no')=?)`;
- return {at,from,to,where,binds:[from+'T00:00:00.000Z',to===at.slice(0,10)?at:to+'T23:59:59.999Z',f.audience,f.audience,f.duration,f.duration,f.avatar,f.avatar,f.animations,f.animations]};
+ return {at,from,to,where,binds:[from+'T00:00:00.000Z',to===at.slice(0,10)?at:to+'T23:59:59.999Z',f.audience,JSON.stringify(emails),f.audience,f.duration,f.duration,f.avatar,f.avatar,f.animations,f.animations]};
 }
-export async function operationsRead(db:D1Database,f:OperationsFilter,now=Date.now()){
- const scope=filter(f,now),{at,from,to,where,binds}=scope;
+export async function operationsRead(db:D1Database,f:OperationsFilter,now=Date.now(),emails:string[]=[]){
+ const scope=filter(f,now,emails),{at,from,to,where,binds}=scope;
  if(f.section==='notes'){
   if(!f.id)throw new RequestFailure('VALIDATION_ERROR');if(!await db.prepare('SELECT 1 FROM agencies WHERE id=?').bind(f.id).first())throw new RequestFailure('NOT_FOUND');
   return {at,notes:await rows<Entry>(db,entrySelect+" WHERE o.kind='note' AND o.target=? ORDER BY o.created_at DESC,o.id DESC LIMIT 100",[f.id])};
@@ -73,10 +74,10 @@ export async function operationsRead(db:D1Database,f:OperationsFilter,now=Date.n
  }
  if(f.section==='changes')return {at,changes:await changes(db,from,to)};
  if(f.section==='providers')return {at,queue:await adminGenerationQueue(db),activity:await providerActivity(db,from,to)};
- if(f.section==='retention')return {at,from,to,...await retention(db,from,to,now)};
+ if(f.section==='retention'){const p=previousWindow(f,scope,emails);return {at,from,to,...await retention(db,from,to,Math.min(now,Date.parse(to+'T23:59:59.999Z')),f.audience,emails),comparison:f.compare==='yes'?{from:p.start,to:p.end,...await retention(db,p.start.slice(0,10),p.end.slice(0,10),Date.parse(p.end),f.audience,emails,p.start)}:null};}
  if(f.section==='profit'){
-  const groups=await rows<{render:string;videos:number;credits:number;revenueMicros:number;costMicros:number;feeMicros:number;incomplete:number;marginMicros:number|null}>(db,`SELECT ${render} AS render,count(*) AS videos,sum(v.credits_used) AS credits,sum(v.revenue_micros) AS revenueMicros,sum(v.cost_micros) AS costMicros,sum(v.fee_micros) AS feeMicros,sum(v.fees_missing>0 OR v.missing_providers IS NOT NULL) AS incomplete,CASE WHEN sum(v.fees_missing>0 OR v.missing_providers IS NOT NULL)=0 THEN sum(v.revenue_micros-v.cost_micros-v.fee_micros) END AS marginMicros FROM finance_video_summary v JOIN jobs j ON j.id=v.job_id LEFT JOIN generation_runs g ON g.job_id=j.id LEFT JOIN agencies a ON a.id=${owner} LEFT JOIN auth_user u ON u.id=a.owner_user_id WHERE ${where} AND v.mode=? GROUP BY 1`,[...binds,f.mode]);
-  return {at,from,to,mode:f.mode,groups};
+  const groups=await profitGroups(db,scope,f.mode),prior=previousWindow(f,scope,emails);
+  return {at,from,to,mode:f.mode,groups,comparison:f.compare==='yes'?{from:prior.start,to:prior.end,groups:await profitGroups(db,prior.scope,f.mode)}:null};
  }
  if(f.section==='incidents')return {at,from,to,incidents:await incidents(db,scope,now)};
  if(f.section==='dashboard'){
@@ -96,7 +97,23 @@ export async function operationsRead(db:D1Database,f:OperationsFilter,now=Date.n
  const complete=sample.filter((s):s is Sample&{seconds:number}=>s.seconds!==null),daily:Record<string,{day:string;ready:number;failed:number;total:number;median:number|null;p95:number|null;measured:number}>={};
  for(let time=Date.parse(from);time<=Date.parse(to);time+=86400_000){const d=new Date(time).toISOString().slice(0,10);const items=sample.filter(s=>s.at.slice(0,10)===d);daily[d]={day:d,ready:items.filter(s=>s.status==='ready').length,failed:items.filter(s=>s.status==='failed').length,total:items.length,...percentiles(items.flatMap(s=>s.seconds===null?[]:[s.seconds]))};}
  // Resource queues can overlap. Sum of waits is a workload metric, never subtracted from wall-clock generation time.
- return {at,from,to,total:total?.total??0,truncated:(total?.total??0)>sample.length,stats:percentiles(complete.map(s=>s.seconds)),wait:percentiles(complete.flatMap(s=>s.waitSeconds===null?[]:[s.waitSeconds])),daily:Object.values(daily),changes:markers};
+ return {at,from,to,total:total?.total??0,truncated:(total?.total??0)>sample.length,stats:percentiles(complete.map(s=>s.seconds)),wait:percentiles(complete.flatMap(s=>s.waitSeconds===null?[]:[s.waitSeconds])),daily:Object.values(daily),changes:markers,comparison:f.compare==='yes'?await comparePerformance(db,f,scope,emails):null};
+}
+
+
+function previousWindow(f:OperationsFilter,scope:ReturnType<typeof filter>,emails:string[]){
+ const end=Date.parse(String(scope.binds[1])),start=Date.parse(String(scope.binds[0])),previousEnd=start-1,previousStart=previousEnd-(end-start);
+ const p={start:new Date(previousStart).toISOString(),end:new Date(previousEnd).toISOString()};
+ const previous=filter({...f,from:p.start.slice(0,10),to:p.end.slice(0,10)},previousEnd,emails);previous.binds[0]=p.start;previous.binds[1]=p.end;return {...p,scope:previous};
+}
+async function profitGroups(db:D1Database,scope:ReturnType<typeof filter>,mode:string){
+ const {where,binds}=scope;return rows<{render:string;videos:number;credits:number;revenueMicros:number;costMicros:number;feeMicros:number;incomplete:number;marginMicros:number|null}>(db,`SELECT ${render} AS render,count(*) AS videos,sum(v.credits_used) AS credits,sum(v.revenue_micros) AS revenueMicros,sum(v.cost_micros) AS costMicros,sum(v.fee_micros) AS feeMicros,sum(v.fees_missing>0 OR v.missing_providers IS NOT NULL) AS incomplete,CASE WHEN sum(v.fees_missing>0 OR v.missing_providers IS NOT NULL)=0 THEN sum(v.revenue_micros-v.cost_micros-v.fee_micros) END AS marginMicros FROM finance_video_summary v JOIN jobs j ON j.id=v.job_id LEFT JOIN generation_runs g ON g.job_id=j.id LEFT JOIN agencies a ON a.id=${owner} LEFT JOIN auth_user u ON u.id=a.owner_user_id WHERE ${where} AND v.mode=? GROUP BY 1`,[...binds,mode]);
+}
+async function comparePerformance(db:D1Database,f:OperationsFilter,scope:ReturnType<typeof filter>,emails:string[]){
+ const p=previousWindow(f,scope,emails),previousFrom=p.start,previousTo=p.end,prior=p.scope;
+ const samples=await rows<{seconds:number|null;status:string}>(db,`SELECT j.status,CASE WHEN j.status='ready' AND julianday(e.created_at)>=julianday(j.created_at) THEN (julianday(e.created_at)-julianday(j.created_at))*86400 END AS seconds ${joins} LEFT JOIN generation_events e ON e.job_id=j.id AND e.event='ready' WHERE ${prior.where} ORDER BY j.created_at DESC LIMIT 20000`,prior.binds);
+ const count=await db.prepare(`SELECT count(*) AS n ${joins} WHERE ${prior.where}`).bind(...prior.binds).first<{n:number}>();
+ return {from:previousFrom,to:previousTo,total:count?.n??0,failed:samples.filter(s=>s.status==='failed').length,truncated:(count?.n??0)>samples.length,stats:percentiles(samples.flatMap(s=>s.seconds===null?[]:[s.seconds]))};
 }
 async function changes(db:D1Database,from:string,to:string){
  return rows<{id:string;at:string;kind:string;title:string;body:string;actor:string|null}>(db,`SELECT * FROM (
@@ -120,10 +137,11 @@ async function incidents(db:D1Database,scope:ReturnType<typeof filter>,now:numbe
  const failures=await rows<{code:string;stage:string;id:string;at:string;agency:string|null;reports:number}>(db,sql+` SELECT code,stage,jobId AS id,at,agency,(SELECT count(*) FROM generation_reports r WHERE r.job_id=failures.jobId) AS reports FROM failures ORDER BY at DESC LIMIT 500`,[...binds,...binds,...binds]);
  return groups.map(g=>{const key=g.stage+':'+g.code,review=latest.find(r=>r.target===key)??null,reopened=review?.state==='resolved'&&g.lastAt>review.at;return {...g,key,reopened,review:reopened&&review?{...review,state:'open'}:review,jobs:failures.filter(r=>r.stage===g.stage&&r.code===g.code).slice(0,20)};});
 }
-async function retention(db:D1Database,from:string,to:string,now:number){
- const cohort=`WITH successful AS (SELECT coalesce(g.owner_agency_id,g.agency_id) AS agencyId,e.created_at AS at FROM generation_runs g JOIN jobs j ON j.id=g.job_id AND j.status='ready' JOIN generation_events e ON e.job_id=j.id AND e.event='ready' JOIN agencies a ON a.id=coalesce(g.owner_agency_id,g.agency_id) JOIN auth_user u ON u.id=a.owner_user_id WHERE e.created_at<=? AND julianday(e.created_at)>=julianday(j.created_at)), ranked AS (SELECT agencyId,at,row_number() OVER(PARTITION BY agencyId ORDER BY at) AS n FROM successful), firsts AS (SELECT agencyId,min(at) AS firstAt,max(CASE WHEN n=2 THEN at END) AS secondAt FROM ranked GROUP BY agencyId)`;
- const summary=await db.prepare(cohort+` SELECT count(*) AS activated,sum(secondAt IS NOT NULL) AS secondVideo,sum(firstAt<=?) AS eligible7,sum(firstAt<=? AND secondAt<=strftime('%Y-%m-%dT%H:%M:%fZ',firstAt,'+7 days')) AS returned7,sum(firstAt<=?) AS eligible30,sum(firstAt<=? AND secondAt<=strftime('%Y-%m-%dT%H:%M:%fZ',firstAt,'+30 days')) AS returned30 FROM firsts WHERE substr(firstAt,1,10) BETWEEN ? AND ?`).bind(new Date(now).toISOString(),...[7,7,30,30].map(d=>new Date(now-d*86400_000).toISOString()),from,to).first<{activated:number;secondVideo:number;eligible7:number;returned7:number;eligible30:number;returned30:number}>();
- const activity=await rows<{id:string;agency:string;videos:number;activeDays:number;weeks:number;lastAt:string}>(db,`SELECT a.id,a.name AS agency,count(*) AS videos,count(DISTINCT substr(e.created_at,1,10)) AS activeDays,count(DISTINCT strftime('%Y-%W',e.created_at)) AS weeks,max(e.created_at) AS lastAt FROM generation_runs g JOIN jobs j ON j.id=g.job_id AND j.status='ready' JOIN generation_events e ON e.job_id=j.id AND e.event='ready' JOIN agencies a ON a.id=coalesce(g.owner_agency_id,g.agency_id) JOIN auth_user u ON u.id=a.owner_user_id WHERE substr(e.created_at,1,10) BETWEEN ? AND ? AND e.created_at<=? GROUP BY a.id ORDER BY weeks DESC,videos DESC,a.id LIMIT 100`,[from,to,new Date(now).toISOString()]);
+async function retention(db:D1Database,from:string,to:string,now:number,selected:string,emails:string[],lower=from+'T00:00:00.000Z'){
+ const eligibility=`(?='all' OR ${audience}=?)`,audienceBinds=[selected,JSON.stringify(emails),selected];
+ const cohort=`WITH successful AS (SELECT coalesce(g.owner_agency_id,g.agency_id) AS agencyId,e.created_at AS at FROM generation_runs g JOIN jobs j ON j.id=g.job_id AND j.status='ready' JOIN generation_events e ON e.job_id=j.id AND e.event='ready' JOIN agencies a ON a.id=coalesce(g.owner_agency_id,g.agency_id) JOIN auth_user u ON u.id=a.owner_user_id WHERE e.created_at<=? AND julianday(e.created_at)>=julianday(j.created_at) AND ${eligibility}), ranked AS (SELECT agencyId,at,row_number() OVER(PARTITION BY agencyId ORDER BY at) AS n FROM successful), firsts AS (SELECT agencyId,min(at) AS firstAt,max(CASE WHEN n=2 THEN at END) AS secondAt FROM ranked GROUP BY agencyId)`;
+ const summary=await db.prepare(cohort+` SELECT count(*) AS activated,sum(secondAt IS NOT NULL) AS secondVideo,sum(firstAt<=?) AS eligible7,sum(firstAt<=? AND secondAt<=strftime('%Y-%m-%dT%H:%M:%fZ',firstAt,'+7 days')) AS returned7,sum(firstAt<=?) AS eligible30,sum(firstAt<=? AND secondAt<=strftime('%Y-%m-%dT%H:%M:%fZ',firstAt,'+30 days')) AS returned30 FROM firsts WHERE firstAt>=? AND firstAt<=?`).bind(new Date(now).toISOString(),...audienceBinds,...[7,7,30,30].map(d=>new Date(now-d*86400_000).toISOString()),lower,new Date(Math.min(now,Date.parse(to+'T23:59:59.999Z'))).toISOString()).first<{activated:number;secondVideo:number;eligible7:number;returned7:number;eligible30:number;returned30:number}>();
+ const activity=await rows<{id:string;agency:string;videos:number;activeDays:number;weeks:number;lastAt:string}>(db,`SELECT a.id,a.name AS agency,count(*) AS videos,count(DISTINCT substr(e.created_at,1,10)) AS activeDays,count(DISTINCT strftime('%Y-%W',e.created_at)) AS weeks,max(e.created_at) AS lastAt FROM generation_runs g JOIN jobs j ON j.id=g.job_id AND j.status='ready' JOIN generation_events e ON e.job_id=j.id AND e.event='ready' JOIN agencies a ON a.id=coalesce(g.owner_agency_id,g.agency_id) JOIN auth_user u ON u.id=a.owner_user_id WHERE e.created_at>=? AND e.created_at<=? AND e.created_at<=? AND ${eligibility} GROUP BY a.id ORDER BY weeks DESC,videos DESC,a.id LIMIT 100`,[lower,to+'T23:59:59.999Z',new Date(now).toISOString(),...audienceBinds]);
  return {summary,activity};
 }
 async function providerActivity(db:D1Database,from:string,to:string){
@@ -144,7 +162,7 @@ export async function operationWrite(db:D1Database,actor:string,input:z.infer<ty
 }
 export function adminOperationsRequest(request:Request,env:AuthEnvironment&{SUPER_ADMIN_EMAIL?:string}){return respond(async()=>{
  const actor=await requireStaff(request,env),superAdmin=isSuperAdmin(env,actor);
- if(request.method==='GET'){const parsed=OperationsQuery.safeParse(Object.fromEntries(new URL(request.url).searchParams));if(!parsed.success)throw new RequestFailure('VALIDATION_ERROR');if(!superAdmin&&parsed.data.section!=='notes')throw new RequestFailure('FORBIDDEN');return Response.json(await operationsRead(env.DB,parsed.data));}
+ if(request.method==='GET'){const parsed=OperationsQuery.safeParse(Object.fromEntries(new URL(request.url).searchParams));if(!parsed.success)throw new RequestFailure('VALIDATION_ERROR');if(!superAdmin&&parsed.data.section!=='notes')throw new RequestFailure('FORBIDDEN');return Response.json(await operationsRead(env.DB,parsed.data,Date.now(),staffEmails(env)));}
  if(request.method!=='POST')throw new RequestFailure('FORBIDDEN');assertSameOrigin(request,env);
  const parsed=OperationAction.safeParse(await boundedJson(request,8192));if(!parsed.success)throw new RequestFailure('VALIDATION_ERROR');
  if(!superAdmin&&parsed.data.action!=='note')throw new RequestFailure('FORBIDDEN');

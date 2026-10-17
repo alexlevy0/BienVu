@@ -122,9 +122,9 @@ export async function adminVideoDetail(db:Database,id:string):Promise<AdminVideo
     selectRows(db,'SELECT event,created_at AS at FROM generation_events WHERE job_id=? ORDER BY created_at LIMIT 30',['event','at'],[id]),
     selectRows(db,'SELECT id,category,comment,status,created_at AS at FROM generation_reports WHERE job_id=? ORDER BY created_at DESC LIMIT 30',['id','category','comment','status','at'],[id]),
     selectRows(db,callMetrics+' WHERE job_id=? ORDER BY created_at,id',callFields,[id]),
-    selectRows(db,`SELECT id,photo_id AS photoId,mode,model,state,task_id AS taskId,error_code AS error,
+    selectRows(db,`SELECT id,slot AS photoSlot,photo_id AS photoId,mode,model,state,task_id AS taskId,error_code AS error,
       credits,reserved_cents AS reservedCents,created_at AS at FROM photo_animations WHERE job_id=? ORDER BY slot`,
-      ['id','photoId','mode','model','state','taskId','error','credits','reservedCents','at'],[id]),
+      ['id','photoSlot','photoId','mode','model','state','taskId','error','credits','reservedCents','at'],[id]),
     db.prepare("SELECT error_code AS code FROM generation_preparation_steps WHERE job_id=? AND step='animations' AND error_code IS NOT NULL").bind(id).first<{code:string}>(),
   ]);return {video,events,reports,calls:calls as AdminNarrationCall[],animations,...(animationIssue?{animationIssue:animationIssue.code}:{})};
 }

@@ -18,6 +18,7 @@ import {submitJobAvatars,pollJobAvatars,timeoutJobAvatars,reconcileAvatarTasks} 
 import type {HeygenEnvironment} from '@bienvu/avatars';
 import {generationController,waitForGenerationResource,syncRunwayLimits} from './generation-queue';
 import {sendGenerationNotifications,type BrowserPushEnvironment} from '@bienvu/notifications';
+import {nextAdminRecovery,recoverKnownAnimations} from './admin-recovery';
 export {VideoRenderer};
 export type GenerationEnv=VideoEnv&Pick<NarrationEnv,'GOOGLE_SERVICE_ACCOUNT_JSON'|'GOOGLE_CLOUD_PROJECT'|'GOOGLE_TTS_VOICE'|'OPENAI_API_KEY'|'SCRIPT_MODEL'>&FishVoiceEnv&HeygenEnvironment&BrowserPushEnvironment&{
   GENERATIONS_ENABLED:string;GENERATION_TOKEN:string;IMPORT_TOKEN:string;IMPORT_SERVICE:Fetcher;GENERATION_WORKFLOW:Workflow<{agencyId:string;jobId:string}>;
@@ -215,6 +216,16 @@ export async function reconcileBatch(env:GenerationEnv){
       else {const frozen=await getJobVideo(env.DB,row.agencyId,row.jobId);if(frozen){const response=await controller(env,row).fetch(`https://video/status/${frozen.hash}`);if(response.ok)await settleVideo(env,row,await response.json());}}}
     catch{console.log(JSON.stringify({event:'generation_reconcile_pending',jobId:row.jobId,stage:row.stage}));}}
 }
+async function runAdminRecovery(env:GenerationEnv){
+ const next=await nextAdminRecovery(env.DB);if(!next)return;
+ const result=await recoverKnownAnimations(env,next.id);if(!result?.done)return;
+ const row=await findGeneration(env.DB,result.job.agencyId,result.job.jobId);
+ if(!row||['ready','failed'].includes(row.status)||row.retention!=='available'||Date.parse(row.deadline)<=Date.now())return;
+ // Reconcile existing work only; never cancel a running renderer or buy media.
+ if(row.launchStatus==='pending'&&row.status==='queued'){const gate=await env.DB.prepare("SELECT enabled FROM generation_control WHERE id='generations'").first<{enabled:number}>();if(env.GENERATIONS_ENABLED==='true'&&gate?.enabled===1)await launchGeneration(env,row);return;}
+ const frozen=await getJobVideo(env.DB,row.agencyId,row.jobId);if(!frozen)return;
+ const response=await controller(env,row).fetch(`https://video/status/${frozen.hash}`);if(response.ok)await settleVideo(env,row,await response.json());
+}
 export default {
   async fetch(request:Request,env:GenerationEnv){
     if(!authorized(request,env.GENERATION_TOKEN))return json({error:'UNAUTHORIZED'},401);
@@ -278,5 +289,5 @@ export default {
       return json({error:'NOT_FOUND'},404);
     }catch(error){const code=error instanceof GenerationFailure?error.code:'INTERNAL_ERROR';return json({error:code},publicErrors[code][0]);}
   },
-  scheduled(_event:ScheduledController,env:GenerationEnv,ctx:ExecutionContext){ctx.waitUntil(syncRunwayLimits(env).then(()=>reconcileBatch(env)).then(()=>reconcileAvatarTasks(env)).then(()=>cleanupAnonymousTrials(env)).then(()=>cleanupAnimations(env)));},
+  scheduled(_event:ScheduledController,env:GenerationEnv,ctx:ExecutionContext){ctx.waitUntil(syncRunwayLimits(env).then(()=>reconcileBatch(env)).then(()=>reconcileAvatarTasks(env)).then(()=>runAdminRecovery(env)).then(()=>cleanupAnonymousTrials(env)).then(()=>cleanupAnimations(env)));},
 };

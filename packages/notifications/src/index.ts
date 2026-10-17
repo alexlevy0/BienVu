@@ -45,3 +45,12 @@ export async function sendGenerationNotifications(env:BrowserPushEnvironment,job
     }
   }));
 }
+// Operational messages have their own opt-in, durable delivery ledger and staff
+// recipient checks at the caller. They never reuse a customer's generation watch.
+export async function sendOperationalPush(env:BrowserPushEnvironment,stored:string,data:{id:string;title:string;body:string;href:string},fetcher:typeof fetch=fetch){
+ if(!browserPushConfigured(env))return null;
+ const subscription=await validatePushSubscription(JSON.parse(stored));if(!subscription)return 410;
+ const payload=await buildPushPayload({data:{type:'admin-alert',...data},options:{ttl:1800,urgency:'normal',topic:data.id.replaceAll('-','').slice(0,32)}},subscription,
+  {subject:env.WEB_PUSH_SUBJECT!,publicKey:env.WEB_PUSH_PUBLIC_KEY!,privateKey:env.WEB_PUSH_PRIVATE_KEY!});
+ const response=await fetcher(subscription.endpoint,{...payload,redirect:'manual',signal:AbortSignal.timeout(5000)});await response.body?.cancel();return response.status;
+}

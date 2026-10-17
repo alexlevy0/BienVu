@@ -64,11 +64,11 @@ export async function prepareBrowserNotifications(){
   await Promise.race([navigator.serviceWorker.ready,new Promise<never>((_,reject)=>setTimeout(()=>reject(new Error('Réessayez dans quelques instants.')),10_000))]);
   return {registration,applicationKey:applicationKey(config.publicKey)};
 }
-export async function saveBrowserSubscription(subscription:PushSubscription){
-  const jobs=pendingNotificationJobs();
+export async function saveBrowserSubscription(subscription:PushSubscription,{watchPending=true}:{watchPending?:boolean}={}){
+  const jobs=watchPending?pendingNotificationJobs():[];
   const response=await fetch('/api/notifications',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'subscribe',token:deviceToken(),subscription:subscription.toJSON(),jobs}),keepalive:true,signal:AbortSignal.timeout(10_000)});
   if(!response.ok)throw new Error('L’activation n’a pas abouti. Votre vidéo continue de se préparer.');
-  saveNotificationPreference('enabled');
+  if(watchPending)saveNotificationPreference('enabled');
   // Acknowledge this request's snapshot only: another generation may have been
   // accepted while its subscription was being saved.
   try{sessionStorage.setItem(jobsKey,JSON.stringify(notificationJobs().filter(job=>!jobs.includes(job.id))));}catch{}

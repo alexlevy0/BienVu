@@ -15,6 +15,7 @@ import {cleanupShowcases,protectShowcaseResponse} from './lib/showcase-maintenan
 import {cleanupPushDevices} from '@bienvu/db';
 import {sendGenerationNotifications} from '@bienvu/notifications';
 import {withServerErrorTracking,captureServerException} from './lib/error-tracking-server';
+import {runAdminAlerts} from './lib/admin-alerts';
 
 export default {
   async fetch(request, env, ctx) {
@@ -28,7 +29,7 @@ export default {
   async scheduled(controller,env,ctx){
    return withServerErrorTracking(null,env,ctx,async()=>{try{
     if(controller.cron==='23 3 * * *'){await purgeTraffic(env.DB);await purgeSeo(env.DB);await cleanupSocial(env);await cleanupHomepageAssets(env);await cleanupMailUploads(env);await cleanupPartnerApplications(env.DB);await purgeAiQuality(env.DB);await cleanupShowcases(env);await cleanupPushDevices(env.DB);}
-    else await Promise.all([runSocialBatch(env),sendMailboxOutbox(env),runAiQualityBatch(env),sendShowcaseNotifications(env),sendGenerationNotifications(env)]);
+    else await Promise.all([runSocialBatch(env),sendMailboxOutbox(env),runAiQualityBatch(env),sendShowcaseNotifications(env),sendGenerationNotifications(env),runAdminAlerts(env)]);
    }catch(error){captureServerException(error,{source:'scheduled'});throw error;}});
   },
 } satisfies ExportedHandler<CloudflareEnv>;

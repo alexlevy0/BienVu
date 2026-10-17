@@ -21,6 +21,8 @@ import {AdminAiQuality} from './admin-ai-quality';
 import {AdminImportDiagnostic,AdminImportError,importDiagnosticKeys} from './admin-import-diagnostic';
 import {AdminAttention,AdminMonthlyCosts,AdminTrafficView,type AdminTarget} from './admin-insights';
 import {AdminNavigation} from './admin-navigation';
+import {AdminCommandSearch,AdminSyncStatus,AdminWorkspaceBoard,AdminConfigurationVersions,AdminAlertRules,AdminCustomerHealth} from './admin-workspace';
+import {readPreferences} from './admin-workspace-client';
 import {AdminSavedViews,readAdminFilters,storeAdminFilters,type AdminListFilters} from './admin-saved-views';
 import {AdminOperations,AdminAgencyNotes,adminVideoHref,adminAgencyHref} from './admin-operations';
 
@@ -80,9 +82,10 @@ export function AdminPanel({restricted=false,initialView}:{restricted?:boolean;i
   const accountId=me?.isSuperAdmin||me?.isAdmin?me.user.id:null;
   const [filtersReady,setFiltersReady]=useState(false);
   function applyFilters(f:AdminListFilters){setQuery(f.q);setSearch(f.q);setStatus(f.status);setFrom(f.from);setTo(f.to);setAgency(f.agency);}
-  useEffect(()=>{if(!accountId)return;const params=new URLSearchParams(location.search),requested=params.get('view'),next=visibleTabs.some(t=>t.id===requested)?requested as View:restricted?'mailbox':'overview';setView(next);applyFilters(readAdminFilters(accountId,next,params));setFiltersReady(true);
+  useEffect(()=>{if(!accountId)return;const params=new URLSearchParams(location.search),requested=params.get('view'),next=visibleTabs.some(t=>t.id===requested)?requested as View:restricted?'mailbox':'overview';setView(next);let live=true;
+    void readPreferences().then(d=>{if(!live)return;for(const [v,f] of Object.entries(d?.value.filters??{})){try{localStorage.setItem('bv:admin:filters:'+accountId+':'+v,JSON.stringify(f));}catch{}}}).catch(()=>{}).finally(()=>{if(live){applyFilters(readAdminFilters(accountId,next,params));setFiltersReady(true);}});
     function back(){const p=new URLSearchParams(location.search),v=p.get('view')??(restricted?'mailbox':'overview');if(visibleTabs.some(t=>t.id===v)){setView(v as View);applyFilters(readAdminFilters(accountId!,v,p));}}
-    addEventListener('popstate',back);return()=>removeEventListener('popstate',back);
+    addEventListener('popstate',back);return()=>{live=false;removeEventListener('popstate',back);};
   },[accountId,restricted]);
   useEffect(()=>{if(!accountId||!filtersReady||specialized.includes(view))return;const f={q:search,status,from,to,agency};storeAdminFilters(accountId,view,f);const p=new URLSearchParams({view});for(const [k,v] of Object.entries(f))if(v)p.set(k,v);history.replaceState(history.state,'','/admin?'+p);},[accountId,filtersReady,view,search,status,from,to,agency]);
   useEffect(()=>{const timer=setTimeout(()=>setSearch(query.trim()),300);return()=>clearTimeout(timer);},[query]);
@@ -90,6 +93,7 @@ export function AdminPanel({restricted=false,initialView}:{restricted?:boolean;i
   useEffect(()=>{
     const controller=new AbortController(),version=++loadVersion.current;setPage(null);setFailure('');setBusy(true);setSelected(null);setDetail(null);setPending(null);setOverview(null);setTraffic(null);
     if(!accountId||!filtersReady){setBusy(false);return()=>controller.abort();}
+    try{const cached=JSON.parse(sessionStorage.getItem('bv:admin:return:'+accountId)??'null');if(cached?.page&&cached.href===location.pathname+location.search&&cached.at>Date.now()-300000&&!specialized.includes(view)&&revision===0){sessionStorage.removeItem('bv:admin:return:'+accountId);setPage(cached.page);setBusy(false);requestAnimationFrame(()=>window.scrollTo({top:cached.scroll??0}));return()=>controller.abort();}}catch{}
     if(specialized.includes(view)&&!['overview','system','traffic','costs'].includes(view)){setBusy(false);return()=>controller.abort();}
     if(from&&to&&from>to){setFailure('La date de fin doit suivre la date de début.');setBusy(false);return()=>controller.abort();}
     const aggregate=['overview','system','performance','costs'].includes(view);
@@ -130,6 +134,7 @@ export function AdminPanel({restricted=false,initialView}:{restricted?:boolean;i
   const selectedColumns=recordView?columns[recordView].filter(c=>!restricted||!['providers','sessions','status'].includes(c.key)||recordView==='videos'||recordView==='users'&&c.key==='status'):[];
   return <div className="admin-shell">
     <header className="admin-heading"><div><span className="admin-eyebrow">PILOTAGE DE BIENVU</span><h1>{restricted?'Admin':'Super admin'}<span>.</span></h1><p>{restricted?'Votre messagerie et le suivi des clients et des vidéos.':'Votre activité, vos agences et votre service, au même endroit.'}</p></div><span className="admin-access"><span/>Accès privé</span></header>
+    {!restricted&&<AdminCommandSearch/>}<AdminSyncStatus/>
     <AdminNavigation tabs={visibleTabs} view={view} choose={choose} accountId={accountId}/>
     <div className="admin-section-heading"><div><h2>{tabs.find(tab=>tab.id===view)?.label}</h2><p>{view==='videos'?'Toutes les générations enregistrées, y compris les échecs, essais anonymes et tests internes.':view==='subscriptions'?'Abonnements synchronisés par Stripe. Les recettes de test sont séparées des recettes réelles dans Conversion & recettes.':view==='quotas'?'Périodes de crédits des agences. Un crédit « Payant » ne constitue pas une preuve de paiement.':view==='imports'?'Annonces et brouillons encore conservés ; les imports purgés restent comptés dans l’usage.':view==='audit'?'Modifications administratives horodatées, avec leur auteur et leur motif.':view==='reports'?'Retours des utilisateurs et suivi de leur traitement.':overview?'Données relues le '+date(overview.at):'Données de l’application.'}</p></div><button className="admin-button" type="button" disabled={busy||loading} onClick={()=>setRevision(n=>n+1)}><HomeIcon name="refresh" size={17}/>Actualiser</button></div>
     {message&&<p role="status" className="admin-notice">{message}</p>}
@@ -139,7 +144,12 @@ export function AdminPanel({restricted=false,initialView}:{restricted?:boolean;i
       <label><span>Du (UTC)</span><input type="date" value={from} onChange={event=>setFrom(event.target.value)}/></label><label><span>Au (UTC)</span><input type="date" value={to} onChange={event=>setTo(event.target.value)}/></label>
       {agency&&<button type="button" className="admin-button" onClick={()=>setAgency('')}>Toutes les agences ×</button>}
     </form>}
-    {recordView&&accountId&&filtersReady&&<AdminSavedViews accountId={accountId} view={recordView}/>}
+    {accountId&&filtersReady&&<AdminSavedViews accountId={accountId} view={view}/>}
+    {restricted&&accountId&&filtersReady&&<AdminWorkspaceBoard compact showAlerts={false} restricted/>}
+    {!restricted&&accountId&&filtersReady&&['overview','incidents','retention','agencies'].includes(view)&&<AdminWorkspaceBoard compact={view!=='incidents'} showAlerts={['overview','incidents'].includes(view)}/>}
+    {!restricted&&accountId&&filtersReady&&['incidents','providers'].includes(view)&&<AdminAlertRules/>}
+    {!restricted&&['retention','agencies'].includes(view)&&accountId&&<AdminCustomerHealth/>}
+    {!restricted&&view==='changes'&&accountId&&<AdminConfigurationVersions/>}
     {!restricted&&accountId&&filtersReady&&(['performance','incidents','providers','retention','changes'] as string[]).includes(view)&&<AdminOperations key={view+':'+revision} section={view as 'performance'|'incidents'|'providers'|'retention'|'changes'} accountId={accountId}/>}
     {view==='commercial'&&accountId&&<AdminCommercial key={revision}/>}
     {view==='seo'&&accountId&&<AdminSeo key={revision}/>}
@@ -156,12 +166,12 @@ export function AdminPanel({restricted=false,initialView}:{restricted?:boolean;i
     {!restricted&&view==='videos'&&accountId&&<AdminGenerationQueueSettings key={'queue:'+accountId+':'+revision}/>}
     {failure&&<p role="alert" className="admin-error">{failure}</p>}
     {busy||loading?<div className="admin-loading" role="status"><span className="admin-spinner"/>Lecture des données…</div>:<>
-      {overview&&view==='overview'&&<><AdminAttention data={overview} onFocus={focus}/>{accountId&&<AdminOperations key={revision} section="dashboard" accountId={accountId}/>}<Overview data={overview} choose={choose}/></>}
+      {overview&&view==='overview'&&<><AdminAttention data={overview} onFocus={focus}/>{accountId&&<AdminOperations key={revision} section="dashboard" accountId={accountId}/>}<p className="admin-muted">Activité globale du service ci-dessous : toutes les origines, comptes internes et essais inclus. Les filtres Clients s’appliquent aux analyses Performance, Rétention et Rentabilité.</p><Overview data={overview} choose={choose}/></>}
       {overview&&view==='system'&&<System data={overview} confirm={confirm}/>}
       {overview&&view==='costs'&&<AdminMonthlyCosts data={overview}/>}
       {traffic&&view==='traffic'&&<AdminTrafficView data={traffic}/>}
       {recordView&&page&&<><div className="admin-table-toolbar"><span>{num(page.total)} résultat{page.total>1?'s':''} · {num(page.rows.length)} affiché{page.rows.length>1?'s':''}</span><button type="button" className="admin-button" disabled={!page.rows.length} onClick={()=>csv(page.rows)}><HomeIcon name="download" size={16}/>Exporter les lignes affichées</button></div>
-        {!page.rows.length?<div className="admin-empty"><HomeIcon name="search" size={28}/><h3>Aucun résultat</h3><p>{view==='subscriptions'?'Aucun abonnement Stripe enregistré à ce jour. Les offres Plus et Pro sont préparées dans le produit.':'Aucun élément pour ces critères.'}</p></div>:<div className="admin-table-scroll"><table className="admin-table"><thead><tr>{selectedColumns.map(c=><th scope="col" key={c.key}>{c.label}</th>)}<th scope="col">Actions</th></tr></thead><tbody>{page.rows.map(row=><tr key={String(row.id)}>{selectedColumns.map(c=><td key={c.key}>{view==='imports'&&c.key==='error'?<AdminImportError row={row}/>:c.format==='status'?<Badge value={view==='videos'&&c.key==='retention'?videoFile(row):row[c.key]}/>:c.format==='date'?date(row[c.key]):c.format==='number'?num(row[c.key]):<span title={text(row[c.key])}>{text(row[c.key])}</span>}{c.key==='title'&&row.locality&&<small>{row.locality}</small>}{c.key==='status'&&view==='videos'&&row.status==='rendering'&&<small>{num(row.progress)} %</small>}</td>)}<td>{!restricted&&(view==='videos'||view==='agencies')?<a className="admin-row-button" href={view==='videos'?adminVideoHref(String(row.id)):adminAgencyHref(String(row.id))}>{view==='videos'?'Diagnostic':'Dossier agence'} <HomeIcon name="arrow" size={15}/></a>:<button className="admin-row-button" type="button" onClick={()=>setSelected(row)} aria-label={'Détails de '+text(row.title??row.agency??row.email??row.id)}>Détails <HomeIcon name="arrow" size={15}/></button>}</td></tr>)}</tbody></table></div>}
+        {!page.rows.length?<div className="admin-empty"><HomeIcon name="search" size={28}/><h3>Aucun résultat</h3><p>{view==='subscriptions'?'Aucun abonnement Stripe enregistré à ce jour. Les offres Plus et Pro sont préparées dans le produit.':'Aucun élément pour ces critères.'}</p></div>:<div className="admin-table-scroll"><table className="admin-table"><thead><tr>{selectedColumns.map(c=><th scope="col" key={c.key}>{c.label}</th>)}<th scope="col">Actions</th></tr></thead><tbody>{page.rows.map(row=><tr key={String(row.id)}>{selectedColumns.map(c=><td key={c.key}>{view==='imports'&&c.key==='error'?<AdminImportError row={row}/>:c.format==='status'?<Badge value={view==='videos'&&c.key==='retention'?videoFile(row):row[c.key]}/>:c.format==='date'?date(row[c.key]):c.format==='number'?num(row[c.key]):<span title={text(row[c.key])}>{text(row[c.key])}</span>}{c.key==='title'&&row.locality&&<small>{row.locality}</small>}{c.key==='status'&&view==='videos'&&row.status==='rendering'&&<small>{num(row.progress)} %</small>}</td>)}<td>{!restricted&&(view==='videos'||view==='agencies')?<a className="admin-row-button" href={view==='videos'?adminVideoHref(String(row.id)):adminAgencyHref(String(row.id))} onClick={()=>{try{sessionStorage.setItem('bv:admin:return:'+accountId,JSON.stringify({href:location.pathname+location.search,ids:page.rows.map(r=>String(r.id)),kind:view==='videos'?'video':'agency',scroll:window.scrollY,page,at:Date.now()}));}catch{}}}>{view==='videos'?'Diagnostic':'Dossier agence'} <HomeIcon name="arrow" size={15}/></a>:<button className="admin-row-button" type="button" onClick={()=>setSelected(row)} aria-label={'Détails de '+text(row.title??row.agency??row.email??row.id)}>Détails <HomeIcon name="arrow" size={15}/></button>}</td></tr>)}</tbody></table></div>}
         {page.nextCursor&&<div className="admin-pagination"><button className="admin-button" type="button" disabled={more} onClick={()=>void loadMore()}>{more?'Chargement…':'Voir les 30 suivants'}</button></div>}
       </>}
     </>}

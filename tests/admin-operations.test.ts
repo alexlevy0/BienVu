@@ -17,11 +17,11 @@ test('Quantiles : médiane exacte, P95 rang supérieur et valeurs absentes exclu
 
 test('Cohortes : retour à 7 et 30 jours, fenêtre complète, événement futur exclu',async t=>{
  const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:'export default{fetch(){return new Response("fixture")}}',compatibilityDate:'2026-09-27',d1Databases:['DB']}));t.after(()=>mf.dispose());const db=await mf.getD1Database('DB');
- await db.exec('CREATE TABLE jobs(id TEXT,status TEXT,created_at TEXT); CREATE TABLE generation_runs(job_id TEXT,owner_agency_id TEXT,agency_id TEXT); CREATE TABLE generation_events(job_id TEXT,event TEXT,created_at TEXT); CREATE TABLE agencies(id TEXT,name TEXT,owner_user_id TEXT); CREATE TABLE auth_user(id TEXT);');
+ await db.exec('CREATE TABLE jobs(id TEXT,status TEXT,created_at TEXT); CREATE TABLE generation_runs(job_id TEXT,owner_agency_id TEXT,agency_id TEXT,anonymous_session_id TEXT); CREATE TABLE generation_events(job_id TEXT,event TEXT,created_at TEXT); CREATE TABLE agencies(id TEXT,name TEXT,owner_user_id TEXT); CREATE TABLE auth_user(id TEXT,email TEXT); CREATE TABLE admin_workspace_documents(key TEXT,body_json TEXT);');
  const now=Date.parse('2026-10-17T12:00:00.000Z');
  for(const [agency,offsets] of [['a',[40,35]],['b',[20,10]],['c',[2,1]],['d',[40]],['future',[-1/24]]] as [string,number[]][]){
-  await db.prepare('INSERT INTO auth_user VALUES(?)').bind(agency).run();await db.prepare('INSERT INTO agencies VALUES(?,?,?)').bind(agency,agency,agency).run();
-  for(const [index,days] of offsets.entries()){const id=agency+'-'+index,at=new Date(now-days*86400_000).toISOString();await db.prepare('INSERT INTO jobs VALUES(?,?,?)').bind(id,'ready',at).run();await db.prepare('INSERT INTO generation_runs VALUES(?,?,?)').bind(id,agency,agency).run();await db.prepare('INSERT INTO generation_events VALUES(?,?,?)').bind(id,'ready',at).run();}
+  await db.prepare('INSERT INTO auth_user(id) VALUES(?)').bind(agency).run();await db.prepare('INSERT INTO agencies VALUES(?,?,?)').bind(agency,agency,agency).run();
+  for(const [index,days] of offsets.entries()){const id=agency+'-'+index,at=new Date(now-days*86400_000).toISOString();await db.prepare('INSERT INTO jobs VALUES(?,?,?)').bind(id,'ready',at).run();await db.prepare('INSERT INTO generation_runs(job_id,owner_agency_id,agency_id) VALUES(?,?,?)').bind(id,agency,agency).run();await db.prepare('INSERT INTO generation_events VALUES(?,?,?)').bind(id,'ready',at).run();}
  }
  const report=await operationsRead(db,OperationsQuery.parse({section:'retention',days:'90'}),now);assert.ok('summary' in report&&report.summary);
  assert.deepEqual(report.summary,{activated:4,secondVideo:3,eligible7:3,returned7:1,eligible30:2,returned30:1});assert.ok('activity' in report&&!report.activity?.some(a=>a.id==='future'));
