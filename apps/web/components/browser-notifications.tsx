@@ -1,7 +1,7 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
 import {useAccount} from './account';
-import {browserNotificationEvent,browserNotificationSettingsEvent,notificationCapability,notificationPreference,saveNotificationPreference,pendingNotificationJobs,
+import {browserNotificationEvent,browserNotificationSettingsEvent,notificationCapability,notificationPreference,saveNotificationPreference,consumeNotificationLaunch,
   prepareBrowserNotifications,saveBrowserSubscription,watchBrowserGenerations,disableBrowserNotifications,type NotificationCapability} from '../lib/browser-notification-client';
 import './browser-notifications.css';
 
@@ -12,7 +12,7 @@ export function BrowserNotifications(){
   const {me,loading}=useAccount(),owner=loading?undefined:me?.user.id??'anonymous';
   const [capability,setCapability]=useState<NotificationCapability>('unavailable'),[open,setOpen]=useState(false),[settings,setSettings]=useState(false),
     [enabled,setEnabled]=useState(false),[preparing,setPreparing]=useState(false),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[denied,setDenied]=useState(false);
-  const prepared=useRef<Awaited<ReturnType<typeof prepareBrowserNotifications>>|null>(null),opening=useRef<Promise<void>|null>(null),currentOwner=useRef(owner),active=useRef(true);
+  const prepared=useRef<Awaited<ReturnType<typeof prepareBrowserNotifications>>|null>(null),opening=useRef<Promise<void>|null>(null),currentOwner=useRef(owner),active=useRef(true),feedbackRevision=useRef(0);
   currentOwner.current=owner;
   useEffect(()=>{active.current=true;return()=>{active.current=false;};},[]);
   const permission=()=>typeof Notification==='undefined'?'default':Notification.permission;
@@ -26,22 +26,35 @@ export function BrowserNotifications(){
   useEffect(()=>{
     if(loading)return;const capability=notificationCapability();setCapability(capability);
     setEnabled(capability==='supported'&&permission()==='granted'&&notificationPreference()==='enabled');setDenied(permission()==='denied');
+    let disposed=false;
+    const sync=(fresh:boolean)=>{
+      const revision=feedbackRevision.current,path=window.location.pathname;
+      void watchBrowserGenerations().catch(()=>{
+        // A restored queue is background work. Report a failure only for the
+        // launch the visitor just made, never after dismissal or navigation.
+        if(!fresh||disposed||!active.current||currentOwner.current!==owner||revision!==feedbackRevision.current||window.location.pathname!==path)return;
+        setOpen(true);setMessage('La notification n’a pas pu être programmée. Réessayez pour cette vidéo.');
+      });
+    };
     const launched=()=>{
+      const fresh=consumeNotificationLaunch();
+      if(fresh)feedbackRevision.current++;
       if(capability==='unavailable')return;
       if(permission()==='granted'&&notificationPreference()==='enabled'){
-        void watchBrowserGenerations().catch(()=>{setOpen(true);setMessage('La notification n’a pas pu être programmée. Réessayez pour cette vidéo.');});return;
+        sync(Boolean(fresh));return;
       }
-      if(notificationPreference()||permission()==='denied')return;
+      if(!fresh||notificationPreference()||permission()==='denied')return;
       setSettings(false);setOpen(true);if(capability==='supported')void prepare();
     };
-    const preferences=()=>{setSettings(true);setOpen(true);setDenied(permission()==='denied');setEnabled(permission()==='granted'&&notificationPreference()==='enabled');setMessage('');if(capability==='supported'&&permission()!=='denied')void prepare();};
+    const preferences=()=>{feedbackRevision.current++;setSettings(true);setOpen(true);setDenied(permission()==='denied');setEnabled(permission()==='granted'&&notificationPreference()==='enabled');setMessage('');if(capability==='supported'&&permission()!=='denied')void prepare();};
     window.addEventListener(browserNotificationEvent,launched);window.addEventListener(browserNotificationSettingsEvent,preferences);
-    // An editor export may navigate to its result immediately after acceptance.
-    if(pendingNotificationJobs().length)launched();
-    return()=>{window.removeEventListener(browserNotificationEvent,launched);window.removeEventListener(browserNotificationSettingsEvent,preferences);};
+    // Restore delivery quietly. Only a fresh acceptance (or its one-time editor
+    // handoff) can show the invitation, including acceptance during auth loading.
+    launched();
+    return()=>{disposed=true;window.removeEventListener(browserNotificationEvent,launched);window.removeEventListener(browserNotificationSettingsEvent,preferences);};
   },[loading,owner]);
   useEffect(()=>{
-    const changed=()=>{setEnabled(permission()==='granted'&&notificationPreference()==='enabled');setDenied(permission()==='denied');if(notificationPreference())setOpen(false);};
+    const changed=()=>{feedbackRevision.current++;setEnabled(permission()==='granted'&&notificationPreference()==='enabled');setDenied(permission()==='denied');if(notificationPreference())setOpen(false);};
     window.addEventListener('storage',changed);return()=>window.removeEventListener('storage',changed);
   },[]);
   useEffect(()=>{if(!open||busy)return;const escape=(event:KeyboardEvent)=>{if(event.key==='Escape')dismiss();};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[open,busy,settings,enabled]);
@@ -59,7 +72,7 @@ export function BrowserNotifications(){
     finally{if(active.current)setBusy(false);}
   }
   async function disable(){setBusy(true);await disableBrowserNotifications();if(active.current){setBusy(false);setEnabled(false);setMessage('Les notifications sont désactivées sur ce navigateur.');}}
-  function dismiss(){if(!settings&&!enabled)saveNotificationPreference('later');setOpen(false);setMessage('');}
+  function dismiss(){feedbackRevision.current++;if(!settings&&!enabled)saveNotificationPreference('later');setOpen(false);setMessage('');}
   if(!open)return null;
   const install=capability==='install-required',unavailable=capability==='unavailable';
   return <aside className="browser-notification-card" aria-labelledby="browser-notification-title" data-state={enabled?'enabled':'prompt'}>

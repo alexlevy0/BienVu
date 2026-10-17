@@ -2,7 +2,10 @@ import type {GenerationView} from '@bienvu/contracts';
 export const browserNotificationEvent='bienvu:generation-started';
 export const browserNotificationSettingsEvent='bienvu:notification-settings';
 export const notificationPreferenceKey='bienvu:browser-notifications:v1';
-const tokenKey='bienvu:push-device:v1',jobsKey='bienvu:push-pending:v1';
+const tokenKey='bienvu:push-device:v1',jobsKey='bienvu:push-pending:v1',handoffKey='bienvu:push-launch:v1';
+// UI intent lives only in this document. The persisted queue is delivery work,
+// never evidence that a visitor just launched a generation after a reload.
+let launchIntent:string|null=null;
 export type NotificationPreference='enabled'|'later'|'disabled';
 export type NotificationCapability='supported'|'install-required'|'unavailable';
 export type PushConfiguration={enabled:boolean;publicKey:string|null};
@@ -24,11 +27,26 @@ function notificationJobs():{id:string;at:number}[]{
   }catch{return [];}
 }
 export function pendingNotificationJobs():string[]{return notificationJobs().map(item=>item.id);}
-export function announceGenerationStarted(job:Pick<GenerationView,'id'|'status'>){
+export function announceGenerationStarted(job:Pick<GenerationView,'id'|'status'>,{navigateToResult=false}:{navigateToResult?:boolean}={}){
   if(typeof window==='undefined'||!validId(job.id)||['ready','failed'].includes(job.status))return;
   const jobs=notificationJobs().filter(item=>item.id!==job.id);jobs.push({id:job.id,at:Date.now()});
-  try{sessionStorage.setItem(jobsKey,JSON.stringify(jobs.slice(-12)));}catch{}
+  launchIntent=navigateToResult?null:job.id;
+  try{
+    sessionStorage.setItem(jobsKey,JSON.stringify(jobs.slice(-12)));sessionStorage.removeItem(handoffKey);
+    if(navigateToResult)sessionStorage.setItem(handoffKey,JSON.stringify({id:job.id,at:Date.now()}));
+  }catch{}
+  // Full-page editor navigation consumes its one-time intent on the result page.
+  if(navigateToResult)return;
   window.dispatchEvent(new CustomEvent(browserNotificationEvent));
+}
+export function consumeNotificationLaunch():string|null{
+  const current=launchIntent;launchIntent=null;if(current)return current;
+  try{
+    const raw=sessionStorage.getItem(handoffKey);sessionStorage.removeItem(handoffKey);const value=JSON.parse(raw??'null');
+    if(value&&validId(value.id)&&Number.isFinite(value.at)&&value.at<=Date.now()&&value.at>Date.now()-60_000
+      &&window.location.pathname===`/historique/${value.id}`&&pendingNotificationJobs().includes(value.id))return value.id;
+  }catch{}
+  return null;
 }
 function deviceToken(){
   const old=localStorage.getItem(tokenKey);if(old&&/^[\w-]{43}$/.test(old))return old;
@@ -47,9 +65,13 @@ export async function prepareBrowserNotifications(){
   return {registration,applicationKey:applicationKey(config.publicKey)};
 }
 export async function saveBrowserSubscription(subscription:PushSubscription){
-  const response=await fetch('/api/notifications',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'subscribe',token:deviceToken(),subscription:subscription.toJSON(),jobs:pendingNotificationJobs()}),keepalive:true,signal:AbortSignal.timeout(10_000)});
+  const jobs=pendingNotificationJobs();
+  const response=await fetch('/api/notifications',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'subscribe',token:deviceToken(),subscription:subscription.toJSON(),jobs}),keepalive:true,signal:AbortSignal.timeout(10_000)});
   if(!response.ok)throw new Error('L’activation n’a pas abouti. Votre vidéo continue de se préparer.');
   saveNotificationPreference('enabled');
+  // Acknowledge this request's snapshot only: another generation may have been
+  // accepted while its subscription was being saved.
+  try{sessionStorage.setItem(jobsKey,JSON.stringify(notificationJobs().filter(job=>!jobs.includes(job.id))));}catch{}
 }
 export async function watchBrowserGenerations(){
   if(notificationPreference()!=='enabled')return;
@@ -61,7 +83,7 @@ export async function watchBrowserGenerations(){
 }
 export async function disableBrowserNotifications(){
   saveNotificationPreference('disabled');
-  try{sessionStorage.removeItem(jobsKey);}catch{}
+  launchIntent=null;try{sessionStorage.removeItem(jobsKey);sessionStorage.removeItem(handoffKey);}catch{}
   let token:string|null=null;try{token=localStorage.getItem(tokenKey);}catch{}
   const local=async()=>{if('serviceWorker' in navigator){const registration=await navigator.serviceWorker.getRegistration('/notifications-sw.js');const subscription=await registration?.pushManager.getSubscription();await subscription?.unsubscribe();}};
   await Promise.allSettled([local(),...(token?[fetch('/api/notifications',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({token}),keepalive:true,signal:AbortSignal.timeout(5000)})]:[])]);
