@@ -27,3 +27,7 @@
 @media(prefers-reduced-motion:reduce){
  ::view-transition-old(*),::view-transition-new(*),::view-transition-group(*){animation-duration:0s!important;animation-delay:0s!important}
 }
+/* A modal belongs above the studio chrome. Leave navigation in the live root
+   during avatar transitions instead of lifting it into a pinned snapshot. */
+:root:active-view-transition-type(bv-avatar) :is(.home-sidebar,.home-mobile-header,.home-topbar,.showcase-public-header),
+:root:has(dialog[open]):active-view-transition-type(bv-list) :is(.home-sidebar,.home-mobile-header,.home-topbar,.showcase-public-header){view-transition-name:none!important}
