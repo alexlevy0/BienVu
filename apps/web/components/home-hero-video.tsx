@@ -7,21 +7,27 @@ import {imageWidthUrl,previewVideoUrl,heroPosterSizes} from '../lib/home-media-v
 import {HeroBacklight} from './hero-backlight';
 import {HomeHeroDepthVideo} from './home-hero-depth-video';
 import {emptyHeroImage,hasHeroDepth} from '../lib/home-hero-depth';
+import {HomeHeroCarousel} from './home-hero-carousel';
 
 type PlaybackProps = {paused: boolean; onPlayingChange(playing: boolean): void};
 
 export function HomeHeroVideo({render,...props}: PlaybackProps & {render?:'standard'|'avatar-ai'}) {
   const inlinePoster=useHomepageHeroPoster();
   const heroVisual = useHomepageMedia('hero.visual'), heroMovie = useHomepageMedia('hero.video');
+  const left=useHomepageMedia('hero.left.video'),right=useHomepageMedia('hero.right.video');
   const example=useHomepageMedia(render==='avatar-ai'?'renders.avatar-ai.video':'renders.standard.video');
   const movie=render?example:heroMovie,visual=render?{...example,kind:'image' as const,src:example.poster??`/images/studio-home/renders-${render}.webp`,custom:true}:heroVisual;
-  return <ResponsiveHeroPlayer key={movie.src} visual={visual} movie={movie} inlinePoster={render?null:inlinePoster} depth={!render&&hasHeroDepth(movie)} {...props}/>;
+  return <ResponsiveHeroPlayer key={movie.src} visual={visual} movie={movie} inlinePoster={render?null:inlinePoster} depth={!render&&hasHeroDepth(movie)} companions={!render&&left.custom&&right.custom?[left,right]:undefined} {...props}/>;
 }
 
-function ResponsiveHeroPlayer({depth,...props}:PlaybackProps&{visual:HomeMediaView;movie:HomeMediaView;inlinePoster:string|null;depth:boolean}){
+function ResponsiveHeroPlayer({depth,companions,...props}:PlaybackProps&{visual:HomeMediaView;movie:HomeMediaView;inlinePoster:string|null;depth:boolean;companions?:[HomeMediaView,HomeMediaView]}){
  const [desktop,setDesktop]=useState(false),[unavailable,setUnavailable]=useState(false);
  const fallback=useCallback(()=>setUnavailable(true),[]);
  useEffect(()=>{const query=matchMedia('(min-width: 761px)'),change=()=>setDesktop(query.matches);change();query.addEventListener('change',change);return()=>query.removeEventListener('change',change);},[]);
+ if(companions)return <>
+  <div className="home-hero-mobile-player"><HeroPlayer {...props} mobileOnly paused={props.paused||desktop}/></div>
+  <div className="home-hero-desktop-player home-hero-carousel-player"><HomeHeroCarousel movie={props.movie} visual={props.visual} companions={companions} paused={props.paused||!desktop} onPlayingChange={props.onPlayingChange} depth={depth&&!unavailable} onDepthUnavailable={fallback}/></div>
+ </>;
  if(!depth||unavailable)return <HeroPlayer {...props}/>;
  return <>
   <div className="home-hero-mobile-player"><HeroPlayer {...props} mobileOnly paused={props.paused||desktop}/></div>

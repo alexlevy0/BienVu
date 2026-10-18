@@ -1,6 +1,45 @@
 .home-hero-desktop-player{display:none}
 .home-hero-mobile-player{display:contents}
 @media(min-width:761px){
+ .home-hero-dashboard:has(.home-hero-carousel){grid-template-columns:minmax(0,1.04fr) minmax(0,1fr);column-gap:22px;padding:30px 28px 22px}
+ .home-hero-dashboard:has(.home-hero-carousel) .home-hero-showcase{align-self:center;gap:0}
+ .home-hero-dashboard:has(.home-hero-carousel) .home-hero-intro{padding-inline:2px}
+ .home-studio-home .home-hero-dashboard:has(.home-hero-carousel) h1{font-size:clamp(56px,17.2cqw,140px)}
+ .home-studio-home .home-hero-dashboard:has(.home-hero-carousel) .home-intro{font-size:clamp(18px,4cqw,25px);max-width:25em}
+ .home-hero-dashboard:has(.home-hero-carousel) .home-hero-showcase>p{font-size:clamp(14px,1.35vw,20px);font-weight:550;color:#214f43;margin:0 0 10px;letter-spacing:-.025em}
+ .home-hero-carousel-player{padding:0!important}
+ .home-hero-carousel{position:relative;min-width:0}
+ .home-hero-carousel-stage{position:relative;aspect-ratio:1/1.1;perspective:1400px;isolation:isolate}
+ .home-hero-carousel-stage::before{content:'';position:absolute;inset:8% -1% 0;border-radius:50%;background:radial-gradient(ellipse,#f8fbea8c,transparent 70%);pointer-events:none}
+ .home-hero-carousel-card{position:absolute;width:50%;left:25%;top:6%;aspect-ratio:9/16;transform-origin:50% 55%;backface-visibility:hidden}
+ .home-hero-carousel-content{position:absolute;inset:0;border-radius:15px;box-shadow:0 22px 35px -19px #1e372c66,0 4px 12px #1e372c1a}
+ .home-hero-carousel-content>.home-hero-depth{height:100%}
+ .home-hero-carousel-card .home-hero-depth-screen{border:2px solid #fffefae6}
+ .home-hero-carousel-card .home-hero-depth-presenter,.home-hero-carousel-card .home-hero-depth-badge{transition:opacity .18s ease,visibility .18s ease}
+ .home-hero-carousel-card:not([data-position="0"]) .home-hero-depth-presenter,.home-hero-carousel-card:not([data-position="0"]) .home-hero-depth-badge{opacity:0;visibility:hidden}
+ .home-hero-carousel-card:not([data-position="0"]) .home-hero-backlight{opacity:0;visibility:hidden}
+ .home-hero-carousel-card:not([data-position="0"]) .home-hero-depth-controls,.home-hero-carousel-card:not([data-position="0"]) .home-hero-depth-cover,.home-hero-carousel-card:not([data-position="0"]) .home-hero-depth-loading,.home-hero-carousel-card:not([data-position="0"]) .home-hero-depth-retry{display:none}
+ .home-studio .home-hero-carousel-select{position:absolute;inset:0;display:block;width:100%;padding:0;border:2px solid #fffefae6;border-radius:15px;overflow:hidden;background:#214f43;color:#fffefa;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent}
+ .home-hero-carousel-select>picture,.home-hero-carousel-select>picture>img{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover}
+ .home-hero-carousel-select::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,#0c241e73,transparent 45%,#0c241e42);transition:opacity .2s}
+ .home-hero-carousel-select:hover::after{opacity:.75}
+ .home-hero-carousel-select:hover{background-color:#fffefa14}
+ .home-hero-carousel-select:focus-visible{outline:3px solid #214f43;outline-offset:5px}
+ .home-hero-carousel-location{position:absolute;z-index:1;top:20px;left:16px;right:12px;font-family:var(--home-font-heading,Georgia,serif);font-size:clamp(17px,2vw,28px);line-height:1.05;text-shadow:0 1px 8px #15372966}
+ .home-hero-carousel-location>small{display:block;margin-top:8px;font-family:var(--home-font-text,Arial,sans-serif);font-size:10px;font-weight:450;letter-spacing:0;line-height:1.3}
+ .home-hero-carousel-card[data-position="1"] .home-hero-carousel-location{left:45%;right:12px;font-size:clamp(15px,1.6vw,23px)}
+ .home-hero-carousel-play{position:absolute;z-index:1;bottom:18px;left:16px;display:grid;place-items:center;width:37px;height:37px;border-radius:50%;background:#102e24b8;border:1px solid #fffefa73;backdrop-filter:blur(6px);box-shadow:0 3px 12px #142a2633}
+ .home-hero-carousel-pagination{display:flex;justify-content:center;gap:2px;position:relative;z-index:4;margin-top:0}
+ .home-hero-carousel-pagination>button{border:0;background:transparent;width:28px;height:28px;display:grid;place-items:center;cursor:pointer;border-radius:50%;padding:0}
+ .home-hero-carousel-pagination>button>span{display:block;width:8px;height:8px;border-radius:50%;background:#8ca4806e;transition:background .2s,scale .2s}
+ .home-hero-carousel-pagination>button[aria-pressed="true"]>span{background:#214f43;scale:1.22}
+ .home-hero-carousel-pagination>button:hover>span{background:#456b51}
+ .home-studio .home-hero-carousel-hint{position:relative;z-index:4;text-align:center;margin:3px 0 0;font-size:11px;line-height:1.4;color:#385448}
+ .home-hero-carousel-movie{position:relative;border:2px solid #fffefae6;border-radius:15px;overflow:hidden;background:#dfe6d8}
+ .home-hero-carousel-movie>picture,.home-hero-carousel-movie>picture>img,.home-hero-carousel-movie>video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+ .home-hero-carousel-movie>video{opacity:0;transition:opacity .25s ease}
+ .home-hero-carousel-movie.has-played>video{opacity:1}
+ .home-hero-carousel-card .home-hero-depth-badge{left:-18%;top:44%}
  .home-hero-mobile-player{display:none}
  .home-hero-desktop-player{display:block;padding:0 30px 24px 0;min-width:0}
  .home-hero-depth{position:relative;isolation:isolate;perspective:1200px}
@@ -50,6 +89,13 @@
  .home-hero-depth-stage:is(:hover,:focus-visible,:has(:focus-visible)) .home-hero-depth-controls{pointer-events:auto}
 }
 @media(min-width:761px) and (max-width:1100px){
+ .home-hero-dashboard:has(.home-hero-carousel){padding:24px 20px 18px;column-gap:16px}
+ .home-hero-carousel-card{width:53%;left:23.5%}
+ .home-hero-carousel-stage{aspect-ratio:1/1.16}
+ .home-hero-carousel-location{top:15px;left:12px;font-size:18px}
+ .home-hero-carousel-location>small{font-size:9px}
+ .home-hero-carousel-card .home-hero-depth-time{font-size:8px}
+ .home-hero-carousel-card .home-hero-depth-toolbar>button{width:23px}
  .home-hero-desktop-player{padding-right:20px;padding-bottom:17px}
  .home-hero-depth-presenter{right:-16%;bottom:-10%;width:87%}
  .home-hero-depth-badge{display:none}
@@ -59,6 +105,7 @@
 }
 @keyframes hero-depth-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){
+ .home-hero-carousel-card .home-hero-depth-presenter,.home-hero-carousel-card .home-hero-depth-badge,.home-hero-carousel-pagination>button>span,.home-hero-carousel-movie>video{transition:none}
  .home-hero-depth video,.home-hero-depth-cover>span,.home-hero-depth-controls{transition:none}
  .home-hero-depth-loading>span{animation:none}
 }

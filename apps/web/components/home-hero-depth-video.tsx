@@ -11,7 +11,7 @@ import {useHeroDepthMotion} from './use-hero-depth-motion';
 
 type Props={paused:boolean;onPlayingChange(playing:boolean):void;onUnavailable():void};
 const initial:VideoPairState={requested:false,playing:false,loading:false,ready:false,error:false,time:0,duration:40};
-function SoundIcon({muted}:{muted:boolean}){return <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M11 4 6 8H3v8h3l5 4V4Z"/>{muted?<path d="m16 9 5 6m-5 0 5-6"/>:<><path d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></>}</svg>;}
+export function SoundIcon({muted}:{muted:boolean}){return <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M11 4 6 8H3v8h3l5 4V4Z"/>{muted?<path d="m16 9 5 6m-5 0 5-6"/>:<><path d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></>}</svg>;}
 function DesktopPicture({src,alt='',imageRef,width=540,height=960}:{src:string;alt?:string;imageRef?:Ref<HTMLImageElement>;width?:number;height?:number}){
  return <picture><source media="(min-width: 761px)" srcSet={src}/><img ref={imageRef} src={emptyHeroImage} alt={alt} width={width} height={height} decoding="async" fetchPriority={imageRef?'high':'auto'}/></picture>;
 }
@@ -55,7 +55,7 @@ export function HomeHeroDepthVideo({paused,onPlayingChange,onUnavailable}:Props)
   if(stage.current)observer.observe(stage.current);
   desktop.addEventListener('change',resize);autoplay.addEventListener('change',resize);window.addEventListener('load',schedule);
   return()=>{disposed=true;observer.disconnect();desktop.removeEventListener('change',resize);autoplay.removeEventListener('change',resize);window.removeEventListener('load',schedule);if(idle!==undefined){if(window.cancelIdleCallback)window.cancelIdleCallback(idle);else clearTimeout(idle);}};
- },[load]);
+ },[load,paused]);
  const play=(withSound=false)=>{
   if(blocked.current)return;load();if(withSound&&background.current){background.current.muted=false;setMuted(false);}
   pair.current?.play();

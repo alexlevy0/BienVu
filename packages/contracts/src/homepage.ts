@@ -5,6 +5,8 @@ const photo='/images/studio-home/paris.webp',movie='/videos/studio-home/paris.mp
 export const homepageSlots=[
   {id:'hero.visual',group:'En haut de page',label:'Visuel principal',kind:'visual',src:photo},
   {id:'hero.video',group:'En haut de page',label:'Vidéo du bouton Lecture',kind:'video',src:movie},
+  {id:'hero.left.video',group:'En haut de page',label:'Carrousel · vidéo de gauche',kind:'video',src:movie},
+  {id:'hero.right.video',group:'En haut de page',label:'Carrousel · vidéo de droite',kind:'video',src:movie},
   {id:'discover.paris.visual',group:'À découvrir sur BienVu',label:'Première inspiration · visuel',kind:'visual',src:photo},
   {id:'discover.paris.video',group:'À découvrir sur BienVu',label:'Première inspiration · vidéo',kind:'video',src:movie},
   {id:'discover.sud.visual',group:'À découvrir sur BienVu',label:'Deuxième inspiration · visuel',kind:'visual',src:'/images/studio-home/sud.webp'},

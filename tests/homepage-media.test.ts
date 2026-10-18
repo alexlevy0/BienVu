@@ -117,7 +117,7 @@ test('Home : banque globale privée, copie indépendante, publication atomique e
   await assert.rejects(db.prepare("UPDATE homepage_audit SET action='discard'").run(),/HOMEPAGE_AUDIT_IMMUTABLE/);
   await assert.rejects(db.prepare('DELETE FROM homepage_audit').run(),/HOMEPAGE_AUDIT_IMMUTABLE/);
   await assign('hero.video',null);await publish();assert.equal((await homepageMediaRequest(req(live.url,''),env,live.id)).status,404,'Une sélection retirée n’est plus lisible publiquement');
-  assert.equal(homepageSlots.length,43);
+  assert.equal(homepageSlots.length,45);
  });
  await t.test('kit du mandat : les dix nouveaux emplacements acceptent et publient les médias de la banque',async()=>{
   const slots=homepageSlots.filter(slot=>slot.group==='Un mandat, sept contenus');

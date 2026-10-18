@@ -99,7 +99,7 @@ export function LandingPage() {
           <div className={`home-hero-intro${conversationActive?' home-hero-intro-leaving':''}`} inert={conversationActive}><h1 id="home-title" data-intro-complete={headlineEntered||undefined} onAnimationEnd={event=>{if(event.animationName==='home-headline-underline')setHeadlineEntered(true);}}><span>Vos annonces,</span> en version <em><strong>vidéo</strong></em>{'\u202f'}!</h1><p className="home-intro"><strong>Transformez un lien en vidéo, avec voix off, avatar et animations IA.</strong></p></div>
           <HomeCreate onLayoutChange={changeLayout} renderChoice={renderChoice} onClearRenderChoice={()=>chooseRender(null)}/>
           <aside className="home-hero-showcase" hidden={conversationActive} aria-label="Un aperçu de votre prochaine vidéo">
-            <p>Votre prochain coup de cœur, en vidéo.</p>
+            <p>Vos biens prennent vie.</p>
             <HomeHeroVideo paused={modalOpen || conversationActive} onPlayingChange={heroPlayback}/>
           </aside>
         </section>
