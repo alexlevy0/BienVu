@@ -15,7 +15,8 @@
  .home-hero-carousel-stage::before{content:'';position:absolute;inset:8% -1% 0;border-radius:50%;background:radial-gradient(ellipse,#f8fbea8c,transparent 70%);pointer-events:none}
  .home-hero-carousel-card{position:absolute;width:50%;left:25%;top:6%;aspect-ratio:9/16;transform-origin:50% 55%;backface-visibility:hidden;isolation:isolate}
  .home-hero-carousel-poster,.home-hero-carousel-poster>img{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover;border-radius:15px}
- .home-hero-carousel-static-halo{opacity:.8}
+ .home-hero-carousel-static-halo{opacity:.8;transition:opacity .8s ease}
+ .home-hero-carousel[data-unfolded="false"] .home-hero-carousel-static-halo{opacity:0}
  .home-hero-carousel-card[data-position="0"]>.home-hero-carousel-static-halo{visibility:hidden}
  .home-hero-carousel-content{position:absolute;inset:0;border-radius:15px;box-shadow:0 22px 35px -19px #1e372c66,0 4px 12px #1e372c1a}
  .home-hero-carousel-content>.home-hero-depth{height:100%}
@@ -111,7 +112,7 @@
 }
 @keyframes hero-depth-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){
- .home-hero-carousel-card .home-hero-depth-presenter,.home-hero-carousel-card .home-hero-depth-badge,.home-hero-carousel-pagination>button>span,.home-hero-carousel-movie>video{transition:none}
+ .home-hero-carousel-card .home-hero-depth-presenter,.home-hero-carousel-card .home-hero-depth-badge,.home-hero-carousel-pagination>button>span,.home-hero-carousel-movie>video,.home-hero-carousel-static-halo{transition:none}
  .home-hero-depth video,.home-hero-depth-cover>span,.home-hero-depth-controls{transition:none}
  .home-hero-depth-loading>span{animation:none}
 }

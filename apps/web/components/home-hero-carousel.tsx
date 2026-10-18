@@ -2,7 +2,7 @@
 
 import {useCallback,useEffect,useRef,useState,type CSSProperties,type KeyboardEvent,type RefObject} from 'react';
 import {useReducedMotion} from 'motion/react';
-import {CreationMotion,m} from './creation-motion';
+import {CreationMotion,m,useCreationMotionReady} from './creation-motion';
 import {HomeHeroDepthVideo,SoundIcon} from './home-hero-depth-video';
 import {HomeIcon} from './home-icons';
 import {HeroBacklight} from './hero-backlight';
@@ -18,24 +18,39 @@ type Props={movie:HomeMediaView;visual:HomeMediaView;companions:[HomeMediaView,H
 export function HomeHeroCarousel(props:Props){return <CreationMotion><Carousel {...props}/></CreationMotion>;}
 
 function Carousel({movie,visual,companions,paused,depth,onDepthUnavailable,onPlayingChange}:Props){
- const [selected,setSelected]=useState(1),[visited,setVisited]=useState(false),reduced=useReducedMotion();
+ const [selected,setSelected]=useState(1),[visited,setVisited]=useState(false),[unfolded,setUnfolded]=useState(false),reduced=useReducedMotion(),ready=useCreationMotionReady();
  const pagination=useRef<HTMLDivElement>(null),keyboardSelection=useRef(false);
  const leftPoster=useRef<HTMLImageElement>(null),centerPoster=useRef<HTMLImageElement>(null),rightPoster=useRef<HTMLImageElement>(null),posters=[leftPoster,centerPoster,rightPoster];
  const cards=[companions[0],movie,companions[1]],label=(item:HomeMediaView)=>item.locality??item.title??'Vidéo immobilière';
- const choose=(index:number)=>{if(index===selected)return;setVisited(true);onPlayingChange(false);setSelected(index);};
+ const choose=(index:number)=>{if(index===selected)return;setUnfolded(true);setVisited(true);onPlayingChange(false);setSelected(index);};
+ useEffect(()=>{
+  if(!ready||unfolded)return;
+  const desktop=matchMedia('(min-width:761px)');let cancelled=false,delay:number|undefined,deadline:number|undefined;
+  const open=()=>{if(!cancelled&&desktop.matches)setUnfolded(true);};
+  const start=()=>{
+   if(!desktop.matches)return;
+   if(reduced||matchMedia('(prefers-reduced-motion:reduce)').matches){open();return;}
+   // Wait for the two covers to decode before opening the fan. A missing image
+   // cannot leave navigation trapped in the collapsed state.
+   deadline=window.setTimeout(open,1600);
+   void Promise.all([leftPoster,rightPoster].map(ref=>ref.current?.decode().catch(()=>{}))).then(()=>{if(!cancelled)delay=window.setTimeout(open,360);});
+  };
+  start();desktop.addEventListener('change',start);
+  return()=>{cancelled=true;clearTimeout(delay);clearTimeout(deadline);desktop.removeEventListener('change',start);};
+ },[ready,unfolded,reduced]);
  useEffect(()=>{if(keyboardSelection.current){keyboardSelection.current=false;pagination.current?.querySelectorAll('button')[selected]?.focus({preventScroll:true});}},[selected]);
  const keyboard=(event:KeyboardEvent<HTMLDivElement>)=>{
   if(!(event.target instanceof HTMLElement)||!event.target.closest('[data-hero-choose]'))return;
   if(event.key==='ArrowRight'||event.key==='ArrowLeft'){event.preventDefault();keyboardSelection.current=true;choose((selected+(event.key==='ArrowRight'?1:2))%3);}
  };
- return <div className="home-hero-carousel" role="region" aria-roledescription="carrousel" aria-label="Exemples de vidéos immobilières" onKeyDown={keyboard}>
+ return <div className="home-hero-carousel" data-unfolded={unfolded} role="region" aria-roledescription="carrousel" aria-label="Exemples de vidéos immobilières" onKeyDown={keyboard}>
   <div className="home-hero-carousel-stage">
    {cards.map((item,index)=>{
     const position=heroCardPosition(index,selected),active=position===0;
-    const target={x:`${position*57}%`,y:active?'0%':'5%',scale:active?1:.83,rotate:position*8,rotateY:-position*12};
+    const target={x:`${unfolded?position*57:0}%`,y:active||!unfolded?'0%':'5%',scale:active?1:unfolded?.83:.97,rotate:unfolded?position*8:0,rotateY:unfolded?-position*12:0};
     const poster=index===1&&depth?homeHeroDepth.backgroundPoster:index===1?(visual.kind==='image'?visual.src:visual.poster??item.poster):item.poster;
     return <m.div key={index} className="home-hero-carousel-card" data-position={position} role="group" aria-roledescription="diapositive" aria-label={`${index+1} sur 3 · ${label(item)}`}
-     initial={false} animate={target} style={{zIndex:active?3:1}} transition={{duration:reduced?0:.72,ease:[.22,1,.36,1]}}>
+     initial={false} animate={target} style={{zIndex:active?3:1}} transition={{duration:reduced?0:visited?.72:1.05,delay:reduced||visited||index!==2?0:.06,ease:[.22,1,.36,1]}}>
      <VideoBacklight posterImage={posters[index]} active={false} className="home-hero-carousel-static-halo"/>
      <picture className="home-hero-carousel-poster"><source media="(min-width:761px)" srcSet={poster?imageWidthUrl(poster,640):emptyHeroImage}/><img ref={posters[index]} src={emptyHeroImage} alt="" width="540" height="960" decoding="async"/></picture>
      <div className="home-hero-carousel-content" inert={!active} aria-hidden={!active}>

@@ -8,6 +8,9 @@ et retrait que les autres médias. Si un emplacement manque, le hero conserve
 son lecteur unique.
 
 La sélection déplace les trois cartes avec Motion, sans rotation automatique.
+À l’arrivée, les cartes partent du même axe, puis les deux cartes arrière se
+déplient une seule fois après décodage des couvertures. L’ouverture n’est pas
+rejouée lors des changements de sélection, du scroll ou des réglages.
 Les boutons latéraux, la pagination et les flèches du clavier changent la
 sélection. Le mouvement est immédiat si l’utilisateur réduit les animations.
 
