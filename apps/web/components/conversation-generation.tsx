@@ -14,6 +14,7 @@ import {GenerationMapConfirmation} from './generation-map-confirmation';
 import {GenerationQueueNotice} from './generation-queue-notice';
 import {GenerationCelebration} from './generation-celebration';
 import {GenerationAnimationCounter} from './generation-animation-counter';
+import {VideoResultActions} from './video-result-actions';
 
 type RequestMessage={kind:'url'|'manual';text:string};
 
@@ -45,7 +46,7 @@ export function ConversationGeneration({job,request,sending,anonymous,unavailabl
     </div></div>
     <div className="home-conversation-response">
       <p className="home-conversation-lead" role="status">{sending?'Envoi de votre demande…':ready?'Votre vidéo est prête.':job?.status==='failed'?'La création a été interrompue.':job?.mapConfirmation?'Confirmez la ville pour continuer.':'Nous préparons votre visite en vidéo.'}</p>
-      <div className={`home-conversation-result${horizontal?' is-horizontal':''}`}><div className={`home-conversation-media${horizontal?' is-horizontal':''}`}>
+      <div className={`home-conversation-result${horizontal?' is-horizontal':''}`}><div className="home-conversation-preview"><div className={`home-conversation-media${horizontal?' is-horizontal':''}`}>
         {job&&(assembling||job.videoUrl)?<ProgressiveVideo key={job.id} jobId={job.id} anonymous={anonymous} active={assembling} finalUrl={job.videoUrl} poster={posterFailed?null:poster} percent={percent} label={anonymous?'Aperçu filigrané de votre vidéo':'Votre vidéo immobilière'}/>
           :<div className="video-backlight-frame"><VideoBacklight poster={posterFailed?null:poster}/><div className={`home-conversation-poster${job?.status==='failed'?' home-poster-failed':''}`}>{poster&&!posterFailed&&<img src={poster} alt="" onError={()=>setPosterFailed(true)}/>}
             {(!poster||posterFailed)&&<span className="home-poster-skeleton" aria-hidden="true"/>}
@@ -53,7 +54,7 @@ export function ConversationGeneration({job,request,sending,anonymous,unavailabl
               <strong>{sending?'Envoi en cours':job?.status==='failed'?'Création interrompue':ready?'Vidéo indisponible':job?.mapConfirmation?'En attente de votre choix':'Génération en cours'}</strong>
               {assembling&&<span className="home-poster-percent">Assemblage · {percent} %</span>}</div>
             <small>{horizontal?'Horizontal 16:9':'Vertical 9:16'} · {job?.syntheticVoice===false?'Sans voix off':'Voix française'}</small></div></div>}
-      </div><CreationSwap className="home-conversation-status-motion" identity={`${statusJob?.id}:${ready?'ready':statusJob?.status==='failed'?'failed':'progress'}`}><div className="home-conversation-status">
+      </div>{ready&&job?.ownership==='owned'&&<VideoResultActions job={job}/>}</div><CreationSwap className="home-conversation-status-motion" identity={`${statusJob?.id}:${ready?'ready':statusJob?.status==='failed'?'failed':'progress'}`}><div className="home-conversation-status">
         <GenerationQueueNotice job={statusJob}/>
         {active||sending?<ol className="home-conversation-steps" aria-label="Étapes de création">{stages.map(({key,state,label,detail,progress})=>{
           const confirmMap=key==='map'&&statusJob?.mapConfirmation;
@@ -68,7 +69,6 @@ export function ConversationGeneration({job,request,sending,anonymous,unavailabl
         {statusJob&&['ready','failed'].includes(statusJob.status)&&generationAnimationOmissionText(statusJob)&&<p className="home-stage-note" role="status">{generationAnimationOmissionText(statusJob)}</p>}
         {statusJob?.status==='failed'&&<p role="alert" className="home-stage-error">{publicErrors[statusJob.errorCode as PublicErrorCode]?.[1]??publicErrors.GENERATION_FAILED[1]}</p>}
         {statusJob?.retryAllowed&&<button type="button" className="text-button" disabled={busy} onClick={()=>void act(`/api/generations/${statusJob.id}/retry`)}>Relancer le démarrage</button>}
-        {ready&&statusJob?.ownership==='owned'&&statusJob.downloadUrl&&<a className="home-primary-button" href={statusJob.downloadUrl} download>Télécharger la vidéo <span aria-hidden="true">↗</span></a>}
         {ready&&anonymous&&statusJob?.ownership==='anonymous'&&<><button type="button" className="home-primary-button" disabled={busy} onClick={()=>void act(`/api/trial/${statusJob.id}/login`)}>Télécharger sans filigrane <span aria-hidden="true">↗</span></button><p className="home-stage-note">Créez votre compte gratuitement pour récupérer votre vidéo.</p></>}
         {ready&&statusJob?.ownership==='owned'&&statusJob.masterAccess==='reserved'&&!statusJob.downloadUrl&&<p className="home-stage-note" role="status">La récupération de votre vidéo est en cours. Le téléchargement apparaîtra ici dès qu’elle sera terminée.</p>}
         {ready&&statusJob?.ownership==='owned'&&statusJob.masterAccess==='locked'&&!statusJob.downloadUrl&&statusJob.videoUrl&&<><p className="home-stage-note">La vidéo est privée. Un crédit est nécessaire pour télécharger le master sans filigrane.</p>

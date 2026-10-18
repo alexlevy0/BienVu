@@ -1,0 +1,17 @@
+.video-result-tools{position:relative;z-index:1;container-type:inline-size;width:100%;min-width:0;max-width:720px;margin-top:14px}
+.video-result-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:100%;min-width:0}
+.video-result-tools .video-result-action{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:44px;min-width:0;margin:0;padding:10px 12px;border:1px solid #d8e1d1;border-radius:9px;background:#fffefa;color:#304333;font:inherit;font-size:13px;font-weight:550;line-height:1.4;text-align:center;text-decoration:none;cursor:pointer;box-shadow:0 1px 2px #243c2910;transition:background .16s,border-color .16s,box-shadow .16s,transform .16s}
+.video-result-action>svg{flex:none;pointer-events:none}
+.video-result-tools .video-result-download{grid-column:1/-1;background:#203c30;border-color:#203c30;color:#fff}
+.video-result-tools .video-result-action:only-child{grid-column:1/-1}
+.video-result-tools .video-result-action:hover{background:#edf3e7;border-color:#b3c5a7;box-shadow:0 3px 8px #243c2912;transform:translateY(-1px)}
+.video-result-tools .video-result-download:hover{background:#2d4c3c;border-color:#2d4c3c}
+.video-result-tools .video-result-action:active{transform:translateY(0);box-shadow:none}
+.video-result-tools .video-result-action:focus-visible{outline:2px solid #6f9165;outline-offset:3px}
+.video-result-tools .video-result-action:disabled{opacity:.6;cursor:wait;transform:none;box-shadow:none}
+.video-result-tools .video-result-error{margin:10px 0 0;font-size:13px;line-height:1.5;color:#9b4935}
+@container(min-width:480px){.video-result-actions{grid-template-columns:1.2fr 1fr 1fr}.video-result-tools .video-result-download{grid-column:auto}}
+@container(max-width:260px){.video-result-tools .video-result-action{padding-inline:8px;gap:6px;font-size:12px}}
+@container(max-width:210px){.video-result-actions{grid-template-columns:minmax(0,1fr)}}
+@media(prefers-reduced-motion:reduce){.video-result-tools .video-result-action{transition:none;transform:none}}
+@media(forced-colors:active){.video-result-tools .video-result-action{border:1px solid ButtonText;box-shadow:none}}

@@ -12,6 +12,7 @@ import {GenerationMapConfirmation} from './generation-map-confirmation';
 import {GenerationQueueNotice} from './generation-queue-notice';
 import {GenerationCelebration} from './generation-celebration';
 import {GenerationAnimationCounter} from './generation-animation-counter';
+import {VideoResultActions} from './video-result-actions';
 export function GenerationProgress({job:currentJob,unavailable=false}:{job:GenerationView;unavailable?:boolean}){
   const job=currentJob;
   const [retrying,setRetrying]=useState(false),[feedback,setFeedback]=useState('');
@@ -31,7 +32,7 @@ export function GenerationProgress({job:currentJob,unavailable=false}:{job:Gener
     {job.retryAllowed&&<button className="text-button" disabled={retrying} onClick={()=>void retry()}>Relancer le démarrage</button>}
     {feedback&&<p role="status">{feedback}</p>}
     </div></CreationSwap>
-    {(currentJob.status==='rendering'||currentJob.videoUrl)&&<><div className={`generated-video${job.aspectRatio==='16:9'?' is-horizontal':''}`}><ProgressiveVideo key={currentJob.id} jobId={currentJob.id} anonymous={currentJob.ownership==='anonymous'} active={currentJob.status==='rendering'} finalUrl={currentJob.videoUrl} percent={currentJob.progressPercent} label={`Vidéo : ${currentJob.title}`}/></div>{job.syntheticVoice&&<p className="field-help">Voix de synthèse.</p>}<CreationSwap identity={job.downloadUrl?'download':'pending'}><div>{job.downloadUrl&&<a className="button primary" href={job.downloadUrl} download>Télécharger la vidéo</a>}</div></CreationSwap></>}
+    {(currentJob.status==='rendering'||currentJob.videoUrl)&&<><div className={`generated-video${job.aspectRatio==='16:9'?' is-horizontal':''}`}><ProgressiveVideo key={currentJob.id} jobId={currentJob.id} anonymous={currentJob.ownership==='anonymous'} active={currentJob.status==='rendering'} finalUrl={currentJob.videoUrl} percent={currentJob.progressPercent} label={`Vidéo : ${currentJob.title}`}/></div><VideoResultActions job={job}/>{job.syntheticVoice&&<p className="field-help">Voix de synthèse.</p>}</>}
     {job.status==='ready'&&Boolean(job.avatar?.failed)&&<p role="status">La vidéo est prête. {job.avatar!.ready?'Un passage de l’avatar n’a pas pu être créé.':'L’avatar n’a pas pu être créé ; ses crédits supplémentaires ont été rendus.'}</p>}
     {job.status==='ready'&&!job.videoUrl&&<p>La période de conservation de cette vidéo est terminée.</p>}
   </section></CreationMotion>;

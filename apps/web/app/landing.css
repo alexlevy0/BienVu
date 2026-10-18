@@ -399,6 +399,7 @@
 .manual-listing-form:not(.manual-guided-form) .manual-step-fields {display:contents}
 .home-conversation-response {max-width:800px;margin:0 auto 20px}
 .home-conversation-result {display:grid;grid-template-columns:minmax(170px,270px) minmax(200px,1fr);align-items:center;gap:clamp(24px,4vw,55px)}
+.home-conversation-preview {min-width:0}
 .home-conversation-media {width:min(100%,270px,30svh);aspect-ratio:9/16;border-radius:16px;position:relative}
 .home-conversation-status {position:relative;z-index:1}
 .home-conversation-media video,.home-conversation-poster {width:100%;height:100%;display:block;object-fit:cover;aspect-ratio:9/16}
