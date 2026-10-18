@@ -108,9 +108,11 @@
  .home-studio .home-composer-modern .home-setting-toggle[aria-pressed=true] .home-toggle-track::after {transform:translateX(14px)}
 }
 /* Lift the same form out of the hero while retaining its original space. The
-   floating bar spans the workspace, leaving the sidebar and dialogs accessible. */
-.home-hero-dashboard:has(.home-composer-dock[data-floating]) {z-index:20}
-.home-hero-dashboard>.home-create:has(.home-composer-dock[data-floating]) {z-index:21}
+   floating bar spans the workspace, leaving the sidebar and dialogs accessible.
+   Its own z-index keeps it above the page; isolating the hero wrappers would
+   prevent its backdrop filter from blurring the sections scrolling behind it. */
+.home-hero-dashboard:has(.home-composer-dock[data-floating]) {z-index:auto;isolation:auto}
+.home-hero-dashboard>.home-create:has(.home-composer-dock[data-floating]) {z-index:auto}
 .home-studio .home-composer-dock[data-floating=true] {position:fixed;top:var(--home-composer-top,var(--home-studio-inset,12px));left:var(--home-composer-left,0px);width:var(--home-composer-width,100%);z-index:20}
 .home-studio .home-composer-dock[data-floating] {max-height:calc(100dvh - var(--home-composer-top,var(--home-studio-inset,12px)) - var(--home-studio-inset,12px));overflow-y:auto;overscroll-behavior:contain;background:#fffefa;border:1px solid #d9e1d2;box-shadow:0 12px 34px -12px #29362026,0 3px 10px -4px #29362014;border-radius:18px}
 .home-studio .home-composer-dock[data-floating] .home-composer-modern {padding:max(12px,env(safe-area-inset-top)) 20px 10px;gap:10px;border:0;border-radius:0;background:transparent;box-shadow:none}
