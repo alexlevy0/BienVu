@@ -13,6 +13,7 @@ import {measureVoiceWav} from '@bienvu/voice';
 import {bundleDir} from './paths';
 import {prepareProgressiveDirectory,progressiveFfmpegArgs,readProgressiveVideo,followProgressiveVideo,type StreamOptions} from './progressive-video';
 import type {ListingVideoProps} from '../../../packages/video/src/listing';
+import {TRIAL_WATERMARK_SVG,trialWatermarkLayout,trialWatermarkOverlay} from '../../../packages/video/src/watermark-artwork';
 const exec = promisify(execFile), sha = (b: Uint8Array) => createHash('sha256').update(b).digest('hex');
 const binary = (name: 'ffmpeg' | 'ffprobe') => process.env[name === 'ffmpeg' ? 'BIENVU_FFMPEG_PATH' : 'BIENVU_FFPROBE_PATH'] ?? name;
 const cwd = (name: string) => path.isAbsolute(name) ? path.dirname(name) : undefined;
@@ -140,20 +141,16 @@ export async function verifyVideoArtifact(file:string,id:string,frames:number,wa
 }
 // One bounded derivative from the finished master. The AAC stream is copied;
 // neither Remotion, narration nor the importer runs a second time.
-export async function writeTrialWatermark(watermark:string){
-  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="660" height="112" viewBox="0 0 660 112">
-    <rect x="1" y="1" width="658" height="110" rx="18" fill="#171714" fill-opacity=".72" stroke="#fff" stroke-opacity=".7"/>
-    <g fill="none" stroke="#fff" stroke-width="4"><path d="M25 48V27H46 M77 27H98V48 M25 66V87H46 M77 87H98V66"/></g>
-    <text x="122" y="58" font-family="sans-serif" font-weight="700" font-size="40" fill="#fff">bienvu · aperçu</text>
-    <text x="124" y="88" font-family="sans-serif" font-size="22" fill="#fff">bienvu.online</text></svg>`;
-  await sharp(Buffer.from(svg)).png().toFile(watermark);
+export async function writeTrialWatermark(watermark:string,dimensions={width:1080,height:1920}){
+  const layout=trialWatermarkLayout(dimensions);
+  await sharp(Buffer.from(TRIAL_WATERMARK_SVG)).resize(layout.width,layout.height).png().toFile(watermark);
 }
 export async function createWatermarkedPreview(master:string,directory:string,id:string,frames:number,voiceEnabled=true,dimensions:Pick<VideoManifest,'width'|'height'>={width:1080,height:1920}) {
   const start=performance.now(),startedAt=new Date().toISOString(),watermark=path.join(directory,'trial-watermark.png');
   const output=path.join(directory,'preview.mp4');
-  await writeTrialWatermark(watermark);
+  await writeTrialWatermark(watermark,dimensions);
   try {
-    await exec(binary('ffmpeg'),['-v','error','-i',master,'-i',watermark,'-filter_complex',`[0:v][1:v]overlay=(W-w)/2:${dimensions.width>dimensions.height?'(H-h)/2':'690'}:format=auto[v]`,
+    await exec(binary('ffmpeg'),['-v','error','-i',master,'-i',watermark,'-filter_complex',trialWatermarkOverlay(dimensions,1),
       '-map','[v]',...(voiceEnabled?['-map','0:a:0']:[]),'-c:v','libx264','-preset','veryfast','-crf','21','-pix_fmt','yuv420p','-threads','1','-c:a','copy','-movflags','+faststart','-y',output],
       // Scale the bounded transcode allowance with the validated 20–40 s
       // master, so anonymous 40 s previews do not inherit a 20 s timeout.
@@ -191,7 +188,7 @@ export async function renderListingVideo(input: unknown, directory: string): Pro
           if(audio)await renderMedia({serveUrl:bundleDir,composition,inputProps:props,...browser(manifest),codec:'wav',
             outputLocation:audio,concurrency:4,timeoutInMilliseconds:120_000,logLevel:'error'});
           const watermark=manifest.rights.kind==='anonymous'?path.join(directory,'trial-watermark.png'):undefined;
-          if(watermark)await writeTrialWatermark(watermark);
+          if(watermark)await writeTrialWatermark(watermark,manifest);
           streamOptions={directory:streamDirectory,audio,watermark,width:manifest.width,height:manifest.height};
         }catch{streamOptions=undefined;await rm(path.join(directory,'stream'),{recursive:true,force:true});}
       }

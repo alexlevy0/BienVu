@@ -11,6 +11,7 @@ import {AvatarOverlay} from './avatar';
 import {MapOverlay} from './map';
 import {SceneLayers} from './scene-layers';
 import {MarketingLayerContext} from './marketing-layer';
+import {TrialWatermark} from './watermark';
 
 // Ces URL sont résolues uniquement par le renderer Node vers son serveur
 // loopback privé. Le manifeste serveur n'accepte jamais d'URL d'asset cliente.
@@ -117,8 +118,6 @@ export function ListingFilm(props: ListingVideoProps) {
     {props.marketingLayer!=='background'&&!horizontal&&!isDesignedStyle(m.visualStyle)&&<VerticalBrand manifest={m} frame={f} media={props.media} logoBackground={props.logoBackground} Image={Img}/>}
     <MapOverlay manifest={m} media={props.media} moduleUrl={props.maplibreModuleUrl} workerUrl={props.maplibreWorkerUrl}/>
     {!props.marketingLayer&&<AvatarOverlay manifest={m} media={props.media} bounds={props.avatarBounds}/>}
-    {props.marketingLayer!=='background'&&m.rights.watermarked && (!horizontal||mapFrame(m.map?.settings,at,f)!==null) && <div style={{position:'absolute',zIndex:VIDEO_LAYERS.watermark,left:editorial?235:262,top:editorial?785:f >= scenes.at(-1)!.from ? 540 : 780,transform:'rotate(-14deg)',
-      background:'#132a23d9',border:'2px solid #ffffffa0',borderRadius:12,padding:'18px 30px',color:'#fff',
-      fontWeight:750,fontSize:35,letterSpacing:2}}>BIENVU · VIDÉO D’ESSAI</div>}
+    {props.marketingLayer!=='background'&&m.rights.watermarked&&<TrialWatermark width={m.width} height={m.height}/>}
   </AbsoluteFill></MarketingLayerContext.Provider>;
 }

@@ -195,8 +195,6 @@ export function HorizontalPhotoScene({manifest:m,media,index,frame:currentFrame,
     {!contact&&(m.logo||m.brand.name)&&<div style={{position:'absolute',top:64,right:96,maxWidth:330,display:'flex',alignItems:'center',gap:12,
       background:'#111b',padding:'12px 18px',borderRadius:10,fontSize:25,lineHeight:1.2,overflowWrap:'anywhere'}}>
       {m.logo&&<Img src={media[m.logo.id]} style={{width:54,height:54,objectFit:'contain',background:logoBackground}}/>}{m.brand.name}</div>}
-    {m.rights.watermarked&&<div style={{position:'absolute',left:600,top:460,transform:'rotate(-9deg)',padding:'20px 32px',background:'#132a23d9',
-      border:'2px solid #ffffffa0',borderRadius:12,fontSize:36,fontWeight:750}}>BIENVU · VIDÉO D’ESSAI</div>}
   </SceneLayers>;
 }
 

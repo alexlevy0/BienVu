@@ -80,6 +80,5 @@ export function DesignedPhotoScene({manifest:m,media,index,frame,audio,Image:Img
    </div>
   </>}
   {m.subtitlesEnabled!==false&&subtitle&&<div data-bienvu-subtitle="true" style={{position:'absolute',left:wide?110:108,right:wide?(signature?792:mosaic?792:250):180,top:wide?(signature?748:mosaic?686:514):(signature?1036:mosaic?1092:968),padding:'18px 24px',borderRadius:signature?0:18,background:signature?'#f5f1e9ed':'#0c1814e8',color:signature?dark:'#fff',fontSize:fitFont(subtitle,wide?(signature||mosaic?970:1512):744,140,wide?37:42,27),lineHeight:1.2,overflowWrap:'anywhere',textAlign:signature?'left':'center'}}>{subtitle}</div>}
-  {wide&&m.rights.watermarked&&<div style={{position:'absolute',left:600,top:460,transform:'rotate(-9deg)',padding:'20px 32px',background:'#132a23d9',border:'2px solid #ffffffa0',borderRadius:12,fontSize:36,fontWeight:750}}>BIENVU · VIDÉO D’ESSAI</div>}
  </Layers>;
 }

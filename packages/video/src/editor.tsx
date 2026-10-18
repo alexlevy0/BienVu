@@ -1,9 +1,10 @@
 import React from 'react';
 import {AbsoluteFill,Audio,Img,OffthreadVideo,Freeze,Sequence,useCurrentFrame} from 'remotion';
-import {editorClipStarts,editorLayerStyle,editorPhotoMotion,editorCaptionStyle,editorMusicGain,editorMusicFrames,mapFrame,VIDEO_LAYERS,type VideoManifest,type EditorCamera,type AvatarContentBounds} from '@bienvu/contracts';
+import {editorClipStarts,editorLayerStyle,editorPhotoMotion,editorCaptionStyle,editorMusicGain,editorMusicFrames,mapFrame,type VideoManifest,type EditorCamera,type AvatarContentBounds} from '@bienvu/contracts';
 import {subtitleGroups} from './layout';
 import {AvatarOverlay} from './avatar';
 import {MapOverlay} from './map';
+import {TrialWatermark} from './watermark';
 
 function EditorPhoto({m,media,slot,index,duration,camera}:{m:VideoManifest;media:Record<string,string>;slot:number;index:number;duration:number;camera?:EditorCamera}){
   const frame=useCurrentFrame(),photo=m.photos[slot],animation=m.photoAnimations?.find(a=>a.photoAssetId===photo.id),
@@ -42,7 +43,6 @@ export function EditorFilm({manifest:m,media,moduleUrl,workerUrl,bounds}:{manife
     </Sequence>}
     <MapOverlay manifest={m} media={media} moduleUrl={moduleUrl} workerUrl={workerUrl}/>
     <AvatarOverlay manifest={m} media={media} bounds={bounds}/>
-    {m.rights.watermarked&&<div style={{position:'absolute',zIndex:VIDEO_LAYERS.watermark,top:'45%',left:'15%',width:'70%',textAlign:'center',fontSize:42,color:'#fff',background:'#132a23d9',padding:24,
-      transform:'rotate(-14deg)'}}>BIENVU · VIDÉO D’ESSAI</div>}
+    {m.rights.watermarked&&<TrialWatermark width={m.width} height={m.height}/>}
   </AbsoluteFill>;
 }

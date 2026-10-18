@@ -3,6 +3,7 @@ import {createHash} from 'node:crypto';
 import {spawn} from 'node:child_process';
 import path from 'node:path';
 import {ProgressiveVideo,STREAM_SEGMENT_MAX_BYTES,streamSegmentFile,type VideoManifest} from '@bienvu/contracts';
+import {trialWatermarkOverlay} from '../../../packages/video/src/watermark-artwork';
 export type StreamOptions={directory:string;audio?:string;watermark?:string;width:number;height:number};
 const sleep=(ms:number)=>new Promise(resolve=>setTimeout(resolve,ms));
 
@@ -24,7 +25,7 @@ export function followProgressiveVideo(file:string,options:StreamOptions){
   const ffmpeg=process.env.BIENVU_FFMPEG_PATH??'/usr/bin/ffmpeg';
   const args=['-v','error','-probesize','32768','-analyzeduration','0','-f','mp4','-i','pipe:0',
     ...(options.audio?['-i',options.audio]:[]),...(options.watermark?['-i',options.watermark]:[]),
-    ...(options.watermark?['-filter_complex',`[0:v][${options.audio?2:1}:v]overlay=(W-w)/2:${options.width>options.height?'(H-h)/2':'690'}:format=auto[v]`,
+    ...(options.watermark?['-filter_complex',trialWatermarkOverlay(options,options.audio?2:1),
       '-map','[v]','-c:v','libx264','-preset','veryfast','-crf','21','-pix_fmt','yuv420p','-threads','1','-g','60','-keyint_min','60','-sc_threshold','0']:['-map','0:v:0','-c:v','copy']),
     ...(options.audio?['-map','1:a:0','-c:a','aac','-b:a','192k','-ar','48000']:[]),
     '-f','hls','-hls_time','2','-hls_list_size','0','-hls_playlist_type','event','-hls_flags','independent_segments+temp_file',
