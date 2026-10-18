@@ -17,6 +17,7 @@ import {HomeCreateButton} from './home-create-button';
 import {BetaSettingsSummary} from './beta-settings-summary';
 import {PhotoDurationAdvice} from './photo-duration-advice';
 import {PhotoAnimationToggle} from './photo-animation-toggle';
+import {HomeComposerSettings} from './home-composer-settings';
 import {withPhotoAnimationChoice,type PhotoAnimationSelection} from '../lib/photo-animation-choice';
 import type {ManualListingFormHandle,PreparedManualListing} from './manual-listing-form';
 import {generationActive, useGenerationProgress} from './generation-progress-state';
@@ -643,20 +644,10 @@ function HomeCreateContent({onLayoutChange,renderChoice,onClearRenderChoice,voic
         <img src={photo.preview} alt={`Photo ${index+1} : ${photo.file.name}`}/><button type="button" disabled={photoChecking||Boolean(incomingPhotos)} aria-label={`Retirer ${photo.file.name}`} onClick={()=>removeComposerPhoto(photo.id)}><HomeIcon name="close" size={14}/></button>
       </m.li>)}</AnimatePresence></m.ol><p role="status">{composerPhotos.length} photo{composerPhotos.length>1?'s':''} · Appuyez sur Entrée pour compléter votre annonce.</p></div>}
       {photoChecking&&<p className="home-photo-status" role="status">Vérification des photos…</p>}
-      <div className="home-composer-bottom"><div className="home-format-tags">
-        <label className="home-format-control"><span className="home-select-content"><HomeIcon name={aspectRatio==='16:9'?'landscape':'phone'} size={21}/><select aria-label="Format de la vidéo" value={aspectRatio} title="Format de la vidéo"
-          disabled={loading||busy||activeGuestJob} onChange={event=>setAspectRatio(event.target.value==='16:9'?'16:9':'9:16')}>
-          <option value="9:16">Vertical 9:16</option><option value="16:9">Horizontal 16:9</option></select><HomeIcon name="chevron" size={16}/></span></label>
-        <label className="home-duration-pill"><span className="home-select-content"><HomeIcon name="clock" size={20}/><select aria-label="Durée de la vidéo" value={durationSeconds} title="Durée de la vidéo"
-          disabled={loading||busy||activeGuestJob} onChange={event=>setDurationSeconds(VideoDuration.parse(Number(event.target.value)))}>
-          <option value={20}>20 s</option><option value={30}>30 s</option><option value={40}>40 s</option></select></span></label>
-        <button type="button" className={`home-voice-pill home-setting-toggle${voiceEnabled?' is-active':''}`} aria-pressed={voiceEnabled} aria-label="Voix off" title="Activer ou désactiver la voix off" disabled={loading||busy||activeGuestJob} onClick={()=>setVoiceEnabled(!voiceEnabled)}><span className="home-option-label">Voix off</span><span className="home-toggle-track" aria-hidden="true"/></button>
-        <button type="button" className={`home-subtitles-pill home-setting-toggle${subtitlesEnabled?' is-active':''}`} aria-pressed={subtitlesEnabled} aria-label="Sous-titres de la voix off"
-          title={voiceEnabled?"Afficher ou masquer les sous-titres de la voix off":"Activez la voix off pour ajouter des sous-titres"} disabled={!voiceEnabled||loading||busy||activeGuestJob}
-          onClick={()=>setSubtitlesEnabled(!subtitlesEnabled)}><span className="home-option-label">Sous-titres</span><span className="home-toggle-track" aria-hidden="true"/></button>
-        <PhotoAnimationToggle enabled={animationsEnabled} selection={animationSelection} requiresLogin={!me} disabled={loading||busy||presetPreparing||photoChecking||activeGuestJob} onChange={changeAnimations}/>
-        </div><m.button whileTap={{scale:.98}} type="button" className="home-customize-button" aria-pressed={customizing||screen.kind==='guest-customizing'} disabled={loading||busy||photoChecking||activeOtherJob||activeGuestJob} onClick={()=>void personalize()}><HomeIcon name="settings" size={21}/>Personnaliser</m.button>
-      </div>
+      <HomeComposerSettings aspectRatio={aspectRatio} durationSeconds={durationSeconds} voiceEnabled={voiceEnabled} subtitlesEnabled={subtitlesEnabled}
+        disabled={loading||busy||activeGuestJob} animationsEnabled={animationsEnabled} animationSelection={animationSelection} animationsDisabled={loading||busy||presetPreparing||photoChecking||activeGuestJob} requiresLogin={!me}
+        personalizing={customizing||screen.kind==='guest-customizing'} personalizeDisabled={loading||busy||photoChecking||activeOtherJob||activeGuestJob}
+        onAspectRatio={setAspectRatio} onDuration={setDurationSeconds} onVoice={setVoiceEnabled} onSubtitles={setSubtitlesEnabled} onAnimations={changeAnimations} onPersonalize={()=>void personalize()}/>
       </div></div></CreationReveal>
     </form>
     <div className="home-composer-secondary" inert={composerSticky&&!composerExpanded} aria-hidden={composerSticky&&!composerExpanded}><div className="home-composer-secondary-clip"><button type="button" className={manual?'home-mode-pill is-active':'home-mode-pill'} aria-pressed={manual} disabled={busy || photoChecking || Boolean(incomingPhotos) || activeGuestJob} onClick={()=>{if(manual)void manualForm.current?.cancel();else if(composerPhotos.length)openWithPhotos();else openManual();}}><HomeIcon name="image" size={20}/>Ajouter mes photos</button></div></div>
