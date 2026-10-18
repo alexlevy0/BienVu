@@ -1,10 +1,12 @@
 'use client';
 
-import {useCallback,useEffect,useRef,useState,type CSSProperties,type KeyboardEvent} from 'react';
+import {useCallback,useEffect,useRef,useState,type CSSProperties,type KeyboardEvent,type RefObject} from 'react';
 import {useReducedMotion} from 'motion/react';
 import {CreationMotion,m} from './creation-motion';
 import {HomeHeroDepthVideo,SoundIcon} from './home-hero-depth-video';
 import {HomeIcon} from './home-icons';
+import {HeroBacklight} from './hero-backlight';
+import {VideoBacklight} from './video-backlight';
 import {homeClock,type HomeMediaView} from './homepage-media';
 import {emptyHeroImage} from '../lib/home-hero-depth';
 import {homeHeroDepth} from '../lib/home-hero-depth-assets';
@@ -18,6 +20,7 @@ export function HomeHeroCarousel(props:Props){return <CreationMotion><Carousel {
 function Carousel({movie,visual,companions,paused,depth,onDepthUnavailable,onPlayingChange}:Props){
  const [selected,setSelected]=useState(1),[visited,setVisited]=useState(false),reduced=useReducedMotion();
  const pagination=useRef<HTMLDivElement>(null),keyboardSelection=useRef(false);
+ const leftPoster=useRef<HTMLImageElement>(null),centerPoster=useRef<HTMLImageElement>(null),rightPoster=useRef<HTMLImageElement>(null),posters=[leftPoster,centerPoster,rightPoster];
  const cards=[companions[0],movie,companions[1]],label=(item:HomeMediaView)=>item.locality??item.title??'Vidéo immobilière';
  const choose=(index:number)=>{if(index===selected)return;setVisited(true);onPlayingChange(false);setSelected(index);};
  useEffect(()=>{if(keyboardSelection.current){keyboardSelection.current=false;pagination.current?.querySelectorAll('button')[selected]?.focus({preventScroll:true});}},[selected]);
@@ -33,12 +36,13 @@ function Carousel({movie,visual,companions,paused,depth,onDepthUnavailable,onPla
     const poster=index===1&&depth?homeHeroDepth.backgroundPoster:index===1?(visual.kind==='image'?visual.src:visual.poster??item.poster):item.poster;
     return <m.div key={index} className="home-hero-carousel-card" data-position={position} role="group" aria-roledescription="diapositive" aria-label={`${index+1} sur 3 · ${label(item)}`}
      initial={false} animate={target} style={{zIndex:active?3:1}} transition={{duration:reduced?0:.72,ease:[.22,1,.36,1]}}>
+     <VideoBacklight posterImage={posters[index]} active={false} className="home-hero-carousel-static-halo"/>
+     <picture className="home-hero-carousel-poster"><source media="(min-width:761px)" srcSet={poster?imageWidthUrl(poster,640):emptyHeroImage}/><img ref={posters[index]} src={emptyHeroImage} alt="" width="540" height="960" decoding="async"/></picture>
      <div className="home-hero-carousel-content" inert={!active} aria-hidden={!active}>
       {index===1&&depth?<HomeHeroDepthVideo paused={paused||!active} onPlayingChange={onPlayingChange} onUnavailable={onDepthUnavailable}/>:
-       <CarouselMovie key={item.src} movie={item} poster={poster} active={active&&!paused} selectedByUser={visited} onPlayingChange={onPlayingChange}/>}
+       <CarouselMovie key={item.src} movie={item} poster={poster} posterImage={posters[index]!} active={active&&!paused} selectedByUser={visited} onPlayingChange={onPlayingChange}/>}
      </div>
      {!active&&<button type="button" data-hero-choose className="home-hero-carousel-select" onClick={event=>{keyboardSelection.current=event.detail===0;choose(index);}} aria-label={`Afficher la vidéo au premier plan : ${label(item)}`}>
-      <picture><source media="(min-width:761px)" srcSet={poster?imageWidthUrl(poster,640):emptyHeroImage}/><img src={emptyHeroImage} alt="" width="540" height="960" decoding="async"/></picture>
       <span className="home-hero-carousel-location">{label(item)}<small>{homeClock(item.duration??20)} · Voir la vidéo</small></span>
       <span className="home-hero-carousel-play" aria-hidden="true"><HomeIcon name="play" filled size={19}/></span>
      </button>}
@@ -52,7 +56,7 @@ function Carousel({movie,visual,companions,paused,depth,onDepthUnavailable,onPla
 }
 
 /** Side movies do not receive a source until selected on desktop. */
-function CarouselMovie({movie,poster,active,selectedByUser,onPlayingChange}:{movie:HomeMediaView;poster:string|null;active:boolean;selectedByUser:boolean;onPlayingChange(playing:boolean):void}){
+function CarouselMovie({movie,poster,posterImage,active,selectedByUser,onPlayingChange}:{movie:HomeMediaView;poster:string|null;posterImage:RefObject<HTMLImageElement|null>;active:boolean;selectedByUser:boolean;onPlayingChange(playing:boolean):void}){
  const root=useRef<HTMLDivElement>(null),video=useRef<HTMLVideoElement>(null),loaded=useRef(false),blocked=useRef(!active),attempt=useRef(0);
  const [shown,setShown]=useState(false),[playing,setPlaying]=useState(false),[loading,setLoading]=useState(false),[error,setError]=useState(false),[muted,setMuted]=useState(true),[time,setTime]=useState(0),[duration,setDuration]=useState(movie.duration??20),[fullscreen,setFullscreen]=useState(false);
  useEffect(()=>setFullscreen(Boolean(document.fullscreenEnabled)),[]);
@@ -86,7 +90,7 @@ function CarouselMovie({movie,poster,active,selectedByUser,onPlayingChange}:{mov
  useEffect(()=>{const player=video.current;return()=>{loaded.current=false;player?.pause();player?.removeAttribute('src');player?.load();};},[]);
  const toggle=()=>{if(playing||loading){attempt.current++;video.current?.pause();setLoading(false);}else void play();};
  const keyboard=(event:KeyboardEvent<HTMLDivElement>)=>{if(event.target!==event.currentTarget)return;if(event.key===' '||event.key==='k'){event.preventDefault();toggle();}else if(event.key==='m'&&video.current)video.current.muted=!video.current.muted;};
- return <div className={`home-hero-carousel-movie home-hero-depth-stage${shown?' has-played':''}`} ref={root} role="group" aria-label={`Vidéo : ${movie.title??movie.locality??'Bien immobilier'}`} tabIndex={active?0:-1} onKeyDown={keyboard}>
+ return <div className="home-hero-carousel-movie-frame"><HeroBacklight video={video} active={active&&playing} posterImage={posterImage}/><div className={`home-hero-carousel-movie home-hero-depth-stage${shown?' has-played':''}`} ref={root} role="group" aria-label={`Vidéo : ${movie.title??movie.locality??'Bien immobilier'}`} tabIndex={active?0:-1} onKeyDown={keyboard}>
   <picture><source media="(min-width:761px)" srcSet={poster?imageWidthUrl(poster,640):emptyHeroImage}/><img src={emptyHeroImage} alt="" width="540" height="960" decoding="async"/></picture>
   <video ref={video} muted playsInline loop preload="none" aria-hidden="true" tabIndex={-1}
    onLoadedMetadata={e=>{if(Number.isFinite(e.currentTarget.duration))setDuration(e.currentTarget.duration);}}
@@ -102,5 +106,5 @@ function CarouselMovie({movie,poster,active,selectedByUser,onPlayingChange}:{mov
    <button type="button" className="home-hero-depth-sound" aria-label={muted?'Activer le son':'Couper le son'} aria-pressed={!muted} onClick={()=>{if(video.current)video.current.muted=!video.current.muted;}}><SoundIcon muted={muted}/></button>
    {fullscreen&&<button type="button" aria-label="Afficher la vidéo en plein écran" onClick={()=>void video.current?.requestFullscreen().catch(()=>{})}><HomeIcon name="fullscreen" size={17}/></button>}
   </div><input type="range" aria-label="Position dans la vidéo" min="0" max={duration} step="0.1" value={time} onChange={e=>{if(video.current&&loaded.current){const next=Number(e.target.value);video.current.currentTime=next;setTime(next);}}} style={{'--hero-progress':`${time/duration*100}%`} as CSSProperties}/></div>
- </div>;
+ </div></div>;
 }

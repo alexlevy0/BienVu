@@ -11,6 +11,11 @@ La sélection déplace les trois cartes avec Motion, sans rotation automatique.
 Les boutons latéraux, la pagination et les flèches du clavier changent la
 sélection. Le mouvement est immédiat si l’utilisateur réduit les animations.
 
+Les trois cartes gardent chacune leur halo coloré : la couverture alimente le
+halo des cartes latérales, et les images décodées de la vidéo active alimentent
+celui du premier plan en temps réel. Les halos utilisent les images et lecteurs
+déjà présents, sans seconde lecture ni requête vidéo supplémentaire.
+
 Une seule vidéo joue à la fois. Les vidéos latérales ne reçoivent une source
 qu’après sélection sur desktop ; les couvertures sont des images. Une vidéo
 masquée, hors écran ou dans un onglet caché est mise en pause. Les lecteurs et
