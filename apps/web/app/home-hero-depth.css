@@ -4,6 +4,8 @@
  .home-hero-dashboard:has(.home-hero-carousel){grid-template-columns:minmax(0,1.04fr) minmax(0,1fr);column-gap:22px;padding:30px 28px 22px}
  .home-hero-dashboard:has(.home-hero-carousel) .home-hero-showcase{align-self:center;gap:0}
  .home-hero-dashboard:has(.home-hero-carousel) .home-hero-intro{padding-inline:2px}
+ .home-hero-dashboard:has(.home-hero-carousel)>.home-create{width:calc(100% + clamp(28px,3.5vw,56px))}
+ .home-hero-dashboard:has(.home-hero-carousel)>.home-create:not(:has(.home-composer-dock[data-floating])){z-index:8}
  .home-studio-home .home-hero-dashboard:has(.home-hero-carousel) h1{font-size:clamp(56px,17.2cqw,140px)}
  .home-studio-home .home-hero-dashboard:has(.home-hero-carousel) .home-intro{font-size:clamp(18px,4cqw,25px);max-width:25em}
  .home-hero-dashboard:has(.home-hero-carousel) .home-hero-showcase>p{font-size:clamp(14px,1.35vw,20px);font-weight:550;color:#214f43;margin:0 0 10px;letter-spacing:-.025em}
