@@ -4,12 +4,21 @@ export type WorldActivity={places:WorldPlace[];videoCount:number;placeCount:numb
 export type WorldLocation={jobId:string;locality:string|null;latitude:number;longitude:number};
 
 export function worldPlaceId(latitude:number,longitude:number){return `${latitude.toFixed(1)}:${longitude.toFixed(1)}`;}
+function publicLocality(value:string|null){
+ const text=value?.trim()??'',normalized=text.normalize('NFKD').replace(/\p{Diacritic}/gu,'').toLowerCase();
+ // A manually filled "city" can accidentally contain a street or contact detail.
+ // Such values must not become labels in the anonymous activity projection.
+ const street='(?:rue|avenue|av\\.|boulevard|bd\\.|allee|impasse|route|chemin|residence|lotissement)';
+ if(/[@\r\n]/.test(text)||new RegExp(`^(?:\\d+\\s*(?:bis|ter)?[,\\s]+)?${street}\\b`).test(normalized)
+  ||new RegExp(`\\b\\d+\\s*(?:bis|ter)?\\s+${street}\\b`).test(normalized))return 'Lieu filmé';
+ return text.slice(0,100)||'Lieu filmé';
+}
 export function groupWorldLocations(rows:WorldLocation[]):WorldPlace[]{
  const groups=new Map<string,WorldPlace>();
  for(const row of rows){
   if(!Number.isFinite(row.latitude)||!Number.isFinite(row.longitude)||Math.abs(row.latitude)>80||Math.abs(row.longitude)>180)continue;
   const latitude=Math.round(row.latitude*10)/10,longitude=Math.round(row.longitude*10)/10,id=worldPlaceId(latitude,longitude);
-  const old=groups.get(id),locality=row.locality?.trim().slice(0,100)||'Lieu filmé';
+  const old=groups.get(id),locality=publicLocality(row.locality);
   if(old){old.count++;if(old.locality==='Lieu filmé')old.locality=locality;}
   else groups.set(id,{id,locality,latitude,longitude,count:1,videos:[]});
  }

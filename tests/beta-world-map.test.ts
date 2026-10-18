@@ -21,6 +21,9 @@ test('carte monde : coordonnées arrondies, données invalides écartées et gro
  assert.equal(worldClusters(places,0).reduce((n,c)=>n+c.count,0),4);
  assert.equal(worldClusters(places,7).length,3);assert.ok(worldClusters(places,0).some(c=>c.places.length>1));
  assert.ok(worldClusters(places,0).every(c=>!worldClusters(places,3).some(other=>other.id===c.id)),'Les écouteurs ne réutilisent pas un ancien cluster après le zoom');
+ for(const locality of ['12 rue des Lilas','Paris, 18 avenue privée','Route de la propriété','client@example.test']){
+  assert.equal(groupWorldLocations([{jobId:'private',locality,latitude:48.85663,longitude:2.35221}])[0].locality,'Lieu filmé');
+ }
 });
 
 test('carte publique : accord du propriétaire, publication existante, révocation, range et absence de fuite des clés',async t=>{
