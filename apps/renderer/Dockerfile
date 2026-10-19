@@ -1,4 +1,4 @@
-FROM node:24.21.0-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20
+FROM node:26.12.0-bookworm-slim@sha256:298992629d69bbd5b2b03ad57094d8e4fcb3a8eeb7c4e25d29de656519568913
 # Chrome/FFmpeg versions are recorded from the built image in evidence.
 RUN apt-get update && apt-get install -y --no-install-recommends \
   ca-certificates ffmpeg fonts-dejavu-core libnss3 libdbus-1-3 libatk1.0-0 \
