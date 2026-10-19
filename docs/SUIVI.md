@@ -1,5 +1,15 @@
 # BienVu — suivi des sprints
 
+### 19/10/2026 — Sourcemaps rétablies après restauration des fichiers locaux
+
+Les **10 fichiers `.env*` réels** restaurés par Alex sont ignorés par Git, non suivis et protégés en mode **600**. La clé personnelle PostHog est validée par les envois effectifs ; seul ce secret de compilation est lu par les scripts habituels. Aucun secret de production n’est remplacé à partir de ces fichiers. La présence des autres fichiers ne constitue pas une vérification des accès fournisseurs.
+
+Build OpenNext avec sourcemaps, préparation du bundle final et publication web `--keep-vars --strict`, sans nouvelle compilation après l’injection PostHog (`no_bundle`). Release **`03ceb9ba9a56`**, Worker web **`efb1f87b-57ff-4e12-b4ae-75133f541cf8`**, actif à **100 %**. PostHog EU **299212** confirme les fichiers du serveur et des deux chunks navigateur contrôlés, sans erreur de chargement. Chunk serveur **`10e58e58-990f-5c0f-99f4-41fd16e9667d`** ; SHA-256 du bundle distant identique au bundle associé aux symboles : **`c39529e8de647093d1f2dbf6beaf4b9de016927cc35a6c967b5ac7da61ae6668`**. Les deux scripts navigateur servis sont également identiques aux fichiers locaux.
+
+Les **64 bindings / 23 secrets** web, domaines, crons et paramètres de runtime restent identiques hors release/chunk. Génération **`4081a1f5-eacb-469a-ae3a-d7afe7a37e52`**, Workflow et renderer **v37** inchangés ; aucun job actif au contrôle. Accueil, Beta et connexion **200**, redirection Beta **302**, génération privée anonyme **401**. Statistiques et suivi des erreurs actifs ; aucune map dans les assets publics, URL de map testée **404**. Publication inscrite dans l’historique du superadmin après vérification de la version active.
+
+La [CI du correctif 30/40 secondes](https://github.com/alexlevy0/BienVu/actions/runs/39312192333) est désormais **réussie**. La limitation PostHog de la publication précédente est levée pour cette nouvelle version. Aucun nouvel appel de génération payant ni migration distante. Preuves et logs privés ignorés dans `evidence/local/posthog-narration-release/`, synthèse `verification.json`. Retour arrière web disponible vers **`f1e6a0de-a3f2-407e-8876-5391e1f3f45a`**.
+
 ### 19/10/2026 — Narrations trente/quarante secondes publiées
 
 Commit produit **`6866e6ce1de598b71a2d4a9f3023b853af8ceec4`** poussé sur `main`. Worker de génération **`4081a1f5-eacb-469a-ae3a-d7afe7a37e52`**, Worker web **`f1e6a0de-a3f2-407e-8876-5391e1f3f45a`**, tous deux actifs à **100 %**. La release web est **`6866e6ce1de5`** ; les nouvelles générations utilisent les formulations 30/40 s corrigées et la proposition locale correspondante. Aucun MP4 historique régénéré.
