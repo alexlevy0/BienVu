@@ -6,6 +6,18 @@
 import type {CoverageSourceId, SourceCoverageEntry} from './source-coverage';
 
 export const sourceCoverageData = {
+  "airbnb": {
+    "summary": "Lecture du logement et de sa galerie publique. Les tarifs par nuit ou séjour ne sont pas assimilés à un loyer mensuel ; les surfaces non publiées restent absentes.",
+    "samples": [{
+      "url": "https://www.airbnb.fr/rooms/1574033703710946850",
+      "label": "Appartement · Paris",
+      "checkedAt": "2026-10-19",
+      "environment": "local_https",
+      "outcome": "complete",
+      "photos": 9,
+      "note": "Titre, type, ville, description et 9 photos décodées via le transport HTTPS sécurisé. Sans tarif ni surface inventés. Vérification Cloudflare à confirmer."
+    }]
+  },
   "orpi": {
     "summary": "Une annonce importée avec 12 photos. Un autre lien n’était pas accessible : utilisez l’adresse d’un bien encore en ligne.",
     "samples": [

@@ -15,6 +15,7 @@ import {extractNestenn} from './agencies/nestenn';
 import {extractHuman} from './agencies/human';
 import {extractCitya} from './agencies/citya';
 import {extractLaforet} from './agencies/laforet';
+import {extractAirbnb} from './portals/airbnb';
 export {verified, missing} from './facts';
 
 type Obj = Record<string, unknown>;
@@ -28,7 +29,7 @@ function canonical(nodes: HtmlNode[], url: string) {
   const value = unique(found, 'Plusieurs URL canoniques.') ?? url;
   const a = publicUrl(value), b = publicUrl(url);
   const source = sourceForHost(b.hostname);
-  const samePath = a.pathname === b.pathname || source?.id === 'orpi' && sourceListingId(source, b.pathname) &&
+  const samePath = a.pathname === b.pathname || (source?.id === 'orpi' || source?.id === 'airbnb') && sourceListingId(source, b.pathname) &&
     a.pathname.replace(/\/$/, '') === b.pathname.replace(/\/$/, '');
   // Le canonique peut enlever la query de suivi, jamais changer de bien.
   if (!sameSourceHost(a.hostname, b.hostname) || !samePath || a.search && a.search !== b.search)
@@ -270,7 +271,8 @@ export function extractListingHtml(html: string, url: string, options: {allowPar
   const scripts = nodes.filter(n => tag(n) === 'script' && attr(n, 'type') === 'application/ld+json');
   if (scripts.length > 20) throw new ImportFailure('NOT_A_LISTING', 'Trop de blocs JSON-LD.');
   const documents = scripts.flatMap(n => {const content = rawText(n); if (content.length > 128_000) throw new ImportFailure('NOT_A_LISTING', 'JSON-LD trop volumineux.'); try {return [JSON.parse(content) as unknown];} catch {return [];}});
-  const specific = adapter.id === 'cesar-brutus' ? extractCesarBrutus(nodes, documents, url, canonicalUrl, adapter.listingId!)
+  const specific = adapter.id === 'airbnb' ? extractAirbnb(nodes, documents, url, canonicalUrl, adapter.listingId!)
+    : adapter.id === 'cesar-brutus' ? extractCesarBrutus(nodes, documents, url, canonicalUrl, adapter.listingId!)
     : adapter.id === 'iad' ? extractIad(nodes, documents, url, canonicalUrl, adapter.listingId!)
     : adapter.id === 'remax' ? extractRemax(nodes, documents, url, canonicalUrl, adapter.listingId!)
     : adapter.id === 'safti' ? extractSafti(nodes, documents, url, canonicalUrl, adapter.listingId!)

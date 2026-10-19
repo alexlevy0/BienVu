@@ -24,6 +24,7 @@ export const coverageSources = [
   {id: 'seloger', name: 'SeLoger', kind: 'portal', hosts: ['www.seloger.com', 'seloger.com'], domains: []},
   {id: 'leboncoin', name: 'Leboncoin', kind: 'portal', hosts: ['www.leboncoin.fr', 'leboncoin.fr'], domains: []},
   {id: 'bienici', name: 'Bien’ici', kind: 'portal', hosts: ['www.bienici.com', 'bienici.com'], domains: []},
+  {id: 'airbnb', name: 'Airbnb', kind: 'portal', hosts: ['www.airbnb.fr', 'airbnb.fr', 'www.airbnb.com', 'airbnb.com'], domains: []},
 ] as const;
 export type CoverageSource = typeof coverageSources[number];
 export type CoverageSourceId = CoverageSource['id'];
