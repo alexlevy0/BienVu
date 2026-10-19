@@ -1,5 +1,13 @@
 # BienVu — suivi des sprints
 
+### 19/10/2026 — Attente HeyGen de trente minutes publiée
+
+À la demande d’Alex, commit **`477d13b91f885ea019e9865aa85829fa8508ab37`** poussé sur `main`, puis publication du seul Worker **`bienvu-generation-development`** avec `wrangler deploy --config wrangler.staging.avatar-wait.jsonc --keep-vars --strict --containers-rollout none`. La configuration privée est reconstituée depuis les réglages distants actuels et compilée avant publication ; aucun instantané historique n’est utilisé comme cible par défaut. Version active **`2711bf06-89c5-4b9d-aad0-7bb5a53b011b` à 100 %**.
+
+Contrôle après publication le **19/10 à 20:36 Paris** : bundle distant identique au bundle vérifié par SHA-256 (**`0575da2f4e294ca785c9e9f3784e47ecc0e39d8a3dcbeb85539088a86db6c532`**), **36 bindings et 10 secrets conservés**, mêmes D1/R2, namespace Durable Object, Workflow, variables, compatibilité, observabilité, limites, domaines et cron cinq minutes. Renderer **version 37**, image, capacité et configuration strictement inchangés ; aucun rollout de conteneur. Worker privé sans authentification **401**, accueil et domaine Beta **200**. Aucun appel de génération payant ni migration. Le job historique `27aa3596-46c7-4936-9e13-f0b970148f1d` reste terminé avec le même manifeste et zéro crédit avatar consommé ; il n’est pas réparé par ce déploiement.
+
+Les **29 tests ciblés**, types complets, frontières et compilation sont validés ; le passage général et sa relance réseau isolée sont détaillés ci-dessous. La fixture de registre de l’essai anonyme est actualisée pour Airbnb. [CI du commit produit](https://github.com/alexlevy0/BienVu/actions/runs/39303587226) et [sécurité des dépendances](https://github.com/alexlevy0/BienVu/actions/runs/39303587281) à consulter pour leur résultat distant ; aucune réussite CI n’est déduite du déploiement. Sauvegardes et preuves privées ignorées sous `evidence/local/avatar-wait-deploy/`, dont `verification.json` et `deploy.log`.
+
 ### 19/10/2026 — Attente prolongée des avatars HeyGen (local)
 
 Le job `27aa3596-46c7-4936-9e13-f0b970148f1d` a livré une vidéo sans avatar après environ onze minutes d’attente ; le clip HeyGen a été récupéré ensuite et les trois crédits avatar ont été libérés. La boucle de 60 contrôles à dix secondes est remplacée par une fenêtre de **30 minutes**, avec contrôles toutes les **30 secondes**, échéance figée dans un checkpoint et limite globale du job prioritaire. Une reprise ne rallonge pas la fenêtre ; le dernier contrôle ne soumet aucun nouveau passage. Succès et échecs définitifs terminent l’attente immédiatement, et le repli existant conserve les seuls clips prêts à l’expiration.
