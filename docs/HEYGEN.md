@@ -32,6 +32,8 @@ Si le rendu final échoue après la préparation du manifeste, **Mes biens → R
 
 Un intent est enregistré avant l’appel payant. Les requêtes utilisent les clés d’idempotence stables de l’API v3. Une réponse de création perdue n’est jamais remplacée par une autre création. Les identifiants connus sont interrogés par le Workflow et le cron ; le bouton de réconciliation du superadmin ne génère rien. Sans identifiant fournisseur ni notification authentifiée, un résultat incertain reste à vérifier. Un clip reçu après un export ne modifie pas le MP4 existant et ne débite pas rétroactivement le client.
 
+Après la première étape de soumission, le Workflow accorde une fenêtre d’attente de **30 minutes**, avec une lecture toutes les **30 secondes** et un dernier contrôle à l’échéance, sans nouvelle soumission à ce dernier passage. L’échéance est enregistrée dans un checkpoint durable : une reprise ne la repousse pas et les temps d’appel sont inclus. La limite globale du job reste prioritaire. Un succès ou un échec définitif arrête l’attente immédiatement ; à expiration, le montage continue avec les seuls clips prêts et le supplément suit les règles existantes. Les pauses durables n’allument pas le renderer. Ce correctif est vérifié localement ; son déploiement est à distinguer du code présent dans le dépôt.
+
 Les fichiers sont conservés dans le R2 privé, sous le job, avant le rendu. Le cache est limité à 90 jours, sauf si le fichier appartient à une vidéo conservée de manière permanente. L’expiration d’une référence de cache ne supprime jamais un média d’une vidéo d’origine.
 
 ## Configuration serveur

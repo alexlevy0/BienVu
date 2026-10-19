@@ -15,6 +15,7 @@ import {animateWorkflowPhotos} from './animation-workflow';
 import {prepareGenerationMap,MapConfirmationRequired} from './default-video-map';
 import {safeAiEvent} from '@bienvu/observability';
 import {submitJobAvatars,pollJobAvatars,timeoutJobAvatars,reconcileAvatarTasks} from './avatars';
+import {waitForWorkflowAvatars} from './avatar-workflow';
 import type {HeygenEnvironment} from '@bienvu/avatars';
 import {generationController,waitForGenerationResource,syncRunwayLimits} from './generation-queue';
 import {sendGenerationNotifications,type BrowserPushEnvironment} from '@bienvu/notifications';
@@ -135,15 +136,13 @@ export class GenerationWorkflow extends WorkflowEntrypoint<GenerationEnv,{agency
         await waitForGenerationResource(this.env,step,agencyId,jobId,'avatar');
         await step.do('prepare-avatar-clips',{...once,timeout:'3 minutes'},async()=>{
           const row=await active(this.env,agencyId,jobId);await setGenerationPreparation(this.env.DB,row,'avatar','working');return this.avatars(agencyId,jobId);});
-        let done=false;
-        for(let poll=0;poll<60;poll++){
-          const status=await step.do(`avatar-status-${poll}`,{retries:{limit:1,delay:'2 seconds'},timeout:'2 minutes'},async()=>{
-            const row=await active(this.env,agencyId,jobId);await this.avatars(agencyId,jobId);
-            const status=await this.pollAvatars(agencyId,jobId);
-            if(status.done)await setGenerationPreparation(this.env.DB,row,'avatar',status.ready?'ready':'skipped');
-            return status;});
-          if(status.done){done=true;break;}await step.sleep(`avatar-wait-${poll}`,'10 seconds');
-        }
+        const done=await waitForWorkflowAvatars(step,async()=>(await active(this.env,agencyId,jobId)).deadline,async maySubmit=>{
+          const row=await active(this.env,agencyId,jobId);
+          if(maySubmit)await this.avatars(agencyId,jobId);
+          const status=await this.pollAvatars(agencyId,jobId);
+          if(status.done)await setGenerationPreparation(this.env.DB,row,'avatar',status.ready?'ready':'skipped');
+          return status.done;
+        });
         if(!done)await step.do('avatar-timeout',once,async()=>{
           await timeoutJobAvatars(this.env,agencyId,jobId);
           const row=await active(this.env,agencyId,jobId);await setGenerationPreparation(this.env.DB,row,'avatar',row.avatarReady?'ready':'skipped');return {done:true};});
