@@ -1,8 +1,8 @@
 import {AgencyBrand, GeneratableListing, ListingScript, NarrationFailure, ScriptCopyVersion, ScriptPlan, SYNTHETIC_VOICE_DISCLOSURE,quantityCompletenessCheck,
   CustomNarration,type NormalizedListing, type SceneKind, type ScriptFactRef, type VideoDuration} from '@bienvu/contracts';
 import {displayEuros, displayNumber, frenchDecimal, frenchEuros, frenchInteger} from './french';
-import {descriptionPassages,expandedNarrationLines,narrationWordLimit,narrationWordTarget,wordCount,
-  DESCRIPTION_SEGMENTATION_VERSION,LEGACY_DESCRIPTION_SEGMENTATION_VERSION,type DescriptionSegmentationVersion} from './suggestion';
+import {descriptionPassages,expandedNarrationLines,expandNarrationBookends,narrationWordLimit,narrationWordTarget,wordCount,
+  DESCRIPTION_SEGMENTATION_VERSION,COMPLETE_DESCRIPTION_SEGMENTATION_VERSION,LEGACY_DESCRIPTION_SEGMENTATION_VERSION,type DescriptionSegmentationVersion} from './suggestion';
 
 export const PROMPT_VERSION = 'narration-fr/1' as const;
 export const COPY_VERSION = 'factual-copy/2' as const;
@@ -21,7 +21,7 @@ export async function scriptContext(listingInput: unknown, brandInput: unknown, 
   const versionResult = ScriptCopyVersion.safeParse(copyVersionInput);
   if (!versionResult.success) throw new NarrationFailure('SCRIPT_INPUT_INVALID');
   const copyVersion = versionResult.data;
-  if(![DESCRIPTION_SEGMENTATION_VERSION,LEGACY_DESCRIPTION_SEGMENTATION_VERSION].includes(descriptionSegmentationVersion))
+  if(![DESCRIPTION_SEGMENTATION_VERSION,COMPLETE_DESCRIPTION_SEGMENTATION_VERSION,LEGACY_DESCRIPTION_SEGMENTATION_VERSION].includes(descriptionSegmentationVersion))
     throw new NarrationFailure('SCRIPT_INPUT_INVALID');
   const parsed = GeneratableListing.safeParse(listingInput), parsedBrand = AgencyBrand.safeParse(brandInput);
   if (!parsed.success || !parsedBrand.success || parsed.data.agencyId !== parsedBrand.data.id) throw new NarrationFailure('SCRIPT_INPUT_INVALID');
@@ -104,11 +104,15 @@ export async function scriptContext(listingInput: unknown, brandInput: unknown, 
   }
   if(copyVersion==='description-copy/2'){
     if(![20,30,40].includes(durationSeconds??20))throw new NarrationFailure('SCRIPT_INPUT_INVALID');
-    const intro=copies.find(c=>c.id==='intro/short')!,ending=copies.find(c=>c.id==='contact/short')!;
+    const style=descriptionSegmentationVersion===DESCRIPTION_SEGMENTATION_VERSION&&durationSeconds===30?'direct':'short';
+    const intro=copies.find(c=>c.id===`intro/${style}`)!,ending=copies.find(c=>c.id===`contact/${style}`)!;
     const facts=['price','area','rooms'].flatMap(kind=>{const c=copies.find(c=>c.id===`${kind}/direct`);return c?[{text:c.narrationText,refs:c.factRefs}]:[];});
+    const bookends=expandNarrationBookends({text:intro.narrationText,refs:intro.factRefs},{text:ending.narrationText,refs:ending.factRefs},facts,
+      listing.description?.text??'',{property,transaction:listing.transaction,locality,agency:channel==='none'?null:brand.name},durationSeconds,descriptionSegmentationVersion);
     const maximum=narrationWordLimit(durationSeconds,copyVersion),seen=new Set<string>();
-    for(const budget of [...new Set([32,40,48,56,64,72,80,88,96,98,104,112,120,maximum])].filter(n=>n<=maximum).sort((a,b)=>a-b)){
-      const lines=expandedNarrationLines({text:intro.narrationText,refs:intro.factRefs},{text:ending.narrationText,refs:ending.factRefs},facts,listing.description?.text??'',budget,descriptionSegmentationVersion);
+    for(const budget of [...new Set([32,40,48,56,64,72,80,88,96,98,104,112,120,maximum,
+      ...(descriptionSegmentationVersion===DESCRIPTION_SEGMENTATION_VERSION&&(durationSeconds===30||durationSeconds===40)?[narrationWordTarget(durationSeconds,descriptionSegmentationVersion)]:[])])].filter(n=>n<=maximum).sort((a,b)=>a-b)){
+      const lines=expandedNarrationLines(bookends.intro,bookends.ending,facts,listing.description?.text??'',budget,descriptionSegmentationVersion);
       if(!lines.length)continue;
       const key=JSON.stringify(lines);if(seen.has(key))continue;seen.add(key);
       for(const [index,line] of lines.entries()){
@@ -127,7 +131,7 @@ export async function scriptContext(listingInput: unknown, brandInput: unknown, 
   const inputHash = await hashJson({listingId: listing.id, agencyId: listing.agencyId, sourceKind: listing.sourceKind,
     copies, provenance, photos: listing.photos.map(p => ({id: p.id, contentHash: p.contentHash})), copyVersion,
     ...(copyVersion.startsWith('description-copy/')?{durationSeconds:durationSeconds??20,
-      ...(descriptionSegmentationVersion===DESCRIPTION_SEGMENTATION_VERSION?{descriptionSegmentationVersion}:{})}: {})});
+      ...(descriptionSegmentationVersion!==LEGACY_DESCRIPTION_SEGMENTATION_VERSION?{descriptionSegmentationVersion}:{})}: {})});
   if(userNarration){
     const parsed=CustomNarration.safeParse(userNarration);if(!parsed.success)throw new NarrationFailure('SCRIPT_INPUT_INVALID');
     const middle=copies.filter(copy=>copy.id.endsWith('/direct')&&!['intro','contact'].includes(copy.kind));
@@ -145,7 +149,7 @@ export async function scriptContext(listingInput: unknown, brandInput: unknown, 
 }
 // Select a coherent, sourced four-paragraph variant. Validate the provider IDs
 // before filling an under-length answer; foreign data must never be repaired.
-export function filledNarrationPlan(context:ScriptContext,input:unknown,targetWords=narrationWordTarget(context.durationSeconds)){
+export function filledNarrationPlan(context:ScriptContext,input:unknown,targetWords=narrationWordTarget(context.durationSeconds,context.descriptionSegmentationVersion)){
   if(context.copyVersion!=='description-copy/2'||context.customNarration)return input;
   const parsed=ScriptPlan.safeParse(input);
   if(!parsed.success||parsed.data.scenes.some(s=>!context.copies.some(c=>c.id===s.copyId)
@@ -274,7 +278,7 @@ export function compileScript(context: ScriptContext, input: unknown, model: str
     || new Set(scenes.map(s => s.photoAssetId)).size < 3 || scenes.some((s, i) => i > 0 && scenes[i - 1].photoAssetId === s.photoAssetId)
     || scenes.reduce((n, s) => n + s.narrationText.length, 0) > 1000) throw new NarrationFailure('SCRIPT_INVALID');
   if(context.copyVersion.startsWith('description-copy/')&&!context.customNarration){
-    if(context.descriptionSegmentationVersion===DESCRIPTION_SEGMENTATION_VERSION
+    if(context.descriptionSegmentationVersion!==LEGACY_DESCRIPTION_SEGMENTATION_VERSION
       &&scenes.some(s=>quantityCompletenessCheck(s.narrationText).status==='fail'))throw new NarrationFailure('SCRIPT_INVALID');
     if(wordCount(scenes.map(s=>s.narrationText).join(' '))>narrationWordLimit(context.durationSeconds,context.copyVersion))throw new NarrationFailure('SCRIPT_INVALID');
     if(context.copies.some(c=>c.factRefs.includes('description'))&&!scenes.some(s=>s.factRefs.includes('description')))

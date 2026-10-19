@@ -1,7 +1,7 @@
 import {EntityId, GenerationRequest, PreparedNarration, PhotoAnimation, VideoAsset, VideoManifest, VideoFailure, videoAssets, videoManifestHash, videoPresentation, videoPhotoTimeline,videoDimensions,audioNormalizationGain} from '@bienvu/contracts';
 import {measureVoiceWav} from '@bienvu/voice';
 import {findNarration,retainedAnimation,generationStoredPermanently,findDefaultGenerationMap,jobAvatarTasks,type AnimationReuse, type Database} from '@bienvu/db';
-import {scriptContext, validateScript, type ScriptContext} from '@bienvu/narration';
+import {scriptContext, validateScript, LEGACY_DESCRIPTION_SEGMENTATION_VERSION, type ScriptContext} from '@bienvu/narration';
 import type {NarrationBucket} from './narration';
 import {prepareMapImage} from '@bienvu/maps';
 import {ConfirmedVideoMap,mapPublicLocation} from '@bienvu/contracts';
@@ -41,9 +41,10 @@ export async function prepareJobVideo(env: {DB: Database; MEDIA: NarrationBucket
   if(!stored) {
     const narration=await findNarration(env.DB,agency,job);
     if(!narration||narration.state!=='prepared'||narration.jobAttempt!==entitlement.attempt||narration.expiresAt<=new Date().toISOString()&&!await generationStoredPermanently(env.DB,agency,job))fail('VIDEO_NARRATION_NOT_READY');
-    const snapshot=JSON.parse(narration.snapshot) as {listing:unknown;brand:unknown;contact:ScriptContext['contact'];copyVersion?:ScriptContext['copyVersion'];customNarration?:string[]};
+    const snapshot=JSON.parse(narration.snapshot) as {listing:unknown;brand:unknown;contact:ScriptContext['contact'];copyVersion?:ScriptContext['copyVersion'];customNarration?:string[];descriptionSegmentationVersion?:ScriptContext['descriptionSegmentationVersion']};
     const input=entitlement.generationInput?GenerationRequest.parse(JSON.parse(entitlement.generationInput)):undefined;
-    const context=await scriptContext(snapshot.listing,snapshot.brand,snapshot.contact,snapshot.copyVersion??'factual-copy/1',snapshot.customNarration,input?.durationSeconds);
+    const context=await scriptContext(snapshot.listing,snapshot.brand,snapshot.contact,snapshot.copyVersion??'factual-copy/1',snapshot.customNarration,input?.durationSeconds,
+      snapshot.descriptionSegmentationVersion??LEGACY_DESCRIPTION_SEGMENTATION_VERSION);
     if(context.listing.agencyId!==agency||context.listing.id!==entitlement.listingId||context.brand.id!==agency)fail('VIDEO_SCOPE_INVALID');
     const prepared=PreparedNarration.parse(JSON.parse(narration.result!));
     validateScript(context,prepared.script);

@@ -77,25 +77,37 @@ test('narration personnelle longue : texte intact et jamais allongé automatique
   assert.deepEqual(s.scenes.map(s=>s.narrationText),paragraphs);assert.equal(fitNarrationDuration(c,s,[1000,5000,3000,1000]),null);
 });
 
-test('D1/R2 : allongement selon WAV, pistes inchangées réutilisées, reprise gratuite et manifeste 40 s',async t=>{
+test('D1/R2 : voix lentes et rapides sur 20/40 s, WAV complets et reprise sans nouvelle dépense',async t=>{
   const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:'export default {fetch(){return new Response("fixture")}}',compatibilityDate:'2026-09-27',d1Databases:['DB'],r2Buckets:['MEDIA']}));
   t.after(()=>mf.dispose());const env=await mf.getBindings<{DB:D1Database;MEDIA:R2Bucket}>();await migrateNarrationProbe(env.DB);
-  const scope=await seedNarrationFixture(env.DB,'coverage'),l=listing();l.id='listing-coverage';l.agencyId=scope.agencyId;
+  await env.DB.prepare('INSERT INTO hosted_import_budget VALUES(?,0,9500,0)').bind(new Date().toISOString().slice(0,7)).run();
+  await env.DB.exec('UPDATE generation_control SET enabled=1');
+  for(const durationSeconds of [20,40] as const)for(const pace of [2.2,2.6,3.2])await t.test(`${durationSeconds} s à ${pace} mots/s`,async()=>{
+  const label=`coverage-${durationSeconds}-${pace*10}`,scope=await seedNarrationFixture(env.DB,label),l=listing();l.id=`listing-${label}`;l.agencyId=scope.agencyId;
   for(const photo of l.photos){photo.agencyId=scope.agencyId;photo.listingId=l.id;photo.objectKey=`agencies/${scope.agencyId}/imports/${l.id}/${photo.id}.png`;}
   await env.DB.prepare('UPDATE listing_imports SET result_json=? WHERE id=?').bind(JSON.stringify(l),l.id).run();
   await env.DB.prepare("UPDATE jobs SET status='failed',error_code='FIXTURE',lease_until=NULL WHERE id=?").bind(scope.jobId).run();
-  await env.DB.prepare('INSERT INTO hosted_import_budget VALUES(?,0,9500,0)').bind(new Date().toISOString().slice(0,7)).run();
-  await env.DB.exec('UPDATE generation_control SET enabled=1');await env.DB.prepare('INSERT INTO generation_access VALUES(?,?,1)').bind(scope.agencyId,'allocation-coverage').run();
-  const job=await admitGeneration(env.DB,scope.agencyId,'coverage-key-001',{listingId:l.id,durationSeconds:40},'true');
+  await env.DB.prepare('INSERT INTO generation_access VALUES(?,?,1)').bind(scope.agencyId,`allocation-${label}`).run();
+  const job=await admitGeneration(env.DB,scope.agencyId,`generation-${label}`,{listingId:l.id,durationSeconds},'true');
   await env.DB.prepare("UPDATE jobs SET status='scripting',stage='scripting',listing_id=? WHERE id=?").bind(l.id,job.jobId).run();
-  const config=GoogleVoiceConfig.parse({projectId:'fixture-coverage'});let calls=0;
+  const config=GoogleVoiceConfig.parse({projectId:'fixture-coverage'}),spokenTexts:string[]=[];let scriptCalls=0;
   const voice=googleTts(config,async()=> 'fixture-token-not-sent',{fetch:async(_url,init)=>{
-    calls++;const body=JSON.parse(String(init?.body));return Response.json({audioContent:Buffer.from(toneFixture(Math.ceil(wordCount(body.input.text)*1000/3.2))).toString('base64')});}});
-  const providers={mode:'mock' as const,script:{model:DEFAULT_SCRIPT_MODEL,plan:async(c:Parameters<typeof fixturePlan>[0])=>({plan:fixturePlan(c),metrics:fixtureScriptMetrics()})},voice:{config,synthesize:voice.synthesize}};
+    const body=JSON.parse(String(init?.body));spokenTexts.push(body.input.text);return Response.json({audioContent:Buffer.from(toneFixture(Math.ceil(wordCount(body.input.text)*1000/pace))).toString('base64')});}});
+  const providers={mode:'mock' as const,script:{model:DEFAULT_SCRIPT_MODEL,plan:async(c:Parameters<typeof fixturePlan>[0])=>{scriptCalls++;return {plan:fixturePlan(c),metrics:fixtureScriptMetrics()};}},voice:{config,synthesize:voice.synthesize}};
   const prepared=await prepareJobNarration(env,scope.agencyId,job.jobId,providers);
-  assert.equal(prepared.script.copyVersion,'description-copy/2');assert.equal(prepared.script.version,2);assert.equal(calls,6);
-  assert.equal(prepared.durationFrames.reduce((a,b)=>a+b,0),1200);assert.ok(prepared.audio.reduce((n,a)=>n+a.durationMs,0)>34000);
-  const row=(await findNarration(env.DB,scope.agencyId,job.jobId))!;assert.equal(JSON.parse(row.script!).version,2);
-  const before=calls;assert.deepEqual(await prepareJobNarration(env,scope.agencyId,job.jobId,providers),prepared);assert.equal(calls,before);
+  assert.equal(prepared.script.copyVersion,'description-copy/2');assert.equal(scriptCalls,1);
+  assert.ok(spokenTexts.length>=4&&spokenTexts.length<=6);assert.equal(new Set(spokenTexts).size,spokenTexts.length);
+  if(durationSeconds===40&&pace===3.2){assert.equal(prepared.script.version,2);assert.equal(spokenTexts.length,6);}
+  assert.equal(prepared.durationFrames.reduce((a,b)=>a+b,0),durationSeconds*30);
+  for(const [index,audio] of prepared.audio.entries())assert.ok(prepared.durationFrames[index]>=Math.ceil(audio.durationMs*30/1000));
+  const spokenMs=prepared.audio.reduce((n,a)=>n+a.durationMs,0);
+  assert.ok(spokenMs>=durationSeconds*850&&spokenMs<=durationSeconds*1000);
+  const endMs=prepared.durationFrames.slice(0,-1).reduce((n,f)=>n+f,0)*1000/30+prepared.audio.at(-1)!.durationMs;
+  assert.ok(durationSeconds*1000-endMs<=durationSeconds*150);
+  const row=(await findNarration(env.DB,scope.agencyId,job.jobId))!;assert.deepEqual(JSON.parse(row.script!),prepared.script);
+  const before={voice:spokenTexts.length,script:scriptCalls};assert.deepEqual(await prepareJobNarration(env,scope.agencyId,job.jobId,providers),prepared);
+  assert.deepEqual({voice:spokenTexts.length,script:scriptCalls},before);
   assert.equal((await env.DB.prepare('SELECT consumed FROM allocations WHERE agency_id=?').bind(scope.agencyId).first<{consumed:number}>())!.consumed,0);
+  await env.DB.prepare("UPDATE jobs SET status='failed',error_code='FIXTURE_FINISHED',lease_until=NULL WHERE id=?").bind(job.jobId).run();
+  });
 });

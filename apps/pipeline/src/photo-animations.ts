@@ -1,6 +1,6 @@
 import {GenerationRequest,PreparedNarration,PhotoAnimation,requestedAnimations,selectedAnimationIndices,type NormalizedListing} from '@bienvu/contracts';
 import {findNarration,findGeneration,findDefaultGenerationMap,type Database} from '@bienvu/db';
-import {scriptContext} from '@bienvu/narration';
+import {scriptContext,LEGACY_DESCRIPTION_SEGMENTATION_VERSION} from '@bienvu/narration';
 import type {NarrationBucket} from './narration';
 import {runwayProvider,runwayError,runwayClipCost,runwayMotionForSlot,type AnimationProvider} from './runway';
 import {videoBytesHash} from './video-manifest';
@@ -26,7 +26,8 @@ export async function prepareJobAnimations(env:AnimationEnv,agencyId:string,jobI
   if(!provider&&(env.RUNWAY_ENABLED!=='true'||!env.RUNWAYML_API_SECRET))return {requested,ready:0,reason:'RUNWAY_DISABLED'};
   const narration=await findNarration(env.DB,agencyId,jobId);
   if(!narration||narration.state!=='prepared'||narration.jobAttempt!==job.attempt)throw Error('RUNWAY_NARRATION_NOT_READY');
-  const snapshot=JSON.parse(narration.snapshot),context=await scriptContext(snapshot.listing,snapshot.brand,snapshot.contact,snapshot.copyVersion,snapshot.customNarration);
+  const snapshot=JSON.parse(narration.snapshot),context=await scriptContext(snapshot.listing,snapshot.brand,snapshot.contact,snapshot.copyVersion,snapshot.customNarration,input.durationSeconds,
+    snapshot.descriptionSegmentationVersion??LEGACY_DESCRIPTION_SEGMENTATION_VERSION);
   const prepared=PreparedNarration.parse(JSON.parse(narration.result!));
   if(context.listing.agencyId!==agencyId||context.listing.id!==job.listingId)throw Error('RUNWAY_SCOPE_INVALID');
   const adapter=provider??runwayProvider(env.RUNWAYML_API_SECRET!),photos=context.listing.photos;

@@ -3,12 +3,15 @@ import {frenchDecimal, frenchEuros, frenchInteger} from './french';
 
 export const narrationWordLimit = (duration: VideoDuration = 20,version:ScriptCopyVersion='description-copy/2') =>
   (version==='description-copy/2'?{20:60,30:90,40:120}:{20:40,30:60,40:75})[duration];
-export const narrationWordTarget = (duration: VideoDuration = 20) => ({20:50,30:77,40:104})[duration];
 export const wordCount = (text: string) => text.trim().split(/\s+/u).filter(Boolean).length;
 export type DescriptionPassage = {text: string; narrationText: string; condition: boolean; score: number};
-export const DESCRIPTION_SEGMENTATION_VERSION = 'description-segmentation/2' as const;
+export const DESCRIPTION_SEGMENTATION_VERSION = 'description-segmentation/3' as const;
+export const COMPLETE_DESCRIPTION_SEGMENTATION_VERSION = 'description-segmentation/2' as const;
 export const LEGACY_DESCRIPTION_SEGMENTATION_VERSION = 'description-segmentation/1' as const;
-export type DescriptionSegmentationVersion = typeof DESCRIPTION_SEGMENTATION_VERSION | typeof LEGACY_DESCRIPTION_SEGMENTATION_VERSION;
+export type DescriptionSegmentationVersion = typeof DESCRIPTION_SEGMENTATION_VERSION | typeof COMPLETE_DESCRIPTION_SEGMENTATION_VERSION | typeof LEGACY_DESCRIPTION_SEGMENTATION_VERSION;
+export const narrationWordTarget = (duration: VideoDuration = 20,version:DescriptionSegmentationVersion=DESCRIPTION_SEGMENTATION_VERSION) =>
+  ({20:50,30:version===DESCRIPTION_SEGMENTATION_VERSION?86:77,40:104})[duration];
+const locationDescription = /(?<!\p{L})(?:quartier|cœur|coeur|boutiques?|cafés?|musées?|écoles?|parcs?)(?!\p{L})/iu;
 const administrative = /(?:RSAC|RNE|SIRE[NT]|immatricul|agent commercial|registre|honoraires|géorisques|diagnostic|DPE|copropriété|charges annuelles|consommation énergétique|estimation des coûts|référence annonce|nos agences|nous contacter|contactez|exclusivité chez|en exclusivité)/iu;
 const instructions = /(?:ignore[rz]?|instructions?|prompt|système|system|assistant|invente[rz]?|http[s]?:|www\.|@|clé api|token|<|>)/iu;
 const condition = /(?:rafra[iî]chissement|r[eé]novation|travaux|r[eé]nover|rafra[iî]chir).{0,35}(?:pr[eé]voir|n[eé]cessaire|requi|à faire)|(?:à r[eé]nover|à rafra[iî]chir)/iu;
@@ -67,7 +70,8 @@ export function descriptionPassages(description: string,expanded=false,version: 
       const count = wordCount(text);
       if (count < 3 || count > (expanded?50:28) || text.length > (expanded?340:165)) continue;
       // Ignore isolated advertising fragments and agent identifiers.
-      if (!/(?:séjour|salon|chambre|cuisine|balcon|terrasse|jardin|piscine|cave|garage|box|cellier|placard|rangement|résidence|calme|lumineu|expos|étage|ascenseur|commerces|métro|gare|proche|rafra[iî]ch|r[eé]nov|travaux|vue|bain|douche|parquet|cheminée|pierre|bureau|suite|extérieur|pièce de vie|centre|transport)/iu.test(text)) continue;
+      if (!/(?:séjour|salon|chambre|cuisine|balcon|terrasse|jardin|piscine|cave|garage|box|cellier|placard|rangement|résidence|calme|lumineu|expos|étage|ascenseur|commerces|métro|gare|proche|rafra[iî]ch|r[eé]nov|travaux|vue|bain|douche|parquet|cheminée|pierre|bureau|suite|extérieur|pièce de vie|centre|transport)/iu.test(text)
+        && !(version===DESCRIPTION_SEGMENTATION_VERSION&&locationDescription.test(text))) continue;
       text = text[0].toLocaleUpperCase('fr-FR') + text.slice(1);
       const noun = /^(?:Un |Une |Deux |Trois |Des |[1-9]\d* chambres?\b)/u.test(text)
         && !(version===LEGACY_DESCRIPTION_SEGMENTATION_VERSION
@@ -120,6 +124,32 @@ export function expandedNarrationLines(intro:NarrationPhrase,ending:NarrationPhr
   return wordCount(textOf(result))<=maximumWords&&textOf(result).length<=900?result:[];
 }
 
+// A short source can support a fuller presentation and invitation to enquire,
+// without adding any property assertion. Keep the source clauses verbatim and
+// prefer them over longer bookends when there is already enough information.
+export function expandNarrationBookends(intro:NarrationPhrase,ending:NarrationPhrase,facts:NarrationPhrase[],description:string,
+  details:{property:string;transaction:'sale'|'rent';locality:string;agency:string|null},duration:VideoDuration=20,
+  version:DescriptionSegmentationVersion=DESCRIPTION_SEGMENTATION_VERSION):{intro:NarrationPhrase;ending:NarrationPhrase}{
+  const original={intro,ending};
+  if(duration!==40||version!==DESCRIPTION_SEGMENTATION_VERSION||!details.locality)return original;
+  const target=narrationWordTarget(duration,version),source=expandedNarrationLines(intro,ending,facts,description,target,version);
+  if(!source.length||wordCount(source.map(p=>p.text).join(' '))>=target-8)return original;
+  const developed={intro:{...intro,text:`Nous vous présentons aujourd’hui ${details.property} à ${details.transaction==='rent'?'louer':'vendre'} à ${details.locality}. Prenons le temps de découvrir les informations de cette annonce.`},
+    ending:{...ending,text:details.agency
+      ?`Pour obtenir davantage d’informations sur ${details.property}, poser vos questions sur cette ${details.transaction==='rent'?'location':'vente'} ou demander une visite, contactez ${details.agency}.`
+      :`Pour obtenir davantage d’informations sur ce bien, retrouvez les détails de cette annonce. Vous pourrez ainsi préparer la suite de votre projet immobilier.`}};
+  // Spend only the words left after the sourced content. Longer framing must
+  // not displace a surface, price, qualifier or descriptive clause that fits.
+  const sourceWords=wordCount(source.map(p=>p.text).join(' ')),bookendWords=wordCount(`${intro.text} ${ending.text}`);
+  const sourceText=source.slice(1,-1).map(p=>p.text).join(' '),required=[...facts.map(p=>p.text),
+    ...descriptionPassages(description,true,version).map(p=>p.narrationText)].filter(text=>sourceText.includes(text));
+  return [developed,{intro:developed.intro,ending},{intro,ending:developed.ending}].find(candidate=>{
+    if(sourceWords-bookendWords+wordCount(`${candidate.intro.text} ${candidate.ending.text}`)>target)return false;
+    const lines=expandedNarrationLines(candidate.intro,candidate.ending,facts,description,target,version),text=lines.slice(1,-1).map(p=>p.text).join(' ');
+    return lines.length>0&&required.every(phrase=>text.includes(phrase));
+  })??original;
+}
+
 export type SuggestedListing = {propertyType: string; transaction: string; locality: string; description: string;
   priceCents: string; area: string; rooms: string; charges?: string};
 const positive = (value: string) => {const n = Number(value.replace(/\s/g, '').replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null;};
@@ -128,8 +158,10 @@ const positive = (value: string) => {const n = Number(value.replace(/\s/g, '').r
 // it; final automatic selection is made from the same source clauses on server.
 export function suggestedNarration(fields: SuggestedListing, agency: string, duration: VideoDuration = 20): string[] {
   const property = fields.propertyType === 'house' ? 'cette maison' : fields.propertyType === 'apartment' ? 'cet appartement' : 'ce bien';
-  const intro = `${fields.transaction === 'rent' ? 'À louer' : 'À vendre'}, ${property}${fields.locality ? ` à ${fields.locality}` : ''}.`;
-  const ending = agency ? `Contactez ${agency}.` : 'Découvrez cette annonce.';
+  const transaction=fields.transaction === 'rent' ? 'À louer' : 'À vendre';
+  const intro = duration===30&&fields.locality?`Direction ${fields.locality}, pour découvrir ${property} ${transaction.toLowerCase()}.`
+    :`${transaction}, ${property}${fields.locality ? ` à ${fields.locality}` : ''}.`;
+  const ending = agency ? `${duration===30?"Envie d'en savoir plus ? ":''}Contactez ${agency}.` : 'Découvrez cette annonce.';
   const limit = narrationWordLimit(duration,'description-copy/1'), available = limit - wordCount(intro + ' ' + ending);
   const passages = descriptionPassages(fields.description), selected: string[] = [];
   let used = 0;
@@ -156,8 +188,10 @@ export function suggestedNarration(fields: SuggestedListing, agency: string, dur
   while (selected.length < 2) add(selected.length ? 'Poursuivons la visite.' : 'Découvrez les lieux en images.') || selected.push('La visite en images.');
   const middle = ['', ''];
   selected.forEach((text, index) => {const at = index % 2; middle[at] += (middle[at] ? ' ' : '') + text;});
-  const longer=expandedNarrationLines({text:intro,refs:['propertyType','transaction','locality']},{text:ending,refs:['agency.name']},
-    [facts.find(f=>f.includes('euros')),...facts.filter(f=>!f.includes('euros'))].filter((text):text is string=>Boolean(text)).map(text=>({text,refs:['photos']})),
-    fields.description,narrationWordTarget(duration));
+  const phrases:NarrationPhrase[]=[facts.find(f=>f.includes('euros')),...facts.filter(f=>!f.includes('euros'))]
+    .filter((text):text is string=>Boolean(text)).map(text=>({text,refs:['photos']}));
+  const bookends=expandNarrationBookends({text:intro,refs:['propertyType','transaction','locality']},{text:ending,refs:['agency.name']},phrases,
+    fields.description,{property,transaction:fields.transaction==='rent'?'rent':'sale',locality:fields.locality,agency:agency||null},duration);
+  const longer=expandedNarrationLines(bookends.intro,bookends.ending,phrases,fields.description,narrationWordTarget(duration));
   return longer.length?longer.map(p=>p.text):[intro,...middle,ending];
 }

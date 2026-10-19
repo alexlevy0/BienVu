@@ -6,7 +6,7 @@ import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {GoogleVoiceConfig,NarrationFailure,PreparedNarration} from '../packages/contracts/src/index';
 import {admitGeneration,findNarration} from '../packages/db/src/index';
-import {DEFAULT_SCRIPT_MODEL,openaiScripts,wordCount,narrationWordLimit,scriptContext,validateScript,type ScriptProvider} from '../packages/narration/src/index';
+import {DEFAULT_SCRIPT_MODEL,openaiScripts,wordCount,narrationWordLimit,scriptContext,validateScript,LEGACY_DESCRIPTION_SEGMENTATION_VERSION,type ScriptProvider} from '../packages/narration/src/index';
 import {googleServiceAccountAccess,googleTts} from '../packages/voice/src/index';
 import {prepareJobNarration,readNarrationAudio} from '../apps/pipeline/src/narration';
 import {fixturePlan,fixtureScriptMetrics,narrationListing} from '../fixtures/narration';
@@ -77,7 +77,8 @@ async function main(){
       const prepared=stored?.state==='prepared'?PreparedNarration.parse(JSON.parse(stored.result!))
         :await prepareJobNarration(env,scope.agencyId,admission.jobId,providers);
       if(stored?.state==='prepared'){
-        const snapshot=JSON.parse(stored.snapshot),context=await scriptContext(snapshot.listing,snapshot.brand,snapshot.contact,snapshot.copyVersion,snapshot.customNarration,durationSeconds);
+        const snapshot=JSON.parse(stored.snapshot),context=await scriptContext(snapshot.listing,snapshot.brand,snapshot.contact,snapshot.copyVersion,snapshot.customNarration,durationSeconds,
+          snapshot.descriptionSegmentationVersion??LEGACY_DESCRIPTION_SEGMENTATION_VERSION);
         validateScript(context,prepared.script);
       }
       const words=wordCount(prepared.script.scenes.map(s=>s.narrationText).join(' '));
