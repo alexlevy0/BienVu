@@ -1,4 +1,5 @@
 import {test,type TestContext} from 'node:test';
+import {mailHtmlDocument} from '../apps/web/lib/mail-html';
 import assert from 'node:assert/strict';
 import {randomBytes,createHmac} from 'node:crypto';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
@@ -233,6 +234,13 @@ test('HTML des emails : boutons et liens actifs, scripts, formulaires et traçag
   assert.ok((await findMailMessage(env.DB,result.result.id))?.body_text.includes('https://example.com/annonce'),'La variante texte conserve aussi l’adresse du bouton');
   const text=await deliver(plain('text-link','Consulter https://example.com/annonce'));assert.ok(text.result);
   const textPreview=await adminMailboxRequest(request('GET'),env,{messageId:text.result.id,html:true});assert.match(await textPreview.text(),/<a href="https:\/\/example.com\/annonce"/);
+});
+
+test('HTML des emails : milliers d’iframes non fermées sans débordement de pile',async()=>{
+  const raw=['From: sender@example.com','To: contact@bienvu.online','Subject: HTML imbriqué',
+    'MIME-Version: 1.0','Content-Type: text/html; charset=UTF-8','','<iframe>'.repeat(2500)].join('\r\n');
+  const rendered=await mailHtmlDocument(new TextEncoder().encode(raw).buffer);
+  assert.match(rendered,/^<!doctype html>/);assert.doesNotMatch(rendered,/<iframe|<script/i);
 });
 
 test('HeyGen : tri des messages anciens et nouveaux de Contact, compteurs, lecture et archivage',async t=>{

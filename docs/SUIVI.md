@@ -1,5 +1,9 @@
 # BienVu — suivi des sprints
 
+### 21/10/2026 — Correctif de dépendance détecté pendant la publication PostHog
+
+La CI du commit **`f142909ad6f1691b0cf3e4aca495904e3268ae73`** a signalé [GHSA-c9rx-x947-fp3h / CVE-2026-113650](https://github.com/advisories/GHSA-c9rx-x947-fp3h), ajouté à la base GitHub le 21 octobre : récursion non bornée dans `sanitize-html` **2.18.0** lors du traitement d’iframes non fermées. La dépendance web est épinglée sur le correctif **2.18.1**, avec son lockfile ; aucun autre paquet n’est mis à jour. Test ajouté sur le vrai rendu HTML des emails avec **2 500 iframes non fermées**. Les **9 tests de messagerie**, compilation des tests et `pnpm audit:dependencies` passent ; l’audit ne rapporte plus de vulnérabilité connue. Les **74 tests ciblés** des corrections PostHog restent la validation fonctionnelle initiale.
+
 ### 21/10/2026 — Corrections après examen de PostHog Error Tracking, validation locale
 
 Inspection des **13 groupes / 477 occurrences sur trente jours** dans le projet PostHog EU **299212**, à partir des stacks et des routes réelles. Ces occurrences ne représentent pas autant de clients ou de vidéos échouées. Aucun incident n’est masqué, supprimé ou marqué résolu dans PostHog.
