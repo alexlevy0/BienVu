@@ -2,6 +2,7 @@ import type {SocialPlatform} from '@bienvu/contracts';
 import {MetaSocial,MetaFailure,type MetaFetcher} from './meta-social';
 import {openSocial,socialConfigured,SocialFailure} from './social-crypto';
 import {socialFetchUrl,socialEvent,type SocialEnv} from './social';
+import {retryIdempotentD1} from './d1-retry';
 
 type Pending={id:string;post_id:string;connection_id:string|null;platform:SocialPlatform;status:string;stage:string;
   remote_id:string|null;upload_url:string|null;attempts:number;polls:number;final_started_at:string|null;
@@ -88,9 +89,9 @@ async function runTarget(env:SocialEnv,row:Pending,api:MetaSocial){
 }
 export async function runSocialBatch(env:SocialEnv,fetcher:MetaFetcher=fetch){
   if(!socialConfigured(env))return;
-  const at=iso(),rows=await env.DB.prepare(`SELECT t.id FROM social_targets t JOIN social_posts p ON p.id=t.post_id
+  const at=iso(),rows=await retryIdempotentD1(()=>env.DB.prepare(`SELECT t.id FROM social_targets t JOIN social_posts p ON p.id=t.post_id
     WHERE p.prepared=1 AND p.media_deleted_at IS NULL AND t.status IN ('scheduled','processing') AND t.next_attempt_at<=?
-    AND (t.lease_until IS NULL OR t.lease_until<?) ORDER BY t.next_attempt_at,t.id LIMIT 10`).bind(at,at).all<{id:string}>();
+    AND (t.lease_until IS NULL OR t.lease_until<?) ORDER BY t.next_attempt_at,t.id LIMIT 10`).bind(at,at).all<{id:string}>());
   const api=new MetaSocial(env,fetcher);
   // Deux vagues bornées ; aucune attente de traitement de vidéo dans une requête HTTP.
   for(let start=0;start<rows.results.length;start+=5)await Promise.all(rows.results.slice(start,start+5).map(async ref=>{

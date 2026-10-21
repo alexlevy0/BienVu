@@ -3,6 +3,7 @@ import {withPostHogConfig} from '@posthog/nextjs-config';
 const release=process.env.BIENVU_RELEASE??process.env.GITHUB_SHA??'development';
 const config: NextConfig = {
   env:{NEXT_PUBLIC_BIENVU_RELEASE:release},
+  deploymentId:release==='development'?undefined:release,
   poweredByHeader: false,
   experimental:{cssChunking:false,inlineCss:true},
   transpilePackages: ['@bienvu/presentation', '@bienvu/contracts', '@bienvu/db', '@bienvu/observability', '@bienvu/importers', '@bienvu/maps', '@bienvu/notifications'],

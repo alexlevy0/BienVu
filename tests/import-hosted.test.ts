@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {assertImportMode,importPorts,photoNormalizer} from '../apps/web/lib/import-transport';
+import {assertImportMode,importPorts,photoNormalizer,photoPreviewer} from '../apps/web/lib/import-transport';
 import {RequestFailure} from '../apps/web/lib/http';
 import type {Database} from '../packages/db/src/index';
 test('transport Cloudflare fermé sans origine, binding ou secret cohérents', () => {
@@ -24,5 +24,18 @@ test('lecture hébergée : les limites de budget et de ressources restent distin
    IMPORT_SERVICE:{fetch:async()=>new Response(null,{status:code==='IMPORT_BUDGET_LIMIT'?503:429,headers:{'X-Import-Error':code}})} as unknown as Fetcher};
   const transport=importPorts(new Request('https://bienvu.online/api/imports'),env,'agency-a').transport;
   await assert.rejects(transport.load('https://www.orpi.com/annonce','page',[],AbortSignal.timeout(1000)),{code});
+ }
+});
+test('aperçu hébergé : diagnostic de route/statut/code utile, sans contenu ni en-tête privé',async()=>{
+ for(const code of ['SOURCE_UNAVAILABLE','Bearer private-token-fixture']){
+  const env={DB:{} as Database,PROBE_MODE:'remote',IMPORT_MODE:'cloudflare',BETTER_AUTH_URL:'https://bienvu.online',IMPORT_TOKEN:'a'.repeat(32),
+   IMPORT_SERVICE:{fetch:async()=>new Response('private-provider-response',{status:502,headers:{'X-Import-Error':code}})} as unknown as Fetcher};
+  const preview=photoPreviewer(new Request('https://bienvu.online/api/imports'),env,'agency-a','import-a');
+  await assert.rejects(preview(new Uint8Array([1,2]),AbortSignal.timeout(1000)),error=>{
+   assert.ok(error instanceof Error&&'code' in error);
+   assert.equal(error.code,'SOURCE_UNAVAILABLE');
+   assert.equal(error.message,`Import hébergé indisponible (/photo-preview, HTTP 502, ${code==='SOURCE_UNAVAILABLE'?code:'UNKNOWN'}).`);
+   return true;
+  });
  }
 });

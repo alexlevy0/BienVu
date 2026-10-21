@@ -27,7 +27,8 @@ async function hostedCall(env: HostedEnv, agencyId: string, id: string, path: st
     if(code==='IMPORT_BUDGET_LIMIT'||code==='IMPORT_RESOURCE_LIMIT'||code==='PROJECT_RATE_LIMIT')throw new RequestFailure(code);
     if (response.status === 429) throw new RequestFailure('IMPORT_LIMIT');
     const failure = new ImportFailure(code === 'UNSAFE_URL' || code === 'SOURCE_BLOCKED' || code === 'IMPORT_TIMEOUT'
-      || code === 'INSUFFICIENT_PHOTOS' || code === 'NOT_A_LISTING' ? code : 'SOURCE_UNAVAILABLE', 'Import hébergé indisponible.', importFailureReason(response.headers.get('X-Import-Reason')),
+      || code === 'INSUFFICIENT_PHOTOS' || code === 'NOT_A_LISTING' ? code : 'SOURCE_UNAVAILABLE',
+      `Import hébergé indisponible (${path}, HTTP ${response.status}, ${errorCodes.find(value=>value===code)??'UNKNOWN'}).`, importFailureReason(response.headers.get('X-Import-Reason')),
       parseImportResourceHeader(response.headers.get('X-Import-Resource')));
     failure.browserUsed = response.headers.get('X-Import-Browser') === '1'; throw failure;
   }

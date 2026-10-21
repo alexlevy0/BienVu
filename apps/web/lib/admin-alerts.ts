@@ -2,6 +2,7 @@ import {browserPushConfigured,sendOperationalPush,type BrowserPushEnvironment} f
 import {expirePushEndpoint} from '@bienvu/db';
 import {staffEmails} from './admin-audience';
 import {AlertRules,defaultAlertRules,workspaceDocument} from './admin-workspace';
+import {retryIdempotentD1} from './d1-retry';
 
 type Env=Omit<BrowserPushEnvironment,'DB'>&{DB:D1Database;SUPER_ADMIN_EMAIL?:string;ADMIN_EMAIL?:string};
 export async function evaluateAdminAlerts(db:D1Database,now=Date.now()){
@@ -26,11 +27,13 @@ export async function evaluateAdminAlerts(db:D1Database,now=Date.now()){
   }
  }
  // Conditional writes remain safe if scheduled invocations overlap.
- await db.batch([
+ const statements=[
   ...conditions.map(c=>db.prepare(`INSERT INTO admin_alerts(id,rule,title,body,href,opened_at,last_seen_at) VALUES(?,?,?,?,?,?,?)
    ON CONFLICT(rule) WHERE resolved_at IS NULL DO UPDATE SET title=excluded.title,body=excluded.body,last_seen_at=excluded.last_seen_at`).bind(crypto.randomUUID(),c.rule,c.title,c.body,c.href,at,at)),
   db.prepare('UPDATE admin_alerts SET resolved_at=? WHERE resolved_at IS NULL AND rule NOT IN (SELECT value FROM json_each(?))').bind(at,JSON.stringify(conditions.map(c=>c.rule))),
- ]);
+ ];
+ // Reuse the same IDs and timestamp if D1 committed but lost its response.
+ await retryIdempotentD1(()=>db.batch(statements));
  return rules;
 }
 export async function runAdminAlerts(env:Env,now=Date.now(),fetcher:typeof fetch=fetch){

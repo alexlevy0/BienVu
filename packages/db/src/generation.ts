@@ -57,7 +57,10 @@ export function generationMasterUnlocked(row:GenerationRow){
   return Boolean(row.ownerAgencyId)&&(row.creditStatus==='consumed'||row.creditVersion===1&&Boolean(row.anonymousSessionId));
 }
 export function generationView(row:GenerationRow,now=Date.now(),audience:'owner'|'anonymous'='owner'):GenerationView {
-  const input=GenerationRequest.parse(JSON.parse(row.input));
+  // Trial cleanup deliberately erases private inputs before its final expired
+  // checkpoint. Keep that history readable without accepting corrupt live jobs.
+  const purged=row.retention!=='available'&&Boolean(row.anonymousSessionId)&&!row.ownerAgencyId&&row.input==='{}';
+  const input:Partial<GenerationRequest>=purged?{}:GenerationRequest.parse(JSON.parse(row.input));
   const recorded=GenerationPreparation.parse(JSON.parse(row.preparation??'{}'));
   const preparation:GenerationPreparation={
     ...(row.defaultMap||input.customization?.map?.location?{map:'pending' as const}:{}),

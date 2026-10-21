@@ -91,6 +91,20 @@ test('Workspace complet : D1, droits, synchronisation, suivi, alertes, restaurat
   await db.prepare("UPDATE generation_provider_limits SET credit_balance=50,balance_checked_at=?,balance_error=NULL WHERE provider='runway'").bind(new Date().toISOString()).run();
   await evaluateAdminAlerts(db);await evaluateAdminAlerts(db);
   assert.equal((await db.prepare("SELECT count(*) AS n FROM admin_alerts WHERE rule='runway' AND resolved_at IS NULL").first<{n:number}>())?.n,1);
+  const original=await db.prepare("SELECT id,opened_at FROM admin_alerts WHERE rule='runway' AND resolved_at IS NULL").first();
+  let batches=0;
+  const interrupted=new Proxy(db,{get(target,key){
+   if(key==='batch')return async(statements:D1PreparedStatement[])=>{
+    const result=await target.batch(statements);
+    if(++batches===1)throw new Error('D1_ERROR: Network connection lost.');
+    return result;
+   };
+   const value=Reflect.get(target,key);return typeof value==='function'?value.bind(target):value;
+  }});
+  // Lost acknowledgement after a committed batch must not create a second alert or send twice.
+  await runAdminAlerts({...env,DB:interrupted,WEB_PUSH_ENABLED:'false'});
+  assert.equal(batches,2);
+  assert.deepEqual(await db.prepare("SELECT id,opened_at FROM admin_alerts WHERE rule='runway' AND resolved_at IS NULL").first(),original);
   await runAdminAlerts({...env,WEB_PUSH_ENABLED:'false'});assert.equal((await db.prepare('SELECT count(*) AS n FROM admin_alert_deliveries').first<{n:number}>())?.n,0);
   await db.prepare("UPDATE generation_provider_limits SET balance_checked_at=? WHERE provider='runway'").bind(new Date(Date.now()-10*60000).toISOString()).run();await evaluateAdminAlerts(db);
   assert.equal((await db.prepare("SELECT count(*) AS n FROM admin_alerts WHERE rule='runway' AND resolved_at IS NULL").first<{n:number}>())?.n,1,'Une mesure périmée ne résout pas une réserve faible');
