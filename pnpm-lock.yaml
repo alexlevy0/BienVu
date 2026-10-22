@@ -19,8 +19,8 @@ importers:
         specifier: 0.18.10
         version: 0.18.10
       '@types/node':
-        specifier: 24.10.1
-        version: 24.10.1
+        specifier: 26.6.5
+        version: 26.6.5
       '@types/react':
         specifier: 19.3.0
         version: 19.3.0
@@ -29,13 +29,13 @@ importers:
         version: 19.2.3(@types/react@19.3.0)
       miniflare:
         specifier: 5.20260926.0-alpha
-        version: 5.20260926.0-alpha(@types/node@24.10.1)
+        version: 5.20260926.0-alpha(@types/node@26.6.5)
       playwright-core:
         specifier: 1.62.1
         version: 1.62.1
       sharp:
         specifier: 0.35.5
-        version: 0.35.5(@types/node@24.10.1)
+        version: 0.35.5(@types/node@26.6.5)
       tsx:
         specifier: 4.23.15
         version: 4.23.15
@@ -44,7 +44,7 @@ importers:
         version: 5.9.3
       wrangler:
         specifier: 4.142.0
-        version: 4.142.0(@types/node@24.10.1)
+        version: 4.142.0(@types/node@26.6.5)
 
   apps/importer:
     dependencies:
@@ -59,7 +59,7 @@ importers:
         version: 1.62.1
       sharp:
         specifier: 0.35.5
-        version: 0.35.5(@types/node@24.10.1)
+        version: 0.35.5(@types/node@26.6.5)
 
   apps/mail:
     dependencies:
@@ -177,7 +177,7 @@ importers:
         version: 4.0.529(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       sharp:
         specifier: 0.35.5
-        version: 0.35.5(@types/node@24.10.1)
+        version: 0.35.5(@types/node@26.6.5)
       tsx:
         specifier: 4.23.15
         version: 4.23.15
@@ -216,10 +216,10 @@ importers:
         version: link:../../packages/voice
       '@opennextjs/cloudflare':
         specifier: 1.20.6
-        version: 1.20.6(next@16.4.1(@types/node@24.10.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(wrangler@4.142.0(@types/node@24.10.1))
+        version: 1.20.6(next@16.4.1(@types/node@26.6.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(wrangler@4.142.0(@types/node@26.6.5))
       better-auth:
         specifier: 1.7.6
-        version: 1.7.6(next@16.4.1(@types/node@24.10.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 1.7.6(next@16.4.1(@types/node@26.6.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       canvas-confetti:
         specifier: 1.9.4
         version: 1.9.4
@@ -240,7 +240,7 @@ importers:
         version: 14.3.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       next:
         specifier: 16.4.1
-        version: 16.4.1(@types/node@24.10.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 16.4.1(@types/node@26.6.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       postal-mime:
         specifier: 4.0.4
         version: 4.0.4
@@ -261,7 +261,7 @@ importers:
         version: 2.18.1
       stripe:
         specifier: 23.0.0
-        version: 23.0.0(@types/node@24.10.1)
+        version: 23.0.0(@types/node@26.6.5)
       web-vitals:
         specifier: 6.2.3
         version: 6.2.3
@@ -271,7 +271,7 @@ importers:
     devDependencies:
       '@posthog/nextjs-config':
         specifier: 1.11.2
-        version: 1.11.2(next@16.4.1(@types/node@24.10.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(posthog-js@1.438.5(@types/react@19.3.0)(react@19.3.0))(webpack@5.105.0)
+        version: 1.11.2(next@16.4.1(@types/node@26.6.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(posthog-js@1.438.5(@types/react@19.3.0)(react@19.3.0))(webpack@5.105.0)
       '@types/canvas-confetti':
         specifier: 1.9.0
         version: 1.9.0
@@ -2239,8 +2239,8 @@ packages:
   '@types/node@18.19.130':
     resolution: {integrity: sha512-GRaXQx6jGfL8sKfaIDD6OupbIHBr9jv7Jnaml9tB7l4v068PAOXqfcujMMo5PhbIs6ggR1XODELqahT2R8v0fg==}
 
-  '@types/node@24.10.1':
-    resolution: {integrity: sha512-GNWcUTRBgIRJD5zj+Tq0fKOJ5XZajIiBroOF0yvj2bSU1WvNdYS/dn9UxwsujGW4JX06dnHyjV2y9rRaybH0iQ==}
+  '@types/node@26.6.5':
+    resolution: {integrity: sha512-uMzsv9stDdofIZBx4UGh4Z9ZgXnGC9seRDscilBcTHAeOFk67MZg/k9bWVfO+bk4qZmG+l52hRnLwUiH2LnJTg==}
 
   '@types/react-dom@19.2.3':
     resolution: {integrity: sha512-jp2L/eY6fn+KgVVQAOqYItbF0VY/YApe5Mz2F0aykSO8gx31bYCZyvSeYxCHKvzHG5eZjc+zyaS5BrBWya2+kQ==}
@@ -3843,8 +3843,8 @@ packages:
   undici-types@5.26.5:
     resolution: {integrity: sha512-JlCMO+ehdEIKqlFxk6IfVoAUVmgz7cU7zD/h9XZ0qzeosSHmUJVOzSQvvYSYWXkFXC+IfLKSIffhv0sVZup6pA==}
 
-  undici-types@7.16.0:
-    resolution: {integrity: sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw==}
+  undici-types@8.9.0:
+    resolution: {integrity: sha512-KTDyRTYX8sWmKXAikPHHSyc63CRPETMctyjKFupcC6OBLXT3xsN0e9aF7m+mIXutFWpUXuedtowG7iLOzp0kQg==}
 
   undici@7.29.1:
     resolution: {integrity: sha512-RYONW2MeafgYlkVOKYKkA/Ag7BmXqgIWCa8t1m0JcxrQg9pI9lEqRhAOruOBCbAohOa/gkCF+iPi9hrgvTzu6Q==}
@@ -5295,7 +5295,7 @@ snapshots:
     dependencies:
       gzip-size: 6.0.0
 
-  '@opennextjs/aws@4.1.4(next@16.4.1(@types/node@24.10.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))':
+  '@opennextjs/aws@4.1.4(next@16.4.1(@types/node@26.6.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))':
     dependencies:
       '@ast-grep/napi': 0.40.5
       '@aws-sdk/client-cloudfront': 3.984.0
@@ -5311,26 +5311,26 @@ snapshots:
       cookie: 1.1.1
       esbuild: 0.25.4
       express: 5.2.1
-      next: 16.4.1(@types/node@24.10.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      next: 16.4.1(@types/node@26.6.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       path-to-regexp: 6.3.0
       urlpattern-polyfill: 10.1.0
       yaml: 2.9.1
     transitivePeerDependencies:
       - supports-color
 
-  '@opennextjs/cloudflare@1.20.6(next@16.4.1(@types/node@24.10.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(wrangler@4.142.0(@types/node@24.10.1))':
+  '@opennextjs/cloudflare@1.20.6(next@16.4.1(@types/node@26.6.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(wrangler@4.142.0(@types/node@26.6.5))':
     dependencies:
       '@ast-grep/napi': 0.40.5
       '@dotenvx/dotenvx': 1.31.0
-      '@opennextjs/aws': 4.1.4(next@16.4.1(@types/node@24.10.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))
+      '@opennextjs/aws': 4.1.4(next@16.4.1(@types/node@26.6.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))
       ci-info: 4.4.0
       cloudflare: 4.5.0
       comment-json: 4.6.2
       enquirer: 2.4.1
       glob: 12.0.0
-      next: 16.4.1(@types/node@24.10.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      next: 16.4.1(@types/node@26.6.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       ts-tqdm: 0.8.6
-      wrangler: 4.142.0(@types/node@24.10.1)
+      wrangler: 4.142.0(@types/node@26.6.5)
       yargs: 18.2.0
     transitivePeerDependencies:
       - encoding
@@ -5371,12 +5371,12 @@ snapshots:
     dependencies:
       '@posthog/types': 1.415.2
 
-  '@posthog/nextjs-config@1.11.2(next@16.4.1(@types/node@24.10.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(posthog-js@1.438.5(@types/react@19.3.0)(react@19.3.0))(webpack@5.105.0)':
+  '@posthog/nextjs-config@1.11.2(next@16.4.1(@types/node@26.6.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(posthog-js@1.438.5(@types/react@19.3.0)(react@19.3.0))(webpack@5.105.0)':
     dependencies:
       '@posthog/cli': 0.18.10
       '@posthog/plugin-utils': 2.0.1
       '@posthog/webpack-plugin': 1.7.1(webpack@5.105.0)
-      next: 16.4.1(@types/node@24.10.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      next: 16.4.1(@types/node@26.6.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       posthog-js: 1.438.5(@types/react@19.3.0)(react@19.3.0)
       semver: 7.8.5
     transitivePeerDependencies:
@@ -6099,16 +6099,16 @@ snapshots:
 
   '@types/node-fetch@2.6.13':
     dependencies:
-      '@types/node': 24.10.1
+      '@types/node': 26.6.5
       form-data: 4.0.6
 
   '@types/node@18.19.130':
     dependencies:
       undici-types: 5.26.5
 
-  '@types/node@24.10.1':
+  '@types/node@26.6.5':
     dependencies:
-      undici-types: 7.16.0
+      undici-types: 8.9.0
 
   '@types/react-dom@19.2.3(@types/react@19.3.0)':
     dependencies:
@@ -6266,7 +6266,7 @@ snapshots:
 
   baseline-browser-mapping@2.11.26: {}
 
-  better-auth@1.7.6(next@16.4.1(@types/node@24.10.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
+  better-auth@1.7.6(next@16.4.1(@types/node@26.6.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
     dependencies:
       '@better-auth/core': 1.7.6(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-call@1.4.0(zod@4.6.5))(jose@6.2.12)(kysely@0.29.6)(nanostores@1.5.4)
       '@better-auth/drizzle-adapter': 1.7.6(@better-auth/core@1.7.6(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-call@1.4.0(zod@4.6.5))(jose@6.2.12)(kysely@0.29.6)(nanostores@1.5.4))(@better-auth/utils@0.4.2)
@@ -6286,7 +6286,7 @@ snapshots:
       nanostores: 1.5.4
       zod: 4.6.5
     optionalDependencies:
-      next: 16.4.1(@types/node@24.10.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      next: 16.4.1(@types/node@26.6.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
     transitivePeerDependencies:
@@ -6983,7 +6983,7 @@ snapshots:
 
   jest-worker@27.5.1:
     dependencies:
-      '@types/node': 24.10.1
+      '@types/node': 26.6.5
       merge-stream: 2.0.0
       supports-color: 8.1.1
 
@@ -7095,10 +7095,10 @@ snapshots:
 
   mimic-fn@2.1.0: {}
 
-  miniflare@5.20260926.0-alpha(@types/node@24.10.1):
+  miniflare@5.20260926.0-alpha(@types/node@26.6.5):
     dependencies:
       '@cspotcode/source-map-support': 0.8.1
-      sharp: 0.35.5(@types/node@24.10.1)
+      sharp: 0.35.5(@types/node@26.6.5)
       undici: 7.29.1
       workerd: 1.20260926.1
       ws: 8.21.0
@@ -7158,7 +7158,7 @@ snapshots:
 
   neo-async@2.6.2: {}
 
-  next@16.4.1(@types/node@24.10.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
+  next@16.4.1(@types/node@26.6.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
     dependencies:
       '@next/env': 16.4.1
       '@swc/helpers': 0.5.23
@@ -7177,7 +7177,7 @@ snapshots:
       '@next/swc-linux-x64-musl': 16.4.1
       '@next/swc-win32-arm64-msvc': 16.4.1
       '@next/swc-win32-x64-msvc': 16.4.1
-      sharp: 0.35.5(@types/node@24.10.1)
+      sharp: 0.35.5(@types/node@26.6.5)
     transitivePeerDependencies:
       - '@babel/core'
       - '@types/node'
@@ -7485,7 +7485,7 @@ snapshots:
 
   setprototypeof@1.2.0: {}
 
-  sharp@0.35.5(@types/node@24.10.1):
+  sharp@0.35.5(@types/node@26.6.5):
     dependencies:
       '@img/colour': 1.1.0
       detect-libc: 2.1.2
@@ -7516,7 +7516,7 @@ snapshots:
       '@img/sharp-win32-arm64': 0.35.5
       '@img/sharp-win32-ia32': 0.35.5
       '@img/sharp-win32-x64': 0.35.5
-      '@types/node': 24.10.1
+      '@types/node': 26.6.5
 
   shebang-command@2.0.0:
     dependencies:
@@ -7599,9 +7599,9 @@ snapshots:
 
   strip-final-newline@2.0.0: {}
 
-  stripe@23.0.0(@types/node@24.10.1):
+  stripe@23.0.0(@types/node@26.6.5):
     optionalDependencies:
-      '@types/node': 24.10.1
+      '@types/node': 26.6.5
 
   style-loader@4.0.0(webpack@5.105.0(esbuild@0.28.1)(postcss@8.5.29)):
     dependencies:
@@ -7701,7 +7701,7 @@ snapshots:
 
   undici-types@5.26.5: {}
 
-  undici-types@7.16.0: {}
+  undici-types@8.9.0: {}
 
   undici@7.29.1: {}
 
@@ -7881,13 +7881,13 @@ snapshots:
       '@cloudflare/workerd-linux-arm64': 1.20260926.1
       '@cloudflare/workerd-windows-64': 1.20260926.1
 
-  wrangler@4.142.0(@types/node@24.10.1):
+  wrangler@4.142.0(@types/node@26.6.5):
     dependencies:
       '@cloudflare/kv-asset-handler': 0.5.0
       '@cloudflare/unenv-preset': 2.16.2(unenv@2.0.0-rc.24)(workerd@1.20260926.1)
       blake3-wasm: 2.1.5
       esbuild: 0.28.1
-      miniflare: 5.20260926.0-alpha(@types/node@24.10.1)
+      miniflare: 5.20260926.0-alpha(@types/node@26.6.5)
       path-to-regexp: 6.3.0
       unenv: 2.0.0-rc.24
       workerd: 1.20260926.1
