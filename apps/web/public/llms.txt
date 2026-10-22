@@ -62,9 +62,9 @@ Si l'export échoue, le crédit vidéo est restitué. Les suppléments d'animati
 | --- | --- | --- |
 | Gratuit | 0 € | 3 |
 | Solo | 50 € HT | 50 |
-| Agence | 100 € HT | 100 |
-| Équipe | 200 € HT | 200 |
-| Réseau | 500 € HT | 500 |
+| Agence | 100 € HT | 120 |
+| Équipe | 200 € HT | 250 |
+| Réseau | 500 € HT | 650 |
 
 Pour les nouvelles offres payantes, les crédits mensuels inutilisés et non réservés sont reportables au mois suivant après renouvellement payé, dans la limite d'une mensualité. Ils sont consommés en premier et ne se reportent pas une seconde fois. L'offre gratuite conserve ses 3 crédits mensuels sans report ; les abonnements Plus et Pro existants gardent leurs conditions. Les recharges ponctuelles complètent le solde sans changer l'abonnement : 20, 50 ou 100 crédits à 1 € HT par crédit, sans expiration. Les achats antérieurs conservent leur barème. La page des offres propose un estimateur selon le nombre de photos animées, le solde et l'historique des crédits après connexion.
 

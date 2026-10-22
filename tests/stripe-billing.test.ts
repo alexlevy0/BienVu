@@ -1,5 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import type {Stripe} from '../apps/web/lib/billing';
 import {migrateNarrationProbe,seedNarrationFixture} from '../scripts/narration-fixtures';
@@ -8,8 +9,10 @@ import {creditBalance,creditHistory,generationRights,admitGeneration,failGenerat
 import {savePromotion,validatePromotion,checkoutPromotion,reconcilePromotionReservations,promotionReport,promotionValidationAttempt} from '../apps/web/lib/subscription-promotions';
 import {commercialSummary} from '../apps/web/lib/commercial';
 import {defaultVideoCustomization} from '../packages/contracts/src/index';
-async function fixture(t:{after(fn:()=>Promise<void>):void},label:string){
- const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:'export default {fetch(){return new Response("fixture")}}',compatibilityDate:'2026-09-27',d1Databases:['DB']}));t.after(()=>mf.dispose());const {DB}=await mf.getBindings<{DB:D1Database}>();await migrateNarrationProbe(DB);
+async function fixture(t:{after(fn:()=>Promise<void>):void},label:string,beforeNewOffers=false){
+ const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:'export default {fetch(){return new Response("fixture")}}',compatibilityDate:'2026-09-27',d1Databases:['DB']}));t.after(()=>mf.dispose());const {DB}=await mf.getBindings<{DB:D1Database}>();
+ if(beforeNewOffers)await DB.exec("CREATE TABLE narration_probe_migrations(name TEXT PRIMARY KEY NOT NULL); INSERT INTO narration_probe_migrations VALUES('0084_subscription_credit_offers.sql')");
+ await migrateNarrationProbe(DB);
  const seed=await seedNarrationFixture(DB,label);await DB.exec("UPDATE jobs SET status='failed',error_code='FIXTURE',lease_until=NULL; UPDATE generation_control SET enabled=1; UPDATE trial_policy SET free_enabled=1");
  const env={DB,BILLING_MODE:'test',STRIPE_SECRET_KEY:'sk_test_fixture',STRIPE_WEBHOOK_SECRET:'whsec_fixture'};
  await DB.prepare('INSERT INTO billing_customers VALUES(?,?,?,?)').bind(seed.agencyId,'test','cus_fixture',new Date().toISOString()).run();
@@ -57,8 +60,8 @@ test('Portail Stripe : accessible après résiliation, liens limités à HTTPS s
   url=unsafe;await assert.rejects(createPortal(f.env,f.agencyId,'https://bienvu.online',f.client),{code:'BILLING_UNAVAILABLE'});
  }
 });
-async function promotionFixture(t:Parameters<typeof fixture>[0],label:string,maxRedemptions:number|null=null){
- const f=await fixture(t,label),at=new Date().toISOString(),actor='promo-admin-'+label;
+async function promotionFixture(t:Parameters<typeof fixture>[0],label:string,maxRedemptions:number|null=null,beforeNewOffers=false){
+ const f=await fixture(t,label,beforeNewOffers),at=new Date().toISOString(),actor='promo-admin-'+label;
  await f.DB.prepare('INSERT INTO auth_user(id,name,email,emailVerified,createdAt,updatedAt) VALUES(?,?,?,1,?,?)').bind(actor,'Admin',actor+'@example.com',at,at).run();
  const settings={code:'BIENVU20',name:'Campagne de test',active:true,startsAt:null,endsAt:null,maxRedemptions,plans:['solo','agence','equipe','reseau']};
  const {id}=await savePromotion(f.DB,actor,{action:'save',settings,reason:'Création de la campagne de test'});
@@ -69,8 +72,8 @@ async function promotionFixture(t:Parameters<typeof fixture>[0],label:string,max
     metadata:params!.metadata,mode:'subscription',livemode:false,subscription:null} as unknown as Stripe.Checkout.Session;
   f.checkoutSessions.set(session.id,session);return session as Stripe.Response<Stripe.Checkout.Session>;
  };
- async function open(key='promotion-checkout-key-001',code='BIENVU20',agency=f.agencyId){
-  await createCheckout(f.env,agency,'fixture@example.com','https://bienvu.online',{plan:'solo',promotionCode:code},key,f.client);
+ async function open(key='promotion-checkout-key-001',code='BIENVU20',agency=f.agencyId,plan='solo'){
+  await createCheckout(f.env,agency,'fixture@example.com','https://bienvu.online',{plan,promotionCode:code},key,f.client);
   const intent=(await checkoutPromotion(f.DB,agency,'test',key))!;
   const row=await f.DB.prepare('SELECT session_id id FROM billing_checkouts WHERE agency_id=? AND idempotency_key=?').bind(agency,key).first<{id:string}>()??await f.DB.prepare('SELECT session_id id FROM billing_checkouts WHERE agency_id=? ORDER BY created_at DESC LIMIT 1').bind(agency).first<{id:string}>();return {intent,session:f.checkoutSessions.get(row!.id)!};
  }
@@ -80,7 +83,7 @@ async function promotionFixture(t:Parameters<typeof fixture>[0],label:string,max
 }
 test('Codes bonus : validation, première facture seulement, replay parallèle et crédits consommés en priorité',async t=>{
  const f=await promotionFixture(t,'promo-paid'),preview=await validatePromotion(f.DB,'  bienvu20 ','test',f.agencyId);
- assert.deepEqual(preview.preview.plans.map(p=>p.total),[60,120,240,600]);
+ assert.deepEqual(preview.preview.plans.map(p=>p.total),[60,144,300,780]);
  const {intent,session}=await f.open();assert.equal((await creditBalance(f.DB,f.agencyId)).available,0,'Un Checkout ouvert ne donne aucun droit');
  session.status='complete';session.subscription=f.sub.id;(f.sub.metadata as Record<string,string>).promotionIntentId=intent.id;
  await Promise.all([1,2].map(n=>processStripeEvent(f.env,f.event('evt_promo_'+n),String(n).repeat(64),f.client)));
@@ -283,12 +286,13 @@ test('Checkout : échec d’expiration et paiement concomitant ne libèrent pas 
 // Annual payment must fund monthly periods, never expose the entire year at once.
 import {subscriptionCreditPeriods} from '../apps/web/lib/subscription-periods';
 import {subscriptionPricing,creditPlans} from '../packages/contracts/src/credits';
-function annual(f:Awaited<ReturnType<typeof fixture>>,start=Math.floor(Date.now()/1000)-10){
+function annual(f:Awaited<ReturnType<typeof fixture>>,start=Math.floor(Date.now()/1000)-10,code='solo'){
  const end=(()=>{const d=new Date(start*1000);d.setUTCFullYear(d.getUTCFullYear()+1);return Math.floor(d.getTime()/1000);})();
- f.sub.metadata.plan='solo';Object.assign(f.sub.items.data[0].price,{unit_amount:54000,recurring:{interval:'year',interval_count:1}});
+ const amount=subscriptionPricing(creditPlans.find(p=>p.code===code)!.price,'year').amountCents;
+ f.sub.metadata.plan=code;Object.assign(f.sub.items.data[0].price,{unit_amount:amount,recurring:{interval:'year',interval_count:1}});
  Object.assign(f.sub.items.data[0],{current_period_start:start,current_period_end:end});
- Object.assign(f.invoice,{amount_paid:54000,subtotal:54000,subtotal_excluding_tax:54000});
- Object.assign(f.invoice.lines.data[0],{amount:54000,period:{start,end}});
+ Object.assign(f.invoice,{amount_paid:amount,subtotal:amount,subtotal_excluding_tax:amount});
+ Object.assign(f.invoice.lines.data[0],{amount,period:{start,end}});
  return subscriptionCreditPeriods('year',start,end);
 }
 test('Annuel : remise exacte sur les quatre offres et calendrier ancré aux fins de mois',()=>{
@@ -364,4 +368,52 @@ test('Annuel : bonus promotionnel au premier mois seulement, admission et revenu
  await f.DB.prepare("INSERT INTO photo_animations(id,agency_id,job_id,photo_id,source_sha256,slot,month,mode,model,credits,reserved_cents,state,created_at,updated_at) VALUES(?,?,?,?,?,0,?,'mock','gen4_turbo',25,0,'ready',?,?)").bind('annual-promo-animation',f.agencyId,run.jobId,photo.id,photo.contentHash,at.slice(0,7),at,at).run();
  await failGeneration(f.DB,run,'FIXTURE');
  assert.deepEqual(await f.DB.prepare('SELECT used,revenue_micros revenue FROM finance_credit_attribution WHERE job_id=?').bind(run.jobId).first(),{used:1,revenue:Math.floor(540e6/610)});
+});
+
+test('Offres : quotas et bonus exacts des quatre plans, paiement mensuel et annuel',async t=>{
+ for(const plan of creditPlans.filter(p=>p.price>0))for(const interval of ['month','year'] as const)await t.test(plan.code+' '+interval,async t=>{
+  const f=await promotionFixture(t,'catalog-'+plan.code+'-'+interval),amount=subscriptionPricing(plan.price,interval).amountCents;
+  if(interval==='year')annual(f,undefined,plan.code);
+  else{
+   f.sub.metadata.plan=plan.code;f.sub.items.data[0].price.unit_amount=amount;
+   Object.assign(f.invoice,{amount_paid:amount,subtotal:amount,subtotal_excluding_tax:amount});f.invoice.lines.data[0].amount=amount;
+  }
+  const original=f.client.checkout.sessions.create;let checkout:Stripe.Checkout.SessionCreateParams|undefined;
+  f.client.checkout.sessions.create=async(params,options)=>{checkout=params;return original(params,options);};
+  // The checkout cadence is part of the public request, independently from the invoice fixture.
+  const key='catalog-checkout-key-0001';
+  await createCheckout(f.env,f.agencyId,'fixture@example.com','https://bienvu.online',{plan:plan.code,billingInterval:interval,promotionCode:'BIENVU20'},key,f.client);
+  const intent=(await checkoutPromotion(f.DB,f.agencyId,'test',key))!,bonus=Math.floor(plan.credits*.2);
+  assert.equal(intent.bonusCredits,bonus);assert.equal(checkout!.line_items![0].price_data!.unit_amount,amount);
+  assert.equal(checkout!.line_items![0].price_data!.recurring!.interval,interval);
+  assert.match(checkout!.line_items![0].price_data!.product_data!.name,new RegExp(plan.credits+' crédits par mois'));
+  const session=[...f.checkoutSessions.values()][0];session.status='complete';session.subscription=f.sub.id;
+  (f.sub.metadata as Record<string,string>).promotionIntentId=intent.id;
+  await processStripeEvent(f.env,f.event('evt_catalog_paid'),'c'.repeat(64),f.client);
+  await processStripeEvent(f.env,f.event('evt_catalog_replayed'),'d'.repeat(64),f.client);
+  assert.equal((await creditBalance(f.DB,f.agencyId)).available,plan.credits+bonus);
+  const quotas=(await f.DB.prepare("SELECT quota_limit n FROM allocations WHERE period_key LIKE 'stripe:%'").all<{n:number}>()).results;
+  assert.equal(quotas.length,interval==='year'?12:1);assert.ok(quotas.every(p=>p.n===plan.credits));
+  assert.deepEqual(await f.DB.prepare('SELECT credits,gross_cents amount FROM financial_receipts').first(),{credits:plan.credits*(interval==='year'?12:1),amount});
+  assert.equal((await f.DB.prepare('SELECT count(*) n FROM credit_promotion_redemptions').first<{n:number}>())!.n,1);
+  assert.deepEqual((await f.DB.prepare('PRAGMA foreign_key_check').all()).results,[]);
+ });
+});
+
+test('Migration des offres : réservations et bonus déjà attribués conservés avec leurs références',async t=>{
+ const f=await promotionFixture(t,'catalog-migration',null,true);await f.pay();
+ const second=await seedNarrationFixture(f.DB,'catalog-old-reserved'),at=new Date().toISOString();
+ await f.DB.prepare("INSERT INTO billing_checkouts(agency_id,idempotency_key,plan,mode,expires_at,created_at) VALUES(?,'legacy-checkout-key','agence','test',?,?)").bind(second.agencyId,new Date(Date.now()+3600000).toISOString(),at).run();
+ await f.DB.prepare("INSERT INTO billing_promotion_intents VALUES('legacy-intent',?,'BIENVU20',?,'test','legacy-checkout-key','agence',20,'reserved',?,?)").bind(f.promotionId,second.agencyId,at,at).run();
+ const beforeIntents=(await f.DB.prepare('SELECT * FROM billing_promotion_intents ORDER BY id').all()).results;
+ const beforeRedemptions=(await f.DB.prepare('SELECT * FROM credit_promotion_redemptions').all()).results;
+ const migration=await readFile(new URL('../packages/db/migrations/0084_subscription_credit_offers.sql',import.meta.url),'utf8');
+ await f.DB.exec(migration.replace(/^--.*$/gm,'').replace(/\n/g,' '));
+ assert.deepEqual((await f.DB.prepare('SELECT * FROM billing_promotion_intents ORDER BY id').all()).results,beforeIntents);
+ assert.deepEqual((await f.DB.prepare('SELECT * FROM credit_promotion_redemptions').all()).results,beforeRedemptions);
+ assert.deepEqual((await f.DB.prepare('PRAGMA foreign_key_check').all()).results,[]);
+ assert.equal((await creditBalance(f.DB,f.agencyId)).available,60);
+ await f.DB.prepare('SELECT * FROM finance_credit_attribution').all();
+ await assert.rejects(f.DB.prepare("UPDATE billing_promotion_intents SET bonus_credits=24 WHERE id='legacy-intent'").run(),/PROMOTION_IMMUTABLE/);
+ await assert.rejects(f.DB.prepare("UPDATE billing_promotion_intents SET state='reserved' WHERE state='redeemed'").run(),/PROMOTION_IMMUTABLE/);
 });

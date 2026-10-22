@@ -14,9 +14,9 @@ export const legacyCreditPlans=[
 export const creditPlans=[
   {code:'gratuit',name:'Gratuit',description:'Pour découvrir BienVu',price:0,credits:3},
   {code:'solo',name:'Solo',description:'Pour les indépendants',price:50,credits:50},
-  {code:'agence',name:'Agence',description:'Pour publier régulièrement',price:100,credits:100},
-  {code:'equipe',name:'Équipe',description:'Pour un volume soutenu',price:200,credits:200},
-  {code:'reseau',name:'Réseau',description:'Pour les agences multi-sites',price:500,credits:500},
+  {code:'agence',name:'Agence',description:'Pour publier régulièrement',price:100,credits:120},
+  {code:'equipe',name:'Équipe',description:'Pour un volume soutenu',price:200,credits:250},
+  {code:'reseau',name:'Réseau',description:'Pour les agences multi-sites',price:500,credits:650},
 ] as const;
 export const BillingInterval=z.enum(['month','year']);
 export type BillingInterval=z.infer<typeof BillingInterval>;

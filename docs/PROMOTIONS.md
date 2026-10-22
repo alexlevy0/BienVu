@@ -5,9 +5,11 @@ Décision du 10 octobre 2026 : proposer **20 % de crédits supplémentaires sur 
 | Offre | Crédits habituels | Bonus | Première mensualité |
 | --- | ---: | ---: | ---: |
 | Solo | 50 | 10 | 60 |
-| Agence | 100 | 20 | 120 |
-| Équipe | 200 | 40 | 240 |
-| Réseau | 500 | 100 | 600 |
+| Agence | 120 | 24 | 144 |
+| Équipe | 250 | 50 | 300 |
+| Réseau | 650 | 130 | 780 |
+
+Catalogue du 22 octobre 2026 : Solo reste à 50 € HT / 50 crédits ; Agence, Équipe et Réseau passent à 120, 250 et 650 crédits pour 100, 200 et 500 € HT. Appliquer `0084_subscription_credit_offers.sql` avant le web : les anciennes réservations conservent leur bonus exact et les nouvelles acceptent 24, 50 et 130 crédits. L’annuel reste à −10 % et le programme partenaires à 15 % des paiements HT encaissés pendant 12 mois.
 
 ## Parcours client
 

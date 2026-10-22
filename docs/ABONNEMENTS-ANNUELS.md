@@ -5,9 +5,9 @@ La page `/abonnement` propose le paiement mensuel sans engagement (sélectionné
 | Offre | Mensuel HT | Annuel HT | Crédits par mois |
 | --- | ---: | ---: | ---: |
 | Solo | 50 € | 540 € | 50 |
-| Agence | 100 € | 1 080 € | 100 |
-| Équipe | 200 € | 2 160 € | 200 |
-| Réseau | 500 € | 5 400 € | 500 |
+| Agence | 100 € | 1 080 € | 120 |
+| Équipe | 200 € | 2 160 € | 250 |
+| Réseau | 500 € | 5 400 € | 650 |
 
 Les montants sont calculés côté serveur. `billingInterval` accepte uniquement `month` ou `year` ; l’absence du champ conserve le fonctionnement des anciens onglets ouverts. La cadence fait partie de l’intention Checkout et de la clé navigateur. Un changement de cadence expire l’ancien paiement ouvert après confirmation par Stripe. Aucun crédit n’est attribué par le retour Checkout.
 

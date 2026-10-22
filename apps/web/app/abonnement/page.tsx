@@ -10,7 +10,7 @@ import {anonymousTrialsConfigured} from '../../lib/trials';
 import '../landing.css';
 import './offers.css';
 
-export const metadata = seoMetadata({title:'Tarifs BienVu — Offres mensuelles et annuelles −10 %',description:'Solo, Agence, Équipe et Réseau : 50 à 500 crédits par mois. Paiement mensuel sans engagement ou annuel avec 10 % de réduction. Report plafonné à une mensualité et essai gratuit.',path:'/abonnement'});
+export const metadata = seoMetadata({title:'Tarifs BienVu — Offres mensuelles et annuelles −10 %',description:'Solo, Agence, Équipe et Réseau : 50, 120, 250 et 650 crédits par mois. Paiement mensuel sans engagement ou annuel avec 10 % de réduction. Report plafonné à une mensualité et essai gratuit.',path:'/abonnement'});
 export const dynamic='force-dynamic';
 
 export default async function Page({searchParams}:{searchParams:Promise<{facturation?:string}>}) {

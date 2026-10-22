@@ -52,7 +52,7 @@ test('Report : changement de palier, plafond d’une mensualité, isolation et r
  const f=await fixture(t,'roll-cap');await f.pay('in_roll_previous',f.start-30*86400,'reseau');await f.pay('in_roll_current',f.start,'solo');
  assert.equal((await creditBalance(f.DB,f.agencyId)).available,100);assert.equal((await creditBalance(f.DB,f.agencyId)).rolloverAvailable,50);
  assert.equal((await creditBalance(f.DB,'foreign-roll-agency')).available,0);
- await f.DB.exec("UPDATE financial_receipts SET reversed_credits=500 WHERE invoice_id='in_roll_previous'");
+ await f.DB.exec("UPDATE financial_receipts SET reversed_credits=650 WHERE invoice_id='in_roll_previous'");
  assert.equal((await creditBalance(f.DB,f.agencyId)).available,50,'Refund of original source revokes unspent carry');
 });
 test('Report : une hausse de quota par admin ne devient pas un crédit mensuel payé reportable',async t=>{
