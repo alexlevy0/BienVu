@@ -25,3 +25,5 @@ overrides:
   'js-yaml@4.2.0': 4.3.2
   # PostHog still resolves this DOMPurify version; preserve the upstream range.
   'dompurify@3.4.16': 3.4.17
+  # The OpenNext minifier pins a glob version with a vulnerable CLI.
+  'glob@10.3.3': 10.5.0
