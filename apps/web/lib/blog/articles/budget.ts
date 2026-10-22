@@ -8,7 +8,7 @@ export const budgetArticle: BlogArticle = {
   category: 'budget', keyword: 'coût vidéo immobilière', image: 'sud', imageAlt: 'Maison avec piscine illustrant le budget vidéo d’un mandat',
   intro: [
     'Le coût d’une vidéo immobilière dépend de la manière de la produire. Un tournage, un montage à partir de photos et une vidéo avec animations IA mobilisent des ressources différentes. Pour un devis de prestation, comparez le périmètre : préparation, déplacement, prises de vue, montage, retouches, musique et formats livrés.',
-    'Dans BienVu, le budget de génération se calcule en crédits. Vous pouvez prévoir les créations, les nouvelles photos animées et le présentateur IA avant de choisir une offre. Les calculs ci-dessous utilisent les tarifs des nouvelles souscriptions au 9 octobre 2026 ; consultez la page des offres avant un achat.',
+    'Dans BienVu, le budget de génération se calcule en crédits. Vous pouvez prévoir les créations, les nouvelles photos animées et le présentateur IA avant de choisir une offre. Les calculs ci-dessous utilisent les tarifs des souscriptions au 22 octobre 2026 ; consultez la page des offres avant un achat.',
   ],
   takeaways: ['Une nouvelle vidéo ou un nouvel export utilise un crédit, plus les nouvelles animations.', 'Comparez votre consommation prévue aux crédits réellement disponibles sur la période.', 'Ajoutez le temps de préparation et la diffusion au budget global du mandat.'],
   sections: [
