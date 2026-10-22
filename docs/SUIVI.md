@@ -1,5 +1,11 @@
 # BienVu — suivi des sprints
 
+### 22/10/2026 — Nouveaux volumes de crédits, Solo conservée
+
+Solo **50 € HT / 50 crédits** conservée ; Agence **100 € / 120**, Équipe **200 € / 250**, Réseau **500 € / 650** par mois. Annuel **−10 %**, bonus **20 % au premier mois** et commission apporteur **15 % HT pendant douze mois** conservés. Catalogue serveur, facturation, estimateur et pages publiques actualisés. Migration **0084** appliquée après sauvegarde et répétition sur les **164 tables / 9 418 lignes** existantes ; historique et intégrité conservés.
+
+Publication du commit **95706519f0bfa9bc96d3d560309fb938113d2ae0**, release **95706519f0bf**, Worker **0d263f6d-8046-4e92-9f3b-c32ad5a9c49d** à **100 %** sur `bienvu.online`. **905 tests validés**, puis **66 contrôles ciblés** après les correctifs Next.js/DOMPurify et la mise à jour compatible OpenNext/Wrangler. Types, build, sourcemaps privées, Worker local, 51 pages SEO et recette navigateur réussis. Offres mensuelles/annuelles relues sur le domaine, configuration et journaux financiers préservés. CI sécurité réussie ; CI fonctionnelle en cours au relevé. **Stripe reste en mode test.** [Détails, contrôles et limites](preuves/maintenance/OFFRES-22-10.md).
+
 ### 21/10/2026 — Publication des corrections PostHog et du correctif sanitize-html
 
 Commits produit **`f142909ad6f1691b0cf3e4aca495904e3268ae73`** puis **`0102b1531d2a066b40197b21fd328f8d9414de73`**, poussés sur `main`. Version finale web **`7a8106de-ff2e-48f6-99dc-ff95278d2801`**, release **`0102b1531d2a`**, activée à **100 %** sur `bienvu.online` et `beta.bienvu.online`. Publication avec le bundle préparé sans recompilation (`no_bundle`), `--keep-vars --strict` et sourcemaps privées. Le SHA-256 du module distant est identique au module envoyé à PostHog : **`f58fbf4807119348f9712474b0913c671ab0a03245eb54682ed1da26e52367dd`**. PostHog EU **299212** confirme le fichier de symboles du chunk serveur **`ea0e7e9e-215f-5a28-8273-74d35bd55203`**, sans erreur de traitement ; **424 sources**, aucune map dans les assets publics.
