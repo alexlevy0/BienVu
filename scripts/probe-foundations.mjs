@@ -21,7 +21,7 @@ for (const [path, expectedContent] of pages) {
   const response = await fetch(new URL(path, base));
   const html = await response.text();
   assert.equal(response.status, 200, path);
-  assert.match(html, /<html lang="fr"/);
+  assert.match(html, /<html\b[^>]*\blang="fr"/);
   assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
   assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
   for (const content of Array.isArray(expectedContent) ? expectedContent : [expectedContent]) {

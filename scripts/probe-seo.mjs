@@ -17,7 +17,7 @@ for(const path of paths){const response=await fetch(base+path,{headers}),html=aw
  assert.match(html,/<meta name="description" content="[^"]{40,}/);assert.match(html,/<meta property="og:title"/);assert.match(html,/<meta property="og:image"/);assert.match(html,/<meta name="twitter:card" content="summary_large_image"/);
  const canonical=html.match(/<link rel="canonical" href="([^"]+)"/)?.[1];assert.ok(canonical,path+' canonical');
  assert.equal(new URL(canonical).href,new URL(path,'https://bienvu.online').href,path+' canonical');
- assert.equal((html.match(/<h1(?:\s|>)/g)??[]).length,1,path+' h1');assert.match(html,/<html lang="fr"/);assert.doesNotMatch(html,/<meta name="robots" content="[^"]*noindex/);
+ assert.equal((html.match(/<h1(?:\s|>)/g)??[]).length,1,path+' h1');assert.match(html,/<html\b[^>]*\blang="fr"/);assert.doesNotMatch(html,/<meta name="robots" content="[^"]*noindex/);
  for(const match of html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g))JSON.parse(match[1]);
  if(path==='/'){
   const footer=html.match(/<footer class="home-premium-footer"[\s\S]*?<\/footer>/)?.[0];
