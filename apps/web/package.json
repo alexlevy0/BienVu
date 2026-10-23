@@ -19,6 +19,7 @@
     "@bienvu/narration": "workspace:*",
     "@bienvu/notifications": "workspace:*",
     "@bienvu/observability": "workspace:*",
+    "@bienvu/presentation": "workspace:*",
     "@bienvu/voice": "workspace:*",
     "@opennextjs/cloudflare": "1.20.13",
     "better-auth": "1.7.6",
@@ -37,8 +38,7 @@
     "sanitize-html": "2.18.1",
     "stripe": "23.0.0",
     "web-vitals": "6.2.3",
-    "zod": "4.6.5",
-    "@bienvu/presentation": "workspace:*"
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@posthog/nextjs-config": "1.11.2",

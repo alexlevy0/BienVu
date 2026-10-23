@@ -1,5 +1,9 @@
 # BienVu — suivi des sprints
 
+### 23/10/2026 — Correctif Zod avant publication
+
+GitHub signale [GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5), risque élevé d’épuisement mémoire lors de validations de tableaux invalides. Avis actualisé le 23 octobre ; le registre npm ne le remontait pas encore. Zod épinglé en **4.6.6** dans les trois dépendances directes, avec override borné pour la copie **4.5.4** de Remotion ; le graphe installé ne contient plus que **4.6.6**. Lockfile régénéré sans mise à jour générale. **30 tests ciblés**, types complets, lint, formatage, frontières et audit des dépendances réussis. Publication en préparation avec ce correctif.
+
 ### 23/10/2026 — Publication demandée de Biome et du formatage
 
 Alex autorise commit, push et déploiement de l’ensemble. Branche `main` synchronisée avec `origin/main`, aucune modification de migration ou fichier de secret dans le diff. Lint, formatage et frontières recontrôlés ; 905 cas de test, types complets et recette des offres validés dans la livraison locale précédente. Configurations, versions actives et ressources Cloudflare sauvegardées sous `evidence/local/biome-deploy/` avant intervention ; aucun job de génération actif. La compilation et les vérifications de publication sont en cours ; versions réellement activées et résultats de CI à consigner après contrôle.
