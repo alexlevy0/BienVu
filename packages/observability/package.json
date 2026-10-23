@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@bienvu/contracts": "workspace:*",
-    "@bienvu/db": "workspace:*"
+    "@bienvu/db": "workspace:*",
+    "posthog-node": "5.55.1"
   }
 }

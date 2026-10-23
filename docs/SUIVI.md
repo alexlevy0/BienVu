@@ -1,5 +1,9 @@
 # BienVu — suivi des sprints
 
+### 23/10/2026 — Fiabilité des crons, correction locale
+
+Branche `codex/cron-reliability` : tâches planifiées web/génération isolées, ordre et concurrence existants conservés, chaque échec journalisé et signalé individuellement avec listes blanches ; invocation en échec après attente de toutes les tâches. Import, qui n’a qu’une purge planifiée, raccordé au même diagnostic. Curseur D1 séparé, écrit avant chaque contrôle, pour que dix générations en erreur ne bloquent plus les suivantes. Migration additive/rejouable **0085**, sans modification des réservations ni des dates métier. Corps du Workflow et narration inchangés. **914 cas distincts validés, dont neuf nouveaux**, après correction du typage du banc et reprise série de trois fichiers (**39/39**) ayant rencontré **19 erreurs locales `EADDRNOTAVAIL`** au second passage complet. Types complets, lint, formatage, frontières, audit et build Next/OpenNext final réussis ; aucune des deux commandes `pnpm check` n’est présentée comme intégralement verte. Aucun commit, push, déploiement, migration distante ni appel fournisseur réel. [Recette, commandes et limites](preuves/maintenance/CRONS-23-10.md).
+
 ### 23/10/2026 — Correctif Zod avant publication
 
 GitHub signale [GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5), risque élevé d’épuisement mémoire lors de validations de tableaux invalides. Avis actualisé le 23 octobre ; le registre npm ne le remontait pas encore. Zod épinglé en **4.6.6** dans les trois dépendances directes, avec override borné pour la copie **4.5.4** de Remotion ; le graphe installé ne contient plus que **4.6.6**. Lockfile régénéré sans mise à jour générale. **45 tests ciblés**, types complets, lint, formatage, frontières et audit des dépendances réussis. Correctif publié dans les quatre Workers avec la release **`648cbc865920`** ; images de conteneurs existantes conservées, comme détaillé dans les preuves ci-dessous.

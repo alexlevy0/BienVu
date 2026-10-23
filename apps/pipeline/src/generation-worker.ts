@@ -35,7 +35,14 @@ import { loadGenerationListing } from './generation-import';
 import { prepareJobAnimations, type AnimationAttempt } from './photo-animations';
 import { animateWorkflowPhotos } from './animation-workflow';
 import { prepareGenerationMap, MapConfirmationRequired } from './default-video-map';
-import { safeAiEvent } from '@bienvu/observability';
+import {
+  safeAiEvent,
+  runScheduledTasks,
+  logDiagnostic,
+  requestContext,
+  scheduledErrorCode,
+  type ScheduledTrackingEnv,
+} from '@bienvu/observability';
 import { submitJobAvatars, pollJobAvatars, timeoutJobAvatars, reconcileAvatarTasks } from './avatars';
 import { waitForWorkflowAvatars } from './avatar-workflow';
 import type { HeygenEnvironment } from '@bienvu/avatars';
@@ -50,6 +57,7 @@ export type GenerationEnv = VideoEnv &
   > &
   FishVoiceEnv &
   HeygenEnvironment &
+  ScheduledTrackingEnv &
   BrowserPushEnvironment & {
     GENERATIONS_ENABLED: string;
     GENERATION_TOKEN: string;
@@ -394,28 +402,51 @@ export class GenerationWorkflow extends WorkflowEntrypoint<GenerationEnv, { agen
   }
 }
 export async function reconcileBatch(env: GenerationEnv) {
+  const now = new Date().toISOString(),
+    context = requestContext();
   const rows =
     await env.DB.prepare(`SELECT g.agency_id AS agencyId,g.job_id AS jobId FROM generation_runs g JOIN jobs j ON j.id=g.job_id
-    JOIN job_launch_intents l ON l.job_id=j.id WHERE j.status NOT IN ('ready','failed') AND (g.deadline<=? OR l.status='pending' OR j.updated_at<=?) ORDER BY g.created_at LIMIT 10`)
-      .bind(new Date().toISOString(), new Date(Date.now() - 60_000).toISOString())
+    JOIN job_launch_intents l ON l.job_id=j.id LEFT JOIN generation_reconciliation_attempts r ON r.job_id=g.job_id
+    WHERE j.status NOT IN ('ready','failed') AND (g.deadline<=? OR l.status='pending' OR j.updated_at<=?)
+    ORDER BY r.last_attempt_at,g.created_at,g.job_id LIMIT 10`)
+      .bind(now, new Date(Date.now() - 60_000).toISOString())
       .all<{ agencyId: string; jobId: string }>();
+  let failed = false;
   for (const ref of rows.results) {
-    const row = await findGeneration(env.DB, ref.agencyId, ref.jobId);
-    if (!row) continue;
     try {
+      // Stamp before reads/network work: errors and interrupted attempts rotate too.
+      // Keep business timestamps, launch attempts and financial journals untouched.
+      await env.DB.prepare(`INSERT INTO generation_reconciliation_attempts(job_id,last_attempt_at) VALUES(?,?)
+        ON CONFLICT(job_id) DO UPDATE SET last_attempt_at=max(last_attempt_at,excluded.last_attempt_at)`)
+        .bind(ref.jobId, new Date().toISOString())
+        .run();
+      const row = await findGeneration(env.DB, ref.agencyId, ref.jobId);
+      if (!row) continue;
       if (row.deadline <= new Date().toISOString()) await reconcileGeneration(env, row);
       else if (row.launchStatus === 'pending') await launchGeneration(env, row);
       else {
         const frozen = await getJobVideo(env.DB, row.agencyId, row.jobId);
         if (frozen) {
           const response = await controller(env, row).fetch(`https://video/status/${frozen.hash}`);
-          if (response.ok) await settleVideo(env, row, await response.json());
+          if (!response.ok) {
+            await response.body?.cancel();
+            throw Error('VIDEO_STATE_UNAVAILABLE');
+          }
+          await settleVideo(env, row, await response.json());
         }
       }
-    } catch {
-      console.log(JSON.stringify({ event: 'generation_reconcile_pending', jobId: row.jobId, stage: row.stage }));
+    } catch (error) {
+      failed = true;
+      const code = scheduledErrorCode(error);
+      logDiagnostic(context, {
+        event: 'generation_reconcile_failed',
+        status: 500,
+        jobId: ref.jobId,
+        code: code === 'GENERATION_RECONCILE_FAILED' ? 'INTERNAL_ERROR' : code,
+      });
     }
   }
+  if (failed) throw Error('GENERATION_RECONCILE_FAILED');
 }
 async function runAdminRecovery(env: GenerationEnv) {
   const next = await nextAdminRecovery(env.DB);
@@ -603,14 +634,16 @@ export default {
       return json({ error: code }, publicErrors[code][0]);
     }
   },
-  scheduled(_event: ScheduledController, env: GenerationEnv, ctx: ExecutionContext) {
-    ctx.waitUntil(
-      syncRunwayLimits(env)
-        .then(() => reconcileBatch(env))
-        .then(() => reconcileAvatarTasks(env))
-        .then(() => runAdminRecovery(env))
-        .then(() => cleanupAnonymousTrials(env))
-        .then(() => cleanupAnimations(env)),
-    );
+  async scheduled(_event: ScheduledController, env: GenerationEnv) {
+    // Reconciliation/recovery stays ahead of cleanup. The Runway snapshot is
+    // advisory (the queue has a conservative fallback), not a prerequisite.
+    await runScheduledTasks('generation', env, [
+      { name: 'sync_runway_limits', run: () => syncRunwayLimits(env) },
+      { name: 'reconcile_generations', run: () => reconcileBatch(env) },
+      { name: 'reconcile_avatars', run: () => reconcileAvatarTasks(env) },
+      { name: 'run_admin_recovery', run: () => runAdminRecovery(env) },
+      { name: 'cleanup_anonymous_trials', run: () => cleanupAnonymousTrials(env) },
+      { name: 'cleanup_animations', run: () => cleanupAnimations(env) },
+    ]);
   },
 };

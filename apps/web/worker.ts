@@ -16,6 +16,7 @@ import { cleanupPushDevices } from '@bienvu/db';
 import { sendGenerationNotifications } from '@bienvu/notifications';
 import { withServerErrorTracking, captureServerException } from './lib/error-tracking-server';
 import { runAdminAlerts } from './lib/admin-alerts';
+import { runScheduledTasks } from '@bienvu/observability';
 
 export default {
   async fetch(request, env, ctx) {
@@ -34,33 +35,35 @@ export default {
       }
     });
   },
-  async scheduled(controller, env, ctx) {
-    return withServerErrorTracking(null, env, ctx, async () => {
-      try {
-        if (controller.cron === '23 3 * * *') {
-          await purgeTraffic(env.DB);
-          await purgeSeo(env.DB);
-          await cleanupSocial(env);
-          await cleanupHomepageAssets(env);
-          await cleanupMailUploads(env);
-          await cleanupPartnerApplications(env.DB);
-          await purgeAiQuality(env.DB);
-          await cleanupShowcases(env);
-          await cleanupPushDevices(env.DB);
-        } else
-          await Promise.all([
-            runSocialBatch(env),
-            sendMailboxOutbox(env),
-            runAiQualityBatch(env),
-            sendShowcaseNotifications(env),
-            sendGenerationNotifications(env),
-            runAdminAlerts(env),
-          ]);
-      } catch (error) {
-        captureServerException(error, { source: 'scheduled' });
-        throw error;
-      }
-    });
+  async scheduled(controller, env) {
+    if (controller.cron === '23 3 * * *') {
+      // Preserve purge order and bounded D1 pressure, even after a task fails.
+      await runScheduledTasks('web', env, [
+        { name: 'purge_traffic', run: () => purgeTraffic(env.DB) },
+        { name: 'purge_seo', run: () => purgeSeo(env.DB) },
+        { name: 'cleanup_social', run: () => cleanupSocial(env) },
+        { name: 'cleanup_homepage_assets', run: () => cleanupHomepageAssets(env) },
+        { name: 'cleanup_mail_uploads', run: () => cleanupMailUploads(env) },
+        { name: 'cleanup_partner_applications', run: () => cleanupPartnerApplications(env.DB) },
+        { name: 'purge_ai_quality', run: () => purgeAiQuality(env.DB) },
+        { name: 'cleanup_showcases', run: () => cleanupShowcases(env) },
+        { name: 'cleanup_push_devices', run: () => cleanupPushDevices(env.DB) },
+      ]);
+    } else {
+      await runScheduledTasks(
+        'web',
+        env,
+        [
+          { name: 'run_social_batch', run: () => runSocialBatch(env) },
+          { name: 'send_mailbox_outbox', run: () => sendMailboxOutbox(env) },
+          { name: 'run_ai_quality_batch', run: () => runAiQualityBatch(env) },
+          { name: 'send_showcase_notifications', run: () => sendShowcaseNotifications(env) },
+          { name: 'send_generation_notifications', run: () => sendGenerationNotifications(env) },
+          { name: 'run_admin_alerts', run: () => runAdminAlerts(env) },
+        ],
+        { parallel: true },
+      );
+    }
   },
 } satisfies ExportedHandler<CloudflareEnv>;
 

@@ -1,5 +1,6 @@
 import { EntityId, JobStage, publicErrors, type PublicErrorCode } from '@bienvu/contracts';
 export * from './ai';
+export * from './scheduled';
 
 export function requestContext() {
   // Ne pas faire confiance à un identifiant fourni par le navigateur.
@@ -8,7 +9,7 @@ export function requestContext() {
 
 export type RequestContext = ReturnType<typeof requestContext>;
 type Diagnostic = {
-  event: 'request_completed' | 'request_failed' | 'generation_paused';
+  event: 'request_completed' | 'request_failed' | 'generation_paused' | 'generation_reconcile_failed';
   status: number;
   code?: PublicErrorCode;
   jobId?: string;
@@ -19,7 +20,9 @@ export function diagnosticRecord(context: RequestContext, input: Diagnostic) {
   // Liste blanche : ni Request, ni headers, URL, corps, message d'exception ou stack.
   return {
     requestId: context.requestId,
-    event: ['request_completed', 'request_failed', 'generation_paused'].includes(input.event)
+    event: ['request_completed', 'request_failed', 'generation_paused', 'generation_reconcile_failed'].includes(
+      input.event,
+    )
       ? input.event
       : 'request_failed',
     status: Number.isInteger(input.status) && input.status >= 100 && input.status <= 599 ? input.status : 500,

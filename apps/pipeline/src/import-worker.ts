@@ -23,8 +23,10 @@ import { authorized, json, smallJson } from './auth';
 import { guardedBrowserHtml } from './import-browser';
 import { purgeHostedImports } from './import-cleanup';
 import { importProbe, importFixture } from './import-probes';
+import { runScheduledTasks, type ScheduledTrackingEnv } from '@bienvu/observability';
 
-type Env = ImportEnv & { IMPORT_TOKEN?: string; PROBE_TOKEN?: string; IMPORT_PROBES_ENABLED?: string };
+type Env = ImportEnv &
+  ScheduledTrackingEnv & { IMPORT_TOKEN?: string; PROBE_TOKEN?: string; IMPORT_PROBES_ENABLED?: string };
 // Un seul petit conteneur, deux ressources au maximum ; aucune logique vidéo.
 export class ImportTransportContainer extends Container<Env> {
   defaultPort = 8080;
@@ -250,6 +252,13 @@ export default {
     }
   },
   async scheduled(_event, env) {
-    console.log(JSON.stringify({ event: 'import_cleanup', ...(await purgeHostedImports(env)) }));
+    await runScheduledTasks('import', env, [
+      {
+        name: 'purge_hosted_imports',
+        run: async () => {
+          console.log(JSON.stringify({ event: 'import_cleanup', ...(await purgeHostedImports(env)) }));
+        },
+      },
+    ]);
   },
 } satisfies ExportedHandler<Env>;
