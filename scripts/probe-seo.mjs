@@ -65,7 +65,7 @@ for (const path of paths) {
   assert.doesNotMatch(html, /<meta name="robots" content="[^"]*noindex/);
   for (const match of html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)) JSON.parse(match[1]);
   if (path === '/') {
-    const footer = html.match(/<footer class="home-premium-footer"[\s\S]*?<\/footer>/)?.[0];
+    const footer = html.match(/<footer\b[^>]*\bclass="home-premium-footer"[^>]*>[\s\S]*?<\/footer>/)?.[0];
     assert.ok(footer, 'Pied de page de la home');
     assert.match(footer, /href="\/blog"/, 'Lien Blog dans le footer');
     assert.match(footer, /href="\/partenaires"/, 'Lien Partenaires dans le footer');
