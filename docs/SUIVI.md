@@ -1,5 +1,11 @@
 # BienVu — suivi des sprints
 
+### 23/10/2026 — Crons et migration 0085 publiés
+
+Commit **`e88b39c`** poussé sur `main`, release **`e88b39c7f6a5`** active sur `bienvu.online`. Workers web, génération et import publiés à **100 %** ; modules distants identiques aux bundles préparés. Migration **0085** appliquée une seule fois avant le Worker de génération, après sauvegarde et répétition sur **164 tables / 9 455 lignes** existantes. Intégrité valide ; schémas existants et **16 tables / 424 lignes** de données critiques comparés avant/après : identiques. Secrets, domaines, crons et conteneurs renderer **v37** / import **v8** conservés. Narration et corps du Workflow inchangés ; Workers mail et narration non redéployés. Publication enregistrée dans l’historique du superadmin.
+
+Build de production et sourcemaps privées réussis ; pages publiques, accès privés, HTML/RSC et assets contrôlés. **51 pages SEO** validées, recette navigateur desktop/mobile sans erreur JavaScript ni débordement. CI sécurité réussie ; CI fonctionnelle en cours au relevé. Aucun appel fournisseur payant ni email de test. [Versions, migration, contrôles et limites](preuves/maintenance/CRONS-23-10.md#publication-vérifiée).
+
 ### 23/10/2026 — Fiabilité des crons, correction locale
 
 Branche `codex/cron-reliability` : tâches planifiées web/génération isolées, ordre et concurrence existants conservés, chaque échec journalisé et signalé individuellement avec listes blanches ; invocation en échec après attente de toutes les tâches. Import, qui n’a qu’une purge planifiée, raccordé au même diagnostic. Curseur D1 séparé, écrit avant chaque contrôle, pour que dix générations en erreur ne bloquent plus les suivantes. Migration additive/rejouable **0085**, sans modification des réservations ni des dates métier. Corps du Workflow et narration inchangés. **914 cas distincts validés, dont neuf nouveaux**, après correction du typage du banc et reprise série de trois fichiers (**39/39**) ayant rencontré **19 erreurs locales `EADDRNOTAVAIL`** au second passage complet. Types complets, lint, formatage, frontières, audit et build Next/OpenNext final réussis ; aucune des deux commandes `pnpm check` n’est présentée comme intégralement verte. Aucun commit, push, déploiement, migration distante ni appel fournisseur réel. [Recette, commandes et limites](preuves/maintenance/CRONS-23-10.md).

@@ -1,6 +1,6 @@
 # Fiabilité des crons — 23 octobre 2026
 
-Sprint : isolation des tâches planifiées et équité de la réconciliation, sur la branche `codex/cron-reliability`. Périmètre autorisé : corrections et tests locaux ; narration exclue.
+Sprint : isolation des tâches planifiées et équité de la réconciliation, préparé sur la branche `codex/cron-reliability`. Corrections et tests locaux, puis commit, push et publication avec 0085 autorisés explicitement ; narration exclue.
 
 ## Résultat utilisable
 
@@ -17,7 +17,7 @@ Chaque invocation rejette après la fin des tâches si au moins une échoue. Le 
 
 `reconcileBatch` écrit un curseur séparé avant chaque tentative et continue même après une erreur de lecture du job. Le lot reste borné à dix candidats, avec priorité aux lignes jamais contrôlées puis au contrôle le plus ancien. Les échecs HTTP de consultation du rendu sont désormais considérés comme des échecs de contrôle. Le lot ne masque plus ses erreurs : il les signale après toutes les lignes.
 
-Migration **`0085_generation_reconciliation.sql`**, uniquement additive : table `generation_reconciliation_attempts(job_id,last_attempt_at)`, clé étrangère vers le job de génération et suppression en cascade. Création `IF NOT EXISTS`, répétée en recette. Aucun ancien SQL modifié. Publication future : migration sur la base cible **avant** le nouveau Worker de génération. Un retour au code précédent peut laisser la table en place.
+Migration **`0085_generation_reconciliation.sql`**, uniquement additive : table `generation_reconciliation_attempts(job_id,last_attempt_at)`, clé étrangère vers le job de génération et suppression en cascade. Création `IF NOT EXISTS`, répétée en recette. Aucun ancien SQL modifié. La migration est appliquée sur la base cible **avant** le nouveau Worker de génération. Un retour au code précédent peut laisser la table en place.
 
 Le corps de `GenerationWorkflow` est comparé octet pour octet à `HEAD` : inchangé. Étapes, noms, retries et connecteurs de narration restent identiques. La réconciliation continue à utiliser les intentions de lancement et les checkpoints existants ; aucun nouveau débit, réservation ni appel fournisseur n’est introduit.
 
@@ -42,6 +42,26 @@ Build Next/OpenNext final réussi via `pnpm --filter @bienvu/web build:worker`, 
 
 Commandes et rapports bruts conservés sous `evidence/local/cron-reliability/`, ignorés par Git : passages complets, reprise ciblée, reprise série, types, build et contrôle du périmètre.
 
-## Limites et livraison
+## Publication vérifiée
 
-Coût des essais fournisseurs : **0 €**, fixtures et bindings locaux uniquement. Aucun commit, push, déploiement, migration distante ni appel fournisseur réel pour cette demande. La migration 0085 et les Workers doivent encore être publiés ensemble avant que la production bénéficie du correctif.
+Commit **`e88b39c7f6a59fcd452d977513a493e48f94bbab`** poussé sur `main`, release web **`e88b39c7f6a5`** publiée sur `bienvu.online`. Build racine `pnpm build:web` réussi avec sourcemaps privées PostHog EU, puis préparation du module final et publication `no_bundle`, `--keep-vars --strict`. Les deux Workers de pipeline sont publiés avec `--containers-rollout none` et les images immuables existantes.
+
+Versions actives à **100 %**, modules distants identiques par SHA-256 aux bundles locaux vérifiés :
+
+| Worker                          | Version Cloudflare                     | Bindings / secrets |
+| ------------------------------- | -------------------------------------- | ------------------ |
+| `bienvu-web-probe-staging`      | `e0b330df-b246-4eb6-ba98-129cfb7f53e8` | 64 / 23            |
+| `bienvu-generation-development` | `0803893d-e2a5-40ae-af7e-2243fe281dcb` | 36 / 10            |
+| `bienvu-import-staging`         | `5ed80873-a357-4754-a9b3-b485fb89c277` | 9 / 2              |
+
+Configuration distante, secrets, domaines et crons comparés aux relevés précédant la publication : conservés, hors les deux identifiants web de release/sourcemap attendus. Renderer **v37**, import **v8** et les autres conteneurs inchangés. Workers mail et narration non redéployés ; version narration toujours **`65002047-58a8-4501-8a19-92b7bc627bf4`**. Le corps de `GenerationWorkflow` reste identique à celui de `ffa5812` (SHA-256 **`82aa4d266475f48967a40480ebf03c53d0da45db6b3d52e829331361243c6f8c`**).
+
+Avant migration : seule 0085 en attente, aucun job actif. Sauvegarde SQL complète de D1 **`bienvu-s00-staging`**, **9 963 783 octets**, SHA-256 **`fce942bf816477da365002f48b92bd026d04d6b85341e8f80641057f01b83d19`**. Restauration SQLite et application répétée de 0085 : **164 tables / 9 455 lignes** existantes identiques, passage à **165 tables**, intégrité et clés étrangères valides. Application distante par le journal Wrangler : 0085 enregistrée **une seule fois**, table et clé étrangère conformes, aucun échec `foreign_key_check`. Schémas des **163 tables métier** existantes conservés ; **16 tables / 424 lignes** de crédits, budgets, jobs, intentions de lancement et narration comparées avant/après : identiques. Publication inscrite dans l’historique du superadmin.
+
+Contrôles du domaine : pages **200**, accès privés **401**, redirection Beta **302**, release HTML/RSC cohérente, deux scripts publics identiques aux assets locaux et leurs maps **404**. **51 pages SEO** validées. Recette Chromium à **1536 et 390 px**, mensuel/annuel : aucun débordement ni erreur JavaScript. Offres inchangées, dont Solo **50 € / 50 crédits** ; Stripe reste en mode test.
+
+Observation passive des journaux pendant cinquante secondes : une invocation naturelle du cron web minute sur la version publiée, résultat **`ok`**, aucune exception. Aucune invocation génération/import dans cette courte fenêtre ; cela ne constitue pas une recette distante de ces deux crons ni de la purge web quotidienne. Leur isolation et la rotation sont couvertes par les tests locaux workerd/D1 décrits plus haut.
+
+[CI sécurité du commit publié](https://github.com/alexlevy0/BienVu/actions/runs/40028741843) réussie. [CI fonctionnelle](https://github.com/alexlevy0/BienVu/actions/runs/40028741868) encore en cours au relevé.
+
+Preuves et configurations privées ignorées sous `evidence/local/cron-deploy/` : sauvegarde, répétition de migration, relevés Cloudflare, builds, comparaisons des modules/configurations, invariants D1, sondes et captures navigateur. Coût des essais fournisseurs : **0 €**. Aucun appel de génération payant ni envoi d’email déclenché pour la recette. Les crons distants ne sont pas invoqués artificiellement et les erreurs historiques PostHog ne sont pas déclarées résolues par cette publication.
