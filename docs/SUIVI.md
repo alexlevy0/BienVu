@@ -1,10 +1,16 @@
 # BienVu — suivi des sprints
 
+### 24/10/2026 — Correctif body-parser publié, CI vérifiées
+
+Alerte **GHSA-27r3-jxmh-p828 / #33** corrigée : override borné vers **body-parser 2.4.0** dans la chaîne OpenNext/Express, avec **qs 6.16.1** requis. Crash reproduit localement en 2.3.0 ; trois contrôles de parsing réussis après correction. GitHub classe automatiquement l’alerte **fixed**. Commit **`d0a5599`** poussé, release **`d0a5599c5ef6`**, Worker web **`bd1d3357-8b79-414a-881b-b9dda7cdcae5`** actif à **100 %**, bundle distant identique au module préparé et sourcemaps privées envoyées. Configuration, secrets, domaines et crons conservés. Narration, génération, import, mail et conteneurs inchangés ; aucune nouvelle migration distante.
+
+**CI fonctionnelle et sécurité entièrement vertes**, **914/914 tests**, typage et build réussis. Sondes locales et production, **51 pages SEO**, navigateur desktop/mobile validés. Données critiques et journal 0085 préservés. Coût des essais fournisseurs **0 €**. Quatre nouvelles alertes distinctes sur **fast-uri 3.1.8** restent ouvertes (deux moyennes, deux faibles) ; l’audit npm réussi ne les efface pas. [Dépendances, preuves, versions et limites](preuves/maintenance/BODY-PARSER-24-10.md).
+
 ### 23/10/2026 — Crons et migration 0085 publiés
 
 Commit **`e88b39c`** poussé sur `main`, release **`e88b39c7f6a5`** active sur `bienvu.online`. Workers web, génération et import publiés à **100 %** ; modules distants identiques aux bundles préparés. Migration **0085** appliquée une seule fois avant le Worker de génération, après sauvegarde et répétition sur **164 tables / 9 455 lignes** existantes. Intégrité valide ; schémas existants et **16 tables / 424 lignes** de données critiques comparés avant/après : identiques. Secrets, domaines, crons et conteneurs renderer **v37** / import **v8** conservés. Narration et corps du Workflow inchangés ; Workers mail et narration non redéployés. Publication enregistrée dans l’historique du superadmin.
 
-Build de production et sourcemaps privées réussis ; pages publiques, accès privés, HTML/RSC et assets contrôlés. **51 pages SEO** validées, recette navigateur desktop/mobile sans erreur JavaScript ni débordement. CI sécurité réussie ; CI fonctionnelle en cours au relevé. Aucun appel fournisseur payant ni email de test. [Versions, migration, contrôles et limites](preuves/maintenance/CRONS-23-10.md#publication-vérifiée).
+Build de production et sourcemaps privées réussis ; pages publiques, accès privés, HTML/RSC et assets contrôlés. **51 pages SEO** validées, recette navigateur desktop/mobile sans erreur JavaScript ni débordement. CI sécurité et CI fonctionnelle intégralement réussies, dont **914/914 tests**. Aucun appel fournisseur payant ni email de test. [Versions, migration, contrôles et limites](preuves/maintenance/CRONS-23-10.md#publication-vérifiée).
 
 ### 23/10/2026 — Fiabilité des crons, correction locale
 

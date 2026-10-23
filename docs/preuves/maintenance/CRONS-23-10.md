@@ -62,6 +62,6 @@ Contrôles du domaine : pages **200**, accès privés **401**, redirection Beta 
 
 Observation passive des journaux pendant cinquante secondes : une invocation naturelle du cron web minute sur la version publiée, résultat **`ok`**, aucune exception. Aucune invocation génération/import dans cette courte fenêtre ; cela ne constitue pas une recette distante de ces deux crons ni de la purge web quotidienne. Leur isolation et la rotation sont couvertes par les tests locaux workerd/D1 décrits plus haut.
 
-[CI sécurité du commit publié](https://github.com/alexlevy0/BienVu/actions/runs/40028741843) réussie. [CI fonctionnelle](https://github.com/alexlevy0/BienVu/actions/runs/40028741868) encore en cours au relevé.
+[CI sécurité du commit publié](https://github.com/alexlevy0/BienVu/actions/runs/40028741843) réussie. [CI fonctionnelle](https://github.com/alexlevy0/BienVu/actions/runs/40028741868) intégralement réussie : **914/914 tests**, typage, migrations rejouées, build et sondes du Worker validés.
 
 Preuves et configurations privées ignorées sous `evidence/local/cron-deploy/` : sauvegarde, répétition de migration, relevés Cloudflare, builds, comparaisons des modules/configurations, invariants D1, sondes et captures navigateur. Coût des essais fournisseurs : **0 €**. Aucun appel de génération payant ni envoi d’email déclenché pour la recette. Les crons distants ne sont pas invoqués artificiellement et les erreurs historiques PostHog ne sont pas déclarées résolues par cette publication.
