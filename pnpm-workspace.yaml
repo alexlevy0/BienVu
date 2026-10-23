@@ -16,6 +16,8 @@ minimumReleaseAgeExclude:
   - "@posthog/core@1.58.0"
 overrides:
   # Security patches only: leave newer upstream versions free to resolve.
+  # Express in OpenNext still resolves the version affected by GHSA-27r3-jxmh-p828.
+  "body-parser@>=2.0.0 <2.4.0": 2.4.0
   # Remotion also pins Zod 4.5.4, affected by GHSA-mrhx-c7xc-m3w5.
   "zod@>=4.0.0 <4.6.6": 4.6.6
   # Miniflare still pins the vulnerable Undici/Sharp patch versions.
