@@ -1,13 +1,103 @@
 'use client';
 import Link from 'next/link';
-import {useEffect,useState} from 'react';
-import type {ShowcasePrivate} from '@bienvu/contracts';
-import {showcaseRequest} from '../lib/showcase-client';
-import {useSiteFeatures} from './site-features';
-import {HomeIcon} from './home-icons';
-export function ShowcasePropertyAction({id,agencyId}:{id:string;agencyId:string}){const features=useSiteFeatures();const[data,setData]=useState<ShowcasePrivate|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[revision,setRevision]=useState(0);
-  useEffect(()=>{const controller=new AbortController();setData(null);setError('');void showcaseRequest<ShowcasePrivate>(`/api/vitrine?propertyId=${encodeURIComponent(id)}`,{signal:controller.signal}).then(value=>{if(!controller.signal.aborted)setData(value);}).catch(cause=>{if(!controller.signal.aborted)setError(cause.message);});return()=>controller.abort();},[id,agencyId,revision]);
-  useEffect(()=>{const refresh=(e:Event)=>{if((e as CustomEvent<{agencyId:string}>).detail.agencyId===agencyId)setRevision(v=>v+1);};window.addEventListener('bienvu:showcase-updated',refresh);return()=>window.removeEventListener('bienvu:showcase-updated',refresh);},[agencyId]);
-  const candidate=data?.properties[0],item=data?.items.find(i=>i.groupId===candidate?.id),published=Boolean(item?.published&&!item.removed&&data?.status==='published'&&!candidate?.archived&&(!['sold','rented'].includes(item.published.settings.status)||data?.published?.keepSold));
-  return <div className="property-showcase-state"><HomeIcon name="globe" size={22}/><span>{published?'Visible sur ma vitrine':'Ma vitrine · Ce bien est privé'}{features.explorer&&<small>La visibilité dans Explorer se règle indépendamment.</small>}</span>{!data&&!error?<small role="status">Vérification…</small>:<>{data?.canEdit&&!published&&<Link href={`/ma-vitrine?bien=${encodeURIComponent(id)}`}>Publier sur ma vitrine →</Link>}{published&&<><Link target="_blank" href={`/agences/${data!.published!.slug}/biens/${item!.id}`}>Voir la fiche publique ↗</Link>{data?.canEdit&&<button disabled={busy} onClick={async()=>{setBusy(true);setError('');try{await showcaseRequest('/api/vitrine',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'property-remove',version:data.version,id:item!.id})});setRevision(v=>v+1);}catch(cause){setError((cause as Error).message);}finally{setBusy(false);}}}>{busy?'Retrait…':'Retirer de ma vitrine'}</button>}</>}<Link href="/ma-vitrine">Gérer ma vitrine</Link></>}{error&&<p role="alert">{error} <button onClick={()=>setRevision(v=>v+1)}>Réessayer</button></p>}</div>;
+import { useEffect, useState } from 'react';
+import type { ShowcasePrivate } from '@bienvu/contracts';
+import { showcaseRequest } from '../lib/showcase-client';
+import { useSiteFeatures } from './site-features';
+import { HomeIcon } from './home-icons';
+export function ShowcasePropertyAction({ id, agencyId }: { id: string; agencyId: string }) {
+  const features = useSiteFeatures();
+  const [data, setData] = useState<ShowcasePrivate | null>(null),
+    [error, setError] = useState(''),
+    [busy, setBusy] = useState(false),
+    [revision, setRevision] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    setData(null);
+    setError('');
+    void showcaseRequest<ShowcasePrivate>(`/api/vitrine?propertyId=${encodeURIComponent(id)}`, {
+      signal: controller.signal,
+    })
+      .then((value) => {
+        if (!controller.signal.aborted) setData(value);
+      })
+      .catch((cause) => {
+        if (!controller.signal.aborted) setError(cause.message);
+      });
+    return () => controller.abort();
+  }, [id, agencyId, revision]);
+  useEffect(() => {
+    const refresh = (e: Event) => {
+      if ((e as CustomEvent<{ agencyId: string }>).detail.agencyId === agencyId) setRevision((v) => v + 1);
+    };
+    window.addEventListener('bienvu:showcase-updated', refresh);
+    return () => window.removeEventListener('bienvu:showcase-updated', refresh);
+  }, [agencyId]);
+  const candidate = data?.properties[0],
+    item = data?.items.find((i) => i.groupId === candidate?.id),
+    published = Boolean(
+      item?.published &&
+        !item.removed &&
+        data?.status === 'published' &&
+        !candidate?.archived &&
+        (!['sold', 'rented'].includes(item.published.settings.status) || data?.published?.keepSold),
+    );
+  return (
+    <div className="property-showcase-state">
+      <HomeIcon name="globe" size={22} />
+      <span>
+        {published ? 'Visible sur ma vitrine' : 'Ma vitrine · Ce bien est privé'}
+        {features.explorer && <small>La visibilité dans Explorer se règle indépendamment.</small>}
+      </span>
+      {!data && !error ? (
+        <small role="status">Vérification…</small>
+      ) : (
+        <>
+          {data?.canEdit && !published && (
+            <Link href={`/ma-vitrine?bien=${encodeURIComponent(id)}`}>Publier sur ma vitrine →</Link>
+          )}
+          {published && (
+            <>
+              <Link target="_blank" href={`/agences/${data!.published!.slug}/biens/${item!.id}`}>
+                Voir la fiche publique ↗
+              </Link>
+              {data?.canEdit && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={async () => {
+                    setBusy(true);
+                    setError('');
+                    try {
+                      await showcaseRequest('/api/vitrine', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'property-remove', version: data.version, id: item!.id }),
+                      });
+                      setRevision((v) => v + 1);
+                    } catch (cause) {
+                      setError((cause as Error).message);
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  {busy ? 'Retrait…' : 'Retirer de ma vitrine'}
+                </button>
+              )}
+            </>
+          )}
+          <Link href="/ma-vitrine">Gérer ma vitrine</Link>
+        </>
+      )}
+      {error && (
+        <p role="alert">
+          {error}{' '}
+          <button type="button" onClick={() => setRevision((v) => v + 1)}>
+            Réessayer
+          </button>
+        </p>
+      )}
+    </div>
+  );
 }

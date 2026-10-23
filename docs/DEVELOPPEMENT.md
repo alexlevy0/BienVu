@@ -31,9 +31,31 @@ La première sonde vérifie les pages et le refus serveur des générations. La 
 
 `pnpm dev` ouvre l'interface Next.js à `http://localhost:3000` pour travailler sur le visuel. Cette commande ne remplace pas le build OpenNext et les sondes workerd. Ne pas lancer `pnpm typecheck` pendant `pnpm build:web` : Next régénère ses types durant le build.
 
-`pnpm check` lance le contrôle des frontières de runtime, les tests de contrats/fixtures et D1 local, puis TypeScript sur les packages et tests. Miniflare est épinglé à la version déjà utilisée par Wrangler ; son convertisseur d'options documenté dans les types installés est nécessaire avec cette version 5 alpha.
+`pnpm check` lance Biome (lint et formatage), le contrôle des frontières de runtime, les tests de contrats/fixtures et D1 local, puis TypeScript sur les packages et tests. Miniflare est épinglé à la version déjà utilisée par Wrangler ; son convertisseur d'options documenté dans les types installés est nécessaire avec cette version 5 alpha.
 
 `node scripts/verify-clean.mjs` vérifie une copie sans `.env`, secrets, `node_modules`, base locale ni build préexistant. Il réutilise le cache pnpm hors ligne, lance l'installation, les contrôles, les migrations deux fois et le build. Le dossier temporaire est supprimé et les preuves restent dans `evidence/local/sprint-01/`.
+
+## Lint et formatage
+
+Biome **2.6.2** est épinglé à la racine. La configuration commune `biome.jsonc` couvre les applications, packages, scripts, tests, fixtures de code et fichiers de configuration pris en charge. Indentation : deux espaces ; largeur préférée : 120 caractères ; chaînes JavaScript/TypeScript : apostrophes. `.editorconfig` reprend l’indentation et les fins de ligne LF pour les éditeurs.
+
+```sh
+pnpm lint          # Lecture seule, avertissements bloquants
+pnpm lint:fix      # Corrections sûres, sans activer --unsafe
+pnpm format        # Écriture du formatage
+pnpm format:check  # Vérification du formatage
+pnpm check         # Lint, formatage, frontières, tests et types
+```
+
+Les exclusions Git protègent secrets, preuves brutes, dépendances et builds. Le lockfile pnpm et les déclarations générées par Wrangler/Next restent gérés par leurs générateurs. Les HTML de `fixtures/imports/` conservent volontairement les défauts des annonces tierces : leur contenu et leur indentation font partie des cas d’import à tester.
+
+Le socle de règles est `recommended`, avec des adaptations commentées : concaténations et assertions TypeScript existantes, cascade CSS volontaire, images servies par le pipeline Cloudflare, sous-titres incrustés et groupes ARIA du studio. Les appels Playwright `Locator.innerText()` ne sont pas des lectures DOM directes. Les clés de révision peuvent déclencher un effet React même sans être lues dans son corps.
+
+Les paquets `presentation`, `video` et l’application `marketing-video` conservent leurs imports React de runtime : les points d’entrée Node/Remotion sont aussi exécutés avec la transformation JSX classique. L’override `javascript.jsxRuntime: reactClassic` empêche Biome de les supprimer ou de les convertir en imports de types.
+
+Les exceptions ponctuelles restent au plus près du code avec `biome-ignore` et leur justification : suppression de caractères de contrôle, comparaison de dates ISO, JSON-LD échappé et scripts constants, éléments natifs `<dialog>`/`<summary>`, défilement clavier, positions de pistes et déclenchements React intentionnels protégeant les formulaires ou les ressources vidéo. Elles conservent une dette de revue ciblée ; le passage au lint ne constitue pas un audit complet des hooks ou de l’accessibilité. Ne pas ajouter de suppression globale pour faire passer un nouveau défaut.
+
+La CI existante exécute `pnpm check` : une erreur de lint, un avertissement ou un fichier mal formaté fait échouer cette étape. La commande `pnpm format` reste explicite et le lint ne réécrit pas les fichiers en CI.
 
 ## Fichiers à versionner
 
@@ -51,11 +73,11 @@ Les choix commerciaux restent ceux du cadrage : SaaS payant, quotas par abonneme
 
 ## Environnements et secrets
 
-| Environnement | Worker web | D1 | R2 | État |
-|---|---|---|---|---|
-| Local | `bienvu-web-probe-local` | `bienvu-probes-local`, ID nul réservé au local | `bienvu-probes-local` | Émulés sur le poste |
-| Staging existant du sprint 00 | `bienvu-web-probe-staging` | `bienvu-s00-staging` | `bienvu-s00-private` | Déployés au sprint 00 ; pas mis à jour aux sprints 01–03 |
-| Production proposée | `bienvu-web-production` | `bienvu-production` | `bienvu-media-production` | Aucun service créé, aucun identifiant configuré |
+| Environnement                 | Worker web                 | D1                                             | R2                        | État                                                     |
+| ----------------------------- | -------------------------- | ---------------------------------------------- | ------------------------- | -------------------------------------------------------- |
+| Local                         | `bienvu-web-probe-local`   | `bienvu-probes-local`, ID nul réservé au local | `bienvu-probes-local`     | Émulés sur le poste                                      |
+| Staging existant du sprint 00 | `bienvu-web-probe-staging` | `bienvu-s00-staging`                           | `bienvu-s00-private`      | Déployés au sprint 00 ; pas mis à jour aux sprints 01–03 |
+| Production proposée           | `bienvu-web-production`    | `bienvu-production`                            | `bienvu-media-production` | Aucun service créé, aucun identifiant configuré          |
 
 `DB`, `MEDIA` et `ASSETS` sont les bindings web. `PROBE_MODE` identifie l'environnement. `GENERATIONS_ENABLED` vaut `false`. `PROBE_TOKEN` est un secret serveur dans `apps/web/.dev.vars` ; ne jamais l'exposer au client. Le pipeline garde `BROWSER`, `MEDIA`, `PROBE_TOKEN`, `RENDER_TOKEN` et les drapeaux existants, tous les appels réels désactivés. Les secrets de staging restent dans des fichiers distincts ignorés par Git.
 

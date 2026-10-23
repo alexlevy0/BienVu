@@ -8,12 +8,12 @@ Après mise à jour de `main` et réanalyse explicite, GitHub affiche **0 alerte
 
 ## Correctifs
 
-| Dépendance | Avant | Après | Avis | Emplacement |
-|---|---|---|---|---|
-| Next.js | 16.3.6 | 16.3.8 | 6, dont 1 élevé | Application web et adaptateur OpenNext |
-| Undici | 7.29.0 | 7.29.1 | 10, dont 2 élevés | Miniflare utilisé par les tests et Wrangler |
-| Sharp | 0.35.4 | 0.35.5 | 1 élevé | Copie transitive de Miniflare ; importer/renderer déjà en 0.35.5 |
-| source-map-js | 1.2.1 | 1.2.2 | 1 élevé | PostCSS, compilation Next.js et bundler Remotion |
+| Dépendance    | Avant  | Après  | Avis              | Emplacement                                                      |
+| ------------- | ------ | ------ | ----------------- | ---------------------------------------------------------------- |
+| Next.js       | 16.3.6 | 16.3.8 | 6, dont 1 élevé   | Application web et adaptateur OpenNext                           |
+| Undici        | 7.29.0 | 7.29.1 | 10, dont 2 élevés | Miniflare utilisé par les tests et Wrangler                      |
+| Sharp         | 0.35.4 | 0.35.5 | 1 élevé           | Copie transitive de Miniflare ; importer/renderer déjà en 0.35.5 |
+| source-map-js | 1.2.1  | 1.2.2  | 1 élevé           | PostCSS, compilation Next.js et bundler Remotion                 |
 
 [Next.js 16.3.8](https://github.com/vercel/next.js/releases/tag/v16.3.8) corrige notamment le SSRF de l'optimisation d'images et les problèmes de cache. Les correctifs [Undici](https://github.com/nodejs/undici/releases/tag/v7.29.1), [Sharp](https://github.com/lovell/sharp/releases/tag/v0.35.5) et [source-map-js](https://github.com/7rulnik/source-map-js/releases/tag/v1.2.2) sont des mises à jour de patch. Le lockfile ne change que ces familles et leurs binaires associés ; versions de Remotion, Wrangler, Miniflare et adaptateur OpenNext conservées.
 
@@ -29,26 +29,26 @@ Les deux images corrigées sont maintenant publiées : importer **version 7**, r
 
 ## Liste des avis traités
 
-| Avis | Dépendance | Niveau |
-|---|---|---|
-| [GHSA-cjq9-62q9-8jv4](https://github.com/advisories/GHSA-cjq9-62q9-8jv4) | next | Élevée |
-| [GHSA-wq5f-xc86-pv6w](https://github.com/advisories/GHSA-wq5f-xc86-pv6w) | sharp | Élevée |
-| [GHSA-68fv-2mgg-jv7q](https://github.com/advisories/GHSA-68fv-2mgg-jv7q) | source-map-js | Élevée |
-| [GHSA-rfgv-xxqx-mfg5](https://github.com/advisories/GHSA-rfgv-xxqx-mfg5) | undici | Élevée |
-| [GHSA-w293-vg96-wgc3](https://github.com/advisories/GHSA-w293-vg96-wgc3) | undici | Élevée |
-| [GHSA-3w37-wq28-93x7](https://github.com/advisories/GHSA-3w37-wq28-93x7) | next | Modérée |
-| [GHSA-4jqv-mc3x-m676](https://github.com/advisories/GHSA-4jqv-mc3x-m676) | next | Modérée |
-| [GHSA-f87g-xv8r-7p7x](https://github.com/advisories/GHSA-f87g-xv8r-7p7x) | next | Modérée |
-| [GHSA-mcj8-r9mp-w47p](https://github.com/advisories/GHSA-mcj8-r9mp-w47p) | next | Modérée |
-| [GHSA-2jfj-6hjv-fm6j](https://github.com/advisories/GHSA-2jfj-6hjv-fm6j) | undici | Modérée |
-| [GHSA-3wwx-pv8p-q78v](https://github.com/advisories/GHSA-3wwx-pv8p-q78v) | undici | Modérée |
-| [GHSA-3xpg-4rpp-hhhm](https://github.com/advisories/GHSA-3xpg-4rpp-hhhm) | undici | Modérée |
-| [GHSA-pmjh-fq2x-6v4x](https://github.com/advisories/GHSA-pmjh-fq2x-6v4x) | undici | Modérée |
-| [GHSA-rx4f-c7p8-82vq](https://github.com/advisories/GHSA-rx4f-c7p8-82vq) | undici | Modérée |
-| [GHSA-39w2-rjm5-chcv](https://github.com/advisories/GHSA-39w2-rjm5-chcv) | next | Faible |
-| [GHSA-2gqq-gqf2-x968](https://github.com/advisories/GHSA-2gqq-gqf2-x968) | undici | Faible |
-| [GHSA-8436-99hf-9mmv](https://github.com/advisories/GHSA-8436-99hf-9mmv) | undici | Faible |
-| [GHSA-r53p-7pc4-xj5r](https://github.com/advisories/GHSA-r53p-7pc4-xj5r) | undici | Faible |
+| Avis                                                                     | Dépendance    | Niveau  |
+| ------------------------------------------------------------------------ | ------------- | ------- |
+| [GHSA-cjq9-62q9-8jv4](https://github.com/advisories/GHSA-cjq9-62q9-8jv4) | next          | Élevée  |
+| [GHSA-wq5f-xc86-pv6w](https://github.com/advisories/GHSA-wq5f-xc86-pv6w) | sharp         | Élevée  |
+| [GHSA-68fv-2mgg-jv7q](https://github.com/advisories/GHSA-68fv-2mgg-jv7q) | source-map-js | Élevée  |
+| [GHSA-rfgv-xxqx-mfg5](https://github.com/advisories/GHSA-rfgv-xxqx-mfg5) | undici        | Élevée  |
+| [GHSA-w293-vg96-wgc3](https://github.com/advisories/GHSA-w293-vg96-wgc3) | undici        | Élevée  |
+| [GHSA-3w37-wq28-93x7](https://github.com/advisories/GHSA-3w37-wq28-93x7) | next          | Modérée |
+| [GHSA-4jqv-mc3x-m676](https://github.com/advisories/GHSA-4jqv-mc3x-m676) | next          | Modérée |
+| [GHSA-f87g-xv8r-7p7x](https://github.com/advisories/GHSA-f87g-xv8r-7p7x) | next          | Modérée |
+| [GHSA-mcj8-r9mp-w47p](https://github.com/advisories/GHSA-mcj8-r9mp-w47p) | next          | Modérée |
+| [GHSA-2jfj-6hjv-fm6j](https://github.com/advisories/GHSA-2jfj-6hjv-fm6j) | undici        | Modérée |
+| [GHSA-3wwx-pv8p-q78v](https://github.com/advisories/GHSA-3wwx-pv8p-q78v) | undici        | Modérée |
+| [GHSA-3xpg-4rpp-hhhm](https://github.com/advisories/GHSA-3xpg-4rpp-hhhm) | undici        | Modérée |
+| [GHSA-pmjh-fq2x-6v4x](https://github.com/advisories/GHSA-pmjh-fq2x-6v4x) | undici        | Modérée |
+| [GHSA-rx4f-c7p8-82vq](https://github.com/advisories/GHSA-rx4f-c7p8-82vq) | undici        | Modérée |
+| [GHSA-39w2-rjm5-chcv](https://github.com/advisories/GHSA-39w2-rjm5-chcv) | next          | Faible  |
+| [GHSA-2gqq-gqf2-x968](https://github.com/advisories/GHSA-2gqq-gqf2-x968) | undici        | Faible  |
+| [GHSA-8436-99hf-9mmv](https://github.com/advisories/GHSA-8436-99hf-9mmv) | undici        | Faible  |
+| [GHSA-r53p-7pc4-xj5r](https://github.com/advisories/GHSA-r53p-7pc4-xj5r) | undici        | Faible  |
 
 ## Prévention
 

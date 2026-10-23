@@ -3,7 +3,6 @@
 ## Résultat et fichiers
 
 Le menu `…` des brouillons de « Récentes » ouvre « Supprimer ». Il fonctionne au clavier (focus, Échap), à la souris et dans la navigation mobile. Un verrou synchrone bloque le double clic. Une erreur conserve l'entrée et permet de réessayer ; une réponse 404 retire aussi une ancienne entrée déjà absente du serveur. Une vidéo terminée ne reçoit pas ce menu.
-
 - `apps/web/components/studio-sidebar.tsx`, `home-icons.tsx`, `generation-store.tsx`, `apps/web/app/landing.css` : menu, état de suppression, retrait immédiat et filtrage des réponses de liste arrivées tardivement.
 - `apps/web/components/home-create.tsx`, `manual-listing-form.tsx`, `apps/web/lib/listing-draft.ts` : fermeture du brouillon supprimé lorsqu'il est ouvert, retrait du paramètre `draft` et suppression ciblée dans IndexedDB/sessionStorage/localStorage. Une sauvegarde locale déjà lancée ne peut pas le rétablir dans cet onglet ; un autre brouillon reste conservé. Les anciens repères de session sans identifiant sont aussi traités. Les nouveaux repères partagent le même horodatage et le même identifiant que leur copie IndexedDB.
 - `apps/web/app/api/imports/[id]/draft/route.ts`, `apps/web/lib/creation-drafts.ts`, `packages/db/src/creation-drafts.ts` : DELETE avec session d'agence et contrôle d'origine, exclusion des imports finalisés et des annonces liées à un job, effacement des photos connues et contrôle après les uploads R2.

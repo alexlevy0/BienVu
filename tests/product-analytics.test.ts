@@ -1,64 +1,197 @@
-import {test} from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {ANALYTICS_CONSENT_KEY,CONSENT_DURATION_MS,analyticsConfiguration,analyticsPath,analyticsUrl,analyticsEvents,readAnalyticsConsent,replayAllowed,replayAttribute,replayUrl,safeAnalyticsProperties,safeWebVitalsProperties} from '../apps/web/lib/analytics-policy';
+import {
+  ANALYTICS_CONSENT_KEY,
+  CONSENT_DURATION_MS,
+  analyticsConfiguration,
+  analyticsPath,
+  analyticsUrl,
+  analyticsEvents,
+  readAnalyticsConsent,
+  replayAllowed,
+  replayAttribute,
+  replayUrl,
+  safeAnalyticsProperties,
+  safeWebVitalsProperties,
+} from '../apps/web/lib/analytics-policy';
 
-test('analytics is disabled without a valid EU project configuration',()=>{
-  assert.equal(analyticsConfiguration({}).enabled,false);
-  assert.equal(analyticsConfiguration({POSTHOG_ENABLED:'true',POSTHOG_PROJECT_TOKEN:'phx_personal_secret'}).enabled,false);
-  assert.equal(analyticsConfiguration({POSTHOG_ENABLED:'true',POSTHOG_PROJECT_TOKEN:'phc_public_fixture_project_key',POSTHOG_HOST:'https://us.i.posthog.com'}).enabled,false);
-  assert.equal(analyticsConfiguration({POSTHOG_ENABLED:'true',POSTHOG_PROJECT_TOKEN:'phc_public_fixture_project_key'}).enabled,true);
-  assert.equal(analyticsConfiguration({POSTHOG_ENABLED:'true',POSTHOG_PROJECT_TOKEN:'phc_public_fixture_project_key',POSTHOG_ERROR_TRACKING_ENABLED:'false'}).errorTracking,false);
+test('analytics is disabled without a valid EU project configuration', () => {
+  assert.equal(analyticsConfiguration({}).enabled, false);
+  assert.equal(
+    analyticsConfiguration({ POSTHOG_ENABLED: 'true', POSTHOG_PROJECT_TOKEN: 'phx_personal_secret' }).enabled,
+    false,
+  );
+  assert.equal(
+    analyticsConfiguration({
+      POSTHOG_ENABLED: 'true',
+      POSTHOG_PROJECT_TOKEN: 'phc_public_fixture_project_key',
+      POSTHOG_HOST: 'https://us.i.posthog.com',
+    }).enabled,
+    false,
+  );
+  assert.equal(
+    analyticsConfiguration({ POSTHOG_ENABLED: 'true', POSTHOG_PROJECT_TOKEN: 'phc_public_fixture_project_key' })
+      .enabled,
+    true,
+  );
+  assert.equal(
+    analyticsConfiguration({
+      POSTHOG_ENABLED: 'true',
+      POSTHOG_PROJECT_TOKEN: 'phc_public_fixture_project_key',
+      POSTHOG_ERROR_TRACKING_ENABLED: 'false',
+    }).errorTracking,
+    false,
+  );
 });
-test('consent expires, rejects contradictory choices, and never implies agreement',()=>{
-  const now=20000000000;
-  for(const raw of [null,'invalid','{}',JSON.stringify({version:1,analytics:true,replay:true,at:now}),JSON.stringify({version:2,analytics:false,replay:true,at:now}),JSON.stringify({version:2,analytics:true,replay:true,at:now+1}),JSON.stringify({version:2,analytics:true,replay:true,at:now-CONSENT_DURATION_MS})])assert.equal(readAnalyticsConsent(raw,now),null);
-  const rejected={version:2,analytics:false,replay:false,at:now};assert.deepEqual(readAnalyticsConsent(JSON.stringify(rejected),now),rejected);
-  assert.equal(ANALYTICS_CONSENT_KEY,'bienvu:privacy:v2');
+test('consent expires, rejects contradictory choices, and never implies agreement', () => {
+  const now = 20000000000;
+  for (const raw of [
+    null,
+    'invalid',
+    '{}',
+    JSON.stringify({ version: 1, analytics: true, replay: true, at: now }),
+    JSON.stringify({ version: 2, analytics: false, replay: true, at: now }),
+    JSON.stringify({ version: 2, analytics: true, replay: true, at: now + 1 }),
+    JSON.stringify({ version: 2, analytics: true, replay: true, at: now - CONSENT_DURATION_MS }),
+  ])
+    assert.equal(readAnalyticsConsent(raw, now), null);
+  const rejected = { version: 2, analytics: false, replay: false, at: now };
+  assert.deepEqual(readAnalyticsConsent(JSON.stringify(rejected), now), rejected);
+  assert.equal(ANALYTICS_CONSENT_KEY, 'bienvu:privacy:v2');
 });
-test('public pages retain their names but all private identifiers, query strings and hashes are removed',()=>{
-  assert.equal(analyticsPath('/partenaires?email=client@example.fr#formulaire'),'/partenaires');
-  assert.equal(analyticsUrl('/editeur?draft=264c088b-5fe7-49f5-aca7-ff4332bc5531'),'https://bienvu.online/editeur');
-  assert.equal(analyticsPath('/biens/listing%3A264c088b-5fe7-49f5-aca7-ff4332bc5531'),'/biens/[id]');
-  assert.equal(analyticsPath('/historique/264c088b-5fe7-49f5-aca7-ff4332bc5531'),'/historique/[id]');
-  assert.equal(analyticsPath('/blog'),'/blog');
+test('public pages retain their names but all private identifiers, query strings and hashes are removed', () => {
+  assert.equal(analyticsPath('/partenaires?email=client@example.fr#formulaire'), '/partenaires');
+  assert.equal(analyticsUrl('/editeur?draft=264c088b-5fe7-49f5-aca7-ff4332bc5531'), 'https://bienvu.online/editeur');
+  assert.equal(analyticsPath('/biens/listing%3A264c088b-5fe7-49f5-aca7-ff4332bc5531'), '/biens/[id]');
+  assert.equal(analyticsPath('/historique/264c088b-5fe7-49f5-aca7-ff4332bc5531'), '/historique/[id]');
+  assert.equal(analyticsPath('/blog'), '/blog');
 });
-test('beta funnel is measurable without leaking imported listing details',()=>{
-  assert.equal(analyticsPath('/beta?url=https://agency.fr/private&voice=private'),'/beta');
-  assert.equal(analyticsUrl('/beta?email=private@example.fr#private'),'https://bienvu.online/beta');
-  for(const name of ['beta_demo_opened','beta_render_selected','beta_demo_applied','beta_voice_applied'])assert.ok(analyticsEvents.has(name));
-  assert.deepEqual(safeAnalyticsProperties({page:'/beta',source_kind:'demo',render_preset:'avatar-ai',credit_cost:7,url:'https://agency.fr/private',title:'PRIVATE_TITLE',voice:'PRIVATE_VOICE'}),{page:'/beta',source_kind:'demo',render_preset:'avatar-ai',credit_cost:7});
-  assert.deepEqual(safeAnalyticsProperties({render_preset:'PRIVATE_TEXT'}),{});
-  assert.equal(analyticsPath('/beta?token=secret'),null);
+test('beta funnel is measurable without leaking imported listing details', () => {
+  assert.equal(analyticsPath('/beta?url=https://agency.fr/private&voice=private'), '/beta');
+  assert.equal(analyticsUrl('/beta?email=private@example.fr#private'), 'https://bienvu.online/beta');
+  for (const name of ['beta_demo_opened', 'beta_render_selected', 'beta_demo_applied', 'beta_voice_applied'])
+    assert.ok(analyticsEvents.has(name));
+  assert.deepEqual(
+    safeAnalyticsProperties({
+      page: '/beta',
+      source_kind: 'demo',
+      render_preset: 'avatar-ai',
+      credit_cost: 7,
+      url: 'https://agency.fr/private',
+      title: 'PRIVATE_TITLE',
+      voice: 'PRIVATE_VOICE',
+    }),
+    { page: '/beta', source_kind: 'demo', render_preset: 'avatar-ai', credit_cost: 7 },
+  );
+  assert.deepEqual(safeAnalyticsProperties({ render_preset: 'PRIVATE_TEXT' }), {});
+  assert.equal(analyticsPath('/beta?token=secret'), null);
 });
-test('admin, private validation links and OAuth/reset URLs are excluded',()=>{
-  for(const url of ['/admin','/admin/boite','/api/social/oauth/callback?code=secret','/validation/private-secret','/agence?grant=private-secret','/connexion#token=secret','/agence?socialError=SOCIAL_PAGE_ACCESS','/laboratoire']){
-    assert.equal(analyticsPath(url),null,url);assert.equal(replayAllowed(url),false,url);
+test('admin, private validation links and OAuth/reset URLs are excluded', () => {
+  for (const url of [
+    '/admin',
+    '/admin/boite',
+    '/api/social/oauth/callback?code=secret',
+    '/validation/private-secret',
+    '/agence?grant=private-secret',
+    '/connexion#token=secret',
+    '/agence?socialError=SOCIAL_PAGE_ACCESS',
+    '/laboratoire',
+  ]) {
+    assert.equal(analyticsPath(url), null, url);
+    assert.equal(replayAllowed(url), false, url);
   }
-  assert.equal(replayAllowed('/connexion'),true);
-  assert.equal(replayAllowed('/editeur?draft=private-id'),true);
+  assert.equal(replayAllowed('/connexion'), true);
+  assert.equal(replayAllowed('/editeur?draft=private-id'), true);
 });
-test('event properties contain only bounded counts and known classifications',()=>{
-  const safe=safeAnalyticsProperties({source_kind:'url',mode:'later',destination_count:2,subtitles_enabled:true,page:'/biens/private-id',email:'client@example.fr',url:'https://agency.fr/mandat',caption:'PRIVATE_TEXT',job_id:'private-id',photo_count:Infinity,description:{text:'PRIVATE_TEXT'},tab:'private-text',error_code:'UNSAFE_URL',duration_seconds:20});
-  assert.deepEqual(safe,{source_kind:'url',mode:'later',destination_count:2,subtitles_enabled:true,page:'/biens/[id]',error_code:'UNSAFE_URL',duration_seconds:20});
-  assert.deepEqual(safeAnalyticsProperties({photo_count:-1,duration_seconds:4000000,error_code:'personal text'}),{});
+test('event properties contain only bounded counts and known classifications', () => {
+  const safe = safeAnalyticsProperties({
+    source_kind: 'url',
+    mode: 'later',
+    destination_count: 2,
+    subtitles_enabled: true,
+    page: '/biens/private-id',
+    email: 'client@example.fr',
+    url: 'https://agency.fr/mandat',
+    caption: 'PRIVATE_TEXT',
+    job_id: 'private-id',
+    photo_count: Infinity,
+    description: { text: 'PRIVATE_TEXT' },
+    tab: 'private-text',
+    error_code: 'UNSAFE_URL',
+    duration_seconds: 20,
+  });
+  assert.deepEqual(safe, {
+    source_kind: 'url',
+    mode: 'later',
+    destination_count: 2,
+    subtitles_enabled: true,
+    page: '/biens/[id]',
+    error_code: 'UNSAFE_URL',
+    duration_seconds: 20,
+  });
+  assert.deepEqual(
+    safeAnalyticsProperties({ photo_count: -1, duration_seconds: 4000000, error_code: 'personal text' }),
+    {},
+  );
 });
-test('replay keeps visible labels, ordinary form values, styles and media',()=>{
-  for(const name of ['value','placeholder','title','data-name','aria-label'])assert.equal(replayAttribute(name,'VISIBLE_TEXT'),'VISIBLE_TEXT',name);
-  assert.equal(replayAttribute('href','/editeur?draft=property-id'),'https://bienvu.online/editeur?draft=property-id');
-  assert.equal(replayAttribute('href','mailto:client@example.fr'),'mailto:client@example.fr');
-  const style='width:200px;background-image:url(/api/photos);color:#fff;content:"VISIBLE_TEXT"';
-  assert.equal(replayAttribute('style',style),style);
-  assert.equal(replayAttribute('src','/api/imports/project/photos/photo'),'https://bienvu.online/api/imports/project/photos/photo');
+test('replay keeps visible labels, ordinary form values, styles and media', () => {
+  for (const name of ['value', 'placeholder', 'title', 'data-name', 'aria-label'])
+    assert.equal(replayAttribute(name, 'VISIBLE_TEXT'), 'VISIBLE_TEXT', name);
+  assert.equal(
+    replayAttribute('href', '/editeur?draft=property-id'),
+    'https://bienvu.online/editeur?draft=property-id',
+  );
+  assert.equal(replayAttribute('href', 'mailto:client@example.fr'), 'mailto:client@example.fr');
+  const style = 'width:200px;background-image:url(/api/photos);color:#fff;content:"VISIBLE_TEXT"';
+  assert.equal(replayAttribute('style', style), style);
+  assert.equal(
+    replayAttribute('src', '/api/imports/project/photos/photo'),
+    'https://bienvu.online/api/imports/project/photos/photo',
+  );
 });
-test('replay never exposes credentials in resource URLs or secret attributes',()=>{
-  assert.equal(replayUrl('/editeur?draft=property-id&access_token=SECRET#token=SECRET'),'https://bienvu.online/editeur?draft=property-id');
-  assert.equal(replayUrl('https://user:SECRET@assets.example.fr/photo.jpg?signature=SECRET'),'https://assets.example.fr/photo.jpg');
-  assert.equal(replayAttribute('data-access-token','SECRET'),'');
-  assert.equal(replayAttribute('src','data:image/jpeg;base64,aGVsbG8='),'data:image/jpeg;base64,aGVsbG8=');
+test('replay never exposes credentials in resource URLs or secret attributes', () => {
+  assert.equal(
+    replayUrl('/editeur?draft=property-id&access_token=SECRET#token=SECRET'),
+    'https://bienvu.online/editeur?draft=property-id',
+  );
+  assert.equal(
+    replayUrl('https://user:SECRET@assets.example.fr/photo.jpg?signature=SECRET'),
+    'https://assets.example.fr/photo.jpg',
+  );
+  assert.equal(replayAttribute('data-access-token', 'SECRET'), '');
+  assert.equal(replayAttribute('src', 'data:image/jpeg;base64,aGVsbG8='), 'data:image/jpeg;base64,aGVsbG8=');
 });
-test('native web vitals preserve measurements and page identity without DOM targets or signed asset URLs',()=>{
-  const safe=safeWebVitalsProperties({$web_vitals_LCP_value:1234.56789,$web_vitals_LCP_event:{name:'LCP',value:1234.56789,id:'v5-123',rating:'good',navigationType:'navigate',timestamp:123456,entries:['SECRET_ENTRY'],$current_url:'/admin',attribution:{url:'https://agency.fr/photo?token=SECRET_TOKEN',element:'PRIVATE_ELEMENT',resourceLoadDuration:200}},$web_vitals_CLS_value:0,$web_vitals_INP_value:Infinity,$web_vitals_FCP_value:-1},'/editeur?draft=PRIVATE_DRAFT');
-  assert.equal(safe.$web_vitals_LCP_value,1234.56789);assert.equal(safe.$web_vitals_CLS_value,0);assert.equal(safe.$web_vitals_INP_value,undefined);
-  assert.equal((safe.$web_vitals_LCP_event as any).$current_url,'https://bienvu.online/editeur');assert.deepEqual((safe.$web_vitals_LCP_event as any).attribution,{resourceLoadDuration:200});assert.ok(!JSON.stringify(safe).includes('SECRET'));assert.ok(!JSON.stringify(safe).includes('PRIVATE'));
-  assert.deepEqual(safeWebVitalsProperties({$web_vitals_LCP_value:1234},'/admin'),{});
+test('native web vitals preserve measurements and page identity without DOM targets or signed asset URLs', () => {
+  const safe = safeWebVitalsProperties(
+    {
+      $web_vitals_LCP_value: 1234.56789,
+      $web_vitals_LCP_event: {
+        name: 'LCP',
+        value: 1234.56789,
+        id: 'v5-123',
+        rating: 'good',
+        navigationType: 'navigate',
+        timestamp: 123456,
+        entries: ['SECRET_ENTRY'],
+        $current_url: '/admin',
+        attribution: {
+          url: 'https://agency.fr/photo?token=SECRET_TOKEN',
+          element: 'PRIVATE_ELEMENT',
+          resourceLoadDuration: 200,
+        },
+      },
+      $web_vitals_CLS_value: 0,
+      $web_vitals_INP_value: Infinity,
+      $web_vitals_FCP_value: -1,
+    },
+    '/editeur?draft=PRIVATE_DRAFT',
+  );
+  assert.equal(safe.$web_vitals_LCP_value, 1234.56789);
+  assert.equal(safe.$web_vitals_CLS_value, 0);
+  assert.equal(safe.$web_vitals_INP_value, undefined);
+  assert.equal((safe.$web_vitals_LCP_event as Record<string, unknown>).$current_url, 'https://bienvu.online/editeur');
+  assert.deepEqual((safe.$web_vitals_LCP_event as Record<string, unknown>).attribution, { resourceLoadDuration: 200 });
+  assert.ok(!JSON.stringify(safe).includes('SECRET'));
+  assert.ok(!JSON.stringify(safe).includes('PRIVATE'));
+  assert.deepEqual(safeWebVitalsProperties({ $web_vitals_LCP_value: 1234 }, '/admin'), {});
 });

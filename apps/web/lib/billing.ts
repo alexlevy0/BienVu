@@ -1,167 +1,545 @@
 import Stripe from 'stripe';
-export {Stripe};
-import {z} from 'zod';
-import {creditPlans,legacyCreditPlans,EntityId,PromotionCode,BillingInterval,subscriptionPricing} from '@bienvu/contracts';
-import {subscriptionCreditPeriods} from './subscription-periods';
-import {RequestFailure} from './http';
-import {contentHash} from './manual-listings';
-import {topupMutations} from './credit-purchases';
-import {financialEventMutations,invoiceAccountingMutations} from './stripe-accounting';
-import {checkoutPromotion,promotionReservation,promotionFailure,promotionInvoiceMutations,reconcilePromotionReservations,releasePromotion,validatePromotion} from './subscription-promotions';
-export type BillingEnv=Pick<CloudflareEnv,'DB'>&{BILLING_MODE?:string;STRIPE_SECRET_KEY?:string;STRIPE_WEBHOOK_SECRET?:string;STRIPE_PRICE_PLUS?:string;STRIPE_PRICE_PRO?:string;STRIPE_PORTAL_CONFIGURATION?:string;STRIPE_TOPUP_PRICE_10?:string;STRIPE_TOPUP_PRICE_30?:string;STRIPE_TOPUP_PRICE_100?:string};
-export function billingMode(env:BillingEnv):'test'|'live'|null{return env.BILLING_MODE==='test'&&env.STRIPE_SECRET_KEY?.startsWith('sk_test_')?'test':env.BILLING_MODE==='live'&&env.STRIPE_SECRET_KEY?.startsWith('sk_live_')?'live':null;}
-export function billingAvailability(env:BillingEnv){const mode=billingMode(env);return {enabled:Boolean(mode&&env.STRIPE_WEBHOOK_SECRET),mode};}
-export type BillingAvailability=ReturnType<typeof billingAvailability>;
-const checkoutConflict=(reason:string)=>new RequestFailure('CONFLICT',{checkout:reason});
-const checkoutUrl=(url:string|null)=>{if(!url||new URL(url).protocol!=='https:'||new URL(url).hostname!=='checkout.stripe.com')throw new RequestFailure('BILLING_UNAVAILABLE');return url;};
-export function stripeClient(env:BillingEnv){if(!billingMode(env))throw new RequestFailure('BILLING_UNAVAILABLE');return new Stripe(env.STRIPE_SECRET_KEY!,{httpClient:Stripe.createFetchHttpClient(),maxNetworkRetries:1,timeout:15000});}
-export async function billingStatus(env:BillingEnv,agencyId:string){
- const subscription=await env.DB.prepare('SELECT plan_code AS plan,billing_interval AS billingInterval,status,period_end AS periodEnd,cancel_at_period_end AS cancelAtPeriodEnd,stripe_mode AS mode FROM subscriptions WHERE agency_id=?').bind(agencyId).first();
- const policy=await env.DB.prepare('SELECT topup_valid_days AS validDays FROM credit_payment_policy WHERE id=1').first<{validDays:number}>();
- const mode=billingMode(env),customer=mode?await env.DB.prepare('SELECT 1 FROM billing_customers WHERE agency_id=? AND mode=?').bind(agencyId,mode).first():null;
- // A credit purchase has the same billing account as a subscription. Keep its
- // portal accessible even when all credits are spent or the webhook is paused.
- return {...billingAvailability(env),subscription,topupValidDays:policy?.validDays??0,portalAvailable:Boolean(customer)};
+export { Stripe };
+import { z } from 'zod';
+import {
+  creditPlans,
+  legacyCreditPlans,
+  EntityId,
+  PromotionCode,
+  BillingInterval,
+  subscriptionPricing,
+} from '@bienvu/contracts';
+import { subscriptionCreditPeriods } from './subscription-periods';
+import { RequestFailure } from './http';
+import { contentHash } from './manual-listings';
+import { topupMutations } from './credit-purchases';
+import { financialEventMutations, invoiceAccountingMutations } from './stripe-accounting';
+import {
+  checkoutPromotion,
+  promotionReservation,
+  promotionFailure,
+  promotionInvoiceMutations,
+  reconcilePromotionReservations,
+  releasePromotion,
+  validatePromotion,
+} from './subscription-promotions';
+export type BillingEnv = Pick<CloudflareEnv, 'DB'> & {
+  BILLING_MODE?: string;
+  STRIPE_SECRET_KEY?: string;
+  STRIPE_WEBHOOK_SECRET?: string;
+  STRIPE_PRICE_PLUS?: string;
+  STRIPE_PRICE_PRO?: string;
+  STRIPE_PORTAL_CONFIGURATION?: string;
+  STRIPE_TOPUP_PRICE_10?: string;
+  STRIPE_TOPUP_PRICE_30?: string;
+  STRIPE_TOPUP_PRICE_100?: string;
+};
+export function billingMode(env: BillingEnv): 'test' | 'live' | null {
+  return env.BILLING_MODE === 'test' && env.STRIPE_SECRET_KEY?.startsWith('sk_test_')
+    ? 'test'
+    : env.BILLING_MODE === 'live' && env.STRIPE_SECRET_KEY?.startsWith('sk_live_')
+      ? 'live'
+      : null;
 }
-export async function createCheckout(env:BillingEnv,agencyId:string,email:string,origin:string,input:unknown,key:string,client=stripeClient(env)){
- // Older open tabs may still send this field; it is not a consent record.
- const parsed=z.object({plan:z.enum(['solo','agence','equipe','reseau']),billingInterval:BillingInterval.default('month'),promotionCode:PromotionCode.optional(),accepted:z.literal(true).optional()}).strict().safeParse(input);if(!parsed.success||!EntityId.safeParse(agencyId).success||!/^[-a-zA-Z0-9_]{16,128}$/.test(key))throw new RequestFailure('VALIDATION_ERROR');
- const mode=billingMode(env);if(!mode||!env.STRIPE_WEBHOOK_SECRET)throw new RequestFailure('BILLING_UNAVAILABLE');
- const interval=parsed.data.billingInterval,plan=creditPlans.find(p=>p.code===parsed.data.plan)!,pricing=subscriptionPricing(plan.price,interval),at=new Date().toISOString();
- const subscription=await env.DB.prepare('SELECT stripe_subscription_id AS id,status FROM subscriptions WHERE agency_id=? AND stripe_mode=?').bind(agencyId,mode).first<{id:string;status:string}>();
- if(subscription&&!['canceled','incomplete_expired'].includes(subscription.status))throw checkoutConflict('subscription');
- let previous=await env.DB.prepare('SELECT plan,billing_interval AS billingInterval,url,expires_at AS expires FROM billing_checkouts WHERE agency_id=? AND mode=? AND idempotency_key=?').bind(agencyId,mode,key).first<{plan:string;billingInterval:BillingInterval;url:string|null;expires:string}>();
- const code=parsed.data.promotionCode??'',previousPromotion=previous?await checkoutPromotion(env.DB,agencyId,mode,key):null;
- if(previous&&(previous.plan!==plan.code||previous.billingInterval!==interval||(previousPromotion?.code??'')!==code))throw checkoutConflict('invalid_intent');
- if(previous&&previous.expires<=at)throw checkoutConflict('expired');
- const active=await env.DB.prepare('SELECT idempotency_key AS key,plan,billing_interval AS billingInterval,url,session_id AS sessionId,expires_at AS expires FROM billing_checkouts WHERE agency_id=? AND mode=? ORDER BY created_at DESC,rowid DESC LIMIT 1').bind(agencyId,mode).first<{key:string;plan:string;billingInterval:BillingInterval;url:string|null;sessionId:string|null;expires:string}>();
- const activePromotion=active?await checkoutPromotion(env.DB,agencyId,mode,active.key):null,sameIntent=active?.plan===plan.code&&active.billingInterval===interval&&(activePromotion?.code??'')===code;
- let customer=await env.DB.prepare('SELECT customer_id AS id FROM billing_customers WHERE agency_id=? AND mode=?').bind(agencyId,mode).first<{id:string}>();
- if(active?.sessionId){
-  let session=await client.checkout.sessions.retrieve(active.sessionId);
-  const owned=()=>session.id===active.sessionId&&stripeId(session.customer)===customer?.id&&session.client_reference_id===agencyId&&session.mode==='subscription'&&session.livemode===(mode==='live');
-  if(!owned())throw new RequestFailure('FORBIDDEN');
-  // Check completed sessions even after their original expiry, before the webhook
-  // has synchronized the subscription. An ended, already synchronized one is safe.
-  const alreadyEnded=()=>session.status==='complete'&&subscription?.id===stripeId(session.subscription);
-  if(session.status==='complete'&&!alreadyEnded())throw checkoutConflict('confirmed');
-  if(session.status==='open'&&sameIntent)return {url:checkoutUrl(session.url)};
-  if(session.status==='open'){
-   try{session=await client.checkout.sessions.expire(active.sessionId,{}, {idempotencyKey:`bienvu:${mode}:expire-checkout:${active.sessionId}`});}
-   catch{session=await client.checkout.sessions.retrieve(active.sessionId);}
-   if(!owned())throw new RequestFailure('FORBIDDEN');
-   if(session.status==='complete')throw checkoutConflict('confirmed');
+export function billingAvailability(env: BillingEnv) {
+  const mode = billingMode(env);
+  return { enabled: Boolean(mode && env.STRIPE_WEBHOOK_SECRET), mode };
+}
+export type BillingAvailability = ReturnType<typeof billingAvailability>;
+const checkoutConflict = (reason: string) => new RequestFailure('CONFLICT', { checkout: reason });
+const checkoutUrl = (url: string | null) => {
+  if (!url || new URL(url).protocol !== 'https:' || new URL(url).hostname !== 'checkout.stripe.com')
+    throw new RequestFailure('BILLING_UNAVAILABLE');
+  return url;
+};
+export function stripeClient(env: BillingEnv) {
+  if (!billingMode(env)) throw new RequestFailure('BILLING_UNAVAILABLE');
+  return new Stripe(env.STRIPE_SECRET_KEY!, {
+    httpClient: Stripe.createFetchHttpClient(),
+    maxNetworkRetries: 1,
+    timeout: 15000,
+  });
+}
+export async function billingStatus(env: BillingEnv, agencyId: string) {
+  const subscription = await env.DB.prepare(
+    'SELECT plan_code AS plan,billing_interval AS billingInterval,status,period_end AS periodEnd,cancel_at_period_end AS cancelAtPeriodEnd,stripe_mode AS mode FROM subscriptions WHERE agency_id=?',
+  )
+    .bind(agencyId)
+    .first();
+  const policy = await env.DB.prepare(
+    'SELECT topup_valid_days AS validDays FROM credit_payment_policy WHERE id=1',
+  ).first<{ validDays: number }>();
+  const mode = billingMode(env),
+    customer = mode
+      ? await env.DB.prepare('SELECT 1 FROM billing_customers WHERE agency_id=? AND mode=?')
+          .bind(agencyId, mode)
+          .first()
+      : null;
+  // A credit purchase has the same billing account as a subscription. Keep its
+  // portal accessible even when all credits are spent or the webhook is paused.
+  return {
+    ...billingAvailability(env),
+    subscription,
+    topupValidDays: policy?.validDays ?? 0,
+    portalAvailable: Boolean(customer),
+  };
+}
+export async function createCheckout(
+  env: BillingEnv,
+  agencyId: string,
+  email: string,
+  origin: string,
+  input: unknown,
+  key: string,
+  client = stripeClient(env),
+) {
+  // Older open tabs may still send this field; it is not a consent record.
+  const parsed = z
+    .object({
+      plan: z.enum(['solo', 'agence', 'equipe', 'reseau']),
+      billingInterval: BillingInterval.default('month'),
+      promotionCode: PromotionCode.optional(),
+      accepted: z.literal(true).optional(),
+    })
+    .strict()
+    .safeParse(input);
+  if (!parsed.success || !EntityId.safeParse(agencyId).success || !/^[-a-zA-Z0-9_]{16,128}$/.test(key))
+    throw new RequestFailure('VALIDATION_ERROR');
+  const mode = billingMode(env);
+  if (!mode || !env.STRIPE_WEBHOOK_SECRET) throw new RequestFailure('BILLING_UNAVAILABLE');
+  const interval = parsed.data.billingInterval,
+    plan = creditPlans.find((p) => p.code === parsed.data.plan)!,
+    pricing = subscriptionPricing(plan.price, interval),
+    at = new Date().toISOString();
+  const subscription = await env.DB.prepare(
+    'SELECT stripe_subscription_id AS id,status FROM subscriptions WHERE agency_id=? AND stripe_mode=?',
+  )
+    .bind(agencyId, mode)
+    .first<{ id: string; status: string }>();
+  if (subscription && !['canceled', 'incomplete_expired'].includes(subscription.status))
+    throw checkoutConflict('subscription');
+  let previous = await env.DB.prepare(
+    'SELECT plan,billing_interval AS billingInterval,url,expires_at AS expires FROM billing_checkouts WHERE agency_id=? AND mode=? AND idempotency_key=?',
+  )
+    .bind(agencyId, mode, key)
+    .first<{ plan: string; billingInterval: BillingInterval; url: string | null; expires: string }>();
+  const code = parsed.data.promotionCode ?? '',
+    previousPromotion = previous ? await checkoutPromotion(env.DB, agencyId, mode, key) : null;
+  if (
+    previous &&
+    (previous.plan !== plan.code || previous.billingInterval !== interval || (previousPromotion?.code ?? '') !== code)
+  )
+    throw checkoutConflict('invalid_intent');
+  if (previous && previous.expires <= at) throw checkoutConflict('expired');
+  const active = await env.DB.prepare(
+    'SELECT idempotency_key AS key,plan,billing_interval AS billingInterval,url,session_id AS sessionId,expires_at AS expires FROM billing_checkouts WHERE agency_id=? AND mode=? ORDER BY created_at DESC,rowid DESC LIMIT 1',
+  )
+    .bind(agencyId, mode)
+    .first<{
+      key: string;
+      plan: string;
+      billingInterval: BillingInterval;
+      url: string | null;
+      sessionId: string | null;
+      expires: string;
+    }>();
+  const activePromotion = active ? await checkoutPromotion(env.DB, agencyId, mode, active.key) : null,
+    sameIntent =
+      active?.plan === plan.code && active.billingInterval === interval && (activePromotion?.code ?? '') === code;
+  let customer = await env.DB.prepare('SELECT customer_id AS id FROM billing_customers WHERE agency_id=? AND mode=?')
+    .bind(agencyId, mode)
+    .first<{ id: string }>();
+  if (active?.sessionId) {
+    let session = await client.checkout.sessions.retrieve(active.sessionId);
+    const owned = () =>
+      session.id === active.sessionId &&
+      stripeId(session.customer) === customer?.id &&
+      session.client_reference_id === agencyId &&
+      session.mode === 'subscription' &&
+      session.livemode === (mode === 'live');
+    if (!owned()) throw new RequestFailure('FORBIDDEN');
+    // Check completed sessions even after their original expiry, before the webhook
+    // has synchronized the subscription. An ended, already synchronized one is safe.
+    const alreadyEnded = () => session.status === 'complete' && subscription?.id === stripeId(session.subscription);
+    if (session.status === 'complete' && !alreadyEnded()) throw checkoutConflict('confirmed');
+    if (session.status === 'open' && sameIntent) return { url: checkoutUrl(session.url) };
+    if (session.status === 'open') {
+      try {
+        session = await client.checkout.sessions.expire(
+          active.sessionId,
+          {},
+          { idempotencyKey: `bienvu:${mode}:expire-checkout:${active.sessionId}` },
+        );
+      } catch {
+        session = await client.checkout.sessions.retrieve(active.sessionId);
+      }
+      if (!owned()) throw new RequestFailure('FORBIDDEN');
+      if (session.status === 'complete') throw checkoutConflict('confirmed');
+    }
+    if (session.status !== 'expired' && !alreadyEnded()) throw new RequestFailure('BILLING_UNAVAILABLE');
+    // Unlock only after Stripe confirms that the old link cannot take a payment.
+    await env.DB.prepare(
+      'UPDATE billing_checkouts SET expires_at=min(expires_at,?) WHERE agency_id=? AND mode=? AND idempotency_key=? AND session_id=?',
+    )
+      .bind(at, agencyId, mode, active.key, active.sessionId)
+      .run();
+    if (session.status === 'expired') await releasePromotion(env.DB, agencyId, mode, active.key);
+    if (active.key === key) throw checkoutConflict('expired');
+  } else if (active && active.expires > at) {
+    if (!sameIntent) throw checkoutConflict('busy');
+    // Recover an uncertain creation from another tab with its original Stripe key.
+    key = active.key;
+    previous = active;
   }
-  if(session.status!=='expired'&&!alreadyEnded())throw new RequestFailure('BILLING_UNAVAILABLE');
-  // Unlock only after Stripe confirms that the old link cannot take a payment.
-  await env.DB.prepare('UPDATE billing_checkouts SET expires_at=min(expires_at,?) WHERE agency_id=? AND mode=? AND idempotency_key=? AND session_id=?').bind(at,agencyId,mode,active.key,active.sessionId).run();
-  if(session.status==='expired')await releasePromotion(env.DB,agencyId,mode,active.key);
-  if(active.key===key)throw checkoutConflict('expired');
- }else if(active&&active.expires>at){
-  if(!sameIntent)throw checkoutConflict('busy');
-  // Recover an uncertain creation from another tab with its original Stripe key.
-  key=active.key;previous=active;
- }
- if(!customer){const created=await client.customers.create({email,metadata:{agencyId}},{idempotencyKey:`bienvu:${mode}:customer:${agencyId}`});
-  await env.DB.prepare('INSERT OR IGNORE INTO billing_customers VALUES(?,?,?,?)').bind(agencyId,mode,created.id,at).run();customer=await env.DB.prepare('SELECT customer_id AS id FROM billing_customers WHERE agency_id=? AND mode=?').bind(agencyId,mode).first<{id:string}>();}
- const expiresAt=previous?.expires??new Date(Date.now()+2700_000).toISOString();
- let promotion=await checkoutPromotion(env.DB,agencyId,mode,key);
- if(code&&!promotion){await reconcilePromotionReservations(env,client);}
- const campaign=code&&!promotion?(await validatePromotion(env.DB,code,mode,agencyId,parsed.data.plan)).promotion:null;
- try{await env.DB.batch([
-  env.DB.prepare('INSERT OR IGNORE INTO billing_checkouts(agency_id,idempotency_key,plan,mode,expires_at,created_at,billing_interval) VALUES(?,?,?,?,?,?,?)').bind(agencyId,key,plan.code,mode,expiresAt,at,interval),
-  ...(campaign?[promotionReservation(env.DB,campaign,agencyId,mode,key,parsed.data.plan,at)]:[]),
- ]);}catch(e){
-  if(e instanceof Error&&e.message.includes('CHECKOUT_IN_PROGRESS'))throw checkoutConflict('busy');
-  const concurrent=await checkoutPromotion(env.DB,agencyId,mode,key);
-  if(!code||concurrent?.code!==code||concurrent.state!=='reserved')promotionFailure(e);
- }
- promotion=await checkoutPromotion(env.DB,agencyId,mode,key);
- const journal=await env.DB.prepare('SELECT expires_at AS expires,plan,billing_interval AS billingInterval FROM billing_checkouts WHERE agency_id=? AND mode=? AND idempotency_key=?').bind(agencyId,mode,key).first<{expires:string;plan:string;billingInterval:BillingInterval}>();
- if(journal?.plan!==plan.code||journal.billingInterval!==interval)throw checkoutConflict('invalid_intent');
- const stableSuffix=(await contentHash(new TextEncoder().encode(`${mode}:${agencyId}:${key}`))).slice(0,8).split('').map(c=>String.fromCharCode(97+parseInt(c,16))).join('');
- const session=await client.checkout.sessions.create({mode:'subscription',managed_payments:{enabled:false},integration_identifier:`bienvu_checkout_${stableSuffix}`,customer:customer!.id,client_reference_id:agencyId,locale:'fr',
-  success_url:`${origin}/abonnement?paiement=confirmation${interval==='year'?'&facturation=year':''}`,cancel_url:`${origin}/abonnement?paiement=annule${interval==='year'?'&facturation=year':''}`,expires_at:Math.floor(Date.parse(journal!.expires)/1000),
-  metadata:{agencyId,plan:plan.code,creditCatalog:'2',...(interval==='year'?{billingInterval:interval}:{}),...(promotion?{promotionIntentId:promotion.id}:{} )},subscription_data:{metadata:{agencyId,plan:plan.code,creditCatalog:'2',...(interval==='year'?{billingInterval:interval}:{}),...(promotion?{promotionIntentId:promotion.id}:{} )}},
-  line_items:[{price_data:{currency:'eur',unit_amount:pricing.amountCents,tax_behavior:'exclusive',recurring:{interval},product_data:{name:`BienVu ${plan.name} · ${plan.credits} crédits par mois`,metadata:{bienvuPlan:plan.code,creditCatalog:'2'}}},quantity:1}],
-  billing_address_collection:'required',customer_update:{name:'auto',address:'auto'},tax_id_collection:{enabled:true},automatic_tax:{enabled:false},
-  custom_text:{submit:{message:`${interval==='year'?`${pricing.amountCents/100} € HT facturés pour un an (−10 %). Renouvellement annuel automatique. `:''}${plan.credits} crédits par mois.${promotion?` Code ${promotion.code} : +${promotion.bonusCredits} crédits après le premier paiement, valables pendant la première mensualité, sans report.`:''} Crédits mensuels inutilisés reportés un mois, dans la limite de ${plan.credits} crédits, ${interval==='year'?'pour les mois couverts par le paiement annuel':'après renouvellement payé'}. Résiliation à la fin de la période payée.`}}},
-  {idempotencyKey:`bienvu:${mode}:checkout:${agencyId}:${key}`});
- const url=checkoutUrl(session.url);
- await env.DB.prepare('UPDATE billing_checkouts SET session_id=?,url=? WHERE agency_id=? AND mode=? AND idempotency_key=?').bind(session.id,url,agencyId,mode,key).run();return {url};
-}
-export async function createPortal(env:BillingEnv,agencyId:string,origin:string,client=stripeClient(env)){
- const mode=billingMode(env);if(!mode)throw new RequestFailure('BILLING_UNAVAILABLE');
- const customer=await env.DB.prepare('SELECT customer_id AS id FROM billing_customers WHERE agency_id=? AND mode=?').bind(agencyId,mode).first<{id:string}>();if(!customer)throw new RequestFailure('NOT_FOUND');
- const session=await client.billingPortal.sessions.create({customer:customer.id,return_url:`${origin}/abonnement#facturation`,...(env.STRIPE_PORTAL_CONFIGURATION?{configuration:env.STRIPE_PORTAL_CONFIGURATION}:{})});const url=new URL(session.url);if(url.protocol!=='https:'||url.hostname!=='billing.stripe.com')throw new RequestFailure('BILLING_UNAVAILABLE');return {url:session.url};
-}
-const stripeId=(value:string|{id:string}|null|undefined)=>typeof value==='string'?value:value?.id??null;
-function approvedPlan(env:BillingEnv,price:Stripe.Price){
- const interval=BillingInterval.safeParse(price.recurring?.interval);
- if(!interval.success||price.recurring?.interval_count!==1||price.currency!=='eur')return null;
- const plan=[...creditPlans,...legacyCreditPlans].find(p=>{
-  const configured=p.code==='plus'?env.STRIPE_PRICE_PLUS:p.code==='pro'?env.STRIPE_PRICE_PRO:undefined;
-  return p.price>0&&(interval.data==='month'||!['plus','pro'].includes(p.code))&&price.unit_amount===subscriptionPricing(p.price,interval.data).amountCents&&(!configured||price.id===configured);
- });
- return plan?{...plan,billingInterval:interval.data,amountCents:subscriptionPricing(plan.price,interval.data).amountCents}:null;
-}
-export async function processStripeEvent(env:BillingEnv,event:Stripe.Event,payloadHash:string,client=stripeClient(env)){
- const mode=billingMode(env);if(!mode||event.livemode!==(mode==='live'))throw new RequestFailure('FORBIDDEN');
- const previous=await env.DB.prepare('SELECT payload_hash AS hash FROM stripe_webhook_events WHERE id=?').bind(event.id).first<{hash:string}>();
- if(previous){if(previous.hash!==payloadHash)throw new RequestFailure('CONFLICT');return {received:true};}
- let subscriptionId:string|null=null,invoice:Stripe.Invoice|null=null;
- if(event.type==='invoice.paid'||event.type==='invoice.payment_failed'){invoice=await client.invoices.retrieve((event.data.object as Stripe.Invoice).id);subscriptionId=stripeId(invoice.parent?.subscription_details?.subscription);if(event.type==='invoice.payment_failed')invoice=null;}
- else if(['customer.subscription.created','customer.subscription.updated','customer.subscription.deleted'].includes(event.type))subscriptionId=(event.data.object as Stripe.Subscription).id;
- // Subscription Checkout still grants nothing. A one-time pack is independently
- // proved by the retrieved paid Checkout, PaymentIntent and server price journal.
- const mutations:D1PreparedStatement[]=[];
- if(['checkout.session.completed','checkout.session.async_payment_succeeded'].includes(event.type)){
-  const object=event.data.object as Stripe.Checkout.Session;
-  if(object.mode==='payment'&&object.metadata?.kind==='credit_topup')mutations.push(...await topupMutations(env,object.id,client));
- }
- mutations.push(...await financialEventMutations(env,event,client));
- if(subscriptionId){
-  const subscription=await client.subscriptions.retrieve(subscriptionId),customerId=stripeId(subscription.customer),agencyId=subscription.metadata.agencyId,
-   item=subscription.items.data[0],plan=item?approvedPlan(env,item.price):null;
-  if(!EntityId.safeParse(agencyId).success||!plan||subscription.items.data.length!==1||item.quantity!==1)throw new RequestFailure('VALIDATION_ERROR');
-  if(!await env.DB.prepare('SELECT 1 FROM billing_customers WHERE agency_id=? AND mode=? AND customer_id=?').bind(agencyId,mode,customerId).first())throw new RequestFailure('FORBIDDEN');
-  const from=new Date(item.current_period_start*1000).toISOString(),until=new Date(item.current_period_end*1000).toISOString(),at=new Date().toISOString();
-  mutations.push(env.DB.prepare(`INSERT INTO subscriptions(agency_id,stripe_customer_id,stripe_subscription_id,plan_code,status,period_start,period_end,cancel_at_period_end,sync_version,updated_at,stripe_mode,billing_interval)
-   VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(agency_id) DO UPDATE SET stripe_customer_id=excluded.stripe_customer_id,stripe_subscription_id=excluded.stripe_subscription_id,plan_code=excluded.plan_code,status=excluded.status,period_start=excluded.period_start,period_end=excluded.period_end,cancel_at_period_end=excluded.cancel_at_period_end,sync_version=excluded.sync_version,updated_at=excluded.updated_at,stripe_mode=excluded.stripe_mode,billing_interval=excluded.billing_interval WHERE subscriptions.sync_version<=excluded.sync_version AND subscriptions.stripe_mode=excluded.stripe_mode`)
-   .bind(agencyId,customerId,subscription.id,plan.code,subscription.status,from,until,subscription.cancel_at_period_end?1:0,event.created,at,mode,plan.billingInterval));
-  if(invoice){
-   const line=invoice.lines.data.find(l=>l.parent?.subscription_item_details?.subscription_item===item.id&&!l.parent.subscription_item_details.proration),period=line?.period,priceId=stripeId(line?.pricing?.price_details?.price);
-   const invoicePlan=priceId?approvedPlan(env,priceId===item.price.id?item.price:await client.prices.retrieve(priceId)):null;
-   if(!invoicePlan||invoice.status!=='paid'||invoice.currency!=='eur'||stripeId(invoice.customer)!==customerId||invoice.amount_paid<invoicePlan.amountCents||line?.amount!==invoicePlan.amountCents||line.quantity!==1||invoice.billing_reason!=='subscription_create'&&invoice.billing_reason!=='subscription_cycle'||!period||invoice.lines.has_more)throw new RequestFailure('VALIDATION_ERROR');
-   let periods:ReturnType<typeof subscriptionCreditPeriods>;
-   try{periods=subscriptionCreditPeriods(invoicePlan.billingInterval,period.start,period.end);}catch{throw new RequestFailure('VALIDATION_ERROR');}
-   const start=periods[0].start,end=periods.at(-1)!.end;
-   const periodKey=`stripe:${mode}:${subscription.id}:${period.start}`;
-   for(const [index,month] of periods.entries()){
-    const allocationId=`stripe-${invoice.id}${index?`-month-${index+1}`:''}`,key=periodKey+(index?`:month:${index+1}`:'');
-    mutations.push(env.DB.prepare(`INSERT INTO allocations(id,agency_id,kind,period_key,quota_limit,valid_from,valid_until) VALUES(?,?,'paid',?,?,?,?) ON CONFLICT(agency_id,kind,period_key) DO NOTHING`).bind(allocationId,agencyId,key,invoicePlan.credits,month.start,month.end));
-   }
-   // The ledger points to the unique period allocation even for duplicate invoice events.
-   mutations.push(env.DB.prepare(`INSERT INTO billing_invoices(id,agency_id,mode,subscription_id,plan,amount_paid,subtotal_excluding_tax,currency,period_start,period_end,allocation_id,created_at,billing_interval)
-    SELECT ?,?,?,?,?,?,?,'eur',?,?,id,?,? FROM allocations WHERE agency_id=? AND kind='paid' AND period_key=? ON CONFLICT(id) DO NOTHING`)
-    .bind(invoice.id,agencyId,mode,subscription.id,invoicePlan.code,invoice.amount_paid,invoice.subtotal_excluding_tax??invoice.subtotal,start,end,at,invoicePlan.billingInterval,agencyId,periodKey));
-   mutations.push(env.DB.prepare(`INSERT INTO generation_access(agency_id,allocation_id,enabled) SELECT agency_id,id,1 FROM allocations WHERE agency_id=? AND kind='paid' AND period_key=? AND valid_from<=? AND valid_until>? ON CONFLICT(agency_id) DO UPDATE SET allocation_id=excluded.allocation_id,enabled=1`).bind(agencyId,periodKey,at,at));
-   mutations.push(env.DB.prepare(`INSERT INTO financial_receipts(id,agency_id,mode,kind,allocation_id,credits,gross_cents,revenue_ht_cents,currency,customer_id,invoice_id,paid_at)
-    SELECT ?,?,?,'subscription',id,?,?,?,'eur',?,?,? FROM allocations WHERE agency_id=? AND kind='paid' AND period_key=? ON CONFLICT(id) DO NOTHING`)
-    .bind('invoice-'+invoice.id,agencyId,mode,invoicePlan.credits*periods.length,invoice.amount_paid,invoice.total_excluding_tax??invoice.subtotal_excluding_tax??invoice.subtotal,customerId,invoice.id,at,agencyId,periodKey));
-   if(invoicePlan.billingInterval==='year')for(let index=0;index<periods.length;index++){
-    mutations.push(env.DB.prepare(`INSERT INTO annual_credit_periods(invoice_id,allocation_id,ordinal) SELECT ?,id,? FROM allocations WHERE agency_id=? AND kind='paid' AND period_key=? ON CONFLICT(invoice_id,ordinal) DO NOTHING`)
-     .bind(invoice.id,index,agencyId,periodKey+(index?`:month:${index+1}`:'')));
-   }
-   mutations.push(...await invoiceAccountingMutations(env,invoice,'invoice-'+invoice.id,client));
-   mutations.push(...await promotionInvoiceMutations(env,client,subscription,invoice,invoicePlan.code,start,periods[0].end));
+  if (!customer) {
+    const created = await client.customers.create(
+      { email, metadata: { agencyId } },
+      { idempotencyKey: `bienvu:${mode}:customer:${agencyId}` },
+    );
+    await env.DB.prepare('INSERT OR IGNORE INTO billing_customers VALUES(?,?,?,?)')
+      .bind(agencyId, mode, created.id, at)
+      .run();
+    customer = await env.DB.prepare('SELECT customer_id AS id FROM billing_customers WHERE agency_id=? AND mode=?')
+      .bind(agencyId, mode)
+      .first<{ id: string }>();
   }
- }
- mutations.push(env.DB.prepare('INSERT OR IGNORE INTO stripe_webhook_events VALUES(?,?,?,?,?,?)').bind(event.id,mode,event.type,payloadHash,event.created,new Date().toISOString()));
- await env.DB.batch(mutations);return {received:true};
+  const expiresAt = previous?.expires ?? new Date(Date.now() + 2700_000).toISOString();
+  let promotion = await checkoutPromotion(env.DB, agencyId, mode, key);
+  if (code && !promotion) {
+    await reconcilePromotionReservations(env, client);
+  }
+  const campaign =
+    code && !promotion ? (await validatePromotion(env.DB, code, mode, agencyId, parsed.data.plan)).promotion : null;
+  try {
+    await env.DB.batch([
+      env.DB.prepare(
+        'INSERT OR IGNORE INTO billing_checkouts(agency_id,idempotency_key,plan,mode,expires_at,created_at,billing_interval) VALUES(?,?,?,?,?,?,?)',
+      ).bind(agencyId, key, plan.code, mode, expiresAt, at, interval),
+      ...(campaign ? [promotionReservation(env.DB, campaign, agencyId, mode, key, parsed.data.plan, at)] : []),
+    ]);
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('CHECKOUT_IN_PROGRESS')) throw checkoutConflict('busy');
+    const concurrent = await checkoutPromotion(env.DB, agencyId, mode, key);
+    if (!code || concurrent?.code !== code || concurrent.state !== 'reserved') promotionFailure(e);
+  }
+  promotion = await checkoutPromotion(env.DB, agencyId, mode, key);
+  const journal = await env.DB.prepare(
+    'SELECT expires_at AS expires,plan,billing_interval AS billingInterval FROM billing_checkouts WHERE agency_id=? AND mode=? AND idempotency_key=?',
+  )
+    .bind(agencyId, mode, key)
+    .first<{ expires: string; plan: string; billingInterval: BillingInterval }>();
+  if (journal?.plan !== plan.code || journal.billingInterval !== interval) throw checkoutConflict('invalid_intent');
+  const stableSuffix = (await contentHash(new TextEncoder().encode(`${mode}:${agencyId}:${key}`)))
+    .slice(0, 8)
+    .split('')
+    .map((c) => String.fromCharCode(97 + parseInt(c, 16)))
+    .join('');
+  const session = await client.checkout.sessions.create(
+    {
+      mode: 'subscription',
+      managed_payments: { enabled: false },
+      integration_identifier: `bienvu_checkout_${stableSuffix}`,
+      customer: customer!.id,
+      client_reference_id: agencyId,
+      locale: 'fr',
+      success_url: `${origin}/abonnement?paiement=confirmation${interval === 'year' ? '&facturation=year' : ''}`,
+      cancel_url: `${origin}/abonnement?paiement=annule${interval === 'year' ? '&facturation=year' : ''}`,
+      expires_at: Math.floor(Date.parse(journal!.expires) / 1000),
+      metadata: {
+        agencyId,
+        plan: plan.code,
+        creditCatalog: '2',
+        ...(interval === 'year' ? { billingInterval: interval } : {}),
+        ...(promotion ? { promotionIntentId: promotion.id } : {}),
+      },
+      subscription_data: {
+        metadata: {
+          agencyId,
+          plan: plan.code,
+          creditCatalog: '2',
+          ...(interval === 'year' ? { billingInterval: interval } : {}),
+          ...(promotion ? { promotionIntentId: promotion.id } : {}),
+        },
+      },
+      line_items: [
+        {
+          price_data: {
+            currency: 'eur',
+            unit_amount: pricing.amountCents,
+            tax_behavior: 'exclusive',
+            recurring: { interval },
+            product_data: {
+              name: `BienVu ${plan.name} · ${plan.credits} crédits par mois`,
+              metadata: { bienvuPlan: plan.code, creditCatalog: '2' },
+            },
+          },
+          quantity: 1,
+        },
+      ],
+      billing_address_collection: 'required',
+      customer_update: { name: 'auto', address: 'auto' },
+      tax_id_collection: { enabled: true },
+      automatic_tax: { enabled: false },
+      custom_text: {
+        submit: {
+          message: `${interval === 'year' ? `${pricing.amountCents / 100} € HT facturés pour un an (−10 %). Renouvellement annuel automatique. ` : ''}${plan.credits} crédits par mois.${promotion ? ` Code ${promotion.code} : +${promotion.bonusCredits} crédits après le premier paiement, valables pendant la première mensualité, sans report.` : ''} Crédits mensuels inutilisés reportés un mois, dans la limite de ${plan.credits} crédits, ${interval === 'year' ? 'pour les mois couverts par le paiement annuel' : 'après renouvellement payé'}. Résiliation à la fin de la période payée.`,
+        },
+      },
+    },
+    { idempotencyKey: `bienvu:${mode}:checkout:${agencyId}:${key}` },
+  );
+  const url = checkoutUrl(session.url);
+  await env.DB.prepare(
+    'UPDATE billing_checkouts SET session_id=?,url=? WHERE agency_id=? AND mode=? AND idempotency_key=?',
+  )
+    .bind(session.id, url, agencyId, mode, key)
+    .run();
+  return { url };
 }
-export async function stripeWebhook(env:BillingEnv,raw:string,signature:string|null,client=stripeClient(env)){
- if(!signature||!env.STRIPE_WEBHOOK_SECRET)throw new RequestFailure('FORBIDDEN');let event:Stripe.Event;
- try{event=await client.webhooks.constructEventAsync(raw,signature,env.STRIPE_WEBHOOK_SECRET,300,Stripe.createSubtleCryptoProvider());}catch{throw new RequestFailure('FORBIDDEN');}
- return processStripeEvent(env,event,await contentHash(new TextEncoder().encode(raw)),client);
+export async function createPortal(env: BillingEnv, agencyId: string, origin: string, client = stripeClient(env)) {
+  const mode = billingMode(env);
+  if (!mode) throw new RequestFailure('BILLING_UNAVAILABLE');
+  const customer = await env.DB.prepare('SELECT customer_id AS id FROM billing_customers WHERE agency_id=? AND mode=?')
+    .bind(agencyId, mode)
+    .first<{ id: string }>();
+  if (!customer) throw new RequestFailure('NOT_FOUND');
+  const session = await client.billingPortal.sessions.create({
+    customer: customer.id,
+    return_url: `${origin}/abonnement#facturation`,
+    ...(env.STRIPE_PORTAL_CONFIGURATION ? { configuration: env.STRIPE_PORTAL_CONFIGURATION } : {}),
+  });
+  const url = new URL(session.url);
+  if (url.protocol !== 'https:' || url.hostname !== 'billing.stripe.com')
+    throw new RequestFailure('BILLING_UNAVAILABLE');
+  return { url: session.url };
+}
+const stripeId = (value: string | { id: string } | null | undefined) =>
+  typeof value === 'string' ? value : (value?.id ?? null);
+function approvedPlan(env: BillingEnv, price: Stripe.Price) {
+  const interval = BillingInterval.safeParse(price.recurring?.interval);
+  if (!interval.success || price.recurring?.interval_count !== 1 || price.currency !== 'eur') return null;
+  const plan = [...creditPlans, ...legacyCreditPlans].find((p) => {
+    const configured = p.code === 'plus' ? env.STRIPE_PRICE_PLUS : p.code === 'pro' ? env.STRIPE_PRICE_PRO : undefined;
+    return (
+      p.price > 0 &&
+      (interval.data === 'month' || !['plus', 'pro'].includes(p.code)) &&
+      price.unit_amount === subscriptionPricing(p.price, interval.data).amountCents &&
+      (!configured || price.id === configured)
+    );
+  });
+  return plan
+    ? {
+        ...plan,
+        billingInterval: interval.data,
+        amountCents: subscriptionPricing(plan.price, interval.data).amountCents,
+      }
+    : null;
+}
+export async function processStripeEvent(
+  env: BillingEnv,
+  event: Stripe.Event,
+  payloadHash: string,
+  client = stripeClient(env),
+) {
+  const mode = billingMode(env);
+  if (!mode || event.livemode !== (mode === 'live')) throw new RequestFailure('FORBIDDEN');
+  const previous = await env.DB.prepare('SELECT payload_hash AS hash FROM stripe_webhook_events WHERE id=?')
+    .bind(event.id)
+    .first<{ hash: string }>();
+  if (previous) {
+    if (previous.hash !== payloadHash) throw new RequestFailure('CONFLICT');
+    return { received: true };
+  }
+  let subscriptionId: string | null = null,
+    invoice: Stripe.Invoice | null = null;
+  if (event.type === 'invoice.paid' || event.type === 'invoice.payment_failed') {
+    invoice = await client.invoices.retrieve((event.data.object as Stripe.Invoice).id);
+    subscriptionId = stripeId(invoice.parent?.subscription_details?.subscription);
+    if (event.type === 'invoice.payment_failed') invoice = null;
+  } else if (
+    ['customer.subscription.created', 'customer.subscription.updated', 'customer.subscription.deleted'].includes(
+      event.type,
+    )
+  )
+    subscriptionId = (event.data.object as Stripe.Subscription).id;
+  // Subscription Checkout still grants nothing. A one-time pack is independently
+  // proved by the retrieved paid Checkout, PaymentIntent and server price journal.
+  const mutations: D1PreparedStatement[] = [];
+  if (['checkout.session.completed', 'checkout.session.async_payment_succeeded'].includes(event.type)) {
+    const object = event.data.object as Stripe.Checkout.Session;
+    if (object.mode === 'payment' && object.metadata?.kind === 'credit_topup')
+      mutations.push(...(await topupMutations(env, object.id, client)));
+  }
+  mutations.push(...(await financialEventMutations(env, event, client)));
+  if (subscriptionId) {
+    const subscription = await client.subscriptions.retrieve(subscriptionId),
+      customerId = stripeId(subscription.customer),
+      agencyId = subscription.metadata.agencyId,
+      item = subscription.items.data[0],
+      plan = item ? approvedPlan(env, item.price) : null;
+    if (!EntityId.safeParse(agencyId).success || !plan || subscription.items.data.length !== 1 || item.quantity !== 1)
+      throw new RequestFailure('VALIDATION_ERROR');
+    if (
+      !(await env.DB.prepare('SELECT 1 FROM billing_customers WHERE agency_id=? AND mode=? AND customer_id=?')
+        .bind(agencyId, mode, customerId)
+        .first())
+    )
+      throw new RequestFailure('FORBIDDEN');
+    const from = new Date(item.current_period_start * 1000).toISOString(),
+      until = new Date(item.current_period_end * 1000).toISOString(),
+      at = new Date().toISOString();
+    mutations.push(
+      env.DB.prepare(`INSERT INTO subscriptions(agency_id,stripe_customer_id,stripe_subscription_id,plan_code,status,period_start,period_end,cancel_at_period_end,sync_version,updated_at,stripe_mode,billing_interval)
+   VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(agency_id) DO UPDATE SET stripe_customer_id=excluded.stripe_customer_id,stripe_subscription_id=excluded.stripe_subscription_id,plan_code=excluded.plan_code,status=excluded.status,period_start=excluded.period_start,period_end=excluded.period_end,cancel_at_period_end=excluded.cancel_at_period_end,sync_version=excluded.sync_version,updated_at=excluded.updated_at,stripe_mode=excluded.stripe_mode,billing_interval=excluded.billing_interval WHERE subscriptions.sync_version<=excluded.sync_version AND subscriptions.stripe_mode=excluded.stripe_mode`).bind(
+        agencyId,
+        customerId,
+        subscription.id,
+        plan.code,
+        subscription.status,
+        from,
+        until,
+        subscription.cancel_at_period_end ? 1 : 0,
+        event.created,
+        at,
+        mode,
+        plan.billingInterval,
+      ),
+    );
+    if (invoice) {
+      const line = invoice.lines.data.find(
+          (l) =>
+            l.parent?.subscription_item_details?.subscription_item === item.id &&
+            !l.parent.subscription_item_details.proration,
+        ),
+        period = line?.period,
+        priceId = stripeId(line?.pricing?.price_details?.price);
+      const invoicePlan = priceId
+        ? approvedPlan(env, priceId === item.price.id ? item.price : await client.prices.retrieve(priceId))
+        : null;
+      if (
+        !invoicePlan ||
+        invoice.status !== 'paid' ||
+        invoice.currency !== 'eur' ||
+        stripeId(invoice.customer) !== customerId ||
+        invoice.amount_paid < invoicePlan.amountCents ||
+        line?.amount !== invoicePlan.amountCents ||
+        line.quantity !== 1 ||
+        (invoice.billing_reason !== 'subscription_create' && invoice.billing_reason !== 'subscription_cycle') ||
+        !period ||
+        invoice.lines.has_more
+      )
+        throw new RequestFailure('VALIDATION_ERROR');
+      let periods: ReturnType<typeof subscriptionCreditPeriods>;
+      try {
+        periods = subscriptionCreditPeriods(invoicePlan.billingInterval, period.start, period.end);
+      } catch {
+        throw new RequestFailure('VALIDATION_ERROR');
+      }
+      const start = periods[0].start,
+        end = periods.at(-1)!.end;
+      const periodKey = `stripe:${mode}:${subscription.id}:${period.start}`;
+      for (const [index, month] of periods.entries()) {
+        const allocationId = `stripe-${invoice.id}${index ? `-month-${index + 1}` : ''}`,
+          key = periodKey + (index ? `:month:${index + 1}` : '');
+        mutations.push(
+          env.DB.prepare(
+            `INSERT INTO allocations(id,agency_id,kind,period_key,quota_limit,valid_from,valid_until) VALUES(?,?,'paid',?,?,?,?) ON CONFLICT(agency_id,kind,period_key) DO NOTHING`,
+          ).bind(allocationId, agencyId, key, invoicePlan.credits, month.start, month.end),
+        );
+      }
+      // The ledger points to the unique period allocation even for duplicate invoice events.
+      mutations.push(
+        env.DB.prepare(`INSERT INTO billing_invoices(id,agency_id,mode,subscription_id,plan,amount_paid,subtotal_excluding_tax,currency,period_start,period_end,allocation_id,created_at,billing_interval)
+    SELECT ?,?,?,?,?,?,?,'eur',?,?,id,?,? FROM allocations WHERE agency_id=? AND kind='paid' AND period_key=? ON CONFLICT(id) DO NOTHING`).bind(
+          invoice.id,
+          agencyId,
+          mode,
+          subscription.id,
+          invoicePlan.code,
+          invoice.amount_paid,
+          invoice.subtotal_excluding_tax ?? invoice.subtotal,
+          start,
+          end,
+          at,
+          invoicePlan.billingInterval,
+          agencyId,
+          periodKey,
+        ),
+      );
+      mutations.push(
+        env.DB.prepare(
+          `INSERT INTO generation_access(agency_id,allocation_id,enabled) SELECT agency_id,id,1 FROM allocations WHERE agency_id=? AND kind='paid' AND period_key=? AND valid_from<=? AND valid_until>? ON CONFLICT(agency_id) DO UPDATE SET allocation_id=excluded.allocation_id,enabled=1`,
+        ).bind(agencyId, periodKey, at, at),
+      );
+      mutations.push(
+        env.DB.prepare(`INSERT INTO financial_receipts(id,agency_id,mode,kind,allocation_id,credits,gross_cents,revenue_ht_cents,currency,customer_id,invoice_id,paid_at)
+    SELECT ?,?,?,'subscription',id,?,?,?,'eur',?,?,? FROM allocations WHERE agency_id=? AND kind='paid' AND period_key=? ON CONFLICT(id) DO NOTHING`).bind(
+          'invoice-' + invoice.id,
+          agencyId,
+          mode,
+          invoicePlan.credits * periods.length,
+          invoice.amount_paid,
+          invoice.total_excluding_tax ?? invoice.subtotal_excluding_tax ?? invoice.subtotal,
+          customerId,
+          invoice.id,
+          at,
+          agencyId,
+          periodKey,
+        ),
+      );
+      if (invoicePlan.billingInterval === 'year')
+        for (let index = 0; index < periods.length; index++) {
+          mutations.push(
+            env.DB.prepare(
+              `INSERT INTO annual_credit_periods(invoice_id,allocation_id,ordinal) SELECT ?,id,? FROM allocations WHERE agency_id=? AND kind='paid' AND period_key=? ON CONFLICT(invoice_id,ordinal) DO NOTHING`,
+            ).bind(invoice.id, index, agencyId, periodKey + (index ? `:month:${index + 1}` : '')),
+          );
+        }
+      mutations.push(...(await invoiceAccountingMutations(env, invoice, 'invoice-' + invoice.id, client)));
+      mutations.push(
+        ...(await promotionInvoiceMutations(
+          env,
+          client,
+          subscription,
+          invoice,
+          invoicePlan.code,
+          start,
+          periods[0].end,
+        )),
+      );
+    }
+  }
+  mutations.push(
+    env.DB.prepare('INSERT OR IGNORE INTO stripe_webhook_events VALUES(?,?,?,?,?,?)').bind(
+      event.id,
+      mode,
+      event.type,
+      payloadHash,
+      event.created,
+      new Date().toISOString(),
+    ),
+  );
+  await env.DB.batch(mutations);
+  return { received: true };
+}
+export async function stripeWebhook(
+  env: BillingEnv,
+  raw: string,
+  signature: string | null,
+  client = stripeClient(env),
+) {
+  if (!signature || !env.STRIPE_WEBHOOK_SECRET) throw new RequestFailure('FORBIDDEN');
+  let event: Stripe.Event;
+  try {
+    event = await client.webhooks.constructEventAsync(
+      raw,
+      signature,
+      env.STRIPE_WEBHOOK_SECRET,
+      300,
+      Stripe.createSubtleCryptoProvider(),
+    );
+  } catch {
+    throw new RequestFailure('FORBIDDEN');
+  }
+  return processStripeEvent(env, event, await contentHash(new TextEncoder().encode(raw)), client);
 }

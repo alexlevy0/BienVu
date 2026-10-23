@@ -1,48 +1,197 @@
 import React from 'react';
-import {AbsoluteFill,Audio,Img,OffthreadVideo,Freeze,Sequence,useCurrentFrame} from 'remotion';
-import {editorClipStarts,editorLayerStyle,editorPhotoMotion,editorCaptionStyle,editorMusicGain,editorMusicFrames,mapFrame,type VideoManifest,type EditorCamera,type AvatarContentBounds} from '@bienvu/contracts';
-import {subtitleGroups} from './layout';
-import {AvatarOverlay} from './avatar';
-import {MapOverlay} from './map';
-import {TrialWatermark} from './watermark';
+import { AbsoluteFill, Audio, Img, OffthreadVideo, Freeze, Sequence, useCurrentFrame } from 'remotion';
+import {
+  editorClipStarts,
+  editorLayerStyle,
+  editorPhotoMotion,
+  editorCaptionStyle,
+  editorMusicGain,
+  editorMusicFrames,
+  mapFrame,
+  type VideoManifest,
+  type EditorCamera,
+  type AvatarContentBounds,
+} from '@bienvu/contracts';
+import { subtitleGroups } from './layout';
+import { AvatarOverlay } from './avatar';
+import { MapOverlay } from './map';
+import { TrialWatermark } from './watermark';
 
-function EditorPhoto({m,media,slot,index,duration,camera}:{m:VideoManifest;media:Record<string,string>;slot:number;index:number;duration:number;camera?:EditorCamera}){
-  const frame=useCurrentFrame(),photo=m.photos[slot],animation=m.photoAnimations?.find(a=>a.photoAssetId===photo.id),
-    motion=editorPhotoMotion(frame,duration,index,m.photoMotion!==false,camera),fade=m.photoTransition==='cut'||index===0?1:Math.min(1,frame/12);
-  return <AbsoluteFill style={{opacity:fade,overflow:'hidden'}}>{animation?<Freeze frame={Math.min(frame,Math.ceil(animation.asset.durationMs!*30/1000)-1)}>
-    <OffthreadVideo src={media[animation.asset.id]} muted style={{width:'100%',height:'100%',objectFit:'cover'}}/>
-    </Freeze>:<Img src={media[photo.id]} style={{width:'100%',height:'100%',objectFit:'cover',...motion}}/>}</AbsoluteFill>;
+function EditorPhoto({
+  m,
+  media,
+  slot,
+  index,
+  duration,
+  camera,
+}: {
+  m: VideoManifest;
+  media: Record<string, string>;
+  slot: number;
+  index: number;
+  duration: number;
+  camera?: EditorCamera;
+}) {
+  const frame = useCurrentFrame(),
+    photo = m.photos[slot],
+    animation = m.photoAnimations?.find((a) => a.photoAssetId === photo.id),
+    motion = editorPhotoMotion(frame, duration, index, m.photoMotion !== false, camera),
+    fade = m.photoTransition === 'cut' || index === 0 ? 1 : Math.min(1, frame / 12);
+  return (
+    <AbsoluteFill style={{ opacity: fade, overflow: 'hidden' }}>
+      {animation ? (
+        <Freeze frame={Math.min(frame, Math.ceil((animation.asset.durationMs! * 30) / 1000) - 1)}>
+          <OffthreadVideo
+            src={media[animation.asset.id]}
+            muted
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        </Freeze>
+      ) : (
+        <Img src={media[photo.id]} style={{ width: '100%', height: '100%', objectFit: 'cover', ...motion }} />
+      )}
+    </AbsoluteFill>
+  );
 }
-function EditorSpeech({m,media,index,showCaption}:{m:VideoManifest;media:Record<string,string>;index:number;showCaption:boolean}){
-  const frame=useCurrentFrame(),scene=m.scenes[index],audio=m.audio.find(a=>a.id===scene.audioAssetId),
-    voiceFrames=Math.ceil((audio?.durationMs??0)*30/1000),groups=subtitleGroups(scene.narrationText,65),total=groups.reduce((n,g)=>n+g.length,0);
-  let threshold=0;
-  const line=groups.find(g=>{threshold+=g.length/total*voiceFrames;return frame<threshold;})??groups.at(-1);
-  return <>{audio&&<Audio src={media[audio.id]} volume={m.editor!.voiceVolume*(m.editor!.audioMix?.normalize?audio.normalizationGain??1:1)}/>}
-    {showCaption&&m.editor!.textsVisible&&m.subtitlesEnabled!==false&&frame<voiceFrames&&<div data-bienvu-subtitle="true" style={editorCaptionStyle(m.width)}>{line}</div>}</>;
+function EditorSpeech({
+  m,
+  media,
+  index,
+  showCaption,
+}: {
+  m: VideoManifest;
+  media: Record<string, string>;
+  index: number;
+  showCaption: boolean;
+}) {
+  const frame = useCurrentFrame(),
+    scene = m.scenes[index],
+    audio = m.audio.find((a) => a.id === scene.audioAssetId),
+    voiceFrames = Math.ceil(((audio?.durationMs ?? 0) * 30) / 1000),
+    groups = subtitleGroups(scene.narrationText, 65),
+    total = groups.reduce((n, g) => n + g.length, 0);
+  let threshold = 0;
+  const line =
+    groups.find((g) => {
+      threshold += (g.length / total) * voiceFrames;
+      return frame < threshold;
+    }) ?? groups.at(-1);
+  return (
+    <>
+      {audio && (
+        <Audio
+          src={media[audio.id]}
+          volume={m.editor!.voiceVolume * (m.editor!.audioMix?.normalize ? (audio.normalizationGain ?? 1) : 1)}
+        />
+      )}
+      {showCaption && m.editor!.textsVisible && m.subtitlesEnabled !== false && frame < voiceFrames && (
+        <div data-bienvu-subtitle="true" style={editorCaptionStyle(m.width)}>
+          {line}
+        </div>
+      )}
+    </>
+  );
 }
-export function EditorFilm({manifest:m,media,moduleUrl,workerUrl,bounds}:{manifest:VideoManifest;media:Record<string,string>;moduleUrl?:string;workerUrl?:string;bounds?:Record<string,AvatarContentBounds>}){
-  const doc=m.editor!,frame=useCurrentFrame(),total=doc.durationSeconds*30,showText=mapFrame(m.map?.settings,total,frame)===null;let at=0;
-  const music=doc.music&&m.music?{...doc.music,asset:m.music.asset}:null,
-    musicFrames=editorMusicFrames(doc);
-  let speechAt=0;const intervals=m.scenes.map(scene=>{const startFrame=speechAt;speechAt+=scene.durationFrames;return {startFrame,durationMs:m.audio.find(a=>a.id===scene.audioAssetId)?.durationMs??0};});
-  return <AbsoluteFill style={{background:'#151b16',overflow:'hidden'}}>
-    {doc.photosVisible&&editorClipStarts(doc,m.map?.settings).map((clip,index)=><Sequence key={clip.id} from={clip.startFrame}
-      durationInFrames={Math.min(total-clip.startFrame,clip.durationFrames+(m.photoTransition==='cut'?0:12))} premountFor={30}>
-      <EditorPhoto m={m} media={media} slot={clip.photoSlot} index={index} duration={clip.durationFrames} camera={clip.camera}/>
-    </Sequence>)}
-    <AbsoluteFill style={{background:'linear-gradient(180deg,rgba(0,0,0,.15),transparent 35%,rgba(0,0,0,.42))'}}/>
-    {showText&&doc.textsVisible&&doc.layers.filter(l=>frame>=l.startFrame&&frame<l.startFrame+l.durationFrames).map(layer=><div key={layer.id}
-      data-editor-layer={layer.id} style={editorLayerStyle(layer,frame)}>{layer.kind==='logo'?m.logo&&<Img src={media[m.logo.id]}
-        style={{display:'block',width:'100%',maxHeight:m.height*.12,objectFit:'contain'}}/>:layer.text}</div>)}
-    {m.voiceEnabled!==false&&m.scenes.map((scene,index)=>{const from=at;at+=scene.durationFrames;return <Sequence key={scene.id}
-      from={from} durationInFrames={scene.durationFrames} premountFor={30}><EditorSpeech m={m} media={media} index={index} showCaption={showText}/></Sequence>;})}
-    {music&&music.volume>0&&musicFrames>0&&<Sequence from={music.startFrame} durationInFrames={musicFrames} premountFor={30}>
-      <Audio src={media[music.asset.id]} trimBefore={music.trimFromFrame} trimAfter={Math.floor(music.durationMs*30/1000)} loop={music.loop??false} loopVolumeCurveBehavior="extend"
-        volume={f=>editorMusicGain({...doc,music:{...music,normalizationGain:music.asset.normalizationGain??music.normalizationGain}},music.startFrame+f,intervals)}/>
-    </Sequence>}
-    <MapOverlay manifest={m} media={media} moduleUrl={moduleUrl} workerUrl={workerUrl}/>
-    <AvatarOverlay manifest={m} media={media} bounds={bounds}/>
-    {m.rights.watermarked&&<TrialWatermark width={m.width} height={m.height}/>}
-  </AbsoluteFill>;
+export function EditorFilm({
+  manifest: m,
+  media,
+  moduleUrl,
+  workerUrl,
+  bounds,
+}: {
+  manifest: VideoManifest;
+  media: Record<string, string>;
+  moduleUrl?: string;
+  workerUrl?: string;
+  bounds?: Record<string, AvatarContentBounds>;
+}) {
+  const doc = m.editor!,
+    frame = useCurrentFrame(),
+    total = doc.durationSeconds * 30,
+    showText = mapFrame(m.map?.settings, total, frame) === null;
+  let at = 0;
+  const music = doc.music && m.music ? { ...doc.music, asset: m.music.asset } : null,
+    musicFrames = editorMusicFrames(doc);
+  let speechAt = 0;
+  const intervals = m.scenes.map((scene) => {
+    const startFrame = speechAt;
+    speechAt += scene.durationFrames;
+    return { startFrame, durationMs: m.audio.find((a) => a.id === scene.audioAssetId)?.durationMs ?? 0 };
+  });
+  return (
+    <AbsoluteFill style={{ background: '#151b16', overflow: 'hidden' }}>
+      {doc.photosVisible &&
+        editorClipStarts(doc, m.map?.settings).map((clip, index) => (
+          <Sequence
+            key={clip.id}
+            from={clip.startFrame}
+            durationInFrames={Math.min(
+              total - clip.startFrame,
+              clip.durationFrames + (m.photoTransition === 'cut' ? 0 : 12),
+            )}
+            premountFor={30}
+          >
+            <EditorPhoto
+              m={m}
+              media={media}
+              slot={clip.photoSlot}
+              index={index}
+              duration={clip.durationFrames}
+              camera={clip.camera}
+            />
+          </Sequence>
+        ))}
+      <AbsoluteFill style={{ background: 'linear-gradient(180deg,rgba(0,0,0,.15),transparent 35%,rgba(0,0,0,.42))' }} />
+      {showText &&
+        doc.textsVisible &&
+        doc.layers
+          .filter((l) => frame >= l.startFrame && frame < l.startFrame + l.durationFrames)
+          .map((layer) => (
+            <div key={layer.id} data-editor-layer={layer.id} style={editorLayerStyle(layer, frame)}>
+              {layer.kind === 'logo'
+                ? m.logo && (
+                    <Img
+                      src={media[m.logo.id]}
+                      style={{ display: 'block', width: '100%', maxHeight: m.height * 0.12, objectFit: 'contain' }}
+                    />
+                  )
+                : layer.text}
+            </div>
+          ))}
+      {m.voiceEnabled !== false &&
+        m.scenes.map((scene, index) => {
+          const from = at;
+          at += scene.durationFrames;
+          return (
+            <Sequence key={scene.id} from={from} durationInFrames={scene.durationFrames} premountFor={30}>
+              <EditorSpeech m={m} media={media} index={index} showCaption={showText} />
+            </Sequence>
+          );
+        })}
+      {music && music.volume > 0 && musicFrames > 0 && (
+        <Sequence from={music.startFrame} durationInFrames={musicFrames} premountFor={30}>
+          <Audio
+            src={media[music.asset.id]}
+            trimBefore={music.trimFromFrame}
+            trimAfter={Math.floor((music.durationMs * 30) / 1000)}
+            loop={music.loop ?? false}
+            loopVolumeCurveBehavior="extend"
+            volume={(f) =>
+              editorMusicGain(
+                {
+                  ...doc,
+                  music: { ...music, normalizationGain: music.asset.normalizationGain ?? music.normalizationGain },
+                },
+                music.startFrame + f,
+                intervals,
+              )
+            }
+          />
+        </Sequence>
+      )}
+      <MapOverlay manifest={m} media={media} moduleUrl={moduleUrl} workerUrl={workerUrl} />
+      <AvatarOverlay manifest={m} media={media} bounds={bounds} />
+      {m.rights.watermarked && <TrialWatermark width={m.width} height={m.height} />}
+    </AbsoluteFill>
+  );
 }

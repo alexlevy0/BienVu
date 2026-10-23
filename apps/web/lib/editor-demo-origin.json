@@ -1,12 +1,7 @@
 {
   "voice": {
     "originJobId": "c7163ef6-8966-407d-b6be-b0d8d2da016e",
-    "durationFrames": [
-      85,
-      190,
-      273,
-      52
-    ]
+    "durationFrames": [85, 190, 273, 52]
   },
   "animations": {
     "demo-animation-2": "c7163ef6-8966-407d-b6be-b0d8d2da016e",

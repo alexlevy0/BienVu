@@ -1,127 +1,1076 @@
 'use client';
-import {analyticsFetch as fetch} from '../lib/product-analytics';
+import { analyticsFetch as fetch } from '../lib/product-analytics';
 import Link from 'next/link';
-import {useEffect,useRef,useState} from 'react';
-import {creditPlans,legacyCreditPlans,subscriptionPricing,type BillingInterval,creditPacks,CreditHistory,AVATAR_SECONDS_PER_CREDIT,promotionErrors,type PromotionPreview,type PaidCreditPlanCode} from '@bienvu/contracts';
-import {useAccount} from './account';
-import {HomeIcon,HomeWordmark} from './home-icons';
-import {CreditTopups,type CreditTopupsHandle} from './credit-topups';
-import {AvatarPortrait} from './avatar-picker';
-import {useAvatarCatalog} from './avatar-controls';
-import type {BillingAvailability} from '../lib/billing';
-import {SubscriptionPromotion} from './subscription-promotion';
-import {OffersFreePlan} from './offers-free-plan';
-import type {PublicFreeOffer} from '../lib/free-offer';
-type Billing=BillingAvailability&{portalAvailable:boolean;topupValidDays?:number;subscription:{plan:string;billingInterval:BillingInterval;status:string;cancelAtPeriodEnd:number;periodEnd:string;mode:string}|null};
-const benefits=[['link','Import par lien ou saisie manuelle'],['microphone','Voix off et sous-titres'],['landscape','Formats vertical et horizontal'],['palette','Logo et couleurs de votre agence'],['clapper','Éditeur intégré'],['sparkle','Zooms et mouvements inclus']] as const;
-function GiftIcon(){return <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 10h18v11H3Zm-1-4h20v4H2Zm10 0v15"/><path d="M12 6H8a2.5 2.5 0 1 1 2-4l2 4Zm0 0h4a2.5 2.5 0 1 0-2-4l-2 4Z"/></svg>;}
-const euros=(value:number)=>new Intl.NumberFormat('fr-FR',{maximumFractionDigits:2}).format(value)+' €';
-function PlanPrice({price,interval}:{price:number;interval:BillingInterval}){
- const annual=interval==='year',pricing=subscriptionPricing(price,interval);
- return <div className="offers-price-block" data-interval={interval}>
-  <div className="offers-price-eyebrow">{annual?<><s>{euros(price)} / mois</s><span>−10 %</span></>:'Sans engagement'}</div>
-  <div className="offers-price" key={interval}><strong>{euros(pricing.monthlyEquivalent)}</strong><span>HT / mois</span></div>
-  <p className="offers-price-billing">{annual?<><span>{euros(pricing.amountCents/100)} HT facturés par an</span><strong>{euros(pricing.annualSaving)} HT économisés / an</strong></>:<><span>Facturés chaque mois</span><span>Résiliable à tout moment</span></>}</p>
- </div>;
+import { useEffect, useRef, useState } from 'react';
+import {
+  creditPlans,
+  legacyCreditPlans,
+  subscriptionPricing,
+  type BillingInterval,
+  creditPacks,
+  CreditHistory,
+  AVATAR_SECONDS_PER_CREDIT,
+  promotionErrors,
+  type PromotionPreview,
+  type PaidCreditPlanCode,
+} from '@bienvu/contracts';
+import { useAccount } from './account';
+import { HomeIcon, HomeWordmark } from './home-icons';
+import { CreditTopups, type CreditTopupsHandle } from './credit-topups';
+import { AvatarPortrait } from './avatar-picker';
+import { useAvatarCatalog } from './avatar-controls';
+import type { BillingAvailability } from '../lib/billing';
+import { SubscriptionPromotion } from './subscription-promotion';
+import { OffersFreePlan } from './offers-free-plan';
+import type { PublicFreeOffer } from '../lib/free-offer';
+type Billing = BillingAvailability & {
+  portalAvailable: boolean;
+  topupValidDays?: number;
+  subscription: {
+    plan: string;
+    billingInterval: BillingInterval;
+    status: string;
+    cancelAtPeriodEnd: number;
+    periodEnd: string;
+    mode: string;
+  } | null;
+};
+const benefits = [
+  ['link', 'Import par lien ou saisie manuelle'],
+  ['microphone', 'Voix off et sous-titres'],
+  ['landscape', 'Formats vertical et horizontal'],
+  ['palette', 'Logo et couleurs de votre agence'],
+  ['clapper', 'Éditeur intégré'],
+  ['sparkle', 'Zooms et mouvements inclus'],
+] as const;
+function GiftIcon() {
+  return (
+    <svg
+      width="28"
+      height="28"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 10h18v11H3Zm-1-4h20v4H2Zm10 0v15" />
+      <path d="M12 6H8a2.5 2.5 0 1 1 2-4l2 4Zm0 0h4a2.5 2.5 0 1 0-2-4l-2 4Z" />
+    </svg>
+  );
 }
-export function Offers({availability,initialInterval='month',freeOffer=null}:{availability:BillingAvailability;initialInterval?:BillingInterval;freeOffer?:PublicFreeOffer|null}){
-  const {me,loading}=useAccount();const owner=useRef(me?.agency.id);owner.current=me?.agency.id;
-  const calculator=useRef<HTMLElement>(null),topups=useRef<CreditTopupsHandle>(null);
-  const paymentLock=useRef<object|null>(null),checkoutKeys=useRef(new Map<string,{id:string;expires:number}>());
-  const {catalog:avatars}=useAvatarCatalog(),presenter=avatars?.looks.find(a=>a.id===avatars.defaultLookId)??avatars?.looks[0];
-  const [demo,setDemo]=useState(false),closeDemo=useRef(()=>setDemo(false)).current;
-  const [photos,setPhotos]=useState(6),[avatar,setAvatar]=useState(true),[history,setHistory]=useState<CreditHistory|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
-  const [interval,setInterval]=useState<BillingInterval>(initialInterval);
-  const [promotion,setPromotion]=useState<PromotionPreview|null>(null);
-  const [avatarCoverage,setAvatarCoverage]=useState<'passages'|'full'>('passages'),[avatarDuration,setAvatarDuration]=useState(20);
-  const [billing,setBilling]=useState<Billing|null>(null),[billingFailure,setBillingFailure]=useState(false),[billingRevision,setBillingRevision]=useState(0),[paymentTarget,setPaymentTarget]=useState<PaidCreditPlanCode|'portal'|null>(null),[paymentBusy,setPaymentBusy]=useState(false),[paymentError,setPaymentError]=useState(''),[confirmation,setConfirmation]=useState(false);
-  const payments=billing??availability;
-  const manages=Boolean(me&&['owner','admin'].includes(me.role??'owner')),canBuyTopups=Boolean(me?.isSuperAdmin&&manages);
-  useEffect(()=>{setBilling(null);setBillingFailure(false);setPaymentTarget(null);setPaymentError('');setPaymentBusy(false);paymentLock.current=null;setConfirmation(Boolean(me)&&new URLSearchParams(location.search).get('paiement')==='confirmation');if(!me)return;const c=new AbortController();void fetch('/api/billing',{signal:c.signal,cache:'no-store'}).then(async r=>{if(!r.ok)throw Error();return r.json() as Promise<Billing>;}).then(value=>{if(!c.signal.aborted)setBilling(value);}).catch(()=>{if(!c.signal.aborted)setBillingFailure(true);});return()=>c.abort();},[me?.agency.id,manages,billingRevision]);
-  async function payment(target:PaidCreditPlanCode|'portal'){if(paymentLock.current||loading||!me||!billing||!manages||(target==='portal'?!billing.portalAvailable:!billing.enabled))return;const attempt={};paymentLock.current=attempt;setPaymentTarget(target);setPaymentBusy(true);setPaymentError('');const agency=me.agency.id,portal=target==='portal';try{
-    const storageKey=`bienvu:checkout:${billing.mode}:${agency}:${target}:${portal?'':promotion?.code??''}:${interval}`;let key=checkoutKeys.current.get(storageKey);
-    if(!key)try{const stored=JSON.parse(sessionStorage.getItem(storageKey)??'null') as {id?:unknown;expires?:unknown}|null;if(stored&&typeof stored.id==='string'&&/^[-a-zA-Z0-9_]{16,128}$/.test(stored.id)&&typeof stored.expires==='number')key={id:stored.id,expires:stored.expires};}catch{/* Use the in-memory key when browser storage is unavailable or malformed. */}
-    if(!key||key.expires<=Date.now())key={id:crypto.randomUUID(),expires:Date.now()+25*60000};checkoutKeys.current.set(storageKey,key);try{sessionStorage.setItem(storageKey,JSON.stringify(key));}catch{/* The server also prevents duplicate active checkouts. */}
-    let r:Response,b:{url?:string;fields?:{checkout?:string;promotion?:string}};
-    for(let retry=0;;retry++){
-      r=await fetch('/api/billing/'+(portal?'portal':'checkout'),{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key.id},body:JSON.stringify(portal?{}:{plan:target,billingInterval:interval,...(promotion?{promotionCode:promotion.code}:{})})});b=await r.json();
-      if(owner.current!==agency||paymentLock.current!==attempt)return;
-      if(!portal&&r.status===409&&b.fields?.checkout==='expired'&&retry===0){key={id:crypto.randomUUID(),expires:Date.now()+25*60000};checkoutKeys.current.set(storageKey,key);try{sessionStorage.setItem(storageKey,JSON.stringify(key));}catch{}continue;}break;
-    }
-    if(!r.ok||!b.url)throw Error(portal?'Votre espace de facturation est momentanément indisponible. Réessayez.':b.fields?.promotion?promotionErrors[b.fields.promotion]??'Ce code ne peut pas être utilisé.':r.status===409?(b.fields?.checkout==='confirmed'?'Stripe a confirmé votre paiement. Votre abonnement est en cours de synchronisation.':b.fields?.checkout==='subscription'?'Votre agence possède déjà un abonnement. Actualisez cette page pour le gérer.':b.fields?.checkout==='expired'?'Ce lien de paiement a expiré. Réessayez.':'Un paiement est en cours de préparation. Réessayez dans quelques secondes.'):'Le paiement est momentanément indisponible. Aucun crédit n’a été débité.');
-    if(owner.current!==agency||paymentLock.current!==attempt)return;const url=new URL(b.url);if(url.protocol!=='https:'||url.hostname!==(portal?'billing.stripe.com':'checkout.stripe.com'))throw Error('Lien de paiement indisponible.');location.assign(url.href);
-  }catch(e){if(owner.current===agency&&paymentLock.current===attempt){paymentLock.current=null;setPaymentError(e instanceof Error?e.message:'Paiement indisponible.');setPaymentBusy(false);}}}
-  const hasSubscription=billing?.subscription&&billing.subscription.mode===billing.mode&&!['canceled','incomplete_expired'].includes(billing.subscription.status);
-  useEffect(()=>{if(hasSubscription)setPromotion(null);},[hasSubscription]);
-  useEffect(()=>{setHistory(null);setError('');if(!me)return;const controller=new AbortController();
-    void fetch('/api/credits',{cache:'no-store',signal:controller.signal}).then(async response=>{
-      if(!response.ok)throw Error();const data=CreditHistory.parse(await response.json());if(!controller.signal.aborted)setHistory(data);
-    }).catch(()=>{if(!controller.signal.aborted)setError('Historique momentanément indisponible.');});return()=>controller.abort();
-  },[me?.agency.id,me?.rights.developmentRemaining,me?.rights.creditReserved]);
-  async function more(){if(!history?.nextCursor||busy)return;setBusy(true);const agency=owner.current;
-    try{const response=await fetch('/api/credits?cursor='+encodeURIComponent(history.nextCursor),{cache:'no-store'});if(!response.ok)throw Error();
-      const data=CreditHistory.parse(await response.json());if(owner.current===agency)setHistory(current=>current?{...data,entries:[...current.entries,...data.entries]}:data);
-    }catch{if(owner.current===agency)setError('La suite de votre historique est momentanément indisponible.');}finally{setBusy(false);}}
-  const cost=1+photos+(avatar?(avatarCoverage==='full'?Math.ceil(avatarDuration/AVATAR_SECONDS_PER_CREDIT):1):0),date=(at:string)=>new Intl.DateTimeFormat('fr-FR',{dateStyle:'medium'}).format(new Date(at));
-  const paidPlans=creditPlans.filter(p=>p.price>0),avatarExtra=avatar?(avatarCoverage==='full'?Math.ceil(avatarDuration/AVATAR_SECONDS_PER_CREDIT):1):0;
-  const videoPrices=paidPlans.map(p=>cost*subscriptionPricing(p.price,interval).monthlyEquivalent/p.credits);
-  const annualCreditPrice=Math.min(...paidPlans.map(p=>subscriptionPricing(p.price,'year').monthlyEquivalent/p.credits));
-  const hasRollover=billing?.subscription&&['solo','agence','equipe','reseau'].includes(billing.subscription.plan);
-  function openHistory(){const details=document.getElementById('credit-history');if(details instanceof HTMLDetailsElement)details.open=true;}
-  function choose(code:PaidCreditPlanCode){if(loading)return;if(!hasSubscription&&promotion&&!promotion.plans.some(p=>p.plan===code)){setPaymentTarget(code);setPaymentError(promotionErrors.plan);return;}if(!me){location.assign('/connexion?next='+encodeURIComponent('/abonnement'+(interval==='year'?'?facturation=year':'')));return;}void payment(hasSubscription?'portal':code);}
-  const options=<>{photos} photo{photos>1?'s':''} animée{photos>1?'s':''}{avatar?' + présentateur IA':''}</>;
-  function purchaseAction(code:PaidCreditPlanCode,name:string,primary=false){return <div className="offers-purchase"><button className={'offers-action '+(primary?'offers-action-primary':'offers-action-outline')} type="button" disabled={loading||!payments.enabled||Boolean(me)&&(!billing?.enabled||!manages)||paymentBusy} aria-busy={paymentBusy&&(paymentTarget===code||paymentTarget==='portal')} onClick={()=>choose(code)}>{paymentBusy&&(paymentTarget===code||paymentTarget==='portal')?'Ouverture de Stripe…':hasSubscription&&billing?.subscription?.plan===code?'Gérer mon offre':hasSubscription?'Gérer mon abonnement':'Choisir '+name}<HomeIcon name="arrow" size={18}/></button>{paymentError&&paymentTarget===code&&<p role="alert" className="offers-payment-error">{paymentError}</p>}</div>;}
-  return <div className="offers-page"><Link className="offers-back" href="/">← Retour au studio</Link>
-    <header className="offers-heading"><h1>Votre budget, <em>en toute clarté.</em><br/><em className="offers-heading-green">Chaque crédit compte.</em></h1><p>Le studio complet, à votre rythme. Environ {euros(annualCreditPrice)} HT par crédit avec l’offre Réseau annuelle.</p></header>
-    {freeOffer&&<OffersFreePlan offer={freeOffer} signedIn={Boolean(me)}/>}
-    {me&&<section id="facturation" className="offers-billing-account" aria-labelledby="offers-billing-title">
-      <div className="offers-billing-copy"><span className="offers-billing-icon"><HomeIcon name="document" size={26}/></span><div><h2 id="offers-billing-title">Abonnement et factures</h2>
-        {!manages?<p>Le propriétaire et les administrateurs de votre agence peuvent accéder à la facturation.</p>:billingFailure?<p role="alert">Votre espace de facturation est momentanément indisponible.</p>:!billing?<p role="status">Chargement de votre espace de facturation…</p>:<>
-          <p>{hasSubscription?<>Votre offre : <strong>{[...creditPlans,...legacyCreditPlans].find(plan=>plan.code===billing.subscription?.plan)?.name??'Abonnement'}</strong> · {billing.subscription!.billingInterval==='year'?'Annuel':'Mensuel'}. {billing.subscription!.cancelAtPeriodEnd?'Fin de l’abonnement':'Prochaine échéance'} le {date(billing.subscription!.periodEnd)}.</>:billing.subscription?.mode===billing.mode&&billing.subscription.status==='canceled'?'Abonnement résilié.':'Sans abonnement.'}</p>
-          <p className="offers-billing-detail">{billing.portalAvailable?hasSubscription?'Consultez vos factures, gérez votre carte bancaire ou résiliez depuis votre espace sécurisé Stripe.':'Retrouvez toutes vos factures et vos coordonnées de facturation dans votre espace sécurisé Stripe.':'Vos factures seront accessibles ici après votre premier achat. Les crédits offerts ne créent pas de facture.'}</p>
-        </>}
-      </div></div>
-      {manages&&<div className="offers-billing-actions">{billingFailure?<button type="button" className="offers-action offers-action-outline" onClick={()=>setBillingRevision(n=>n+1)}>Réessayer <HomeIcon name="refresh" size={18}/></button>:<button type="button" className="offers-action offers-action-primary" disabled={loading||!billing?.portalAvailable||paymentBusy} aria-busy={paymentBusy&&paymentTarget==='portal'} onClick={()=>void payment('portal')}>{paymentBusy&&paymentTarget==='portal'?'Ouverture de Stripe…':'Accéder à mes factures'}<HomeIcon name="external" size={18}/></button>}</div>}
-      {paymentError&&paymentTarget==='portal'&&<p role="alert" className="offers-payment-error offers-billing-error">{paymentError}</p>}
-    </section>}
-    {confirmation&&<p role="status" className="offers-billing-notice">Votre paiement est en cours de confirmation. Les crédits apparaîtront après validation de la facture par Stripe. <button type="button" onClick={()=>location.reload()}>Actualiser</button></p>}
-    <section ref={calculator} className="offers-calculator" aria-labelledby="offers-calculator-heading">
-      <div className="offers-calculator-intro"><h2 id="offers-calculator-heading">Combien coûte<br/>votre vidéo ?</h2><p>Ajustez vos options, voyez le prix immédiatement.</p></div>
-      <div className="offers-calculator-settings">
-        <label className="offers-slider-label" htmlFor="offers-photos">Photos animées par IA <span>{photos} <small>/ 12</small></span></label>
-        <div className="offers-photo-stepper"><button type="button" aria-label="Retirer une photo animée" disabled={photos===0} onClick={()=>setPhotos(n=>Math.max(0,n-1))}>−</button><input id="offers-photos" type="range" min={0} max={12} value={photos} onChange={e=>setPhotos(Number(e.target.value))} style={{background:`linear-gradient(to right,#496b3e ${photos/12*100}%,#dbe4d2 ${photos/12*100}%)`}}/><button type="button" aria-label="Ajouter une photo animée" disabled={photos===12} onClick={()=>setPhotos(n=>Math.min(12,n+1))}>+</button></div><div className="offers-slider-limits" aria-hidden="true"><span>0</span><span>12</span></div>
-        <div className="offers-presenter-setting"><span className="offers-presenter-portrait">{presenter&&<AvatarPortrait look={presenter}/>}</span><label className="offers-avatar-choice"><span><strong>Présentateur IA <small className="offers-new">✦ Nouveau</small></strong><small>{avatarCoverage==='full'?`${avatarDuration} s · toute la vidéo`:'En introduction et en conclusion'}</small></span><input type="checkbox" role="switch" checked={avatar} onChange={e=>setAvatar(e.target.checked)}/></label><span className="offers-avatar-cost">+{avatarCoverage==='full'?Math.ceil(avatarDuration/AVATAR_SECONDS_PER_CREDIT):1} crédit{avatarCoverage==='full'&&avatarDuration>10?'s':''}</span></div>
-        {avatar&&<details className="offers-avatar-options"><summary>Autres apparitions du présentateur</summary><label>Apparition<select value={avatarCoverage} onChange={e=>setAvatarCoverage(e.target.value as 'passages'|'full')}><option value="passages">Introduction et conclusion · +1 crédit</option><option value="full">Toute la vidéo · +1 crédit / 10 s</option></select></label>{avatarCoverage==='full'&&<label>Durée de la vidéo<select value={avatarDuration} onChange={e=>setAvatarDuration(Number(e.target.value))}>{[20,30,40].map(n=><option key={n} value={n}>{n} secondes</option>)}</select></label>}</details>}
+const euros = (value: number) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(value) + ' €';
+function PlanPrice({ price, interval }: { price: number; interval: BillingInterval }) {
+  const annual = interval === 'year',
+    pricing = subscriptionPricing(price, interval);
+  return (
+    <div className="offers-price-block" data-interval={interval}>
+      <div className="offers-price-eyebrow">
+        {annual ? (
+          <>
+            <s>{euros(price)} / mois</s>
+            <span>−10 %</span>
+          </>
+        ) : (
+          'Sans engagement'
+        )}
       </div>
-      <output className="offers-calculated-cost" aria-live="polite" aria-atomic="true"><strong>{cost} crédit{cost>1?'s':''}<small>Environ {euros(Math.min(...videoPrices))} à {euros(Math.max(...videoPrices))} HT selon l’offre</small></strong><dl><div><dt>Vidéo classique</dt><dd>1 crédit</dd></div><div><dt>{photos} photo{photos>1?'s':''} animée{photos>1?'s':''}</dt><dd>{photos} crédit{photos>1?'s':''}</dd></div>{avatar&&<div><dt>Présentateur IA</dt><dd>{avatarExtra} crédit{avatarExtra>1?'s':''}</dd></div>}</dl><span>Jusqu’à {13+avatarExtra} crédits : 12 photos animées{avatar?' et le présentateur':''}.</span></output>
-    </section><p className="offers-calculator-caption">Animations désactivables photo par photo. Présentateur facultatif. {interval==='year'?'Équivalence au tarif annuel, payé en une fois.':'Équivalence au tarif mensuel.'}</p>
-    <section className="offers-cadence" aria-label="Choisir votre rythme de facturation">
-      <div><span className="offers-cadence-kicker">À votre rythme</span><h2>Un an de créations. 10 % d’économies.</h2><p>Les mêmes crédits chaque mois, un tarif plus doux à l’année.</p></div>
-      <div className="offers-cadence-choice"><div className="offers-cadence-tabs" role="tablist" aria-label="Facturation" data-annual={interval==='year'} onKeyDown={event=>{
-        if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)||paymentBusy)return;
-        event.preventDefault();const next=event.key==='Home'?'month':event.key==='End'?'year':interval==='month'?'year':'month';setInterval(next);setPaymentError('');event.currentTarget.querySelector<HTMLButtonElement>('#offers-tab-'+next)?.focus();
-      }}>{(['month','year'] as const).map(value=><button key={value} id={'offers-tab-'+value} type="button" role="tab" aria-selected={interval===value} aria-controls="offers-plans" tabIndex={interval===value?0:-1} disabled={paymentBusy} onClick={()=>{setInterval(value);setPaymentError('');}}>{value==='month'?'Mensuel':<>Annuel <span>−10 %</span></>}</button>)}</div><p className="offers-cadence-note" aria-live="polite">{interval==='year'?'Un paiement par an · crédits chaque mois':'Sans engagement · paiement chaque mois'}</p></div>
-    </section>
-    <div id="offers-plans" role="tabpanel" aria-labelledby={'offers-tab-'+interval}>
-    <h2 className="offers-context-heading">Avec {options} par vidéo…</h2>
-    {!hasSubscription&&payments.enabled&&<SubscriptionPromotion agencyId={me?.agency.id} disabled={paymentBusy} onApplied={setPromotion}/>}
-    <div className="offers-cards">{paidPlans.filter(p=>p.code!=='reseau').map(plan=>{const videos=Math.floor(plan.credits/cost),remaining=plan.credits-videos*cost;return <section className={'offers-card offers-card-'+plan.code} key={plan.code} aria-labelledby={'offers-'+plan.code}>
-      {plan.code==='agence'&&<span className="offers-recommended">Recommandé</span>}<h2 id={'offers-'+plan.code}>{plan.name}</h2><p className="offers-card-description">{plan.description}</p><PlanPrice price={plan.price} interval={interval}/><p className="offers-quota"><strong>{plan.credits} crédits par mois</strong></p>{promotion?.plans.filter(p=>p.plan===plan.code).map(p=><p className="offers-bonus" key={p.plan}><strong>+{p.bonus} crédits offerts</strong><span>{p.total} crédits le premier mois · {Math.floor(p.total/cost)} vidéos avec ces options</span></p>)}<p className="offers-equivalent">Avec {options} :<br/><strong>{videos} vidéo{videos!==1?'s':''}</strong> ({remaining?`${remaining} crédit${remaining>1?'s':''} restant${remaining>1?'s':''}`:plan.credits+' crédits utilisés'})</p>{purchaseAction(plan.code as PaidCreditPlanCode,plan.name,plan.code==='agence')}
-    </section>;})}</div>
-    {paidPlans.filter(p=>p.code==='reseau').map(plan=><section className="offers-network" key={plan.code}><div><h2>{plan.name}</h2><p>{plan.description}</p></div><PlanPrice price={plan.price} interval={interval}/><div><p className="offers-quota"><strong>{plan.credits} crédits par mois</strong></p>{promotion?.plans.filter(p=>p.plan===plan.code).map(p=><p className="offers-bonus" key={p.plan}><strong>+{p.bonus} crédits offerts</strong><span>{p.total} crédits le premier mois</span></p>)}<p><strong>{Math.floor(plan.credits/cost)} vidéos</strong> avec ces options</p></div>{purchaseAction(plan.code as PaidCreditPlanCode,plan.name,true)}</section>)}
-    <p className="offers-rollover">Crédits inutilisés reportés un mois, dans la limite d’un mois de crédits. {interval==='year'?'Vos crédits sont attribués chaque mois pendant les 12 mois payés.':'Formule mensuelle sans engagement.'}</p>
-    <p className="offers-purchase-terms">Renouvellement {interval==='year'?'annuel':'mensuel'} automatique. Résiliation à la fin de la période payée. Paiement via Stripe. <Link href="/conditions">Conditions d’utilisation</Link> · <Link href="/confidentialite">Politique de confidentialité</Link>.</p>
+      <div className="offers-price" key={interval}>
+        <strong>{euros(pricing.monthlyEquivalent)}</strong>
+        <span>HT / mois</span>
+      </div>
+      <p className="offers-price-billing">
+        {annual ? (
+          <>
+            <span>{euros(pricing.amountCents / 100)} HT facturés par an</span>
+            <strong>{euros(pricing.annualSaving)} HT économisés / an</strong>
+          </>
+        ) : (
+          <>
+            <span>Facturés chaque mois</span>
+            <span>Résiliable à tout moment</span>
+          </>
+        )}
+      </p>
     </div>
-    <section className="offers-included" aria-labelledby="offers-included-heading"><h2 id="offers-included-heading">Le studio complet, dans chaque offre.</h2><ul className="offers-included-grid">{benefits.map(([icon,label])=><li key={icon}><HomeIcon name={icon} size={29}/><span>{label}</span></li>)}</ul>
-      <div className="offers-presenter-banner"><button type="button" className="offers-demo" aria-label={demo?'Arrêter la démonstration du présentateur':'Voir la démonstration du présentateur'} disabled={!presenter?.preview} onClick={()=>setDemo(!demo)}>{presenter&&<AvatarPortrait look={presenter} playing={demo} onUnavailable={closeDemo}/>}<span className="offers-demo-play"><HomeIcon name={demo?'stop':'play'} size={17}/></span></button><div><h3>Donnez un visage à vos annonces.</h3><p>Un présentateur en introduction et en conclusion.</p></div><button type="button" className="offers-action offers-action-outline" onClick={()=>{setAvatar(true);setAvatarCoverage('passages');calculator.current?.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});}}>Option · +1 crédit / vidéo</button></div>
-    </section>
-    {!payments.enabled&&<p className="offers-billing-notice">Les paiements sont momentanément indisponibles.{freeOffer?.anonymousTrial?' L’essai gratuit reste disponible.':''}</p>}
-    {me&&<section className="offers-wallet" aria-label="Vos crédits"><div><h2>Vos crédits</h2><strong>{me.rights.developmentRemaining}</strong> disponibles</div><div>{me.rights.creditReserved} réservé(s) · {me.rights.creditConsumed} utilisé(s)<p>{hasRollover?'Crédits mensuels reportables au mois suivant, dans la limite d’une mensualité.':'Vos conditions de crédits actuelles sont conservées.'}</p>{history?.balance.rolloverAvailable!==undefined&&history.balance.rolloverAvailable>0&&<p>{history.balance.rolloverAvailable} crédit(s) reporté(s) disponibles.</p>}{Boolean(me.rights.creditPurchased)&&<p>{me.rights.creditPurchased} crédit(s) achetés disponibles.</p>}{Boolean(history?.balance.bonusAvailable)&&<p>{history!.balance.bonusAvailable} crédit(s) bonus disponibles jusqu’à la fin de la première mensualité.</p>}</div><a href="#credit-history" onClick={openHistory}>Voir l’historique <HomeIcon name="arrow" size={16}/></a></section>}
-    {canBuyTopups&&<section className="offers-discovery"><h2>Besoin d’un coup de pouce ?</h2><div><span className="offers-gift"><GiftIcon/></span><h3>Découverte</h3><p><strong>20 crédits · 20 € <small>HT</small></strong><span>Achat ponctuel, sans renouvellement automatique.</span></p><button type="button" className="offers-action offers-action-primary" onClick={()=>topups.current?.choose(creditPacks[0].code)}>Essayer avec 20 crédits<HomeIcon name="arrow" size={17}/></button></div></section>}
-    <CreditTopups ref={topups} enabled={payments.enabled} mode={payments.mode} validDays={billing?.topupValidDays}/>
-    <section className="offers-comparison"><h2>Comparez les offres</h2><div className="offers-table-scroll"><table><thead><tr><th scope="col">Fonctionnalités</th>{paidPlans.map(p=><th scope="col" key={p.code}>{p.name}</th>)}</tr></thead><tbody><tr><th scope="row">{interval==='year'?'Équivalent mensuel (annuel)':'Prix mensuel'}</th>{paidPlans.map(p=><td key={p.code}>{euros(subscriptionPricing(p.price,interval).monthlyEquivalent)} HT</td>)}</tr>{interval==='year'&&<tr><th scope="row">Montant facturé par an</th>{paidPlans.map(p=><td key={p.code}>{euros(subscriptionPricing(p.price,interval).amountCents/100)} HT</td>)}</tr>}<tr><th scope="row">Crédits mensuels</th>{paidPlans.map(p=><td key={p.code}>{p.credits}</td>)}</tr>{[['Vidéo classique','1 crédit'],['Photo animée par IA','+ 1 crédit'],['Présentateur IA (intro + conclusion)','+ 1 crédit'],['Présentateur sur toute la vidéo','+ 1 crédit / 10 s']].map(([label,value])=><tr key={label}><th scope="row">{label}</th>{paidPlans.map(p=><td key={p.code}>{value}</td>)}</tr>)}<tr><th scope="row">Avec {options}</th>{paidPlans.map(p=><td key={p.code}>{Math.floor(p.credits/cost)} vidéos</td>)}</tr><tr><th scope="row">Report plafonné à un mois</th>{paidPlans.map(p=><td key={p.code}>{p.credits} crédits maximum</td>)}</tr><tr><th scope="row">Outils de création</th>{paidPlans.map(p=><td key={p.code}><span className="offers-included-check"><HomeIcon name="check" size={15}/><span className="sr-only">Inclus</span></span></td>)}</tr></tbody></table></div></section>
-    <details className="offers-credit-history" id="credit-history"><summary><HomeIcon name="clock"/><span>Historique de vos crédits<small>Consultez l’historique complet de vos crédits et utilisations.</small></span><HomeIcon name="chevron" size={17}/></summary><div className="offers-history-body">{!me?<p><Link href="/connexion?next=/abonnement">Connectez-vous pour consulter vos crédits.</Link></p>:<>{error&&<p role="alert">{error}</p>}{history?.bonuses?.map(bonus=><div className="offers-history-bonus" key={bonus.id}><strong>Bonus {bonus.code} · +{bonus.credits} crédits</strong><span>Attribué le {date(bonus.at)} · valable jusqu’au {date(bonus.expiresAt)}, sans report.</span><span>{bonus.used} utilisés · {bonus.reserved} réservés{bonus.reversed?` · ${bonus.reversed} repris après remboursement`:''}{bonus.disputed?' · suspendu pendant le litige':''}{Date.parse(bonus.expiresAt)<=Date.now()?' · expiré':''}</span></div>)}{!history&&!error?<p>Chargement…</p>:history?.entries.length?<><div className="offers-table-scroll"><table><thead><tr><th>Création</th><th>État</th><th>Réservés</th><th>Utilisés</th><th>Restitués</th></tr></thead><tbody>{history.entries.map(entry=><tr key={entry.id}><th scope="row"><Link href={'/historique/'+entry.id}>{entry.title}</Link><small>{date(entry.at)}</small></th><td>{entry.gift?'Essai offert':entry.status==='ready'?'Terminée':entry.status==='failed'?'Échouée':'En préparation'}</td><td>{entry.reserved}</td><td>{entry.gift?'Offert':entry.used}</td><td>{entry.refunded}</td></tr>)}</tbody></table></div>{history.nextCursor&&<button className="offers-action offers-action-outline offers-history-more" type="button" disabled={busy} onClick={()=>void more()}>{busy?'Chargement…':'Voir la suite'}</button>}</>:history&&<p>Votre première création apparaîtra ici.</p>}</>}</div></details>
-    <section className="offers-faq"><h2>Une question ?</h2><details><summary>Comment fonctionne l’offre annuelle ?</summary><p>Vous payez une année en une fois et économisez 10 % par rapport à 12 paiements mensuels. Vos crédits sont attribués chaque mois, avec le même report plafonné. Le renouvellement est annuel ; vous pouvez le désactiver depuis votre espace Stripe et conserver vos droits jusqu’à la fin de l’année payée.</p></details><details><summary>Comment mes crédits sont-ils décomptés ?</summary><p>Une vidéo classique coûte 1 crédit, chaque photo animée ajoute 1 crédit. Le présentateur ajoute 1 crédit pour les passages courts, ou 1 crédit par tranche de 10 secondes sur toute la vidéo. Le coût maximum est affiché avant le lancement. Les clips compatibles réutilisés n’entraînent pas de nouveau supplément.</p></details><details><summary>Comment fonctionne le report ?</summary><p>Avec les nouvelles offres, les crédits payants inutilisés peuvent servir au mois suivant après renouvellement payé, dans la limite d’une mensualité. Ils sont consommés avant les nouveaux crédits et expirent à la fin de ce mois supplémentaire. Les crédits réservés par une création en cours ne sont pas reportés. Les crédits gratuits et les anciennes offres gardent leurs conditions.</p></details><details><summary>Et si une création échoue ?</summary><p>Le crédit vidéo et les suppléments non réalisés sont restitués dans leur lot d’origine, avec sa validité d’origine. Les animations ou avatars réussis restent réutilisables selon les règles de leur bibliothèque.</p></details><details><summary>Puis-je arrêter mon abonnement ?</summary><p>La résiliation prend effet à la fin de la période payée. Gérez vos factures et votre résiliation depuis votre abonnement. Les crédits achetés précédemment restent utilisables selon leur validité.</p></details></section>
-    <footer className="offers-footer"><Link href="/" aria-label="BienVu, accueil"><HomeWordmark/></Link><span>Le studio marketing IA de votre agence immobilière.</span><nav aria-label="Informations"><Link href="/conditions">Conditions</Link><Link href="/confidentialite">Confidentialité</Link><a href="mailto:contact@bienvu.online">Contact</a></nav></footer>
-  </div>;
+  );
+}
+export function Offers({
+  availability,
+  initialInterval = 'month',
+  freeOffer = null,
+}: {
+  availability: BillingAvailability;
+  initialInterval?: BillingInterval;
+  freeOffer?: PublicFreeOffer | null;
+}) {
+  const { me, loading } = useAccount();
+  const agencyId = me?.agency.id;
+  const owner = useRef(me?.agency.id);
+  owner.current = me?.agency.id;
+  const calculator = useRef<HTMLElement>(null),
+    topups = useRef<CreditTopupsHandle>(null);
+  const paymentLock = useRef<object | null>(null),
+    checkoutKeys = useRef(new Map<string, { id: string; expires: number }>());
+  const { catalog: avatars } = useAvatarCatalog(),
+    presenter = avatars?.looks.find((a) => a.id === avatars.defaultLookId) ?? avatars?.looks[0];
+  const [demo, setDemo] = useState(false),
+    closeDemo = useRef(() => setDemo(false)).current;
+  const [photos, setPhotos] = useState(6),
+    [avatar, setAvatar] = useState(true),
+    [history, setHistory] = useState<CreditHistory | null>(null),
+    [error, setError] = useState(''),
+    [busy, setBusy] = useState(false);
+  const [interval, setInterval] = useState<BillingInterval>(initialInterval);
+  const [promotion, setPromotion] = useState<PromotionPreview | null>(null);
+  const [avatarCoverage, setAvatarCoverage] = useState<'passages' | 'full'>('passages'),
+    [avatarDuration, setAvatarDuration] = useState(20);
+  const [billing, setBilling] = useState<Billing | null>(null),
+    [billingFailure, setBillingFailure] = useState(false),
+    [billingRevision, setBillingRevision] = useState(0),
+    [paymentTarget, setPaymentTarget] = useState<PaidCreditPlanCode | 'portal' | null>(null),
+    [paymentBusy, setPaymentBusy] = useState(false),
+    [paymentError, setPaymentError] = useState(''),
+    [confirmation, setConfirmation] = useState(false);
+  const payments = billing ?? availability;
+  const manages = Boolean(me && ['owner', 'admin'].includes(me.role ?? 'owner')),
+    canBuyTopups = Boolean(me?.isSuperAdmin && manages);
+  useEffect(() => {
+    setBilling(null);
+    setBillingFailure(false);
+    setPaymentTarget(null);
+    setPaymentError('');
+    setPaymentBusy(false);
+    paymentLock.current = null;
+    setConfirmation(Boolean(agencyId) && new URLSearchParams(location.search).get('paiement') === 'confirmation');
+    if (!agencyId) return;
+    const c = new AbortController();
+    void fetch('/api/billing', { signal: c.signal, cache: 'no-store' })
+      .then(async (r) => {
+        if (!r.ok) throw Error();
+        return r.json() as Promise<Billing>;
+      })
+      .then((value) => {
+        if (!c.signal.aborted) setBilling(value);
+      })
+      .catch(() => {
+        if (!c.signal.aborted) setBillingFailure(true);
+      });
+    return () => c.abort();
+  }, [agencyId, manages, billingRevision]);
+  async function payment(target: PaidCreditPlanCode | 'portal') {
+    if (
+      paymentLock.current ||
+      loading ||
+      !me ||
+      !billing ||
+      !manages ||
+      (target === 'portal' ? !billing.portalAvailable : !billing.enabled)
+    )
+      return;
+    const attempt = {};
+    paymentLock.current = attempt;
+    setPaymentTarget(target);
+    setPaymentBusy(true);
+    setPaymentError('');
+    const agency = me.agency.id,
+      portal = target === 'portal';
+    try {
+      const storageKey = `bienvu:checkout:${billing.mode}:${agency}:${target}:${portal ? '' : (promotion?.code ?? '')}:${interval}`;
+      let key = checkoutKeys.current.get(storageKey);
+      if (!key)
+        try {
+          const stored = JSON.parse(sessionStorage.getItem(storageKey) ?? 'null') as {
+            id?: unknown;
+            expires?: unknown;
+          } | null;
+          if (
+            stored &&
+            typeof stored.id === 'string' &&
+            /^[-a-zA-Z0-9_]{16,128}$/.test(stored.id) &&
+            typeof stored.expires === 'number'
+          )
+            key = { id: stored.id, expires: stored.expires };
+        } catch {
+          /* Use the in-memory key when browser storage is unavailable or malformed. */
+        }
+      if (!key || key.expires <= Date.now()) key = { id: crypto.randomUUID(), expires: Date.now() + 25 * 60000 };
+      checkoutKeys.current.set(storageKey, key);
+      try {
+        sessionStorage.setItem(storageKey, JSON.stringify(key));
+      } catch {
+        /* The server also prevents duplicate active checkouts. */
+      }
+      let r: Response, b: { url?: string; fields?: { checkout?: string; promotion?: string } };
+      for (let retry = 0; ; retry++) {
+        r = await fetch('/api/billing/' + (portal ? 'portal' : 'checkout'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key.id },
+          body: JSON.stringify(
+            portal
+              ? {}
+              : { plan: target, billingInterval: interval, ...(promotion ? { promotionCode: promotion.code } : {}) },
+          ),
+        });
+        b = await r.json();
+        if (owner.current !== agency || paymentLock.current !== attempt) return;
+        if (!portal && r.status === 409 && b.fields?.checkout === 'expired' && retry === 0) {
+          key = { id: crypto.randomUUID(), expires: Date.now() + 25 * 60000 };
+          checkoutKeys.current.set(storageKey, key);
+          try {
+            sessionStorage.setItem(storageKey, JSON.stringify(key));
+          } catch {}
+          continue;
+        }
+        break;
+      }
+      if (!r.ok || !b.url)
+        throw Error(
+          portal
+            ? 'Votre espace de facturation est momentanément indisponible. Réessayez.'
+            : b.fields?.promotion
+              ? (promotionErrors[b.fields.promotion] ?? 'Ce code ne peut pas être utilisé.')
+              : r.status === 409
+                ? b.fields?.checkout === 'confirmed'
+                  ? 'Stripe a confirmé votre paiement. Votre abonnement est en cours de synchronisation.'
+                  : b.fields?.checkout === 'subscription'
+                    ? 'Votre agence possède déjà un abonnement. Actualisez cette page pour le gérer.'
+                    : b.fields?.checkout === 'expired'
+                      ? 'Ce lien de paiement a expiré. Réessayez.'
+                      : 'Un paiement est en cours de préparation. Réessayez dans quelques secondes.'
+                : 'Le paiement est momentanément indisponible. Aucun crédit n’a été débité.',
+        );
+      if (owner.current !== agency || paymentLock.current !== attempt) return;
+      const url = new URL(b.url);
+      if (url.protocol !== 'https:' || url.hostname !== (portal ? 'billing.stripe.com' : 'checkout.stripe.com'))
+        throw Error('Lien de paiement indisponible.');
+      location.assign(url.href);
+    } catch (e) {
+      if (owner.current === agency && paymentLock.current === attempt) {
+        paymentLock.current = null;
+        setPaymentError(e instanceof Error ? e.message : 'Paiement indisponible.');
+        setPaymentBusy(false);
+      }
+    }
+  }
+  const hasSubscription =
+    billing?.subscription &&
+    billing.subscription.mode === billing.mode &&
+    !['canceled', 'incomplete_expired'].includes(billing.subscription.status);
+  useEffect(() => {
+    if (hasSubscription) setPromotion(null);
+  }, [hasSubscription]);
+  useEffect(() => {
+    setHistory(null);
+    setError('');
+    if (!agencyId) return;
+    const controller = new AbortController();
+    void fetch('/api/credits', { cache: 'no-store', signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw Error();
+        const data = CreditHistory.parse(await response.json());
+        if (!controller.signal.aborted) setHistory(data);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setError('Historique momentanément indisponible.');
+      });
+    return () => controller.abort();
+  }, [agencyId, me?.rights.developmentRemaining, me?.rights.creditReserved]);
+  async function more() {
+    if (!history?.nextCursor || busy) return;
+    setBusy(true);
+    const agency = owner.current;
+    try {
+      const response = await fetch('/api/credits?cursor=' + encodeURIComponent(history.nextCursor), {
+        cache: 'no-store',
+      });
+      if (!response.ok) throw Error();
+      const data = CreditHistory.parse(await response.json());
+      if (owner.current === agency)
+        setHistory((current) => (current ? { ...data, entries: [...current.entries, ...data.entries] } : data));
+    } catch {
+      if (owner.current === agency) setError('La suite de votre historique est momentanément indisponible.');
+    } finally {
+      setBusy(false);
+    }
+  }
+  const cost =
+      1 +
+      photos +
+      (avatar ? (avatarCoverage === 'full' ? Math.ceil(avatarDuration / AVATAR_SECONDS_PER_CREDIT) : 1) : 0),
+    date = (at: string) => new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' }).format(new Date(at));
+  const paidPlans = creditPlans.filter((p) => p.price > 0),
+    avatarExtra = avatar ? (avatarCoverage === 'full' ? Math.ceil(avatarDuration / AVATAR_SECONDS_PER_CREDIT) : 1) : 0;
+  const videoPrices = paidPlans.map(
+    (p) => (cost * subscriptionPricing(p.price, interval).monthlyEquivalent) / p.credits,
+  );
+  const annualCreditPrice = Math.min(
+    ...paidPlans.map((p) => subscriptionPricing(p.price, 'year').monthlyEquivalent / p.credits),
+  );
+  const hasRollover =
+    billing?.subscription && ['solo', 'agence', 'equipe', 'reseau'].includes(billing.subscription.plan);
+  function openHistory() {
+    const details = document.getElementById('credit-history');
+    if (details instanceof HTMLDetailsElement) details.open = true;
+  }
+  function choose(code: PaidCreditPlanCode) {
+    if (loading) return;
+    if (!hasSubscription && promotion && !promotion.plans.some((p) => p.plan === code)) {
+      setPaymentTarget(code);
+      setPaymentError(promotionErrors.plan);
+      return;
+    }
+    if (!me) {
+      location.assign(
+        '/connexion?next=' + encodeURIComponent('/abonnement' + (interval === 'year' ? '?facturation=year' : '')),
+      );
+      return;
+    }
+    void payment(hasSubscription ? 'portal' : code);
+  }
+  const options = (
+    <>
+      {photos} photo{photos > 1 ? 's' : ''} animée{photos > 1 ? 's' : ''}
+      {avatar ? ' + présentateur IA' : ''}
+    </>
+  );
+  function purchaseAction(code: PaidCreditPlanCode, name: string, primary = false) {
+    return (
+      <div className="offers-purchase">
+        <button
+          className={'offers-action ' + (primary ? 'offers-action-primary' : 'offers-action-outline')}
+          type="button"
+          disabled={loading || !payments.enabled || (Boolean(me) && (!billing?.enabled || !manages)) || paymentBusy}
+          aria-busy={paymentBusy && (paymentTarget === code || paymentTarget === 'portal')}
+          onClick={() => choose(code)}
+        >
+          {paymentBusy && (paymentTarget === code || paymentTarget === 'portal')
+            ? 'Ouverture de Stripe…'
+            : hasSubscription && billing?.subscription?.plan === code
+              ? 'Gérer mon offre'
+              : hasSubscription
+                ? 'Gérer mon abonnement'
+                : 'Choisir ' + name}
+          <HomeIcon name="arrow" size={18} />
+        </button>
+        {paymentError && paymentTarget === code && (
+          <p role="alert" className="offers-payment-error">
+            {paymentError}
+          </p>
+        )}
+      </div>
+    );
+  }
+  return (
+    <div className="offers-page">
+      <Link className="offers-back" href="/">
+        ← Retour au studio
+      </Link>
+      <header className="offers-heading">
+        <h1>
+          Votre budget, <em>en toute clarté.</em>
+          <br />
+          <em className="offers-heading-green">Chaque crédit compte.</em>
+        </h1>
+        <p>
+          Le studio complet, à votre rythme. Environ {euros(annualCreditPrice)} HT par crédit avec l’offre Réseau
+          annuelle.
+        </p>
+      </header>
+      {freeOffer && <OffersFreePlan offer={freeOffer} signedIn={Boolean(me)} />}
+      {me && (
+        <section id="facturation" className="offers-billing-account" aria-labelledby="offers-billing-title">
+          <div className="offers-billing-copy">
+            <span className="offers-billing-icon">
+              <HomeIcon name="document" size={26} />
+            </span>
+            <div>
+              <h2 id="offers-billing-title">Abonnement et factures</h2>
+              {!manages ? (
+                <p>Le propriétaire et les administrateurs de votre agence peuvent accéder à la facturation.</p>
+              ) : billingFailure ? (
+                <p role="alert">Votre espace de facturation est momentanément indisponible.</p>
+              ) : !billing ? (
+                <p role="status">Chargement de votre espace de facturation…</p>
+              ) : (
+                <>
+                  <p>
+                    {hasSubscription ? (
+                      <>
+                        Votre offre :{' '}
+                        <strong>
+                          {[...creditPlans, ...legacyCreditPlans].find(
+                            (plan) => plan.code === billing.subscription?.plan,
+                          )?.name ?? 'Abonnement'}
+                        </strong>{' '}
+                        · {billing.subscription!.billingInterval === 'year' ? 'Annuel' : 'Mensuel'}.{' '}
+                        {billing.subscription!.cancelAtPeriodEnd ? 'Fin de l’abonnement' : 'Prochaine échéance'} le{' '}
+                        {date(billing.subscription!.periodEnd)}.
+                      </>
+                    ) : billing.subscription?.mode === billing.mode && billing.subscription.status === 'canceled' ? (
+                      'Abonnement résilié.'
+                    ) : (
+                      'Sans abonnement.'
+                    )}
+                  </p>
+                  <p className="offers-billing-detail">
+                    {billing.portalAvailable
+                      ? hasSubscription
+                        ? 'Consultez vos factures, gérez votre carte bancaire ou résiliez depuis votre espace sécurisé Stripe.'
+                        : 'Retrouvez toutes vos factures et vos coordonnées de facturation dans votre espace sécurisé Stripe.'
+                      : 'Vos factures seront accessibles ici après votre premier achat. Les crédits offerts ne créent pas de facture.'}
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+          {manages && (
+            <div className="offers-billing-actions">
+              {billingFailure ? (
+                <button
+                  type="button"
+                  className="offers-action offers-action-outline"
+                  onClick={() => setBillingRevision((n) => n + 1)}
+                >
+                  Réessayer <HomeIcon name="refresh" size={18} />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="offers-action offers-action-primary"
+                  disabled={loading || !billing?.portalAvailable || paymentBusy}
+                  aria-busy={paymentBusy && paymentTarget === 'portal'}
+                  onClick={() => void payment('portal')}
+                >
+                  {paymentBusy && paymentTarget === 'portal' ? 'Ouverture de Stripe…' : 'Accéder à mes factures'}
+                  <HomeIcon name="external" size={18} />
+                </button>
+              )}
+            </div>
+          )}
+          {paymentError && paymentTarget === 'portal' && (
+            <p role="alert" className="offers-payment-error offers-billing-error">
+              {paymentError}
+            </p>
+          )}
+        </section>
+      )}
+      {confirmation && (
+        <p role="status" className="offers-billing-notice">
+          Votre paiement est en cours de confirmation. Les crédits apparaîtront après validation de la facture par
+          Stripe.{' '}
+          <button type="button" onClick={() => location.reload()}>
+            Actualiser
+          </button>
+        </p>
+      )}
+      <section ref={calculator} className="offers-calculator" aria-labelledby="offers-calculator-heading">
+        <div className="offers-calculator-intro">
+          <h2 id="offers-calculator-heading">
+            Combien coûte
+            <br />
+            votre vidéo ?
+          </h2>
+          <p>Ajustez vos options, voyez le prix immédiatement.</p>
+        </div>
+        <div className="offers-calculator-settings">
+          <label className="offers-slider-label" htmlFor="offers-photos">
+            Photos animées par IA{' '}
+            <span>
+              {photos} <small>/ 12</small>
+            </span>
+          </label>
+          <div className="offers-photo-stepper">
+            <button
+              type="button"
+              aria-label="Retirer une photo animée"
+              disabled={photos === 0}
+              onClick={() => setPhotos((n) => Math.max(0, n - 1))}
+            >
+              −
+            </button>
+            <input
+              id="offers-photos"
+              type="range"
+              min={0}
+              max={12}
+              value={photos}
+              onChange={(e) => setPhotos(Number(e.target.value))}
+              style={{
+                background: `linear-gradient(to right,#496b3e ${(photos / 12) * 100}%,#dbe4d2 ${(photos / 12) * 100}%)`,
+              }}
+            />
+            <button
+              type="button"
+              aria-label="Ajouter une photo animée"
+              disabled={photos === 12}
+              onClick={() => setPhotos((n) => Math.min(12, n + 1))}
+            >
+              +
+            </button>
+          </div>
+          <div className="offers-slider-limits" aria-hidden="true">
+            <span>0</span>
+            <span>12</span>
+          </div>
+          <div className="offers-presenter-setting">
+            <span className="offers-presenter-portrait">{presenter && <AvatarPortrait look={presenter} />}</span>
+            <label className="offers-avatar-choice">
+              <span>
+                <strong>
+                  Présentateur IA <small className="offers-new">✦ Nouveau</small>
+                </strong>
+                <small>
+                  {avatarCoverage === 'full'
+                    ? `${avatarDuration} s · toute la vidéo`
+                    : 'En introduction et en conclusion'}
+                </small>
+              </span>
+              <input
+                aria-checked={avatar}
+                type="checkbox"
+                role="switch"
+                checked={avatar}
+                onChange={(e) => setAvatar(e.target.checked)}
+              />
+            </label>
+            <span className="offers-avatar-cost">
+              +{avatarCoverage === 'full' ? Math.ceil(avatarDuration / AVATAR_SECONDS_PER_CREDIT) : 1} crédit
+              {avatarCoverage === 'full' && avatarDuration > 10 ? 's' : ''}
+            </span>
+          </div>
+          {avatar && (
+            <details className="offers-avatar-options">
+              <summary>Autres apparitions du présentateur</summary>
+              <label>
+                Apparition
+                <select
+                  value={avatarCoverage}
+                  onChange={(e) => setAvatarCoverage(e.target.value as 'passages' | 'full')}
+                >
+                  <option value="passages">Introduction et conclusion · +1 crédit</option>
+                  <option value="full">Toute la vidéo · +1 crédit / 10 s</option>
+                </select>
+              </label>
+              {avatarCoverage === 'full' && (
+                <label>
+                  Durée de la vidéo
+                  <select value={avatarDuration} onChange={(e) => setAvatarDuration(Number(e.target.value))}>
+                    {[20, 30, 40].map((n) => (
+                      <option key={n} value={n}>
+                        {n} secondes
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </details>
+          )}
+        </div>
+        <output className="offers-calculated-cost" aria-live="polite" aria-atomic="true">
+          <strong>
+            {cost} crédit{cost > 1 ? 's' : ''}
+            <small>
+              Environ {euros(Math.min(...videoPrices))} à {euros(Math.max(...videoPrices))} HT selon l’offre
+            </small>
+          </strong>
+          <dl>
+            <div>
+              <dt>Vidéo classique</dt>
+              <dd>1 crédit</dd>
+            </div>
+            <div>
+              <dt>
+                {photos} photo{photos > 1 ? 's' : ''} animée{photos > 1 ? 's' : ''}
+              </dt>
+              <dd>
+                {photos} crédit{photos > 1 ? 's' : ''}
+              </dd>
+            </div>
+            {avatar && (
+              <div>
+                <dt>Présentateur IA</dt>
+                <dd>
+                  {avatarExtra} crédit{avatarExtra > 1 ? 's' : ''}
+                </dd>
+              </div>
+            )}
+          </dl>
+          <span>
+            Jusqu’à {13 + avatarExtra} crédits : 12 photos animées{avatar ? ' et le présentateur' : ''}.
+          </span>
+        </output>
+      </section>
+      <p className="offers-calculator-caption">
+        Animations désactivables photo par photo. Présentateur facultatif.{' '}
+        {interval === 'year' ? 'Équivalence au tarif annuel, payé en une fois.' : 'Équivalence au tarif mensuel.'}
+      </p>
+      <section className="offers-cadence" aria-label="Choisir votre rythme de facturation">
+        <div>
+          <span className="offers-cadence-kicker">À votre rythme</span>
+          <h2>Un an de créations. 10 % d’économies.</h2>
+          <p>Les mêmes crédits chaque mois, un tarif plus doux à l’année.</p>
+        </div>
+        <div className="offers-cadence-choice">
+          <div
+            className="offers-cadence-tabs"
+            role="tablist"
+            aria-label="Facturation"
+            data-annual={interval === 'year'}
+            onKeyDown={(event) => {
+              if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) || paymentBusy) return;
+              event.preventDefault();
+              const next =
+                event.key === 'Home' ? 'month' : event.key === 'End' ? 'year' : interval === 'month' ? 'year' : 'month';
+              setInterval(next);
+              setPaymentError('');
+              event.currentTarget.querySelector<HTMLButtonElement>('#offers-tab-' + next)?.focus();
+            }}
+          >
+            {(['month', 'year'] as const).map((value) => (
+              <button
+                key={value}
+                id={'offers-tab-' + value}
+                type="button"
+                role="tab"
+                aria-selected={interval === value}
+                aria-controls="offers-plans"
+                tabIndex={interval === value ? 0 : -1}
+                disabled={paymentBusy}
+                onClick={() => {
+                  setInterval(value);
+                  setPaymentError('');
+                }}
+              >
+                {value === 'month' ? (
+                  'Mensuel'
+                ) : (
+                  <>
+                    Annuel <span>−10 %</span>
+                  </>
+                )}
+              </button>
+            ))}
+          </div>
+          <p className="offers-cadence-note" aria-live="polite">
+            {interval === 'year'
+              ? 'Un paiement par an · crédits chaque mois'
+              : 'Sans engagement · paiement chaque mois'}
+          </p>
+        </div>
+      </section>
+      <div id="offers-plans" role="tabpanel" aria-labelledby={'offers-tab-' + interval}>
+        <h2 className="offers-context-heading">Avec {options} par vidéo…</h2>
+        {!hasSubscription && payments.enabled && (
+          <SubscriptionPromotion agencyId={me?.agency.id} disabled={paymentBusy} onApplied={setPromotion} />
+        )}
+        <div className="offers-cards">
+          {paidPlans
+            .filter((p) => p.code !== 'reseau')
+            .map((plan) => {
+              const videos = Math.floor(plan.credits / cost),
+                remaining = plan.credits - videos * cost;
+              return (
+                <section
+                  className={'offers-card offers-card-' + plan.code}
+                  key={plan.code}
+                  aria-labelledby={'offers-' + plan.code}
+                >
+                  {plan.code === 'agence' && <span className="offers-recommended">Recommandé</span>}
+                  <h2 id={'offers-' + plan.code}>{plan.name}</h2>
+                  <p className="offers-card-description">{plan.description}</p>
+                  <PlanPrice price={plan.price} interval={interval} />
+                  <p className="offers-quota">
+                    <strong>{plan.credits} crédits par mois</strong>
+                  </p>
+                  {promotion?.plans
+                    .filter((p) => p.plan === plan.code)
+                    .map((p) => (
+                      <p className="offers-bonus" key={p.plan}>
+                        <strong>+{p.bonus} crédits offerts</strong>
+                        <span>
+                          {p.total} crédits le premier mois · {Math.floor(p.total / cost)} vidéos avec ces options
+                        </span>
+                      </p>
+                    ))}
+                  <p className="offers-equivalent">
+                    Avec {options} :<br />
+                    <strong>
+                      {videos} vidéo{videos !== 1 ? 's' : ''}
+                    </strong>{' '}
+                    (
+                    {remaining
+                      ? `${remaining} crédit${remaining > 1 ? 's' : ''} restant${remaining > 1 ? 's' : ''}`
+                      : plan.credits + ' crédits utilisés'}
+                    )
+                  </p>
+                  {purchaseAction(plan.code as PaidCreditPlanCode, plan.name, plan.code === 'agence')}
+                </section>
+              );
+            })}
+        </div>
+        {paidPlans
+          .filter((p) => p.code === 'reseau')
+          .map((plan) => (
+            <section className="offers-network" key={plan.code}>
+              <div>
+                <h2>{plan.name}</h2>
+                <p>{plan.description}</p>
+              </div>
+              <PlanPrice price={plan.price} interval={interval} />
+              <div>
+                <p className="offers-quota">
+                  <strong>{plan.credits} crédits par mois</strong>
+                </p>
+                {promotion?.plans
+                  .filter((p) => p.plan === plan.code)
+                  .map((p) => (
+                    <p className="offers-bonus" key={p.plan}>
+                      <strong>+{p.bonus} crédits offerts</strong>
+                      <span>{p.total} crédits le premier mois</span>
+                    </p>
+                  ))}
+                <p>
+                  <strong>{Math.floor(plan.credits / cost)} vidéos</strong> avec ces options
+                </p>
+              </div>
+              {purchaseAction(plan.code as PaidCreditPlanCode, plan.name, true)}
+            </section>
+          ))}
+        <p className="offers-rollover">
+          Crédits inutilisés reportés un mois, dans la limite d’un mois de crédits.{' '}
+          {interval === 'year'
+            ? 'Vos crédits sont attribués chaque mois pendant les 12 mois payés.'
+            : 'Formule mensuelle sans engagement.'}
+        </p>
+        <p className="offers-purchase-terms">
+          Renouvellement {interval === 'year' ? 'annuel' : 'mensuel'} automatique. Résiliation à la fin de la période
+          payée. Paiement via Stripe. <Link href="/conditions">Conditions d’utilisation</Link> ·{' '}
+          <Link href="/confidentialite">Politique de confidentialité</Link>.
+        </p>
+      </div>
+      <section className="offers-included" aria-labelledby="offers-included-heading">
+        <h2 id="offers-included-heading">Le studio complet, dans chaque offre.</h2>
+        <ul className="offers-included-grid">
+          {benefits.map(([icon, label]) => (
+            <li key={icon}>
+              <HomeIcon name={icon} size={29} />
+              <span>{label}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="offers-presenter-banner">
+          <button
+            type="button"
+            className="offers-demo"
+            aria-label={demo ? 'Arrêter la démonstration du présentateur' : 'Voir la démonstration du présentateur'}
+            disabled={!presenter?.preview}
+            onClick={() => setDemo(!demo)}
+          >
+            {presenter && <AvatarPortrait look={presenter} playing={demo} onUnavailable={closeDemo} />}
+            <span className="offers-demo-play">
+              <HomeIcon name={demo ? 'stop' : 'play'} size={17} />
+            </span>
+          </button>
+          <div>
+            <h3>Donnez un visage à vos annonces.</h3>
+            <p>Un présentateur en introduction et en conclusion.</p>
+          </div>
+          <button
+            type="button"
+            className="offers-action offers-action-outline"
+            onClick={() => {
+              setAvatar(true);
+              setAvatarCoverage('passages');
+              calculator.current?.scrollIntoView({
+                behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+              });
+            }}
+          >
+            Option · +1 crédit / vidéo
+          </button>
+        </div>
+      </section>
+      {!payments.enabled && (
+        <p className="offers-billing-notice">
+          Les paiements sont momentanément indisponibles.
+          {freeOffer?.anonymousTrial ? ' L’essai gratuit reste disponible.' : ''}
+        </p>
+      )}
+      {me && (
+        <section className="offers-wallet" aria-label="Vos crédits">
+          <div>
+            <h2>Vos crédits</h2>
+            <strong>{me.rights.developmentRemaining}</strong> disponibles
+          </div>
+          <div>
+            {me.rights.creditReserved} réservé(s) · {me.rights.creditConsumed} utilisé(s)
+            <p>
+              {hasRollover
+                ? 'Crédits mensuels reportables au mois suivant, dans la limite d’une mensualité.'
+                : 'Vos conditions de crédits actuelles sont conservées.'}
+            </p>
+            {history?.balance.rolloverAvailable !== undefined && history.balance.rolloverAvailable > 0 && (
+              <p>{history.balance.rolloverAvailable} crédit(s) reporté(s) disponibles.</p>
+            )}
+            {Boolean(me.rights.creditPurchased) && <p>{me.rights.creditPurchased} crédit(s) achetés disponibles.</p>}
+            {Boolean(history?.balance.bonusAvailable) && (
+              <p>
+                {history!.balance.bonusAvailable} crédit(s) bonus disponibles jusqu’à la fin de la première mensualité.
+              </p>
+            )}
+          </div>
+          {/** biome-ignore lint/a11y/useValidAnchor: This anchor navigates to the credit-history fragment; the click handler also opens the target details element. */}
+          <a href="#credit-history" onClick={openHistory}>
+            Voir l’historique <HomeIcon name="arrow" size={16} />
+          </a>
+        </section>
+      )}
+      {canBuyTopups && (
+        <section className="offers-discovery">
+          <h2>Besoin d’un coup de pouce ?</h2>
+          <div>
+            <span className="offers-gift">
+              <GiftIcon />
+            </span>
+            <h3>Découverte</h3>
+            <p>
+              <strong>
+                20 crédits · 20 € <small>HT</small>
+              </strong>
+              <span>Achat ponctuel, sans renouvellement automatique.</span>
+            </p>
+            <button
+              type="button"
+              className="offers-action offers-action-primary"
+              onClick={() => topups.current?.choose(creditPacks[0].code)}
+            >
+              Essayer avec 20 crédits
+              <HomeIcon name="arrow" size={17} />
+            </button>
+          </div>
+        </section>
+      )}
+      <CreditTopups ref={topups} enabled={payments.enabled} mode={payments.mode} validDays={billing?.topupValidDays} />
+      <section className="offers-comparison">
+        <h2>Comparez les offres</h2>
+        <div className="offers-table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Fonctionnalités</th>
+                {paidPlans.map((p) => (
+                  <th scope="col" key={p.code}>
+                    {p.name}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">{interval === 'year' ? 'Équivalent mensuel (annuel)' : 'Prix mensuel'}</th>
+                {paidPlans.map((p) => (
+                  <td key={p.code}>{euros(subscriptionPricing(p.price, interval).monthlyEquivalent)} HT</td>
+                ))}
+              </tr>
+              {interval === 'year' && (
+                <tr>
+                  <th scope="row">Montant facturé par an</th>
+                  {paidPlans.map((p) => (
+                    <td key={p.code}>{euros(subscriptionPricing(p.price, interval).amountCents / 100)} HT</td>
+                  ))}
+                </tr>
+              )}
+              <tr>
+                <th scope="row">Crédits mensuels</th>
+                {paidPlans.map((p) => (
+                  <td key={p.code}>{p.credits}</td>
+                ))}
+              </tr>
+              {[
+                ['Vidéo classique', '1 crédit'],
+                ['Photo animée par IA', '+ 1 crédit'],
+                ['Présentateur IA (intro + conclusion)', '+ 1 crédit'],
+                ['Présentateur sur toute la vidéo', '+ 1 crédit / 10 s'],
+              ].map(([label, value]) => (
+                <tr key={label}>
+                  <th scope="row">{label}</th>
+                  {paidPlans.map((p) => (
+                    <td key={p.code}>{value}</td>
+                  ))}
+                </tr>
+              ))}
+              <tr>
+                <th scope="row">Avec {options}</th>
+                {paidPlans.map((p) => (
+                  <td key={p.code}>{Math.floor(p.credits / cost)} vidéos</td>
+                ))}
+              </tr>
+              <tr>
+                <th scope="row">Report plafonné à un mois</th>
+                {paidPlans.map((p) => (
+                  <td key={p.code}>{p.credits} crédits maximum</td>
+                ))}
+              </tr>
+              <tr>
+                <th scope="row">Outils de création</th>
+                {paidPlans.map((p) => (
+                  <td key={p.code}>
+                    <span className="offers-included-check">
+                      <HomeIcon name="check" size={15} />
+                      <span className="sr-only">Inclus</span>
+                    </span>
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <details className="offers-credit-history" id="credit-history">
+        <summary>
+          <HomeIcon name="clock" />
+          <span>
+            Historique de vos crédits<small>Consultez l’historique complet de vos crédits et utilisations.</small>
+          </span>
+          <HomeIcon name="chevron" size={17} />
+        </summary>
+        <div className="offers-history-body">
+          {!me ? (
+            <p>
+              <Link href="/connexion?next=/abonnement">Connectez-vous pour consulter vos crédits.</Link>
+            </p>
+          ) : (
+            <>
+              {error && <p role="alert">{error}</p>}
+              {history?.bonuses?.map((bonus) => (
+                <div className="offers-history-bonus" key={bonus.id}>
+                  <strong>
+                    Bonus {bonus.code} · +{bonus.credits} crédits
+                  </strong>
+                  <span>
+                    Attribué le {date(bonus.at)} · valable jusqu’au {date(bonus.expiresAt)}, sans report.
+                  </span>
+                  <span>
+                    {bonus.used} utilisés · {bonus.reserved} réservés
+                    {bonus.reversed ? ` · ${bonus.reversed} repris après remboursement` : ''}
+                    {bonus.disputed ? ' · suspendu pendant le litige' : ''}
+                    {Date.parse(bonus.expiresAt) <= Date.now() ? ' · expiré' : ''}
+                  </span>
+                </div>
+              ))}
+              {!history && !error ? (
+                <p>Chargement…</p>
+              ) : history?.entries.length ? (
+                <>
+                  <div className="offers-table-scroll">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Création</th>
+                          <th>État</th>
+                          <th>Réservés</th>
+                          <th>Utilisés</th>
+                          <th>Restitués</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {history.entries.map((entry) => (
+                          <tr key={entry.id}>
+                            <th scope="row">
+                              <Link href={'/historique/' + entry.id}>{entry.title}</Link>
+                              <small>{date(entry.at)}</small>
+                            </th>
+                            <td>
+                              {entry.gift
+                                ? 'Essai offert'
+                                : entry.status === 'ready'
+                                  ? 'Terminée'
+                                  : entry.status === 'failed'
+                                    ? 'Échouée'
+                                    : 'En préparation'}
+                            </td>
+                            <td>{entry.reserved}</td>
+                            <td>{entry.gift ? 'Offert' : entry.used}</td>
+                            <td>{entry.refunded}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {history.nextCursor && (
+                    <button
+                      className="offers-action offers-action-outline offers-history-more"
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void more()}
+                    >
+                      {busy ? 'Chargement…' : 'Voir la suite'}
+                    </button>
+                  )}
+                </>
+              ) : (
+                history && <p>Votre première création apparaîtra ici.</p>
+              )}
+            </>
+          )}
+        </div>
+      </details>
+      <section className="offers-faq">
+        <h2>Une question ?</h2>
+        <details>
+          <summary>Comment fonctionne l’offre annuelle ?</summary>
+          <p>
+            Vous payez une année en une fois et économisez 10 % par rapport à 12 paiements mensuels. Vos crédits sont
+            attribués chaque mois, avec le même report plafonné. Le renouvellement est annuel ; vous pouvez le
+            désactiver depuis votre espace Stripe et conserver vos droits jusqu’à la fin de l’année payée.
+          </p>
+        </details>
+        <details>
+          <summary>Comment mes crédits sont-ils décomptés ?</summary>
+          <p>
+            Une vidéo classique coûte 1 crédit, chaque photo animée ajoute 1 crédit. Le présentateur ajoute 1 crédit
+            pour les passages courts, ou 1 crédit par tranche de 10 secondes sur toute la vidéo. Le coût maximum est
+            affiché avant le lancement. Les clips compatibles réutilisés n’entraînent pas de nouveau supplément.
+          </p>
+        </details>
+        <details>
+          <summary>Comment fonctionne le report ?</summary>
+          <p>
+            Avec les nouvelles offres, les crédits payants inutilisés peuvent servir au mois suivant après
+            renouvellement payé, dans la limite d’une mensualité. Ils sont consommés avant les nouveaux crédits et
+            expirent à la fin de ce mois supplémentaire. Les crédits réservés par une création en cours ne sont pas
+            reportés. Les crédits gratuits et les anciennes offres gardent leurs conditions.
+          </p>
+        </details>
+        <details>
+          <summary>Et si une création échoue ?</summary>
+          <p>
+            Le crédit vidéo et les suppléments non réalisés sont restitués dans leur lot d’origine, avec sa validité
+            d’origine. Les animations ou avatars réussis restent réutilisables selon les règles de leur bibliothèque.
+          </p>
+        </details>
+        <details>
+          <summary>Puis-je arrêter mon abonnement ?</summary>
+          <p>
+            La résiliation prend effet à la fin de la période payée. Gérez vos factures et votre résiliation depuis
+            votre abonnement. Les crédits achetés précédemment restent utilisables selon leur validité.
+          </p>
+        </details>
+      </section>
+      <footer className="offers-footer">
+        <Link href="/" aria-label="BienVu, accueil">
+          <HomeWordmark />
+        </Link>
+        <span>Le studio marketing IA de votre agence immobilière.</span>
+        <nav aria-label="Informations">
+          <Link href="/conditions">Conditions</Link>
+          <Link href="/confidentialite">Confidentialité</Link>
+          <a href="mailto:contact@bienvu.online">Contact</a>
+        </nav>
+      </footer>
+    </div>
+  );
 }

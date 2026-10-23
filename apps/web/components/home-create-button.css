@@ -1,30 +1,97 @@
 .home-studio .home-primary-button.home-rainbow-button,
 .home-studio .home-primary-button.home-rainbow-button:hover:not(:disabled) {
- --home-button-spectrum:linear-gradient(115deg,#27a8f4,#5edfcf,#8e77ff,#eb75c3,#f3a65e,#91d5a1,#27a8f4);
- position:relative;isolation:isolate;border:1.5px solid transparent;
- background:linear-gradient(#11120f,#11120f) padding-box,var(--home-button-spectrum) border-box;
- background-size:100% 100%,300% 100%;background-position:0 0,0% 50%;
- transform:translate3d(var(--home-magnet-x,0px),var(--home-magnet-y,0px),0);
- transition:box-shadow .2s;animation:home-button-rainbow 12s ease-in-out infinite;
+  --home-button-spectrum: linear-gradient(115deg, #27a8f4, #5edfcf, #8e77ff, #eb75c3, #f3a65e, #91d5a1, #27a8f4);
+  position: relative;
+  isolation: isolate;
+  border: 1.5px solid transparent;
+  background:
+    linear-gradient(#11120f, #11120f) padding-box,
+    var(--home-button-spectrum) border-box;
+  background-size:
+    100% 100%,
+    300% 100%;
+  background-position:
+    0 0,
+    0% 50%;
+  transform: translate3d(var(--home-magnet-x, 0px), var(--home-magnet-y, 0px), 0);
+  transition: box-shadow 0.2s;
+  animation: home-button-rainbow 12s ease-in-out infinite;
 }
 .home-rainbow-button::before {
- content:'';position:absolute;top:calc(100% - 3px);left:10%;right:10%;height:14px;z-index:-1;
- border-radius:50%;background:var(--home-button-spectrum);background-size:300% 100%;
- filter:blur(13px);opacity:.25;pointer-events:none;transition:opacity .25s;
- animation:home-button-glow 12s ease-in-out infinite;
+  content: "";
+  position: absolute;
+  top: calc(100% - 3px);
+  left: 10%;
+  right: 10%;
+  height: 14px;
+  z-index: -1;
+  border-radius: 50%;
+  background: var(--home-button-spectrum);
+  background-size: 300% 100%;
+  filter: blur(13px);
+  opacity: 0.25;
+  pointer-events: none;
+  transition: opacity 0.25s;
+  animation: home-button-glow 12s ease-in-out infinite;
 }
-.home-studio .home-primary-button.home-rainbow-button:hover:not(:disabled) {box-shadow:0 4px 12px #20251b16}
-.home-rainbow-button:hover:not(:disabled)::before {opacity:.4}
-.home-rainbow-button[data-magnet-active] {will-change:transform}
-.home-studio .home-primary-button.home-rainbow-button:disabled {background:#11120f;border-color:#11120f;animation:none}
-.home-rainbow-button:disabled::before {display:none}
-@keyframes home-button-rainbow {0%,100% {background-position:0 0,0% 50%}50% {background-position:0 0,100% 50%}}
-@keyframes home-button-glow {0%,100% {background-position:0% 50%}50% {background-position:100% 50%}}
-@media(prefers-reduced-motion:reduce) {
- .home-studio .home-primary-button.home-rainbow-button {animation:none;transform:none;transition:none}
- .home-rainbow-button::before {animation:none;transition:none}
+.home-studio .home-primary-button.home-rainbow-button:hover:not(:disabled) {
+  box-shadow: 0 4px 12px #20251b16;
 }
-@media(forced-colors:active) {
- .home-studio .home-primary-button.home-rainbow-button {background:ButtonFace;color:ButtonText;border-color:ButtonText;animation:none}
- .home-rainbow-button::before {display:none}
+.home-rainbow-button:hover:not(:disabled)::before {
+  opacity: 0.4;
+}
+.home-rainbow-button[data-magnet-active] {
+  will-change: transform;
+}
+.home-studio .home-primary-button.home-rainbow-button:disabled {
+  background: #11120f;
+  border-color: #11120f;
+  animation: none;
+}
+.home-rainbow-button:disabled::before {
+  display: none;
+}
+@keyframes home-button-rainbow {
+  0%,
+  100% {
+    background-position:
+      0 0,
+      0% 50%;
+  }
+  50% {
+    background-position:
+      0 0,
+      100% 50%;
+  }
+}
+@keyframes home-button-glow {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-studio .home-primary-button.home-rainbow-button {
+    animation: none;
+    transform: none;
+    transition: none;
+  }
+  .home-rainbow-button::before {
+    animation: none;
+    transition: none;
+  }
+}
+@media (forced-colors: active) {
+  .home-studio .home-primary-button.home-rainbow-button {
+    background: ButtonFace;
+    color: ButtonText;
+    border-color: ButtonText;
+    animation: none;
+  }
+  .home-rainbow-button::before {
+    display: none;
+  }
 }

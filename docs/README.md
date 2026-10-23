@@ -16,33 +16,33 @@ Ce dossier rassemble le cahier de construction, les sprints et leurs preuves. Un
 
 ## Documents de référence
 
-| Document | Usage |
-|---|---|
-| [CADRAGE.md](CADRAGE.md) | Choix d'Alex, parcours et périmètre |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Services Cloudflare et séparation des environnements |
-| [CONTRATS.md](CONTRATS.md) | Données, états, droits d'accès et règles de quota |
-| [BUDGET-ET-OFFRES.md](BUDGET-ET-OFFRES.md) | Budget de 30 €, coûts et offres proposées |
-| [CONSIGNES-CODEX.md](CONSIGNES-CODEX.md) | Manière de travailler et définition d'un sprint terminé |
-| [SOURCES.md](SOURCES.md) | Sources officielles et points à revérifier |
-| [BILAN-SPRINTS.md](BILAN-SPRINTS.md) | Revue des critères, preuves locales/réelles et priorités restantes |
-| [SUIVI.md](SUIVI.md) | État actuel et journal daté du développement |
-| [VOIX-CARTESIA.md](VOIX-CARTESIA.md) | Sonic 3.6, voix parisiennes, comparaisons superadmin et plafond Free |
-| [SIMULATEUR-PRIX.md](SIMULATEUR-PRIX.md) | Scénarios de packs/abonnements, coûts observés, prix cible et prévisions de rentabilité |
+| Document                                   | Usage                                                                                   |
+| ------------------------------------------ | --------------------------------------------------------------------------------------- |
+| [CADRAGE.md](CADRAGE.md)                   | Choix d'Alex, parcours et périmètre                                                     |
+| [ARCHITECTURE.md](ARCHITECTURE.md)         | Services Cloudflare et séparation des environnements                                    |
+| [CONTRATS.md](CONTRATS.md)                 | Données, états, droits d'accès et règles de quota                                       |
+| [BUDGET-ET-OFFRES.md](BUDGET-ET-OFFRES.md) | Budget de 30 €, coûts et offres proposées                                               |
+| [CONSIGNES-CODEX.md](CONSIGNES-CODEX.md)   | Manière de travailler et définition d'un sprint terminé                                 |
+| [SOURCES.md](SOURCES.md)                   | Sources officielles et points à revérifier                                              |
+| [BILAN-SPRINTS.md](BILAN-SPRINTS.md)       | Revue des critères, preuves locales/réelles et priorités restantes                      |
+| [SUIVI.md](SUIVI.md)                       | État actuel et journal daté du développement                                            |
+| [VOIX-CARTESIA.md](VOIX-CARTESIA.md)       | Sonic 3.6, voix parisiennes, comparaisons superadmin et plafond Free                    |
+| [SIMULATEUR-PRIX.md](SIMULATEUR-PRIX.md)   | Scénarios de packs/abonnements, coûts observés, prix cible et prévisions de rentabilité |
 
 ## Ordre des sprints
 
-| Sprint | Résultat démontrable | Dépendances |
-|---|---|---|
-| [00 — Faisabilité](sprints/SPRINT-00-FAISABILITE.md) | Preuves Next.js + navigateur + rendu Cloudflare, premiers coûts | Aucune |
-| [01 — Fondations](sprints/SPRINT-01-FONDATIONS.md) | Monorepo, schémas, environnements et première interface | 00 |
-| [02 — Comptes et marque](sprints/SPRINT-02-COMPTES-MARQUE.md) | Inscription, agence et identité enregistrée | 01 |
-| [03 — Import agences](sprints/SPRINT-03-IMPORT-AGENCES.md) | URL d'agence → données fiables et photos privées | 02 |
-| [04 — Portails](sprints/SPRINT-04-PORTAILS.md) | Couverture mesurée des portails et import générique | 03 |
-| [05 — Texte et voix](sprints/SPRINT-05-TEXTE-VOIX.md) | Script factuel et narration française synchronisable | 04 |
-| [06 — Vidéo](sprints/SPRINT-06-VIDEO.md) | MP4 vertical de marque et version d'essai filigranée | 05 |
-| [07 — Parcours complet](sprints/SPRINT-07-PARCOURS.md) | Job durable, aperçu et téléchargement après un seul lien | 06 |
-| [08 — Abonnements](sprints/SPRINT-08-ABONNEMENTS.md) | Stripe, crédits atomiques et essai gratuit unique | 07 |
-| [09 — Lancement](sprints/SPRINT-09-LANCEMENT.md) | Recette payante, exploitation et limites publiées | 08 |
+| Sprint                                                        | Résultat démontrable                                            | Dépendances |
+| ------------------------------------------------------------- | --------------------------------------------------------------- | ----------- |
+| [00 — Faisabilité](sprints/SPRINT-00-FAISABILITE.md)          | Preuves Next.js + navigateur + rendu Cloudflare, premiers coûts | Aucune      |
+| [01 — Fondations](sprints/SPRINT-01-FONDATIONS.md)            | Monorepo, schémas, environnements et première interface         | 00          |
+| [02 — Comptes et marque](sprints/SPRINT-02-COMPTES-MARQUE.md) | Inscription, agence et identité enregistrée                     | 01          |
+| [03 — Import agences](sprints/SPRINT-03-IMPORT-AGENCES.md)    | URL d'agence → données fiables et photos privées                | 02          |
+| [04 — Portails](sprints/SPRINT-04-PORTAILS.md)                | Couverture mesurée des portails et import générique             | 03          |
+| [05 — Texte et voix](sprints/SPRINT-05-TEXTE-VOIX.md)         | Script factuel et narration française synchronisable            | 04          |
+| [06 — Vidéo](sprints/SPRINT-06-VIDEO.md)                      | MP4 vertical de marque et version d'essai filigranée            | 05          |
+| [07 — Parcours complet](sprints/SPRINT-07-PARCOURS.md)        | Job durable, aperçu et téléchargement après un seul lien        | 06          |
+| [08 — Abonnements](sprints/SPRINT-08-ABONNEMENTS.md)          | Stripe, crédits atomiques et essai gratuit unique               | 07          |
+| [09 — Lancement](sprints/SPRINT-09-LANCEMENT.md)              | Recette payante, exploitation et limites publiées               | 08          |
 
 Les sprints 00 à 07 utilisent un accès de développement contrôlé. L'essai public et les paiements ne sont activés qu'une fois les règles de quota du sprint 08 intégrées. Un portail bloqué doit apparaître comme tel : cela n'autorise pas à supprimer l'objectif multi-sites ni à annoncer une compatibilité inexistante.
 

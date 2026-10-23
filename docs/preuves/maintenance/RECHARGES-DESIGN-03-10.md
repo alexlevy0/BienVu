@@ -5,7 +5,6 @@ La section `/abonnement#recharges` reprend la seconde maquette transmise par Ale
 Les tarifs restent **10/30/100 crédits à 7/19/59 € HT**, et **3/40/120 crédits mensuels à 0/19/49 € HT**. Un changement de pack décoche le consentement. La connexion et les droits de propriétaire/administrateur restent nécessaires à l’achat ; le Checkout existant conserve sa clé d’idempotence et sa vérification du lien Stripe. L’historique des recharges et les messages de confirmation sont conservés. Stripe reste en mode test, explicitement indiqué après connexion ; la validité affichée suit toujours la configuration existante.
 
 Vérifications réalisées :
-
 - Build Next.js, TypeScript et OpenNext (`pnpm build:web`), dry-run Wrangler et `git diff --check` réussis.
 - **12 scénarios Chromium**, en local puis sur les assets publiés : visiteur à **1536/1280/1101/1024/620/390/320 px**, propriétaire à **1536/390 px**, rôle éditeur à **390 px**, paiement désactivé à **1280 px**, validité de 12 mois et historique de remboursement à **390 px**.
 - Pack initial, choix des trois montants, prix unitaires, récapitulatif, navigation radio au clavier, consentement réinitialisé, droits d’achat, liens juridiques, essai gratuit, nouvelle ligne du comparatif et estimateur du haut de page vérifiés. Aucun débordement horizontal de la page ; le tableau reste défilable dans son conteneur sur mobile.

@@ -1,7 +1,6 @@
 # Administration des visuels de la home — 4 octobre 2026
 
 Demande : choisir dans le super admin tous les médias de la page d’accueil, depuis les photos importées, exports et plans IA de l’ensemble de BienVu.
-
 - Onglet **Page d’accueil** : 24 emplacements, sélection avec recherche, filtres, pagination et prévisualisation.
 - Brouillon privé, aperçu complet protégé et publication explicite ; rétablissement des visuels par défaut ou de la publication précédente.
 - Copies indépendantes dans R2, originales privées conservées, diffusion publique limitée aux sélections publiées et purge des seules copies inutilisées.

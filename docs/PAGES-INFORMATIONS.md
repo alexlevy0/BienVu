@@ -4,11 +4,11 @@
 
 Dans **Google Auth Platform → Branding → App Domain**, utiliser :
 
-| Champ | URL |
-|---|---|
-| Application home page | https://bienvu.online/ |
-| Privacy policy | https://bienvu.online/confidentialite |
-| Terms of service | https://bienvu.online/conditions |
+| Champ                 | URL                                   |
+| --------------------- | ------------------------------------- |
+| Application home page | https://bienvu.online/                |
+| Privacy policy        | https://bienvu.online/confidentialite |
+| Terms of service      | https://bienvu.online/conditions      |
 
 Conserver le domaine autorisé `bienvu.online` et la redirection déjà validée `https://bienvu.online/api/auth/callback/google`. Ces liens ne modifient pas le client OAuth ni ses secrets. Leur saisie dans Google et l'éventuelle vérification de marque restent des opérations de console distinctes ; créer ces pages ne prouve pas une approbation Google.
 

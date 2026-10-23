@@ -13,7 +13,11 @@
     "db:migrate": "pnpm --filter @bienvu/web exec wrangler d1 migrations apply DB --local",
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "audit:dependencies": "pnpm audit --audit-level=low",
-    "check": "pnpm check:boundaries && pnpm test && pnpm typecheck",
+    "lint": "biome lint . --error-on-warnings",
+    "lint:fix": "biome lint . --write --error-on-warnings",
+    "format": "biome format . --write",
+    "format:check": "biome format .",
+    "check": "pnpm lint && pnpm format:check && pnpm check:boundaries && pnpm test && pnpm typecheck",
     "probe:foundations": "node scripts/probe-foundations.mjs",
     "setup:local": "node scripts/setup-local.mjs",
     "fixtures": "tsx scripts/generate-fixtures.ts",
@@ -57,6 +61,7 @@
     "probe:partners:ui": "node scripts/probe-partners-ui.mjs"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.6.2",
     "@posthog/cli": "0.18.10",
     "@types/node": "24.10.1",
     "@types/react": "19.3.0",

@@ -22,7 +22,6 @@ La batterie complète initiale a exécuté **623 tests** : 620 réussis et trois
 Bookmark D1 enregistré avant la migration. Migration **0065** appliquée sur `bienvu-s00-staging` : compteurs, budgets et nombres de lignes des imports, médias, générations, jobs, allocations, réservations et coûts identiques avant/après. Trigger distant relu : **40/jour et 300/mois**.
 
 Déploiements à 100 % avec `--keep-vars --strict` :
-
 - Web : `54fb4dff-e696-4e45-9053-e4b6a967dc70`, **56 bindings conservés**.
 - Génération : `5fa8752d-caa8-4778-b055-c8ab1da28688`, **32 bindings conservés**, conteneur de rendu inchangé (`--containers-rollout none`).
 

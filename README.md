@@ -10,7 +10,7 @@ SaaS immobilier en construction : un lien d’annonce ou une saisie avec photos 
 
 ## Démarrer localement
 
-Prérequis : Node **24.17.0**, pnpm **10.33.2**. Aucun Docker ni secret Cloudflare/OpenAI nécessaire aux fondations. Docker sert aux recettes Linux du renderer et du transport d’import ; les tests unitaires et le rendu natif local restent utilisables séparément.
+Prérequis : Node **24.21.0** (ou version 24 plus récente), pnpm **10.33.2**. Aucun Docker ni secret Cloudflare/OpenAI nécessaire aux fondations. Docker sert aux recettes Linux du renderer et du transport d’import ; les tests unitaires et le rendu natif local restent utilisables séparément.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -31,6 +31,8 @@ Pour importer une vraie annonce en local, lancer `pnpm dev:imports` dans un seco
 Sous l’import par URL, **Saisir mon annonce manuellement** permet aussi d’enregistrer les informations du bien et 3 à 12 photos. En local, ce parcours utilise le pont Node ; sur Cloudflare, un conteneur privé prépare les images ; [guide de saisie et vérifications](docs/SAISIE-MANUELLE.md).
 
 Pour travailler seulement sur l'interface : `pnpm dev` (`http://localhost:3000`). Ne pas exécuter le build et TypeScript simultanément : Next régénère ses types. Guide détaillé, bindings, arrêt des générations et reproduction depuis une copie propre : [DEVELOPPEMENT.md](docs/DEVELOPPEMENT.md).
+
+`pnpm lint` vérifie tout le monorepo avec Biome ; `pnpm lint:fix` applique ses corrections sûres. `pnpm format` harmonise le formatage et l’indentation à deux espaces ; `pnpm format:check` les vérifie sans écrire. Ces deux contrôles sont inclus dans `pnpm check` et donc exécutés en CI. [Périmètre et exceptions](docs/DEVELOPPEMENT.md#lint-et-formatage).
 
 ## Vidéo locale et parcours Cloudflare
 
@@ -89,22 +91,22 @@ Le service Node accepte aussi des jobs via `POST /jobs`, renvoie `202`, puis exp
 
 ## Organisation
 
-| Dossier | Rôle |
-|---|---|
-| `apps/web` | Next.js + OpenNext, coque produit, laboratoire et sondes protégées |
-| `apps/pipeline` | Worker Browser Run, contrôleur Containers et limites du sprint |
-| `apps/importer` | Transport HTTPS à IP épinglée et Sharp, Container Cloudflare privé |
-| `apps/renderer` | Node/Linux, Remotion, FFmpeg, HTTP asynchrone |
-| `packages/contracts`, `packages/importers`, `packages/video` | Schémas, extraction bornée, composition produit et fixtures explicites |
-| `packages/db` | Migrations D1 métier, accès limités par agence, journal de coûts et pause |
-| `packages/narration`, `packages/voice` | Script factuel, connecteurs OpenAI/Google, mesure audio portable et timing |
-| `packages/observability` | Identifiants de requête et journaux sur liste blanche |
-| `scripts`, `tests`, `fixtures` | Commandes reproductibles et tests sans API payante |
-| `docs/preuves/sprint-00` | Rapports et procédure versionnés ; sorties brutes conservées localement |
-| `docs/preuves/sprint-01` | Contrôles locaux, limites et inspection de l'interface |
-| `docs/preuves/sprint-02` | Sessions, marque et isolation locales ; e-mails et connexion Google réels validés |
-| `docs/preuves/sprint-03` | Imports privés, sécurité, fixtures et trois sources réelles depuis le poste |
-| `evidence/local`, `evidence/remote` | Sorties datées, ignorées par Git |
+| Dossier                                                      | Rôle                                                                              |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| `apps/web`                                                   | Next.js + OpenNext, coque produit, laboratoire et sondes protégées                |
+| `apps/pipeline`                                              | Worker Browser Run, contrôleur Containers et limites du sprint                    |
+| `apps/importer`                                              | Transport HTTPS à IP épinglée et Sharp, Container Cloudflare privé                |
+| `apps/renderer`                                              | Node/Linux, Remotion, FFmpeg, HTTP asynchrone                                     |
+| `packages/contracts`, `packages/importers`, `packages/video` | Schémas, extraction bornée, composition produit et fixtures explicites            |
+| `packages/db`                                                | Migrations D1 métier, accès limités par agence, journal de coûts et pause         |
+| `packages/narration`, `packages/voice`                       | Script factuel, connecteurs OpenAI/Google, mesure audio portable et timing        |
+| `packages/observability`                                     | Identifiants de requête et journaux sur liste blanche                             |
+| `scripts`, `tests`, `fixtures`                               | Commandes reproductibles et tests sans API payante                                |
+| `docs/preuves/sprint-00`                                     | Rapports et procédure versionnés ; sorties brutes conservées localement           |
+| `docs/preuves/sprint-01`                                     | Contrôles locaux, limites et inspection de l'interface                            |
+| `docs/preuves/sprint-02`                                     | Sessions, marque et isolation locales ; e-mails et connexion Google réels validés |
+| `docs/preuves/sprint-03`                                     | Imports privés, sécurité, fixtures et trois sources réelles depuis le poste       |
+| `evidence/local`, `evidence/remote`                          | Sorties datées, ignorées par Git                                                  |
 
 Les documents initiaux restent dans `docs/` pour conserver leurs liens. Les versions directes sont exactes et les dépendances transitives figurent dans `pnpm-lock.yaml`.
 

@@ -6,11 +6,11 @@ Recette du 28 septembre 2026 sur **https://bienvu.online**, Worker de développe
 
 Chaque URL a été tentée une fois ; un rejeu identique retrouve le dossier sans recontacter la source. Images réencodées, stockées dans R2 privé, relues, décodées puis comparées par SHA-256. Aucune photo étrangère visible sur les trois premières de chaque galerie inspectées ; les filigranes des agences sont conservés.
 
-| Source et bien | Résultat | Latence HTTP | Corps source | Photos stockées | Description |
-|---|---|---:|---:|---:|---:|
-| [Espaces Atypiques, Lyon, réf. 14713](https://www.espaces-atypiques.com/ventes/69007-lyon-ancien-renove-au-coeur-du-7eme-14713/) | Vente, 470 000 €, Lyon, 4 pièces | 11 971 ms | 4 890 717 octets | 12 / 4 497 150 octets | 2 141 caractères |
-| [Orpi, Paris 12, réf. ddbf1828](https://www.orpi.com/annonce-vente-appartement-t2-paris-12-75012-ddbf1828-1eb9-4ebe-885c-85f7e30057f1/) | Vente, 379 000 €, 42,06 m², 2 pièces | 14 125 ms | 2 794 181 octets | 11 / 2 744 429 octets | 1 456 caractères |
-| [Century 21, Lyon, réf. 16965965448](https://www.century21.fr/trouver_logement/detail/16965965448/) | Vente, 190 000 €, 61 m², 3 pièces | 4 746 ms | 514 281 octets | 7 / 244 461 octets | 1 251 caractères |
+| Source et bien                                                                                                                          | Résultat                             | Latence HTTP |     Corps source |       Photos stockées |      Description |
+| --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | -----------: | ---------------: | --------------------: | ---------------: |
+| [Espaces Atypiques, Lyon, réf. 14713](https://www.espaces-atypiques.com/ventes/69007-lyon-ancien-renove-au-coeur-du-7eme-14713/)        | Vente, 470 000 €, Lyon, 4 pièces     |    11 971 ms | 4 890 717 octets | 12 / 4 497 150 octets | 2 141 caractères |
+| [Orpi, Paris 12, réf. ddbf1828](https://www.orpi.com/annonce-vente-appartement-t2-paris-12-75012-ddbf1828-1eb9-4ebe-885c-85f7e30057f1/) | Vente, 379 000 €, 42,06 m², 2 pièces |    14 125 ms | 2 794 181 octets | 11 / 2 744 429 octets | 1 456 caractères |
+| [Century 21, Lyon, réf. 16965965448](https://www.century21.fr/trouver_logement/detail/16965965448/)                                     | Vente, 190 000 €, 61 m², 3 pièces    |     4 746 ms |   514 281 octets |    7 / 244 461 octets | 1 251 caractères |
 
 Ces trois pages sont extraites statiquement, sans Browser Run. Les descriptions sont sauvegardées dans `listings.description_json`, relues par l'API et affichées comme texte avec paragraphes. Espaces Atypiques conserve une **surface structurée absente** et un avertissement : le parseur ne confond pas surface Carrez/au sol/pondérée ; les 124 m² du texte source ne deviennent pas automatiquement un fait vérifié. Ce résultat est volontairement prudent.
 

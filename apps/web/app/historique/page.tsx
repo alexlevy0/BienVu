@@ -1,8 +1,12 @@
-import {PropertyLibrary} from '../../components/property-library';
-import {StudioFrame} from '../../components/studio-frame';
+import { PropertyLibrary } from '../../components/property-library';
+import { StudioFrame } from '../../components/studio-frame';
 import '../landing.css';
 import '../biens/properties.css';
-export const metadata = {title: 'Mes biens',robots:{index:false,follow:true}};
+export const metadata = { title: 'Mes biens', robots: { index: false, follow: true } };
 export default function Page() {
-  return <StudioFrame active="videos"><PropertyLibrary/></StudioFrame>;
+  return (
+    <StudioFrame active="videos">
+      <PropertyLibrary />
+    </StudioFrame>
+  );
 }

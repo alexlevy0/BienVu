@@ -1,6 +1,6 @@
 // Both property and recent-draft queries use alias i. Filter before pagination;
 // retain imports, derived versions and editor work even without listing fields.
-export const visibleImportSql=`(i.status!='importing' OR i.draft_pending=0 OR i.source_kind!='manual'
+export const visibleImportSql = `(i.status!='importing' OR i.draft_pending=0 OR i.source_kind!='manual'
   OR json_extract(i.input_json,'$.editorSource') IS NOT NULL OR json_extract(i.input_json,'$.sourceHash') IS NOT NULL
   OR EXISTS(SELECT 1 FROM import_objects o WHERE o.agency_id=i.agency_id AND o.import_id=i.id)
   OR EXISTS(SELECT 1 FROM editor_music_assets a WHERE a.agency_id=i.agency_id AND a.import_id=i.id)

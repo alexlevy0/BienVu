@@ -1,156 +1,767 @@
-import {test} from 'node:test';import assert from 'node:assert/strict';
-import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
-import {ensureAgency,readShowcase,readShowcaseItems,admitGeneration,findOwnedGeneration,generationMasterUnlocked,beginManualImport,startCreationDraft,blankCreationDraft} from '../packages/db/src/index';
-import {ShowcaseSlug,defaultShowcaseProperty,defaultVideoCustomization,GoogleVoiceConfig} from '../packages/contracts/src/index';
-import {migrateNarrationProbe} from '../scripts/narration-fixtures';import {fixtureImportTransport} from '../scripts/import-fixtures';
-import {createPrivateImport} from '../apps/web/lib/imports';import {readPropertyGroups,archiveProperty} from '../apps/web/lib/properties';
-import {ensureShowcase,mutateShowcase,resolvePublicShowcase,showcaseView,publicShowcaseProperty,publicShowcaseMedia,uploadShowcaseImage} from '../apps/web/lib/showcases';
-import {submitShowcaseContact,listShowcaseLeads,mutateShowcaseLead,sendShowcaseNotifications,showcaseStatistics,recordShowcaseEvent,type ShowcaseContactEnv} from '../apps/web/lib/showcase-contacts';
-import {showcaseManagement} from '../apps/web/lib/showcase-management';import {respond} from '../apps/web/lib/http';
-import {publicShowcaseSitemap,protectShowcaseResponse,cleanupShowcases} from '../apps/web/lib/showcase-maintenance';
-import {customizeImportedListing,patchCreationDraft,deleteCreationDraft} from '../apps/web/lib/creation-drafts';
-import {prepareJobNarration} from '../apps/pipeline/src/narration';
-import {prepareJobVideo} from '../apps/pipeline/src/video-manifest';
-import {videoReport} from '../fixtures/video';
-import {createHmac} from 'node:crypto';
-import {workspaceAction} from '../apps/web/lib/agency-workspace';
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
+import {
+  ensureAgency,
+  readShowcase,
+  readShowcaseItems,
+  admitGeneration,
+  findOwnedGeneration,
+  generationMasterUnlocked,
+  beginManualImport,
+  startCreationDraft,
+  blankCreationDraft,
+} from '../packages/db/src/index';
+import {
+  ShowcaseSlug,
+  defaultShowcaseProperty,
+  defaultVideoCustomization,
+  GoogleVoiceConfig,
+} from '../packages/contracts/src/index';
+import { migrateNarrationProbe } from '../scripts/narration-fixtures';
+import { fixtureImportTransport } from '../scripts/import-fixtures';
+import { createPrivateImport } from '../apps/web/lib/imports';
+import { readPropertyGroups, archiveProperty } from '../apps/web/lib/properties';
+import {
+  ensureShowcase,
+  mutateShowcase,
+  resolvePublicShowcase,
+  showcaseView,
+  publicShowcaseProperty,
+  publicShowcaseMedia,
+  uploadShowcaseImage,
+} from '../apps/web/lib/showcases';
+import {
+  submitShowcaseContact,
+  listShowcaseLeads,
+  mutateShowcaseLead,
+  sendShowcaseNotifications,
+  showcaseStatistics,
+  recordShowcaseEvent,
+  type ShowcaseContactEnv,
+} from '../apps/web/lib/showcase-contacts';
+import { showcaseManagement } from '../apps/web/lib/showcase-management';
+import { respond } from '../apps/web/lib/http';
+import { publicShowcaseSitemap, protectShowcaseResponse, cleanupShowcases } from '../apps/web/lib/showcase-maintenance';
+import { customizeImportedListing, patchCreationDraft, deleteCreationDraft } from '../apps/web/lib/creation-drafts';
+import { prepareJobNarration } from '../apps/pipeline/src/narration';
+import { prepareJobVideo } from '../apps/pipeline/src/video-manifest';
+import { videoReport } from '../fixtures/video';
+import { createHmac } from 'node:crypto';
+import { workspaceAction } from '../apps/web/lib/agency-workspace';
 
-async function fixture(t:{after(fn:()=>Promise<void>):void}){const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:'export default {fetch(){return new Response("fixture")}}',compatibilityDate:'2026-09-27',d1Databases:['DB'],r2Buckets:['MEDIA']}));t.after(()=>mf.dispose());
-  const bindings=await mf.getBindings<{DB:D1Database;MEDIA:R2Bucket}>();await migrateNarrationProbe(bindings.DB);const at=new Date().toISOString();
-  for(const id of['showcase-owner','showcase-foreign'])await bindings.DB.prepare('INSERT INTO auth_user(id,name,email,emailVerified,createdAt,updatedAt) VALUES(?,?,?,1,?,?)').bind(id,id,id+'@example.invalid',at,at).run();
-  const agency=await ensureAgency(bindings.DB,{id:'showcase-owner',email:'showcase-owner@example.invalid'}),foreign=await ensureAgency(bindings.DB,{id:'showcase-foreign',email:'showcase-foreign@example.invalid'});
-  await bindings.DB.prepare('INSERT INTO hosted_import_budget VALUES(?,0,9500,0)').bind(at.slice(0,7)).run();let sent=0,failEmail=false,verified=0;
-  const env:ShowcaseContactEnv={...bindings,PROBE_MODE:'local',BETTER_AUTH_URL:'http://localhost:8787',BETTER_AUTH_SECRET:'a'.repeat(32),GOOGLE_CLIENT_ID:'',GOOGLE_CLIENT_SECRET:'',
-    AUTH_EMAIL_MODE:'local',AUTH_EMAIL_FROM:'contact@bienvu.example',AUTH_EMAIL:{async send(){sent++;if(failEmail)throw Error('PRIVATE_PROVIDER_ERROR_WITH_EMAIL');return{messageId:'local-fixture'};}},TURNSTILE_SITE_KEY:'fixture-public',TURNSTILE_SECRET_KEY:'fixture-secret'};
-  const imported=await createPrivateImport(env,agency.id,'https://fixtures.bienvu.example/vente','showcase-source-key00',fixtureImportTransport());const group=(await readPropertyGroups(env,agency.id))[0];
-  const action=async(body:Record<string,unknown>,owner=agency,role='owner')=>mutateShowcase(env,owner,role,{version:(await ensureShowcase(env,owner)).version,...body});
-  const config=(await ensureShowcase(env,agency)).draft,settings={...defaultShowcaseProperty(),photoIds:[group.photos[0].hash],coverPhotoId:group.photos[0].hash};
-  const prepare=async()=>{await action({action:'save',config:{...config,name:'Agence Lumière',slug:'agence-lumiere',city:'Lyon'}});await action({action:'property-save',propertyId:group.summary.id,settings});return(await readShowcaseItems(env.DB,agency.id))[0];};
-  const publish=async()=>{const item=await prepare();await action({action:'publish'});return item;};
-  const contact=(id=crypto.randomUUID(),body:Record<string,unknown>={})=>new Request(env.BETTER_AUTH_URL+'/api/vitrines/agence-lumiere/contact',{method:'POST',headers:{origin:env.BETTER_AUTH_URL,'Content-Type':'application/json','Idempotency-Key':id},body:JSON.stringify({name:'Marie Dupont',email:'marie@example.invalid',phone:'',message:'Je souhaite avoir des informations sur ce bien.',propertyId:null,website:'',turnstileToken:'proof-'+id,...body})});
-  const verifier=(changes:Record<string,unknown>={})=>(async()=>{verified++;return Response.json({success:true,hostname:'localhost',action:'showcase_contact',challenge_ts:new Date().toISOString(),...changes});})as typeof fetch;
-  return{env,agency,foreign,group,imported,action,config,settings,prepare,publish,contact,verifier,count:()=>({sent,verified}),setFail:(value:boolean)=>{failEmail=value;}};
+async function fixture(t: { after(fn: () => Promise<void>): void }) {
+  const mf = new Miniflare(
+    convertV4MiniflareOptions({
+      modules: true,
+      script: 'export default {fetch(){return new Response("fixture")}}',
+      compatibilityDate: '2026-09-27',
+      d1Databases: ['DB'],
+      r2Buckets: ['MEDIA'],
+    }),
+  );
+  t.after(() => mf.dispose());
+  const bindings = await mf.getBindings<{ DB: D1Database; MEDIA: R2Bucket }>();
+  await migrateNarrationProbe(bindings.DB);
+  const at = new Date().toISOString();
+  for (const id of ['showcase-owner', 'showcase-foreign'])
+    await bindings.DB.prepare(
+      'INSERT INTO auth_user(id,name,email,emailVerified,createdAt,updatedAt) VALUES(?,?,?,1,?,?)',
+    )
+      .bind(id, id, id + '@example.invalid', at, at)
+      .run();
+  const agency = await ensureAgency(bindings.DB, { id: 'showcase-owner', email: 'showcase-owner@example.invalid' }),
+    foreign = await ensureAgency(bindings.DB, { id: 'showcase-foreign', email: 'showcase-foreign@example.invalid' });
+  await bindings.DB.prepare('INSERT INTO hosted_import_budget VALUES(?,0,9500,0)').bind(at.slice(0, 7)).run();
+  let sent = 0,
+    failEmail = false,
+    verified = 0;
+  const env: ShowcaseContactEnv = {
+    ...bindings,
+    PROBE_MODE: 'local',
+    BETTER_AUTH_URL: 'http://localhost:8787',
+    BETTER_AUTH_SECRET: 'a'.repeat(32),
+    GOOGLE_CLIENT_ID: '',
+    GOOGLE_CLIENT_SECRET: '',
+    AUTH_EMAIL_MODE: 'local',
+    AUTH_EMAIL_FROM: 'contact@bienvu.example',
+    AUTH_EMAIL: {
+      async send() {
+        sent++;
+        if (failEmail) throw Error('PRIVATE_PROVIDER_ERROR_WITH_EMAIL');
+        return { messageId: 'local-fixture' };
+      },
+    },
+    TURNSTILE_SITE_KEY: 'fixture-public',
+    TURNSTILE_SECRET_KEY: 'fixture-secret',
+  };
+  const imported = await createPrivateImport(
+    env,
+    agency.id,
+    'https://fixtures.bienvu.example/vente',
+    'showcase-source-key00',
+    fixtureImportTransport(),
+  );
+  const group = (await readPropertyGroups(env, agency.id))[0];
+  const action = async (body: Record<string, unknown>, owner = agency, role = 'owner') =>
+    mutateShowcase(env, owner, role, { version: (await ensureShowcase(env, owner)).version, ...body });
+  const config = (await ensureShowcase(env, agency)).draft,
+    settings = { ...defaultShowcaseProperty(), photoIds: [group.photos[0].hash], coverPhotoId: group.photos[0].hash };
+  const prepare = async () => {
+    await action({
+      action: 'save',
+      config: { ...config, name: 'Agence Lumière', slug: 'agence-lumiere', city: 'Lyon' },
+    });
+    await action({ action: 'property-save', propertyId: group.summary.id, settings });
+    return (await readShowcaseItems(env.DB, agency.id))[0];
+  };
+  const publish = async () => {
+    const item = await prepare();
+    await action({ action: 'publish' });
+    return item;
+  };
+  const contact = (id = crypto.randomUUID(), body: Record<string, unknown> = {}) =>
+    new Request(env.BETTER_AUTH_URL + '/api/vitrines/agence-lumiere/contact', {
+      method: 'POST',
+      headers: { origin: env.BETTER_AUTH_URL, 'Content-Type': 'application/json', 'Idempotency-Key': id },
+      body: JSON.stringify({
+        name: 'Marie Dupont',
+        email: 'marie@example.invalid',
+        phone: '',
+        message: 'Je souhaite avoir des informations sur ce bien.',
+        propertyId: null,
+        website: '',
+        turnstileToken: 'proof-' + id,
+        ...body,
+      }),
+    });
+  const verifier = (changes: Record<string, unknown> = {}) =>
+    (async () => {
+      verified++;
+      return Response.json({
+        success: true,
+        hostname: 'localhost',
+        action: 'showcase_contact',
+        challenge_ts: new Date().toISOString(),
+        ...changes,
+      });
+    }) as typeof fetch;
+  return {
+    env,
+    agency,
+    foreign,
+    group,
+    imported,
+    action,
+    config,
+    settings,
+    prepare,
+    publish,
+    contact,
+    verifier,
+    count: () => ({ sent, verified }),
+    setFail: (value: boolean) => {
+      failEmail = value;
+    },
+  };
 }
-test('Ma vitrine : adresses réservées, création privée et présentation publiée stable',async t=>{const f=await fixture(t);assert.equal(ShowcaseSlug.safeParse('admin').success,false);assert.equal(ShowcaseSlug.safeParse('../agence').success,false);
-  await assert.rejects(resolvePublicShowcase(f.env,f.config.slug),/NOT_FOUND/);await assert.rejects(f.action({action:'publish'}),/VALIDATION_ERROR/);
-  const item=await f.publish(),before=await showcaseView(f.env,await resolvePublicShowcase(f.env,'agence-lumiere'));assert.equal(before.config.name,'Agence Lumière');assert.equal(before.total,1);assert.equal(before.properties[0].id,item.id);assert.equal(before.properties[0].video,null);assert.equal(before.properties[0].photos.length,1);
-  await f.action({action:'save',config:{...f.config,name:'Présentation en brouillon',slug:'nouvelle-agence',address:'Adresse privée',showAddress:false}});
-  await assert.rejects(resolvePublicShowcase(f.env,'nouvelle-agence'),/NOT_FOUND/);assert.equal((await showcaseView(f.env,await resolvePublicShowcase(f.env,'agence-lumiere'))).config.name,'Agence Lumière');
-  const preview=await showcaseView(f.env,(await readShowcase(f.env.DB,f.agency.id))!,new URLSearchParams(),true);assert.equal(preview.config.name,'Présentation en brouillon');assert.equal(preview.config.address,'');assert.ok(preview.properties[0].photos[0].url.startsWith('/api/vitrine/assets/'));
-  await f.action({action:'publish'});assert.equal((await resolvePublicShowcase(f.env,'agence-lumiere')).published!.slug,'nouvelle-agence');assert.equal((await resolvePublicShowcase(f.env,'nouvelle-agence')).published!.name,'Présentation en brouillon');
-  assert.equal((await f.env.DB.prepare('SELECT count(*) n FROM generation_shares').first<{n:number}>())!.n,0);assert.equal((await f.env.DB.prepare('SELECT count(*) n FROM generation_runs').first<{n:number}>())!.n,0);
+test('Ma vitrine : adresses réservées, création privée et présentation publiée stable', async (t) => {
+  const f = await fixture(t);
+  assert.equal(ShowcaseSlug.safeParse('admin').success, false);
+  assert.equal(ShowcaseSlug.safeParse('../agence').success, false);
+  await assert.rejects(resolvePublicShowcase(f.env, f.config.slug), /NOT_FOUND/);
+  await assert.rejects(f.action({ action: 'publish' }), /VALIDATION_ERROR/);
+  const item = await f.publish(),
+    before = await showcaseView(f.env, await resolvePublicShowcase(f.env, 'agence-lumiere'));
+  assert.equal(before.config.name, 'Agence Lumière');
+  assert.equal(before.total, 1);
+  assert.equal(before.properties[0].id, item.id);
+  assert.equal(before.properties[0].video, null);
+  assert.equal(before.properties[0].photos.length, 1);
+  await f.action({
+    action: 'save',
+    config: {
+      ...f.config,
+      name: 'Présentation en brouillon',
+      slug: 'nouvelle-agence',
+      address: 'Adresse privée',
+      showAddress: false,
+    },
+  });
+  await assert.rejects(resolvePublicShowcase(f.env, 'nouvelle-agence'), /NOT_FOUND/);
+  assert.equal(
+    (await showcaseView(f.env, await resolvePublicShowcase(f.env, 'agence-lumiere'))).config.name,
+    'Agence Lumière',
+  );
+  const preview = await showcaseView(f.env, (await readShowcase(f.env.DB, f.agency.id))!, new URLSearchParams(), true);
+  assert.equal(preview.config.name, 'Présentation en brouillon');
+  assert.equal(preview.config.address, '');
+  assert.ok(preview.properties[0].photos[0].url.startsWith('/api/vitrine/assets/'));
+  await f.action({ action: 'publish' });
+  assert.equal((await resolvePublicShowcase(f.env, 'agence-lumiere')).published!.slug, 'nouvelle-agence');
+  assert.equal((await resolvePublicShowcase(f.env, 'nouvelle-agence')).published!.name, 'Présentation en brouillon');
+  assert.equal((await f.env.DB.prepare('SELECT count(*) n FROM generation_shares').first<{ n: number }>())!.n, 0);
+  assert.equal((await f.env.DB.prepare('SELECT count(*) n FROM generation_runs').first<{ n: number }>())!.n, 0);
 });
-test('Le logo et la couverture d’agence ne remplacent pas les photos publiques du bien',async t=>{const f=await fixture(t),photo=f.group.photos[0],source=await f.env.MEDIA.get(photo.objectKey);assert.ok(source);
-  const pixels=new Uint8Array(await source.arrayBuffer()),logo=await uploadShowcaseImage(f.env,f.agency.id,pixels,photo.mime,'logo'),cover=await uploadShowcaseImage(f.env,f.agency.id,pixels,photo.mime,'cover');
-  await f.action({action:'save',config:{...f.config,name:'Agence Lumière',slug:'agence-lumiere',logoAssetId:logo.id,coverAssetId:cover.id}});
-  await f.action({action:'property-save',propertyId:f.group.summary.id,settings:defaultShowcaseProperty()});const item=(await readShowcaseItems(f.env.DB,f.agency.id))[0];
-  const management=await showcaseManagement(f.env,f.agency,'owner');assert.equal(management.items[0].issues.length,1);assert.match(management.items[0].issues[0],/photo de ce bien/);
-  const refused=await respond(async()=>{await f.action({action:'publish'});return Response.json({ok:true});});assert.equal(refused.status,422);
-  const failure=await refused.json() as{fields:Record<string,string>};assert.ok(failure.fields[item.id].includes(f.group.summary.title));assert.match(failure.fields[item.id],/onglet Biens/);
-  await assert.rejects(resolvePublicShowcase(f.env,'agence-lumiere'),/NOT_FOUND/);assert.equal((await readShowcaseItems(f.env.DB,f.agency.id))[0].published,null);
-  await f.action({action:'property-save',propertyId:f.group.summary.id,settings:{...f.settings,coverPhotoId:null}});const missingCover=await showcaseManagement(f.env,f.agency,'owner');assert.deepEqual(missingCover.items[0].issues,['Choisissez la photo de couverture de ce bien.']);
-  await f.action({action:'property-save',propertyId:f.group.summary.id,settings:f.settings});await f.action({action:'publish'});const publicData=await showcaseView(f.env,await resolvePublicShowcase(f.env,'agence-lumiere'));
-  assert.equal(publicData.logo!.id,logo.id);assert.equal(publicData.cover!.id,cover.id);assert.equal(publicData.properties[0].photos.length,1);assert.ok(publicData.properties[0].cover);assert.notEqual(publicData.properties[0].cover!.id,cover.id);
+test('Le logo et la couverture d’agence ne remplacent pas les photos publiques du bien', async (t) => {
+  const f = await fixture(t),
+    photo = f.group.photos[0],
+    source = await f.env.MEDIA.get(photo.objectKey);
+  assert.ok(source);
+  const pixels = new Uint8Array(await source.arrayBuffer()),
+    logo = await uploadShowcaseImage(f.env, f.agency.id, pixels, photo.mime, 'logo'),
+    cover = await uploadShowcaseImage(f.env, f.agency.id, pixels, photo.mime, 'cover');
+  await f.action({
+    action: 'save',
+    config: {
+      ...f.config,
+      name: 'Agence Lumière',
+      slug: 'agence-lumiere',
+      logoAssetId: logo.id,
+      coverAssetId: cover.id,
+    },
+  });
+  await f.action({ action: 'property-save', propertyId: f.group.summary.id, settings: defaultShowcaseProperty() });
+  const item = (await readShowcaseItems(f.env.DB, f.agency.id))[0];
+  const management = await showcaseManagement(f.env, f.agency, 'owner');
+  assert.equal(management.items[0].issues.length, 1);
+  assert.match(management.items[0].issues[0], /photo de ce bien/);
+  const refused = await respond(async () => {
+    await f.action({ action: 'publish' });
+    return Response.json({ ok: true });
+  });
+  assert.equal(refused.status, 422);
+  const failure = (await refused.json()) as { fields: Record<string, string> };
+  assert.ok(failure.fields[item.id].includes(f.group.summary.title));
+  assert.match(failure.fields[item.id], /onglet Biens/);
+  await assert.rejects(resolvePublicShowcase(f.env, 'agence-lumiere'), /NOT_FOUND/);
+  assert.equal((await readShowcaseItems(f.env.DB, f.agency.id))[0].published, null);
+  await f.action({
+    action: 'property-save',
+    propertyId: f.group.summary.id,
+    settings: { ...f.settings, coverPhotoId: null },
+  });
+  const missingCover = await showcaseManagement(f.env, f.agency, 'owner');
+  assert.deepEqual(missingCover.items[0].issues, ['Choisissez la photo de couverture de ce bien.']);
+  await f.action({ action: 'property-save', propertyId: f.group.summary.id, settings: f.settings });
+  await f.action({ action: 'publish' });
+  const publicData = await showcaseView(f.env, await resolvePublicShowcase(f.env, 'agence-lumiere'));
+  assert.equal(publicData.logo!.id, logo.id);
+  assert.equal(publicData.cover!.id, cover.id);
+  assert.equal(publicData.properties[0].photos.length, 1);
+  assert.ok(publicData.properties[0].cover);
+  assert.notEqual(publicData.properties[0].cover!.id, cover.id);
 });
-test('Ma vitrine : isolation, conflits de version et publication explicite de chaque média',async t=>{const f=await fixture(t),item=await f.publish(),publicRow=await resolvePublicShowcase(f.env,'agence-lumiere');
-  await assert.rejects(f.action({action:'property-save',propertyId:f.group.summary.id,settings:f.settings},f.foreign),/NOT_FOUND/);
-  await assert.rejects(f.action({action:'property-remove',id:item.id},f.foreign),/NOT_FOUND/);
-  await assert.rejects(f.action({action:'save',config:{...f.config,slug:'agence-lumiere'}},f.foreign),/CONFLICT/);
-  await assert.rejects(f.action({action:'publish'},f.agency,'editor'),/FORBIDDEN/);await assert.rejects(f.action({action:'property-remove',id:item.id},f.agency,'viewer'),/FORBIDDEN/);
-  const old=(await readShowcase(f.env.DB,f.agency.id))!.version;await f.action({action:'save',config:publicRow.draft});await assert.rejects(mutateShowcase(f.env,f.agency,'owner',{action:'offline',version:old}),/CONFLICT/);
-  const next=f.group.photos[1].hash;await f.action({action:'property-save',propertyId:f.group.summary.id,settings:{...f.settings,photoIds:[...f.settings.photoIds,next]}});
-  const draft=(await readShowcaseItems(f.env.DB,f.agency.id))[0];assert.equal(draft.id,item.id);assert.equal(draft.draft.photos.length,2);assert.equal(draft.published!.photos.length,1);
-  await assert.rejects(publicShowcaseMedia(new Request('http://localhost/photo'),f.env,'agence-lumiere',draft.draft.photos[1].id,item.id),/NOT_FOUND/);
-  await f.action({action:'property-publish',id:item.id});const data=await publicShowcaseProperty(f.env,await resolvePublicShowcase(f.env,'agence-lumiere'),item.id);assert.equal(data.photos.length,2);
-  const serialized=JSON.stringify(data);for(const forbidden of['objectKey','ownerUserId','agencyId','sourceUrl','jobId','input_json','provenance'])assert.equal(serialized.includes(forbidden),false,forbidden);
-  const response=await publicShowcaseMedia(new Request('http://localhost/photo'),f.env,'agence-lumiere',data.photos[0].id,item.id);assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'private, no-store');
+test('Ma vitrine : isolation, conflits de version et publication explicite de chaque média', async (t) => {
+  const f = await fixture(t),
+    item = await f.publish(),
+    publicRow = await resolvePublicShowcase(f.env, 'agence-lumiere');
+  await assert.rejects(
+    f.action({ action: 'property-save', propertyId: f.group.summary.id, settings: f.settings }, f.foreign),
+    /NOT_FOUND/,
+  );
+  await assert.rejects(f.action({ action: 'property-remove', id: item.id }, f.foreign), /NOT_FOUND/);
+  await assert.rejects(
+    f.action({ action: 'save', config: { ...f.config, slug: 'agence-lumiere' } }, f.foreign),
+    /CONFLICT/,
+  );
+  await assert.rejects(f.action({ action: 'publish' }, f.agency, 'editor'), /FORBIDDEN/);
+  await assert.rejects(f.action({ action: 'property-remove', id: item.id }, f.agency, 'viewer'), /FORBIDDEN/);
+  const old = (await readShowcase(f.env.DB, f.agency.id))!.version;
+  await f.action({ action: 'save', config: publicRow.draft });
+  await assert.rejects(mutateShowcase(f.env, f.agency, 'owner', { action: 'offline', version: old }), /CONFLICT/);
+  const next = f.group.photos[1].hash;
+  await f.action({
+    action: 'property-save',
+    propertyId: f.group.summary.id,
+    settings: { ...f.settings, photoIds: [...f.settings.photoIds, next] },
+  });
+  const draft = (await readShowcaseItems(f.env.DB, f.agency.id))[0];
+  assert.equal(draft.id, item.id);
+  assert.equal(draft.draft.photos.length, 2);
+  assert.equal(draft.published!.photos.length, 1);
+  await assert.rejects(
+    publicShowcaseMedia(
+      new Request('http://localhost/photo'),
+      f.env,
+      'agence-lumiere',
+      draft.draft.photos[1].id,
+      item.id,
+    ),
+    /NOT_FOUND/,
+  );
+  await f.action({ action: 'property-publish', id: item.id });
+  const data = await publicShowcaseProperty(f.env, await resolvePublicShowcase(f.env, 'agence-lumiere'), item.id);
+  assert.equal(data.photos.length, 2);
+  const serialized = JSON.stringify(data);
+  for (const forbidden of ['objectKey', 'ownerUserId', 'agencyId', 'sourceUrl', 'jobId', 'input_json', 'provenance'])
+    assert.equal(serialized.includes(forbidden), false, forbidden);
+  const response = await publicShowcaseMedia(
+    new Request('http://localhost/photo'),
+    f.env,
+    'agence-lumiere',
+    data.photos[0].id,
+    item.id,
+  );
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('cache-control'), 'private, no-store');
 });
-test('Ma vitrine : hors ligne, retrait direct, archivage et liens de médias ne contournent pas le retrait',async t=>{const f=await fixture(t),item=await f.publish(),data=await publicShowcaseProperty(f.env,await resolvePublicShowcase(f.env,'agence-lumiere'),item.id),photo=data.photos[0].id;
-  await f.action({action:'offline'});await assert.rejects(resolvePublicShowcase(f.env,'agence-lumiere'),/NOT_FOUND/);await assert.rejects(publicShowcaseMedia(new Request('http://localhost/photo',{headers:{'If-None-Match':'cached'}}),f.env,'agence-lumiere',photo,item.id),/NOT_FOUND/);
-  await f.action({action:'publish'});await f.action({action:'property-remove',id:item.id});await assert.rejects(publicShowcaseProperty(f.env,await resolvePublicShowcase(f.env,'agence-lumiere'),item.id),/NOT_FOUND/);
-  await f.action({action:'property-save',propertyId:f.group.summary.id,settings:f.settings});await f.action({action:'publish'});await archiveProperty(f.env,f.agency.id,f.group.summary.id,true);
-  await assert.rejects(publicShowcaseMedia(new Request('http://localhost/photo'),f.env,'agence-lumiere',photo,item.id),/NOT_FOUND/);
-  const archived=(await readPropertyGroups(f.env,f.agency.id))[0];await archiveProperty(f.env,f.agency.id,archived.summary.id,false);
-  await assert.rejects(publicShowcaseMedia(new Request('http://localhost/photo'),f.env,'agence-lumiere',photo,item.id),/NOT_FOUND/,'Le désarchivage ne republie rien.');
+test('Ma vitrine : hors ligne, retrait direct, archivage et liens de médias ne contournent pas le retrait', async (t) => {
+  const f = await fixture(t),
+    item = await f.publish(),
+    data = await publicShowcaseProperty(f.env, await resolvePublicShowcase(f.env, 'agence-lumiere'), item.id),
+    photo = data.photos[0].id;
+  await f.action({ action: 'offline' });
+  await assert.rejects(resolvePublicShowcase(f.env, 'agence-lumiere'), /NOT_FOUND/);
+  await assert.rejects(
+    publicShowcaseMedia(
+      new Request('http://localhost/photo', { headers: { 'If-None-Match': 'cached' } }),
+      f.env,
+      'agence-lumiere',
+      photo,
+      item.id,
+    ),
+    /NOT_FOUND/,
+  );
+  await f.action({ action: 'publish' });
+  await f.action({ action: 'property-remove', id: item.id });
+  await assert.rejects(
+    publicShowcaseProperty(f.env, await resolvePublicShowcase(f.env, 'agence-lumiere'), item.id),
+    /NOT_FOUND/,
+  );
+  await f.action({ action: 'property-save', propertyId: f.group.summary.id, settings: f.settings });
+  await f.action({ action: 'publish' });
+  await archiveProperty(f.env, f.agency.id, f.group.summary.id, true);
+  await assert.rejects(
+    publicShowcaseMedia(new Request('http://localhost/photo'), f.env, 'agence-lumiere', photo, item.id),
+    /NOT_FOUND/,
+  );
+  const archived = (await readPropertyGroups(f.env, f.agency.id))[0];
+  await archiveProperty(f.env, f.agency.id, archived.summary.id, false);
+  await assert.rejects(
+    publicShowcaseMedia(new Request('http://localhost/photo'), f.env, 'agence-lumiere', photo, item.id),
+    /NOT_FOUND/,
+    'Le désarchivage ne republie rien.',
+  );
 });
-test('Référencement et caches : uniquement les publications actives, retrait et slugs propres',async t=>{const f=await fixture(t);assert.deepEqual(await publicShowcaseSitemap(f.env),[]);const item=await f.publish(),entries=await publicShowcaseSitemap(f.env);assert.equal(entries.length,2);assert.ok(entries.some(e=>e.path.endsWith(item.id)));assert.ok(entries.every(e=>!e.path.includes('/ma-vitrine')));
-  for(const path of['/agences/agence-lumiere','/agences/agence-lumiere/biens/'+item.id,'/ma-vitrine/apercu?preview=true']){const response=protectShowcaseResponse(new Request('http://localhost'+path),new Response('private fixture',{headers:{'Cache-Control':'public, max-age=3600'}}));assert.match(response.headers.get('Cache-Control')!,/no-store/);assert.equal(response.headers.get('CDN-Cache-Control'),'no-store');if(path.startsWith('/ma-vitrine'))assert.match(response.headers.get('X-Robots-Tag')!,/noindex/);}
-  await f.action({action:'property-remove',id:item.id});assert.equal((await publicShowcaseSitemap(f.env)).length,1);await f.action({action:'offline'});assert.deepEqual(await publicShowcaseSitemap(f.env),[]);
+test('Référencement et caches : uniquement les publications actives, retrait et slugs propres', async (t) => {
+  const f = await fixture(t);
+  assert.deepEqual(await publicShowcaseSitemap(f.env), []);
+  const item = await f.publish(),
+    entries = await publicShowcaseSitemap(f.env);
+  assert.equal(entries.length, 2);
+  assert.ok(entries.some((e) => e.path.endsWith(item.id)));
+  assert.ok(entries.every((e) => !e.path.includes('/ma-vitrine')));
+  for (const path of [
+    '/agences/agence-lumiere',
+    '/agences/agence-lumiere/biens/' + item.id,
+    '/ma-vitrine/apercu?preview=true',
+  ]) {
+    const response = protectShowcaseResponse(
+      new Request('http://localhost' + path),
+      new Response('private fixture', { headers: { 'Cache-Control': 'public, max-age=3600' } }),
+    );
+    assert.match(response.headers.get('Cache-Control')!, /no-store/);
+    assert.equal(response.headers.get('CDN-Cache-Control'), 'no-store');
+    if (path.startsWith('/ma-vitrine')) assert.match(response.headers.get('X-Robots-Tag')!, /noindex/);
+  }
+  await f.action({ action: 'property-remove', id: item.id });
+  assert.equal((await publicShowcaseSitemap(f.env)).length, 1);
+  await f.action({ action: 'offline' });
+  assert.deepEqual(await publicShowcaseSitemap(f.env), []);
 });
-test('Les statistiques exigent le consentement, dédoublonnent et excluent les membres et robots',async t=>{const f=await fixture(t),item=await f.publish();const body={event:'agency_view',propertyId:null,intent:crypto.randomUUID(),consent:true};
-  const request=(input:unknown=body,headers:Record<string,string>={})=>new Request(f.env.BETTER_AUTH_URL+'/api/vitrines/agence-lumiere/events',{method:'POST',headers:{origin:f.env.BETTER_AUTH_URL,'Content-Type':'application/json','User-Agent':'Mozilla/5.0 Real visitor',...headers},body:JSON.stringify(input)});
-  await assert.rejects(recordShowcaseEvent(request({...body,consent:false}),f.env,'agence-lumiere',false),/VALIDATION_ERROR/);await recordShowcaseEvent(request(),f.env,'agence-lumiere',false);await recordShowcaseEvent(request(),f.env,'agence-lumiere',false);assert.equal((await showcaseStatistics(f.env,f.agency.id)).agencyViews,1);
-  await recordShowcaseEvent(request({...body,intent:crypto.randomUUID()},{'User-Agent':'Googlebot'}),f.env,'agence-lumiere',false);assert.equal((await showcaseStatistics(f.env,f.agency.id)).agencyViews,1);
-  const token='fixture-session-token',now=Date.now();await f.env.DB.prepare('INSERT INTO auth_session(id,expiresAt,token,createdAt,updatedAt,userId) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),now+3600000,token,now,now,'showcase-owner').run();
-  const cookie='bienvu.session_token='+encodeURIComponent(token+'.'+createHmac('sha256',f.env.BETTER_AUTH_SECRET).update(token).digest('base64'));
-  await recordShowcaseEvent(request({...body,intent:crypto.randomUUID()},{cookie}),f.env,'agence-lumiere',false);assert.equal((await showcaseStatistics(f.env,f.agency.id)).agencyViews,1);
-  await recordShowcaseEvent(request({...body,event:'property_view',propertyId:item.id,intent:crypto.randomUUID()}),f.env,'agence-lumiere',false);await recordShowcaseEvent(request({...body,event:'contact_click',propertyId:item.id,intent:crypto.randomUUID()}),f.env,'agence-lumiere',false);
-  assert.deepEqual(await showcaseStatistics(f.env,f.agency.id,7),{days:7,agencyViews:1,propertyViews:1,contactClicks:1,requests:0});await assert.rejects(recordShowcaseEvent(request({...body,propertyId:crypto.randomUUID()}),f.env,'agence-lumiere',false),/NOT_FOUND/);
+test('Les statistiques exigent le consentement, dédoublonnent et excluent les membres et robots', async (t) => {
+  const f = await fixture(t),
+    item = await f.publish();
+  const body = { event: 'agency_view', propertyId: null, intent: crypto.randomUUID(), consent: true };
+  const request = (input: unknown = body, headers: Record<string, string> = {}) =>
+    new Request(f.env.BETTER_AUTH_URL + '/api/vitrines/agence-lumiere/events', {
+      method: 'POST',
+      headers: {
+        origin: f.env.BETTER_AUTH_URL,
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 Real visitor',
+        ...headers,
+      },
+      body: JSON.stringify(input),
+    });
+  await assert.rejects(
+    recordShowcaseEvent(request({ ...body, consent: false }), f.env, 'agence-lumiere', false),
+    /VALIDATION_ERROR/,
+  );
+  await recordShowcaseEvent(request(), f.env, 'agence-lumiere', false);
+  await recordShowcaseEvent(request(), f.env, 'agence-lumiere', false);
+  assert.equal((await showcaseStatistics(f.env, f.agency.id)).agencyViews, 1);
+  await recordShowcaseEvent(
+    request({ ...body, intent: crypto.randomUUID() }, { 'User-Agent': 'Googlebot' }),
+    f.env,
+    'agence-lumiere',
+    false,
+  );
+  assert.equal((await showcaseStatistics(f.env, f.agency.id)).agencyViews, 1);
+  const token = 'fixture-session-token',
+    now = Date.now();
+  await f.env.DB.prepare('INSERT INTO auth_session(id,expiresAt,token,createdAt,updatedAt,userId) VALUES(?,?,?,?,?,?)')
+    .bind(crypto.randomUUID(), now + 3600000, token, now, now, 'showcase-owner')
+    .run();
+  const cookie =
+    'bienvu.session_token=' +
+    encodeURIComponent(token + '.' + createHmac('sha256', f.env.BETTER_AUTH_SECRET).update(token).digest('base64'));
+  await recordShowcaseEvent(
+    request({ ...body, intent: crypto.randomUUID() }, { cookie }),
+    f.env,
+    'agence-lumiere',
+    false,
+  );
+  assert.equal((await showcaseStatistics(f.env, f.agency.id)).agencyViews, 1);
+  await recordShowcaseEvent(
+    request({ ...body, event: 'property_view', propertyId: item.id, intent: crypto.randomUUID() }),
+    f.env,
+    'agence-lumiere',
+    false,
+  );
+  await recordShowcaseEvent(
+    request({ ...body, event: 'contact_click', propertyId: item.id, intent: crypto.randomUUID() }),
+    f.env,
+    'agence-lumiere',
+    false,
+  );
+  assert.deepEqual(await showcaseStatistics(f.env, f.agency.id, 7), {
+    days: 7,
+    agencyViews: 1,
+    propertyViews: 1,
+    contactClicks: 1,
+    requests: 0,
+  });
+  await assert.rejects(
+    recordShowcaseEvent(request({ ...body, propertyId: crypto.randomUUID() }), f.env, 'agence-lumiere', false),
+    /NOT_FOUND/,
+  );
 });
-test('Vidéo sélectionnée : génération terminée, copie protégée, changement de prix et nouveaux contenus privés',async t=>{const f=await fixture(t);await f.env.DB.exec('UPDATE generation_control SET enabled=1; UPDATE trial_policy SET free_enabled=1');
-  const draft=await customizeImportedListing(f.env,f.agency.id,f.imported.id,'showcase-draft-key00',AbortSignal.timeout(20000)),job=await admitGeneration(f.env.DB,f.agency.id,'showcase-video-key00',{listingId:f.imported.id,voiceEnabled:false,subtitlesEnabled:false,customization:{...defaultVideoCustomization(),narration:['Découvrez cet appartement.','La visite se poursuit en images.','Retrouvez les informations du bien.','Contactez votre agence pour une visite.']}},'true');
-  const item=await f.publish();await assert.rejects(f.action({action:'property-save',propertyId:f.group.summary.id,settings:{...f.settings,videoJobId:job.jobId}}),/NOT_FOUND/);
-  await f.env.DB.prepare("UPDATE jobs SET status='scripting',stage='scripting',listing_id=? WHERE id=?").bind(f.imported.id,job.jobId).run();await prepareJobNarration(f.env,f.agency.id,job.jobId,{mode:'mock',script:{model:'gpt-5.4-mini',plan:async()=>{throw Error('NO_OPENAI');}},voice:{config:GoogleVoiceConfig.parse({projectId:'fixture',voice:'fr-FR-Chirp3-HD-Aoede'}),synthesize:async()=>{throw Error('NO_TTS');}}});
-  const prepared=await prepareJobVideo(f.env,f.agency.id,job.jobId),report=videoReport(prepared.hash,prepared.manifest),key=`agencies/${f.agency.id}/jobs/${job.jobId}/video/output.mp4`,at=new Date().toISOString();
-  await f.env.MEDIA.put(key,new Uint8Array(report.sizeBytes),{customMetadata:{sha256:report.sha256}});await f.env.DB.batch([f.env.DB.prepare('INSERT INTO generation_artifacts VALUES(?,?,?,?)').bind(job.jobId,key,JSON.stringify(report),at),f.env.DB.prepare("UPDATE jobs SET status='ready',lease_until=NULL WHERE id=?").bind(job.jobId)]);
-  assert.equal(generationMasterUnlocked((await findOwnedGeneration(f.env.DB,f.agency.id,job.jobId))!),true);assert.equal((await publicShowcaseProperty(f.env,await resolvePublicShowcase(f.env,'agence-lumiere'),item.id)).video,null,'Une nouvelle vidéo terminée reste privée.');
-  await f.action({action:'property-save',propertyId:f.group.summary.id,settings:{...f.settings,videoJobId:job.jobId}});await f.action({action:'property-publish',id:item.id});let publicProperty=await publicShowcaseProperty(f.env,await resolvePublicShowcase(f.env,'agence-lumiere'),item.id);assert.ok(publicProperty.video);
-  const videoId=(await readShowcaseItems(f.env.DB,f.agency.id))[0].published!.video!.id;assert.equal((await publicShowcaseMedia(new Request('http://localhost/video',{headers:{range:'bytes=0-1'}}),f.env,'agence-lumiere',videoId,item.id)).status,206);
-  await f.env.MEDIA.delete(key);assert.ok((await publicShowcaseProperty(f.env,await resolvePublicShowcase(f.env,'agence-lumiere'),item.id)).video,'La copie publiée ne dépend pas du fichier temporaire d’origine.');
-  await patchCreationDraft(f.env.DB,f.agency.id,draft.id,{version:draft.version,changes:{priceCents:30000000},confirm:[]});publicProperty=await publicShowcaseProperty(f.env,await resolvePublicShowcase(f.env,'agence-lumiere'),item.id);assert.equal(publicProperty.fields.priceCents,30000000);assert.equal(publicProperty.video,null);assert.equal(publicProperty.videoOutdated,true);
-  await assert.rejects(publicShowcaseMedia(new Request('http://localhost/video'),f.env,'agence-lumiere',videoId,item.id),/NOT_FOUND/);assert.equal((await f.env.DB.prepare('SELECT count(*) n FROM generation_runs').first<{n:number}>())!.n,1,'Aucune génération supplémentaire par la vitrine.');assert.equal((await f.env.DB.prepare('SELECT count(*) n FROM generation_shares').first<{n:number}>())!.n,0);
+test('Vidéo sélectionnée : génération terminée, copie protégée, changement de prix et nouveaux contenus privés', async (t) => {
+  const f = await fixture(t);
+  await f.env.DB.exec('UPDATE generation_control SET enabled=1; UPDATE trial_policy SET free_enabled=1');
+  const draft = await customizeImportedListing(
+      f.env,
+      f.agency.id,
+      f.imported.id,
+      'showcase-draft-key00',
+      AbortSignal.timeout(20000),
+    ),
+    job = await admitGeneration(
+      f.env.DB,
+      f.agency.id,
+      'showcase-video-key00',
+      {
+        listingId: f.imported.id,
+        voiceEnabled: false,
+        subtitlesEnabled: false,
+        customization: {
+          ...defaultVideoCustomization(),
+          narration: [
+            'Découvrez cet appartement.',
+            'La visite se poursuit en images.',
+            'Retrouvez les informations du bien.',
+            'Contactez votre agence pour une visite.',
+          ],
+        },
+      },
+      'true',
+    );
+  const item = await f.publish();
+  await assert.rejects(
+    f.action({
+      action: 'property-save',
+      propertyId: f.group.summary.id,
+      settings: { ...f.settings, videoJobId: job.jobId },
+    }),
+    /NOT_FOUND/,
+  );
+  await f.env.DB.prepare("UPDATE jobs SET status='scripting',stage='scripting',listing_id=? WHERE id=?")
+    .bind(f.imported.id, job.jobId)
+    .run();
+  await prepareJobNarration(f.env, f.agency.id, job.jobId, {
+    mode: 'mock',
+    script: {
+      model: 'gpt-5.4-mini',
+      plan: async () => {
+        throw Error('NO_OPENAI');
+      },
+    },
+    voice: {
+      config: GoogleVoiceConfig.parse({ projectId: 'fixture', voice: 'fr-FR-Chirp3-HD-Aoede' }),
+      synthesize: async () => {
+        throw Error('NO_TTS');
+      },
+    },
+  });
+  const prepared = await prepareJobVideo(f.env, f.agency.id, job.jobId),
+    report = videoReport(prepared.hash, prepared.manifest),
+    key = `agencies/${f.agency.id}/jobs/${job.jobId}/video/output.mp4`,
+    at = new Date().toISOString();
+  await f.env.MEDIA.put(key, new Uint8Array(report.sizeBytes), { customMetadata: { sha256: report.sha256 } });
+  await f.env.DB.batch([
+    f.env.DB.prepare('INSERT INTO generation_artifacts VALUES(?,?,?,?)').bind(
+      job.jobId,
+      key,
+      JSON.stringify(report),
+      at,
+    ),
+    f.env.DB.prepare("UPDATE jobs SET status='ready',lease_until=NULL WHERE id=?").bind(job.jobId),
+  ]);
+  assert.equal(generationMasterUnlocked((await findOwnedGeneration(f.env.DB, f.agency.id, job.jobId))!), true);
+  assert.equal(
+    (await publicShowcaseProperty(f.env, await resolvePublicShowcase(f.env, 'agence-lumiere'), item.id)).video,
+    null,
+    'Une nouvelle vidéo terminée reste privée.',
+  );
+  await f.action({
+    action: 'property-save',
+    propertyId: f.group.summary.id,
+    settings: { ...f.settings, videoJobId: job.jobId },
+  });
+  await f.action({ action: 'property-publish', id: item.id });
+  let publicProperty = await publicShowcaseProperty(
+    f.env,
+    await resolvePublicShowcase(f.env, 'agence-lumiere'),
+    item.id,
+  );
+  assert.ok(publicProperty.video);
+  const videoId = (await readShowcaseItems(f.env.DB, f.agency.id))[0].published!.video!.id;
+  assert.equal(
+    (
+      await publicShowcaseMedia(
+        new Request('http://localhost/video', { headers: { range: 'bytes=0-1' } }),
+        f.env,
+        'agence-lumiere',
+        videoId,
+        item.id,
+      )
+    ).status,
+    206,
+  );
+  await f.env.MEDIA.delete(key);
+  assert.ok(
+    (await publicShowcaseProperty(f.env, await resolvePublicShowcase(f.env, 'agence-lumiere'), item.id)).video,
+    'La copie publiée ne dépend pas du fichier temporaire d’origine.',
+  );
+  await patchCreationDraft(f.env.DB, f.agency.id, draft.id, {
+    version: draft.version,
+    changes: { priceCents: 30000000 },
+    confirm: [],
+  });
+  publicProperty = await publicShowcaseProperty(f.env, await resolvePublicShowcase(f.env, 'agence-lumiere'), item.id);
+  assert.equal(publicProperty.fields.priceCents, 30000000);
+  assert.equal(publicProperty.video, null);
+  assert.equal(publicProperty.videoOutdated, true);
+  await assert.rejects(
+    publicShowcaseMedia(new Request('http://localhost/video'), f.env, 'agence-lumiere', videoId, item.id),
+    /NOT_FOUND/,
+  );
+  assert.equal(
+    (await f.env.DB.prepare('SELECT count(*) n FROM generation_runs').first<{ n: number }>())!.n,
+    1,
+    'Aucune génération supplémentaire par la vitrine.',
+  );
+  assert.equal((await f.env.DB.prepare('SELECT count(*) n FROM generation_shares').first<{ n: number }>())!.n, 0);
 });
-test('Photos manquantes, adresse masquée, vendu et suppression du bien : aucune fuite ou republication',async t=>{const f=await fixture(t),item=await f.publish();assert.equal((await publicShowcaseProperty(f.env,await resolvePublicShowcase(f.env,'agence-lumiere'),item.id)).address,null);
-  await f.action({action:'property-save',propertyId:f.group.summary.id,settings:{...f.settings,status:'sold',address:'Adresse privée de recette',showAddress:false}});await f.action({action:'publish'});await assert.rejects(publicShowcaseProperty(f.env,await resolvePublicShowcase(f.env,'agence-lumiere'),item.id),/NOT_FOUND/);
-  await f.action({action:'save',config:{...f.config,slug:'agence-lumiere',keepSold:true}});await f.action({action:'publish'});assert.equal((await publicShowcaseProperty(f.env,await resolvePublicShowcase(f.env,'agence-lumiere'),item.id)).status,'sold');
-  const photo=(await readShowcaseItems(f.env.DB,f.agency.id))[0].published!.photos[0],copied=await f.env.DB.prepare('SELECT object_key AS key FROM showcase_assets WHERE id=?').bind(photo.id).first<{key:string}>();await f.env.MEDIA.delete(copied!.key);
-  await assert.rejects(publicShowcaseProperty(f.env,await resolvePublicShowcase(f.env,'agence-lumiere'),item.id),/NOT_FOUND/,'Un média manquant ne produit pas de fiche factice.');await f.action({action:'property-save',propertyId:f.group.summary.id,settings:{...f.settings,status:'sold'}});await f.action({action:'property-publish',id:item.id});
-  const manual=await beginManualImport(f.env.DB,f.agency.id,'showcase-delete-manual00','{}','a'.repeat(64)),draft=blankCreationDraft();draft.fields=f.group.summary.fields;await startCreationDraft(f.env.DB,f.agency.id,manual.row.id,draft);
-  const original=f.group.photos[0],sourcePhoto={id:crypto.randomUUID(),agencyId:f.agency.id,listingId:manual.row.id,sourceUrl:null,sourceOrder:0,objectKey:`agencies/${f.agency.id}/imports/${manual.row.id}/${original.hash}.jpg`,contentHash:original.hash,width:original.width,height:original.height,mime:original.mime,sizeBytes:original.sizeBytes};
-  await f.env.MEDIA.put(sourcePhoto.objectKey,await(await f.env.MEDIA.get(original.objectKey))!.arrayBuffer(),{customMetadata:{sha256:original.hash}});await f.env.DB.prepare('INSERT INTO import_objects(id,agency_id,import_id,object_key,photo_json) VALUES(?,?,?,?,?)').bind(sourcePhoto.id,f.agency.id,manual.row.id,sourcePhoto.objectKey,JSON.stringify(sourcePhoto)).run();
-  await f.action({action:'property-save',propertyId:'listing:'+manual.row.id,settings:f.settings});const manualItem=(await readShowcaseItems(f.env.DB,f.agency.id)).find(i=>i.propertyId==='listing:'+manual.row.id)!;await f.action({action:'property-publish',id:manualItem.id});
-  await deleteCreationDraft(f.env,f.agency.id,manual.row.id);await assert.rejects(publicShowcaseProperty(f.env,await resolvePublicShowcase(f.env,'agence-lumiere'),manualItem.id),/NOT_FOUND/);assert.equal((await readShowcaseItems(f.env.DB,f.agency.id)).find(i=>i.id===manualItem.id)!.removed,true);
-  await cleanupShowcases(f.env,Date.now()+181*86400000);assert.ok((await f.env.DB.prepare('SELECT count(*) n FROM showcase_assets').first<{n:number}>())!.n>=1,'Les médias encore sélectionnés dans un brouillon restent protégés et conservés.');
+test('Photos manquantes, adresse masquée, vendu et suppression du bien : aucune fuite ou republication', async (t) => {
+  const f = await fixture(t),
+    item = await f.publish();
+  assert.equal(
+    (await publicShowcaseProperty(f.env, await resolvePublicShowcase(f.env, 'agence-lumiere'), item.id)).address,
+    null,
+  );
+  await f.action({
+    action: 'property-save',
+    propertyId: f.group.summary.id,
+    settings: { ...f.settings, status: 'sold', address: 'Adresse privée de recette', showAddress: false },
+  });
+  await f.action({ action: 'publish' });
+  await assert.rejects(
+    publicShowcaseProperty(f.env, await resolvePublicShowcase(f.env, 'agence-lumiere'), item.id),
+    /NOT_FOUND/,
+  );
+  await f.action({ action: 'save', config: { ...f.config, slug: 'agence-lumiere', keepSold: true } });
+  await f.action({ action: 'publish' });
+  assert.equal(
+    (await publicShowcaseProperty(f.env, await resolvePublicShowcase(f.env, 'agence-lumiere'), item.id)).status,
+    'sold',
+  );
+  const photo = (await readShowcaseItems(f.env.DB, f.agency.id))[0].published!.photos[0],
+    copied = await f.env.DB.prepare('SELECT object_key AS key FROM showcase_assets WHERE id=?')
+      .bind(photo.id)
+      .first<{ key: string }>();
+  await f.env.MEDIA.delete(copied!.key);
+  await assert.rejects(
+    publicShowcaseProperty(f.env, await resolvePublicShowcase(f.env, 'agence-lumiere'), item.id),
+    /NOT_FOUND/,
+    'Un média manquant ne produit pas de fiche factice.',
+  );
+  await f.action({
+    action: 'property-save',
+    propertyId: f.group.summary.id,
+    settings: { ...f.settings, status: 'sold' },
+  });
+  await f.action({ action: 'property-publish', id: item.id });
+  const manual = await beginManualImport(f.env.DB, f.agency.id, 'showcase-delete-manual00', '{}', 'a'.repeat(64)),
+    draft = blankCreationDraft();
+  draft.fields = f.group.summary.fields;
+  await startCreationDraft(f.env.DB, f.agency.id, manual.row.id, draft);
+  const original = f.group.photos[0],
+    sourcePhoto = {
+      id: crypto.randomUUID(),
+      agencyId: f.agency.id,
+      listingId: manual.row.id,
+      sourceUrl: null,
+      sourceOrder: 0,
+      objectKey: `agencies/${f.agency.id}/imports/${manual.row.id}/${original.hash}.jpg`,
+      contentHash: original.hash,
+      width: original.width,
+      height: original.height,
+      mime: original.mime,
+      sizeBytes: original.sizeBytes,
+    };
+  await f.env.MEDIA.put(sourcePhoto.objectKey, await (await f.env.MEDIA.get(original.objectKey))!.arrayBuffer(), {
+    customMetadata: { sha256: original.hash },
+  });
+  await f.env.DB.prepare('INSERT INTO import_objects(id,agency_id,import_id,object_key,photo_json) VALUES(?,?,?,?,?)')
+    .bind(sourcePhoto.id, f.agency.id, manual.row.id, sourcePhoto.objectKey, JSON.stringify(sourcePhoto))
+    .run();
+  await f.action({ action: 'property-save', propertyId: 'listing:' + manual.row.id, settings: f.settings });
+  const manualItem = (await readShowcaseItems(f.env.DB, f.agency.id)).find(
+    (i) => i.propertyId === 'listing:' + manual.row.id,
+  )!;
+  await f.action({ action: 'property-publish', id: manualItem.id });
+  await deleteCreationDraft(f.env, f.agency.id, manual.row.id);
+  await assert.rejects(
+    publicShowcaseProperty(f.env, await resolvePublicShowcase(f.env, 'agence-lumiere'), manualItem.id),
+    /NOT_FOUND/,
+  );
+  assert.equal((await readShowcaseItems(f.env.DB, f.agency.id)).find((i) => i.id === manualItem.id)!.removed, true);
+  await cleanupShowcases(f.env, Date.now() + 181 * 86400000);
+  assert.ok(
+    (await f.env.DB.prepare('SELECT count(*) n FROM showcase_assets').first<{ n: number }>())!.n >= 1,
+    'Les médias encore sélectionnés dans un brouillon restent protégés et conservés.',
+  );
 });
-test('Demandes de vitrine : réception durable, double clic, protection anti-spam et aucun e-mail perdu',async t=>{const f=await fixture(t),item=await f.publish(),id=crypto.randomUUID();
-  const submit=(request:Request,fetcher=f.verifier())=>respond(()=>submitShowcaseContact(request,f.env,'agence-lumiere',false,fetcher));
-  assert.equal((await submit(f.contact(undefined,{email:'invalid'}))).status,422);assert.equal((await submit(f.contact(undefined,{website:'spam'}))).status,422);
-  assert.equal((await submit(f.contact(undefined,{}),f.verifier({action:'anonymous_trial'}))).status,422);
-  const replies=await Promise.all([submit(f.contact(id,{propertyId:item.id})),submit(f.contact(id,{propertyId:item.id}))]);assert.ok(replies.every(r=>[200,201].includes(r.status)));
-  const inbox=await listShowcaseLeads(f.env,f.agency.id,null);assert.equal(inbox.leads.length,1);assert.equal(inbox.leads[0].propertyId,item.id);assert.equal(inbox.leads[0].status,'new');assert.equal(f.count().sent,0);
-  const verified=f.count().verified;assert.equal((await submit(f.contact(id,{propertyId:item.id,turnstileToken:''}))).status,200);assert.equal(f.count().verified,verified);
-  assert.equal((await submit(f.contact(id,{propertyId:item.id,message:'Une autre demande à la place de l’originale.'}))).status,409);
-  await assert.rejects(mutateShowcaseLead(f.env,f.foreign.id,'owner',{action:'lead',id,status:'treated'}),/NOT_FOUND/);
-  await assert.rejects(mutateShowcaseLead(f.env,f.agency.id,'viewer',{action:'lead',id,status:'treated'}),/FORBIDDEN/);
-  f.setFail(true);await sendShowcaseNotifications(f.env);assert.equal((await listShowcaseLeads(f.env,f.agency.id,null)).leads[0].notification,'pending');assert.equal((await listShowcaseLeads(f.env,f.agency.id,null)).leads.length,1);
-  f.setFail(false);await sendShowcaseNotifications(f.env,Date.now()+61000);assert.equal((await listShowcaseLeads(f.env,f.agency.id,null)).leads[0].notification,'sent');
-  await mutateShowcaseLead(f.env,f.agency.id,'owner',{action:'lead',id,status:'treated'});assert.equal((await listShowcaseLeads(f.env,f.agency.id,null)).leads[0].status,'treated');
-  await mutateShowcaseLead(f.env,f.agency.id,'owner',{action:'lead-delete',id});assert.equal((await submit(f.contact(id,{propertyId:item.id,turnstileToken:''}))).status,200);assert.equal((await listShowcaseLeads(f.env,f.agency.id,null)).leads.length,0);
-  assert.equal((await showcaseStatistics(f.env,f.agency.id)).requests,1);
+test('Demandes de vitrine : réception durable, double clic, protection anti-spam et aucun e-mail perdu', async (t) => {
+  const f = await fixture(t),
+    item = await f.publish(),
+    id = crypto.randomUUID();
+  const submit = (request: Request, fetcher = f.verifier()) =>
+    respond(() => submitShowcaseContact(request, f.env, 'agence-lumiere', false, fetcher));
+  assert.equal((await submit(f.contact(undefined, { email: 'invalid' }))).status, 422);
+  assert.equal((await submit(f.contact(undefined, { website: 'spam' }))).status, 422);
+  assert.equal((await submit(f.contact(undefined, {}), f.verifier({ action: 'anonymous_trial' }))).status, 422);
+  const replies = await Promise.all([
+    submit(f.contact(id, { propertyId: item.id })),
+    submit(f.contact(id, { propertyId: item.id })),
+  ]);
+  assert.ok(replies.every((r) => [200, 201].includes(r.status)));
+  const inbox = await listShowcaseLeads(f.env, f.agency.id, null);
+  assert.equal(inbox.leads.length, 1);
+  assert.equal(inbox.leads[0].propertyId, item.id);
+  assert.equal(inbox.leads[0].status, 'new');
+  assert.equal(f.count().sent, 0);
+  const verified = f.count().verified;
+  assert.equal((await submit(f.contact(id, { propertyId: item.id, turnstileToken: '' }))).status, 200);
+  assert.equal(f.count().verified, verified);
+  assert.equal(
+    (await submit(f.contact(id, { propertyId: item.id, message: 'Une autre demande à la place de l’originale.' })))
+      .status,
+    409,
+  );
+  await assert.rejects(
+    mutateShowcaseLead(f.env, f.foreign.id, 'owner', { action: 'lead', id, status: 'treated' }),
+    /NOT_FOUND/,
+  );
+  await assert.rejects(
+    mutateShowcaseLead(f.env, f.agency.id, 'viewer', { action: 'lead', id, status: 'treated' }),
+    /FORBIDDEN/,
+  );
+  f.setFail(true);
+  await sendShowcaseNotifications(f.env);
+  assert.equal((await listShowcaseLeads(f.env, f.agency.id, null)).leads[0].notification, 'pending');
+  assert.equal((await listShowcaseLeads(f.env, f.agency.id, null)).leads.length, 1);
+  f.setFail(false);
+  await sendShowcaseNotifications(f.env, Date.now() + 61000);
+  assert.equal((await listShowcaseLeads(f.env, f.agency.id, null)).leads[0].notification, 'sent');
+  await mutateShowcaseLead(f.env, f.agency.id, 'owner', { action: 'lead', id, status: 'treated' });
+  assert.equal((await listShowcaseLeads(f.env, f.agency.id, null)).leads[0].status, 'treated');
+  await mutateShowcaseLead(f.env, f.agency.id, 'owner', { action: 'lead-delete', id });
+  assert.equal((await submit(f.contact(id, { propertyId: item.id, turnstileToken: '' }))).status, 200);
+  assert.equal((await listShowcaseLeads(f.env, f.agency.id, null)).leads.length, 0);
+  assert.equal((await showcaseStatistics(f.env, f.agency.id)).requests, 1);
 });
-test('Demandes sans service mail : sauvegarde dans la bonne agence et statistiques à zéro',async t=>{const f=await fixture(t);await f.publish();const env={...f.env,AUTH_EMAIL:undefined};
-  assert.equal((await respond(()=>submitShowcaseContact(f.contact(),env,'agence-lumiere',false,f.verifier()))).status,201);await sendShowcaseNotifications(env);assert.equal(f.count().sent,0);
-  const own=await showcaseManagement(env,f.agency,'owner');assert.equal(own.leads[0].notification,'disabled');assert.equal(own.emailConfigured,false);assert.deepEqual(own.stats,{days:30,agencyViews:0,propertyViews:0,contactClicks:0,requests:1});
-  assert.equal((await listShowcaseLeads(env,f.foreign.id,null)).leads.length,0);
+test('Demandes sans service mail : sauvegarde dans la bonne agence et statistiques à zéro', async (t) => {
+  const f = await fixture(t);
+  await f.publish();
+  const env = { ...f.env, AUTH_EMAIL: undefined };
+  assert.equal(
+    (await respond(() => submitShowcaseContact(f.contact(), env, 'agence-lumiere', false, f.verifier()))).status,
+    201,
+  );
+  await sendShowcaseNotifications(env);
+  assert.equal(f.count().sent, 0);
+  const own = await showcaseManagement(env, f.agency, 'owner');
+  assert.equal(own.leads[0].notification, 'disabled');
+  assert.equal(own.emailConfigured, false);
+  assert.deepEqual(own.stats, { days: 30, agencyViews: 0, propertyViews: 0, contactClicks: 0, requests: 1 });
+  assert.equal((await listShowcaseLeads(env, f.foreign.id, null)).leads.length, 0);
 });
-test('Un dossier archivé retire aussi la sélection publique de sa source originale',async t=>{const f=await fixture(t),item=await f.publish();
-  const draft=await customizeImportedListing(f.env,f.agency.id,f.imported.id,'showcase-project-draft00',AbortSignal.timeout(20000));
-  const project=await workspaceAction(f.env,f.agency.id,{action:'project',name:'Le bien et ses contenus'});
-  assert.ok('id' in project);if(!('id' in project))throw Error('PROJECT_MISSING');
-  await workspaceAction(f.env,f.agency.id,{action:'attach',projectId:project.id,kind:'draft',id:draft.id});
-  const grouped=(await readPropertyGroups(f.env,f.agency.id)).find(g=>g.summary.projectId===project.id)!;
-  assert.ok(grouped.aliases.includes('listing:'+f.imported.id));
-  assert.ok((await publicShowcaseProperty(f.env,await resolvePublicShowcase(f.env,'agence-lumiere'),item.id)).photos.length);
-  await workspaceAction(f.env,f.agency.id,{action:'archive',id:project.id,archived:true});
-  assert.equal((await readShowcaseItems(f.env.DB,f.agency.id))[0].removed,true);
-  await workspaceAction(f.env,f.agency.id,{action:'archive',id:project.id,archived:false});
-  await assert.rejects(publicShowcaseProperty(f.env,await resolvePublicShowcase(f.env,'agence-lumiere'),item.id),/NOT_FOUND/);
-  await assert.rejects(publicShowcaseMedia(new Request('http://localhost/photo'),f.env,'agence-lumiere',item.draft.photos[0].id,item.id),/NOT_FOUND/);
+test('Un dossier archivé retire aussi la sélection publique de sa source originale', async (t) => {
+  const f = await fixture(t),
+    item = await f.publish();
+  const draft = await customizeImportedListing(
+    f.env,
+    f.agency.id,
+    f.imported.id,
+    'showcase-project-draft00',
+    AbortSignal.timeout(20000),
+  );
+  const project = await workspaceAction(f.env, f.agency.id, { action: 'project', name: 'Le bien et ses contenus' });
+  assert.ok('id' in project);
+  if (!('id' in project)) throw Error('PROJECT_MISSING');
+  await workspaceAction(f.env, f.agency.id, { action: 'attach', projectId: project.id, kind: 'draft', id: draft.id });
+  const grouped = (await readPropertyGroups(f.env, f.agency.id)).find((g) => g.summary.projectId === project.id)!;
+  assert.ok(grouped.aliases.includes('listing:' + f.imported.id));
+  assert.ok(
+    (await publicShowcaseProperty(f.env, await resolvePublicShowcase(f.env, 'agence-lumiere'), item.id)).photos.length,
+  );
+  await workspaceAction(f.env, f.agency.id, { action: 'archive', id: project.id, archived: true });
+  assert.equal((await readShowcaseItems(f.env.DB, f.agency.id))[0].removed, true);
+  await workspaceAction(f.env, f.agency.id, { action: 'archive', id: project.id, archived: false });
+  await assert.rejects(
+    publicShowcaseProperty(f.env, await resolvePublicShowcase(f.env, 'agence-lumiere'), item.id),
+    /NOT_FOUND/,
+  );
+  await assert.rejects(
+    publicShowcaseMedia(
+      new Request('http://localhost/photo'),
+      f.env,
+      'agence-lumiere',
+      item.draft.photos[0].id,
+      item.id,
+    ),
+    /NOT_FOUND/,
+  );
 });
-test('Cinq échecs de notification restent visibles et une relance ne duplique pas la demande',async t=>{const f=await fixture(t);await f.publish();const id=crypto.randomUUID();
-  await submitShowcaseContact(f.contact(id),f.env,'agence-lumiere',false,f.verifier());f.setFail(true);const now=Date.now();
-  for(let i=0;i<5;i++)await sendShowcaseNotifications(f.env,now+i*3600001);
-  assert.equal((await listShowcaseLeads(f.env,f.agency.id,null)).leads[0].notification,'failed');assert.equal(f.count().sent,5);
-  await mutateShowcaseLead(f.env,f.agency.id,'owner',{action:'lead-retry',id});f.setFail(false);await sendShowcaseNotifications(f.env);
-  const leads=(await listShowcaseLeads(f.env,f.agency.id,null)).leads;assert.equal(leads.length,1);assert.equal(leads[0].notification,'sent');assert.equal((await showcaseStatistics(f.env,f.agency.id)).requests,1);
+test('Cinq échecs de notification restent visibles et une relance ne duplique pas la demande', async (t) => {
+  const f = await fixture(t);
+  await f.publish();
+  const id = crypto.randomUUID();
+  await submitShowcaseContact(f.contact(id), f.env, 'agence-lumiere', false, f.verifier());
+  f.setFail(true);
+  const now = Date.now();
+  for (let i = 0; i < 5; i++) await sendShowcaseNotifications(f.env, now + i * 3600001);
+  assert.equal((await listShowcaseLeads(f.env, f.agency.id, null)).leads[0].notification, 'failed');
+  assert.equal(f.count().sent, 5);
+  await mutateShowcaseLead(f.env, f.agency.id, 'owner', { action: 'lead-retry', id });
+  f.setFail(false);
+  await sendShowcaseNotifications(f.env);
+  const leads = (await listShowcaseLeads(f.env, f.agency.id, null)).leads;
+  assert.equal(leads.length, 1);
+  assert.equal(leads[0].notification, 'sent');
+  assert.equal((await showcaseStatistics(f.env, f.agency.id)).requests, 1);
 });

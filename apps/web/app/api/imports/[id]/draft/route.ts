@@ -1,21 +1,33 @@
-import {findCreationDraft} from '@bienvu/db';
-import {requireOwner} from '../../../../../lib/owner';
-import {assertSameOrigin,boundedJson,RequestFailure,respond} from '../../../../../lib/http';
-import {patchCreationDraft,deleteCreationDraft} from '../../../../../lib/creation-drafts';
-export const dynamic='force-dynamic';
-type Context={params:Promise<{id:string}>};
-export async function GET(request:Request,context:Context){return respond(async()=>{
-  const {env,agency}=await requireOwner(request),draft=await findCreationDraft(env.DB,agency.id,(await context.params).id);
-  if(!draft)throw new RequestFailure('NOT_FOUND');return Response.json(draft);
-});}
-export async function PATCH(request:Request,context:Context){return respond(async()=>{
-  const {env,agency}=await requireOwner(request);assertSameOrigin(request,env);
-  // The draft contains validated facts and the unfinished form input. Allow
-  // both copies of a long UTF-8 description alongside video settings.
-  return Response.json(await patchCreationDraft(env.DB,agency.id,(await context.params).id,await boundedJson(request,256_000)));
-});}
-export async function DELETE(request:Request,context:Context){return respond(async()=>{
-  const {env,agency}=await requireOwner(request);assertSameOrigin(request,env);
-  await deleteCreationDraft(env,agency.id,(await context.params).id);
-  return Response.json({ok:true});
-});}
+import { findCreationDraft } from '@bienvu/db';
+import { requireOwner } from '../../../../../lib/owner';
+import { assertSameOrigin, boundedJson, RequestFailure, respond } from '../../../../../lib/http';
+import { patchCreationDraft, deleteCreationDraft } from '../../../../../lib/creation-drafts';
+export const dynamic = 'force-dynamic';
+type Context = { params: Promise<{ id: string }> };
+export async function GET(request: Request, context: Context) {
+  return respond(async () => {
+    const { env, agency } = await requireOwner(request),
+      draft = await findCreationDraft(env.DB, agency.id, (await context.params).id);
+    if (!draft) throw new RequestFailure('NOT_FOUND');
+    return Response.json(draft);
+  });
+}
+export async function PATCH(request: Request, context: Context) {
+  return respond(async () => {
+    const { env, agency } = await requireOwner(request);
+    assertSameOrigin(request, env);
+    // The draft contains validated facts and the unfinished form input. Allow
+    // both copies of a long UTF-8 description alongside video settings.
+    return Response.json(
+      await patchCreationDraft(env.DB, agency.id, (await context.params).id, await boundedJson(request, 256_000)),
+    );
+  });
+}
+export async function DELETE(request: Request, context: Context) {
+  return respond(async () => {
+    const { env, agency } = await requireOwner(request);
+    assertSameOrigin(request, env);
+    await deleteCreationDraft(env, agency.id, (await context.params).id);
+    return Response.json({ ok: true });
+  });
+}

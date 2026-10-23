@@ -66,18 +66,18 @@ Le Node interne ne reçoit ni URL extérieure ni code client. Les assets sont tr
 
 Le Worker opérateur est protégé par `PROBE_TOKEN`, limité à `VIDEO_AGENCY_ID` / `VIDEO_JOB_ID`. Le service Node utilise un autre secret `RENDER_TOKEN`. Aucun secret ne va dans le manifeste, l'image Docker ou une URL de lecteur.
 
-| Route Worker | Effet |
-|---|---|
-| `POST /prepare` sans corps | Fige le manifeste et prépare ses médias |
-| `GET /manifest` | Lit le manifeste privé |
-| `POST /render` sans corps | Réserve le budget atomiquement et accepte rapidement le rendu |
-| `GET /status` | Lit le statut et réconcilie un traitement actif |
-| `GET/HEAD /file` | Sert le MP4 privé depuis R2, avec plages HTTP |
-| `GET /state` | Slot, budget durable, état du conteneur, mesures et diagnostic de démarrage |
-| `POST /retry` sans corps | Reprise opérateur explicite d’un échec précis, nouvelle provision et historique conservé |
-| `GET /attempts` | Historique privé des tentatives du même manifeste |
-| `GET /diagnostic` | Lecture bornée des processus et du port du conteneur déjà actif ; ne le démarre jamais |
-| `POST /pause` | Interdit les nouveaux rendus ; le résultat existant reste lisible |
+| Route Worker               | Effet                                                                                    |
+| -------------------------- | ---------------------------------------------------------------------------------------- |
+| `POST /prepare` sans corps | Fige le manifeste et prépare ses médias                                                  |
+| `GET /manifest`            | Lit le manifeste privé                                                                   |
+| `POST /render` sans corps  | Réserve le budget atomiquement et accepte rapidement le rendu                            |
+| `GET /status`              | Lit le statut et réconcilie un traitement actif                                          |
+| `GET/HEAD /file`           | Sert le MP4 privé depuis R2, avec plages HTTP                                            |
+| `GET /state`               | Slot, budget durable, état du conteneur, mesures et diagnostic de démarrage              |
+| `POST /retry` sans corps   | Reprise opérateur explicite d’un échec précis, nouvelle provision et historique conservé |
+| `GET /attempts`            | Historique privé des tentatives du même manifeste                                        |
+| `GET /diagnostic`          | Lecture bornée des processus et du port du conteneur déjà actif ; ne le démarre jamais   |
+| `POST /pause`              | Interdit les nouveaux rendus ; le résultat existant reste lisible                        |
 
 Le contrôleur `VideoRenderer` utilise SQLite Durable Objects et les callbacks persistants `Container.schedule`, sans remplacer l'alarme du SDK. États : `accepted → staging → starting → rendering → publishing → ready`, ou `failed`. Un slot borne les coûts de recette ; ce n'est pas une file de production multi-agences.
 

@@ -1,257 +1,847 @@
-import {test} from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {randomBytes,createHmac} from 'node:crypto';
-import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
-import {migrateNarrationProbe,seedNarrationFixture} from '../scripts/narration-fixtures';
-import {adminPage,adminOverview,adminAction,adminVideoDetail,ensureAgency,admitGeneration,findGeneration,beginImport,failImport,findImport} from '../packages/db/src/index';
-import {AdminQuery,Me,VideoReport,DEFAULT_VIDEO_MAP,DEFAULT_GENERATION_QUEUE} from '../packages/contracts/src/index';
-import {isSuperAdmin,requireAdmin} from '../apps/web/lib/admin-access';
-import {financeRequest} from '../apps/web/lib/profitability';
-import {adminRequest,adminJobRequest} from '../apps/web/lib/admin';
-import {createAuth} from '../apps/web/lib/auth';
-import {videoFixture,videoReport} from '../fixtures/video';
-import {RequestFailure} from '../apps/web/lib/http';
-import {importResult} from '../apps/web/lib/imports';
-import {adminVideoMapRequest} from '../apps/web/lib/video-map-settings';
-import {adminAiQualityRequest} from '../apps/web/lib/ai-quality';
-import {promotionsRequest} from '../apps/web/lib/subscription-promotions';
-import {adminGenerationQueueRequest} from '../apps/web/lib/generation-queue';
+import { randomBytes, createHmac } from 'node:crypto';
+import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
+import { migrateNarrationProbe, seedNarrationFixture } from '../scripts/narration-fixtures';
+import {
+  adminPage,
+  adminOverview,
+  adminAction,
+  adminVideoDetail,
+  ensureAgency,
+  admitGeneration,
+  beginImport,
+  failImport,
+  findImport,
+} from '../packages/db/src/index';
+import { AdminQuery, Me, DEFAULT_VIDEO_MAP, DEFAULT_GENERATION_QUEUE } from '../packages/contracts/src/index';
+import { isSuperAdmin, requireAdmin } from '../apps/web/lib/admin-access';
+import { financeRequest } from '../apps/web/lib/profitability';
+import { adminRequest, adminJobRequest } from '../apps/web/lib/admin';
+import { createAuth } from '../apps/web/lib/auth';
+import { videoFixture, videoReport } from '../fixtures/video';
+import { RequestFailure } from '../apps/web/lib/http';
+import { importResult } from '../apps/web/lib/imports';
+import { adminVideoMapRequest } from '../apps/web/lib/video-map-settings';
+import { adminAiQualityRequest } from '../apps/web/lib/ai-quality';
+import { promotionsRequest } from '../apps/web/lib/subscription-promotions';
+import { adminGenerationQueueRequest } from '../apps/web/lib/generation-queue';
 
-test('Super admin : accès fermé par défaut, adresse exacte et vérification obligatoires',()=>{
-  const user={id:'admin',email:'Owner@Example.com',emailVerified:true};
-  assert.equal(isSuperAdmin({},user),false);assert.equal(isSuperAdmin({SUPER_ADMIN_EMAIL:'owner@example.com'},user),true);
-  assert.equal(isSuperAdmin({SUPER_ADMIN_EMAIL:'owner@example.com'},{...user,emailVerified:false}),false);
-  for(const email of ['owner@example.com.evil','other@example.com','Owner+test@example.com'])assert.equal(isSuperAdmin({SUPER_ADMIN_EMAIL:'owner@example.com'},{...user,email}),false);
-  assert.equal(isSuperAdmin({SUPER_ADMIN_EMAIL:'owner@example.com,other@example.com'},user),false);
-  assert.equal(isSuperAdmin({SUPER_ADMIN_EMAIL:'owner@example.com'},null),false);
-  assert.equal(Me.shape.isSuperAdmin.parse(undefined),false);
+test('Super admin : accès fermé par défaut, adresse exacte et vérification obligatoires', () => {
+  const user = { id: 'admin', email: 'Owner@Example.com', emailVerified: true };
+  assert.equal(isSuperAdmin({}, user), false);
+  assert.equal(isSuperAdmin({ SUPER_ADMIN_EMAIL: 'owner@example.com' }, user), true);
+  assert.equal(isSuperAdmin({ SUPER_ADMIN_EMAIL: 'owner@example.com' }, { ...user, emailVerified: false }), false);
+  for (const email of ['owner@example.com.evil', 'other@example.com', 'Owner+test@example.com'])
+    assert.equal(isSuperAdmin({ SUPER_ADMIN_EMAIL: 'owner@example.com' }, { ...user, email }), false);
+  assert.equal(isSuperAdmin({ SUPER_ADMIN_EMAIL: 'owner@example.com,other@example.com' }, user), false);
+  assert.equal(isSuperAdmin({ SUPER_ADMIN_EMAIL: 'owner@example.com' }, null), false);
+  assert.equal(Me.shape.isSuperAdmin.parse(undefined), false);
 });
 
-test('Admin avec Better Auth/D1/R2 locaux : isolation, pagination globale, actions atomiques et audit',async t=>{
-  const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:'export default {fetch(){return new Response("fixture")}}',compatibilityDate:'2026-09-27',d1Databases:['DB'],r2Buckets:['MEDIA']}));t.after(()=>mf.dispose());
-  const bindings=await mf.getBindings<{DB:D1Database;MEDIA:R2Bucket}>(),db=bindings.DB,bucket=bindings.MEDIA;await migrateNarrationProbe(db);
-  const at=new Date().toISOString(),month=at.slice(0,7);
-  await db.prepare('INSERT INTO hosted_import_budget VALUES(?,0,4500,0)').bind(month).run();await db.exec('UPDATE generation_control SET enabled=1; UPDATE trial_policy SET free_enabled=1,enabled=1,budget_ceiling_cents=4500');
-  const env={DB:db,MEDIA:bucket,PROBE_MODE:'local',SUPER_ADMIN_EMAIL:'owner@example.com',BETTER_AUTH_URL:'http://localhost:8787',BETTER_AUTH_SECRET:randomBytes(32).toString('hex'),
-    GOOGLE_CLIENT_ID:'',GOOGLE_CLIENT_SECRET:'',GENERATIONS_ENABLED:'true',AUTH_EMAIL_MODE:'local',ANONYMOUS_TRIALS_ENABLED:'true',IMPORT_MODE:'disabled'};
-  const auth=createAuth(env),context=await auth.$context;
-  const users=[{id:crypto.randomUUID(),email:'owner@example.com',name:'Owner',emailVerified:1},{id:crypto.randomUUID(),email:'regular@example.com',name:'Regular',emailVerified:1},{id:crypto.randomUUID(),email:'unverified@example.com',name:'Unverified',emailVerified:0}];
-  const cookies:string[]=[];
-  for(const u of users){await db.prepare('INSERT INTO auth_user(id,name,email,emailVerified,createdAt,updatedAt) VALUES(?,?,?,?,?,?)').bind(u.id,u.name,u.email,u.emailVerified,Date.now(),Date.now()).run();
-    let session:{token:string}|null;
-    if(u.emailVerified)session=await context.internalAdapter.createSession(u.id);
-    else{const token=randomBytes(32).toString('hex');await db.prepare('INSERT INTO auth_session(id,expiresAt,token,createdAt,updatedAt,userId) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),Date.now()+86400_000,token,Date.now(),Date.now(),u.id).run();session={token};}
-    assert.ok(session);cookies.push(context.authCookies.sessionToken.name+'='+encodeURIComponent(session.token+'.'+createHmac('sha256',env.BETTER_AUTH_SECRET).update(session.token).digest('base64')));}
-  const agency=await ensureAgency(db,users[0]),otherAgency=await ensureAgency(db,users[1]);
-  const req=(path:string,cookie=cookies[0],options:RequestInit={})=>new Request(env.BETTER_AUTH_URL+path,{...options,headers:{cookie,...options.headers}});
-  await t.test('file de génération : superadmin seul, CSRF, révisions et lecture gratuite des quotas',async()=>{
-    let refreshes=0;
-    const e={...env,ADMIN_EMAIL:users[1].email,GENERATION_TOKEN:'fixture-generation-token',GENERATION_SERVICE:{fetch:async(_url:unknown,init:RequestInit)=>{
-      assert.equal(new Headers(init.headers).get('X-Agency-ID'),users[0].id);refreshes++;
-      await db.prepare("UPDATE generation_provider_limits SET concurrency=3,checked_at=?,last_error=NULL WHERE provider='runway'").bind(new Date().toISOString()).run();
-      return Response.json({checked:true});
-    }} as unknown as Fetcher};
-    const patch=(body:unknown,cookie=cookies[0],origin=env.BETTER_AUTH_URL)=>adminGenerationQueueRequest(req('/api/admin/generation-queue',cookie,{method:'PATCH',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify(body)}),e);
-    for(const [cookie,expected] of [['',401],[cookies[1],403],[cookies[2],401]] as const){
-      assert.equal((await adminGenerationQueueRequest(req('/api/admin/generation-queue',cookie),e)).status,expected);
-      assert.equal((await patch({settings:DEFAULT_GENERATION_QUEUE,revision:1},cookie)).status,expected);
-      assert.equal((await adminGenerationQueueRequest(req('/api/admin/generation-queue',cookie,{method:'POST',headers:{origin:env.BETTER_AUTH_URL,'Content-Type':'application/json'},body:'{"action":"refresh-runway"}'}),e)).status,expected);
+test('Admin avec Better Auth/D1/R2 locaux : isolation, pagination globale, actions atomiques et audit', async (t) => {
+  const mf = new Miniflare(
+    convertV4MiniflareOptions({
+      modules: true,
+      script: 'export default {fetch(){return new Response("fixture")}}',
+      compatibilityDate: '2026-09-27',
+      d1Databases: ['DB'],
+      r2Buckets: ['MEDIA'],
+    }),
+  );
+  t.after(() => mf.dispose());
+  const bindings = await mf.getBindings<{ DB: D1Database; MEDIA: R2Bucket }>(),
+    db = bindings.DB,
+    bucket = bindings.MEDIA;
+  await migrateNarrationProbe(db);
+  const at = new Date().toISOString(),
+    month = at.slice(0, 7);
+  await db.prepare('INSERT INTO hosted_import_budget VALUES(?,0,4500,0)').bind(month).run();
+  await db.exec(
+    'UPDATE generation_control SET enabled=1; UPDATE trial_policy SET free_enabled=1,enabled=1,budget_ceiling_cents=4500',
+  );
+  const env = {
+    DB: db,
+    MEDIA: bucket,
+    PROBE_MODE: 'local',
+    SUPER_ADMIN_EMAIL: 'owner@example.com',
+    BETTER_AUTH_URL: 'http://localhost:8787',
+    BETTER_AUTH_SECRET: randomBytes(32).toString('hex'),
+    GOOGLE_CLIENT_ID: '',
+    GOOGLE_CLIENT_SECRET: '',
+    GENERATIONS_ENABLED: 'true',
+    AUTH_EMAIL_MODE: 'local',
+    ANONYMOUS_TRIALS_ENABLED: 'true',
+    IMPORT_MODE: 'disabled',
+  };
+  const auth = createAuth(env),
+    context = await auth.$context;
+  const users = [
+    { id: crypto.randomUUID(), email: 'owner@example.com', name: 'Owner', emailVerified: 1 },
+    { id: crypto.randomUUID(), email: 'regular@example.com', name: 'Regular', emailVerified: 1 },
+    { id: crypto.randomUUID(), email: 'unverified@example.com', name: 'Unverified', emailVerified: 0 },
+  ];
+  const cookies: string[] = [];
+  for (const u of users) {
+    await db
+      .prepare('INSERT INTO auth_user(id,name,email,emailVerified,createdAt,updatedAt) VALUES(?,?,?,?,?,?)')
+      .bind(u.id, u.name, u.email, u.emailVerified, Date.now(), Date.now())
+      .run();
+    let session: { token: string } | null;
+    if (u.emailVerified) session = await context.internalAdapter.createSession(u.id);
+    else {
+      const token = randomBytes(32).toString('hex');
+      await db
+        .prepare('INSERT INTO auth_session(id,expiresAt,token,createdAt,updatedAt,userId) VALUES(?,?,?,?,?,?)')
+        .bind(crypto.randomUUID(), Date.now() + 86400_000, token, Date.now(), Date.now(), u.id)
+        .run();
+      session = { token };
     }
-    assert.equal(refreshes,0);
-    assert.equal((await patch({settings:DEFAULT_GENERATION_QUEUE,revision:1},cookies[0],'https://other.example')).status,403);
-    assert.equal((await patch({settings:{...DEFAULT_GENERATION_QUEUE,renderConcurrency:6},revision:1})).status,422);
-    assert.equal((await patch({settings:{...DEFAULT_GENERATION_QUEUE,renderConcurrency:2},revision:1})).status,200);
-    assert.equal((await patch({settings:DEFAULT_GENERATION_QUEUE,revision:1})).status,409);
-    const response=await adminGenerationQueueRequest(req('/api/admin/generation-queue',cookies[0],{method:'POST',headers:{origin:env.BETTER_AUTH_URL,'Content-Type':'application/json'},body:'{"action":"refresh-runway"}'}),e);
-    assert.equal(response.status,200);assert.equal(refreshes,1);assert.equal(response.headers.get('cache-control'),'private, no-store');
-    const result=await response.json() as {runway:{concurrency:number}};assert.equal(result.runway.concurrency,3);
+    assert.ok(session);
+    cookies.push(
+      context.authCookies.sessionToken.name +
+        '=' +
+        encodeURIComponent(
+          session.token + '.' + createHmac('sha256', env.BETTER_AUTH_SECRET).update(session.token).digest('base64'),
+        ),
+    );
+  }
+  const agency = await ensureAgency(db, users[0]),
+    otherAgency = await ensureAgency(db, users[1]);
+  const req = (path: string, cookie = cookies[0], options: RequestInit = {}) =>
+    new Request(env.BETTER_AUTH_URL + path, { ...options, headers: { cookie, ...options.headers } });
+  await t.test('file de génération : superadmin seul, CSRF, révisions et lecture gratuite des quotas', async () => {
+    let refreshes = 0;
+    const e = {
+      ...env,
+      ADMIN_EMAIL: users[1].email,
+      GENERATION_TOKEN: 'fixture-generation-token',
+      GENERATION_SERVICE: {
+        fetch: async (_url: unknown, init: RequestInit) => {
+          assert.equal(new Headers(init.headers).get('X-Agency-ID'), users[0].id);
+          refreshes++;
+          await db
+            .prepare(
+              "UPDATE generation_provider_limits SET concurrency=3,checked_at=?,last_error=NULL WHERE provider='runway'",
+            )
+            .bind(new Date().toISOString())
+            .run();
+          return Response.json({ checked: true });
+        },
+      } as unknown as Fetcher,
+    };
+    const patch = (body: unknown, cookie = cookies[0], origin = env.BETTER_AUTH_URL) =>
+      adminGenerationQueueRequest(
+        req('/api/admin/generation-queue', cookie, {
+          method: 'PATCH',
+          headers: { origin, 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }),
+        e,
+      );
+    for (const [cookie, expected] of [
+      ['', 401],
+      [cookies[1], 403],
+      [cookies[2], 401],
+    ] as const) {
+      assert.equal((await adminGenerationQueueRequest(req('/api/admin/generation-queue', cookie), e)).status, expected);
+      assert.equal((await patch({ settings: DEFAULT_GENERATION_QUEUE, revision: 1 }, cookie)).status, expected);
+      assert.equal(
+        (
+          await adminGenerationQueueRequest(
+            req('/api/admin/generation-queue', cookie, {
+              method: 'POST',
+              headers: { origin: env.BETTER_AUTH_URL, 'Content-Type': 'application/json' },
+              body: '{"action":"refresh-runway"}',
+            }),
+            e,
+          )
+        ).status,
+        expected,
+      );
+    }
+    assert.equal(refreshes, 0);
+    assert.equal(
+      (await patch({ settings: DEFAULT_GENERATION_QUEUE, revision: 1 }, cookies[0], 'https://other.example')).status,
+      403,
+    );
+    assert.equal(
+      (await patch({ settings: { ...DEFAULT_GENERATION_QUEUE, renderConcurrency: 6 }, revision: 1 })).status,
+      422,
+    );
+    assert.equal(
+      (await patch({ settings: { ...DEFAULT_GENERATION_QUEUE, renderConcurrency: 2 }, revision: 1 })).status,
+      200,
+    );
+    assert.equal((await patch({ settings: DEFAULT_GENERATION_QUEUE, revision: 1 })).status, 409);
+    const response = await adminGenerationQueueRequest(
+      req('/api/admin/generation-queue', cookies[0], {
+        method: 'POST',
+        headers: { origin: env.BETTER_AUTH_URL, 'Content-Type': 'application/json' },
+        body: '{"action":"refresh-runway"}',
+      }),
+      e,
+    );
+    assert.equal(response.status, 200);
+    assert.equal(refreshes, 1);
+    assert.equal(response.headers.get('cache-control'), 'private, no-store');
+    const result = (await response.json()) as { runway: { concurrency: number } };
+    assert.equal(result.runway.concurrency, 3);
   });
-  await t.test('codes bonus : accès superadmin seul, CSRF, campagnes et journal',async()=>{
-    const e={...env,ADMIN_EMAIL:users[1].email,BILLING_MODE:'test',STRIPE_SECRET_KEY:'sk_test_fixture',STRIPE_WEBHOOK_SECRET:'whsec_fixture'};
-    const post=(body:unknown,cookie=cookies[0],origin=env.BETTER_AUTH_URL)=>promotionsRequest(req('/api/admin/promotions',cookie,{method:'POST',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify(body)}),e);
-    for(const [cookie,expected] of [['',401],[cookies[1],403],[cookies[2],401]] as const){
-      for(const r of [await promotionsRequest(req('/api/admin/promotions',cookie),e),await post({action:'reconcile'},cookie)]){assert.equal(r.status,expected);assert.equal(r.headers.get('cache-control'),'private, no-store');}
+  await t.test('codes bonus : accès superadmin seul, CSRF, campagnes et journal', async () => {
+    const e = {
+      ...env,
+      ADMIN_EMAIL: users[1].email,
+      BILLING_MODE: 'test',
+      STRIPE_SECRET_KEY: 'sk_test_fixture',
+      STRIPE_WEBHOOK_SECRET: 'whsec_fixture',
+    };
+    const post = (body: unknown, cookie = cookies[0], origin = env.BETTER_AUTH_URL) =>
+      promotionsRequest(
+        req('/api/admin/promotions', cookie, {
+          method: 'POST',
+          headers: { origin, 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }),
+        e,
+      );
+    for (const [cookie, expected] of [
+      ['', 401],
+      [cookies[1], 403],
+      [cookies[2], 401],
+    ] as const) {
+      for (const r of [
+        await promotionsRequest(req('/api/admin/promotions', cookie), e),
+        await post({ action: 'reconcile' }, cookie),
+      ]) {
+        assert.equal(r.status, expected);
+        assert.equal(r.headers.get('cache-control'), 'private, no-store');
+      }
     }
-    assert.equal((await post({action:'reconcile'},cookies[0],'https://other.example')).status,403);
-    const body={action:'save',reason:'Lancement de la campagne locale',settings:{code:'LANCEMENT20',name:'Campagne agences',active:true,startsAt:null,endsAt:null,maxRedemptions:25,plans:['solo','agence']}};
-    const created=await post(body);assert.equal(created.status,200);const {id}=await created.json() as {id:string};
-    const report=await promotionsRequest(req('/api/admin/promotions?mode=test&id='+id),e);assert.equal(report.status,200);const data=await report.json() as {codes:{code:string}[];audit:unknown[]};assert.equal(data.codes[0].code,'LANCEMENT20');assert.equal(data.audit.length,1);
-    assert.equal((await post(body)).status,409,'Un code ne peut pas être créé deux fois');
-    assert.equal((await post({...body,id,version:1,settings:{...body.settings,active:false}})).status,200);
-    assert.equal((await post({...body,id,version:1})).status,409,'Une écriture obsolète est rejetée');
-    assert.equal((await post({...body,id,version:2,settings:{...body.settings,code:'RENAMED20'}})).status,409,'Les codes utilisés comme identifiants restent stables');
-    assert.equal((await post({...body,settings:{...body.settings,plans:[]}})).status,422);
-    assert.equal((await promotionsRequest(req('/api/admin/promotions?mode=invalid'),e)).status,422);
-    await assert.rejects(db.prepare('DELETE FROM promotion_audit WHERE promotion_id=?').bind(id).run(),/PROMOTION_IMMUTABLE/);
+    assert.equal((await post({ action: 'reconcile' }, cookies[0], 'https://other.example')).status, 403);
+    const body = {
+      action: 'save',
+      reason: 'Lancement de la campagne locale',
+      settings: {
+        code: 'LANCEMENT20',
+        name: 'Campagne agences',
+        active: true,
+        startsAt: null,
+        endsAt: null,
+        maxRedemptions: 25,
+        plans: ['solo', 'agence'],
+      },
+    };
+    const created = await post(body);
+    assert.equal(created.status, 200);
+    const { id } = (await created.json()) as { id: string };
+    const report = await promotionsRequest(req('/api/admin/promotions?mode=test&id=' + id), e);
+    assert.equal(report.status, 200);
+    const data = (await report.json()) as { codes: { code: string }[]; audit: unknown[] };
+    assert.equal(data.codes[0].code, 'LANCEMENT20');
+    assert.equal(data.audit.length, 1);
+    assert.equal((await post(body)).status, 409, 'Un code ne peut pas être créé deux fois');
+    assert.equal((await post({ ...body, id, version: 1, settings: { ...body.settings, active: false } })).status, 200);
+    assert.equal((await post({ ...body, id, version: 1 })).status, 409, 'Une écriture obsolète est rejetée');
+    assert.equal(
+      (await post({ ...body, id, version: 2, settings: { ...body.settings, code: 'RENAMED20' } })).status,
+      409,
+      'Les codes utilisés comme identifiants restent stables',
+    );
+    assert.equal((await post({ ...body, settings: { ...body.settings, plans: [] } })).status, 422);
+    assert.equal((await promotionsRequest(req('/api/admin/promotions?mode=invalid'), e)).status, 422);
+    await assert.rejects(
+      db.prepare('DELETE FROM promotion_audit WHERE promotion_id=?').bind(id).run(),
+      /PROMOTION_IMMUTABLE/,
+    );
   });
-  await t.test('toutes les routes privées refusent anonyme, autre compte et adresse non vérifiée',async()=>{
-    for(const [cookie,expected] of [['',401],[cookies[1],403],[cookies[2],401]] as const){
-      for(const response of [await financeRequest(req('/api/admin/finance?mode=test',cookie),env),await financeRequest(req('/api/admin/finance',cookie,{method:'POST',headers:{origin:env.BETTER_AUTH_URL,'Content-Type':'application/json'},body:JSON.stringify({action:'stripe_sync'})}),env),await adminRequest(req('/api/admin?section=overview',cookie),env),await adminRequest(req('/api/admin?section=traffic',cookie),env),await adminRequest(req('/api/admin',cookie,{method:'POST',headers:{origin:env.BETTER_AUTH_URL,'Content-Type':'application/json'},body:JSON.stringify({action:'generation_gate',expected:true,enabled:false,reason:'Fixture'})}),env),await adminJobRequest(req('/api/admin/jobs/missing',cookie),env,'missing'),await adminJobRequest(req('/api/admin/jobs/missing/video',cookie),env,'missing',true),await adminAiQualityRequest(req('/api/admin/ai-quality',cookie),env),await adminAiQualityRequest(req('/api/admin/ai-quality?id=private',cookie),env),await adminAiQualityRequest(req('/api/admin/ai-quality?export=dataset',cookie),env),await adminAiQualityRequest(req('/api/admin/ai-quality',cookie,{method:'POST',headers:{origin:env.BETTER_AUTH_URL},body:'{"action":"scan"}'}),env),await adminVideoMapRequest(req('/api/admin/video-map',cookie),env),await adminVideoMapRequest(req('/api/admin/video-map',cookie,{method:'PATCH',headers:{origin:env.BETTER_AUTH_URL,'Content-Type':'application/json'},body:'{}'}),env)]){
-        assert.equal(response.status,expected);assert.equal(response.headers.get('cache-control'),'private, no-store');}
+  await t.test('toutes les routes privées refusent anonyme, autre compte et adresse non vérifiée', async () => {
+    for (const [cookie, expected] of [
+      ['', 401],
+      [cookies[1], 403],
+      [cookies[2], 401],
+    ] as const) {
+      for (const response of [
+        await financeRequest(req('/api/admin/finance?mode=test', cookie), env),
+        await financeRequest(
+          req('/api/admin/finance', cookie, {
+            method: 'POST',
+            headers: { origin: env.BETTER_AUTH_URL, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'stripe_sync' }),
+          }),
+          env,
+        ),
+        await adminRequest(req('/api/admin?section=overview', cookie), env),
+        await adminRequest(req('/api/admin?section=traffic', cookie), env),
+        await adminRequest(
+          req('/api/admin', cookie, {
+            method: 'POST',
+            headers: { origin: env.BETTER_AUTH_URL, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'generation_gate', expected: true, enabled: false, reason: 'Fixture' }),
+          }),
+          env,
+        ),
+        await adminJobRequest(req('/api/admin/jobs/missing', cookie), env, 'missing'),
+        await adminJobRequest(req('/api/admin/jobs/missing/video', cookie), env, 'missing', true),
+        await adminAiQualityRequest(req('/api/admin/ai-quality', cookie), env),
+        await adminAiQualityRequest(req('/api/admin/ai-quality?id=private', cookie), env),
+        await adminAiQualityRequest(req('/api/admin/ai-quality?export=dataset', cookie), env),
+        await adminAiQualityRequest(
+          req('/api/admin/ai-quality', cookie, {
+            method: 'POST',
+            headers: { origin: env.BETTER_AUTH_URL },
+            body: '{"action":"scan"}',
+          }),
+          env,
+        ),
+        await adminVideoMapRequest(req('/api/admin/video-map', cookie), env),
+        await adminVideoMapRequest(
+          req('/api/admin/video-map', cookie, {
+            method: 'PATCH',
+            headers: { origin: env.BETTER_AUTH_URL, 'Content-Type': 'application/json' },
+            body: '{}',
+          }),
+          env,
+        ),
+      ]) {
+        assert.equal(response.status, expected);
+        assert.equal(response.headers.get('cache-control'), 'private, no-store');
+      }
     }
-    await assert.rejects(requireAdmin(req('/api/admin'),{...env,SUPER_ADMIN_EMAIL:''}),e=>e instanceof RequestFailure&&e.code==='FORBIDDEN');
-    await db.prepare('UPDATE auth_user SET emailVerified=0 WHERE id=?').bind(users[0].id).run();assert.equal((await adminRequest(req('/api/admin'),env)).status,401);
+    await assert.rejects(
+      requireAdmin(req('/api/admin'), { ...env, SUPER_ADMIN_EMAIL: '' }),
+      (e) => e instanceof RequestFailure && e.code === 'FORBIDDEN',
+    );
+    await db.prepare('UPDATE auth_user SET emailVerified=0 WHERE id=?').bind(users[0].id).run();
+    assert.equal((await adminRequest(req('/api/admin'), env)).status, 401);
     await db.prepare('UPDATE auth_user SET emailVerified=1 WHERE id=?').bind(users[0].id).run();
   });
-  await t.test('carte par défaut : accès admin, validation, origine et sauvegarde sans écrasement concurrent',async()=>{
-    const response=await adminVideoMapRequest(req('/api/admin/video-map'),env);assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'private, no-store');
-    const current=await response.json() as {settings:typeof DEFAULT_VIDEO_MAP;revision:number};assert.deepEqual(current.settings,DEFAULT_VIDEO_MAP);
-    const update={settings:{...DEFAULT_VIDEO_MAP,enabled:false,position:'end',zoomStart:13,zoomEnd:16},revision:current.revision};
-    const patch=(body:unknown,origin=env.BETTER_AUTH_URL)=>adminVideoMapRequest(req('/api/admin/video-map',cookies[0],{method:'PATCH',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify(body)}),env);
-    assert.equal((await patch(update,'https://evil.example')).status,403);
-    assert.equal((await patch({...update,actorId:users[1].id})).status,422);
-    assert.equal((await patch({...update,settings:{...update.settings,zoomEnd:19}})).status,422);
-    const saved=await patch(update);assert.equal(saved.status,200);
-    const state=await saved.json() as {settings:typeof DEFAULT_VIDEO_MAP;revision:number};assert.deepEqual(state.settings,update.settings);assert.equal(state.revision,current.revision+1);
-    assert.equal((await patch(update)).status,409);
-    assert.equal((await db.prepare('SELECT actor_id FROM video_map_setting_events').first<{actor_id:string}>())?.actor_id,users[0].id);
-    assert.equal((await patch({settings:DEFAULT_VIDEO_MAP,revision:state.revision})).status,200);
+  await t.test(
+    'carte par défaut : accès admin, validation, origine et sauvegarde sans écrasement concurrent',
+    async () => {
+      const response = await adminVideoMapRequest(req('/api/admin/video-map'), env);
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get('cache-control'), 'private, no-store');
+      const current = (await response.json()) as { settings: typeof DEFAULT_VIDEO_MAP; revision: number };
+      assert.deepEqual(current.settings, DEFAULT_VIDEO_MAP);
+      const update = {
+        settings: { ...DEFAULT_VIDEO_MAP, enabled: false, position: 'end', zoomStart: 13, zoomEnd: 16 },
+        revision: current.revision,
+      };
+      const patch = (body: unknown, origin = env.BETTER_AUTH_URL) =>
+        adminVideoMapRequest(
+          req('/api/admin/video-map', cookies[0], {
+            method: 'PATCH',
+            headers: { origin, 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          }),
+          env,
+        );
+      assert.equal((await patch(update, 'https://evil.example')).status, 403);
+      assert.equal((await patch({ ...update, actorId: users[1].id })).status, 422);
+      assert.equal((await patch({ ...update, settings: { ...update.settings, zoomEnd: 19 } })).status, 422);
+      const saved = await patch(update);
+      assert.equal(saved.status, 200);
+      const state = (await saved.json()) as { settings: typeof DEFAULT_VIDEO_MAP; revision: number };
+      assert.deepEqual(state.settings, update.settings);
+      assert.equal(state.revision, current.revision + 1);
+      assert.equal((await patch(update)).status, 409);
+      assert.equal(
+        (await db.prepare('SELECT actor_id FROM video_map_setting_events').first<{ actor_id: string }>())?.actor_id,
+        users[0].id,
+      );
+      assert.equal((await patch({ settings: DEFAULT_VIDEO_MAP, revision: state.revision })).status, 200);
+    },
+  );
+  await t.test('qualité IA : réglages privés, origine vérifiée, aucun juge payant et audit', async () => {
+    const response = await adminAiQualityRequest(req('/api/admin/ai-quality'), env);
+    assert.equal(response.status, 200);
+    const current = (await response.json()) as {
+      revision: number;
+      settings: { enabled: boolean; retentionDays: number; reviewSamplePercent: number };
+    };
+    const patch = (body: unknown, origin = env.BETTER_AUTH_URL) =>
+      adminAiQualityRequest(
+        req('/api/admin/ai-quality', cookies[0], {
+          method: 'PATCH',
+          headers: { origin, 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }),
+        env,
+      );
+    const change = { settings: { ...current.settings, reviewSamplePercent: 20 }, revision: current.revision };
+    assert.equal((await patch(change, 'https://evil.example')).status, 403);
+    assert.equal((await patch(null)).status, 422);
+    assert.equal((await patch({ ...change, settings: { ...change.settings, judgeEnabled: true } })).status, 422);
+    assert.equal((await patch(change)).status, 200);
+    assert.equal((await patch(change)).status, 409);
+    assert.equal(
+      (await db.prepare("SELECT actor_id FROM ai_quality_audit WHERE action='settings'").first<{ actor_id: string }>())
+        ?.actor_id,
+      users[0].id,
+    );
+    assert.equal((await adminAiQualityRequest(req('/api/admin/ai-quality?export=dataset'), env)).status, 200);
+    assert.equal((await adminAiQualityRequest(req('/api/admin/ai-quality?days=365'), env)).status, 422);
   });
-  await t.test('qualité IA : réglages privés, origine vérifiée, aucun juge payant et audit',async()=>{
-    const response=await adminAiQualityRequest(req('/api/admin/ai-quality'),env);assert.equal(response.status,200);
-    const current=await response.json() as {revision:number;settings:{enabled:boolean;retentionDays:number;reviewSamplePercent:number}};
-    const patch=(body:unknown,origin=env.BETTER_AUTH_URL)=>adminAiQualityRequest(req('/api/admin/ai-quality',cookies[0],{method:'PATCH',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify(body)}),env);
-    const change={settings:{...current.settings,reviewSamplePercent:20},revision:current.revision};
-    assert.equal((await patch(change,'https://evil.example')).status,403);
-    assert.equal((await patch(null)).status,422);
-    assert.equal((await patch({...change,settings:{...change.settings,judgeEnabled:true}})).status,422);
-    assert.equal((await patch(change)).status,200);assert.equal((await patch(change)).status,409);
-    assert.equal((await db.prepare("SELECT actor_id FROM ai_quality_audit WHERE action='settings'").first<{actor_id:string}>())?.actor_id,users[0].id);
-    assert.equal((await adminAiQualityRequest(req('/api/admin/ai-quality?export=dataset'),env)).status,200);
-    assert.equal((await adminAiQualityRequest(req('/api/admin/ai-quality?days=365'),env)).status,422);
-  });
-  await t.test('toutes les sections se lisent sans secrets et les mauvais paramètres sont refusés',async()=>{
-    for(const section of ['traffic','performance','seo','overview','videos','agencies','users','subscriptions','quotas','imports','reports','audit']){
-      const response=await adminRequest(req('/api/admin?section='+section),env);assert.equal(response.status,200,section+': '+await response.clone().text());
-      assert.doesNotMatch(await response.text(),/proof_hash|password|accessToken|refreshToken|object_key|BETTER_AUTH_SECRET|ip_hmac|author_key/);
+  await t.test('toutes les sections se lisent sans secrets et les mauvais paramètres sont refusés', async () => {
+    for (const section of [
+      'traffic',
+      'performance',
+      'seo',
+      'overview',
+      'videos',
+      'agencies',
+      'users',
+      'subscriptions',
+      'quotas',
+      'imports',
+      'reports',
+      'audit',
+    ]) {
+      const response = await adminRequest(req('/api/admin?section=' + section), env);
+      assert.equal(response.status, 200, section + ': ' + (await response.clone().text()));
+      assert.doesNotMatch(
+        await response.text(),
+        /proof_hash|password|accessToken|refreshToken|object_key|BETTER_AUTH_SECRET|ip_hmac|author_key/,
+      );
     }
-    assert.equal((await adminRequest(req('/api/admin?section=users&from=2026-10-01&to=2026-01-01'),env)).status,422);
-    for(const query of ['section=performance&days=365','section=performance&agency=private','section=traffic&days=365','section=traffic&country=FR','section=users&status=ready','section=videos&cursor=evil','section=users&secret=x','section=videos&q='+encodeURIComponent('x'.repeat(101))])assert.equal((await adminRequest(req('/api/admin?'+query),env)).status,422);
-    const overview=await adminOverview(db,{generations:true,anonymousTrials:true,imports:'disabled',email:'local',google:false,origin:env.BETTER_AUTH_URL});
-    assert.equal(overview.counts.agencies,2);assert.equal(overview.counts.users,3);assert.equal(overview.counts.activeSubscriptions,0);
+    assert.equal((await adminRequest(req('/api/admin?section=users&from=2026-10-01&to=2026-01-01'), env)).status, 422);
+    for (const query of [
+      'section=performance&days=365',
+      'section=performance&agency=private',
+      'section=traffic&days=365',
+      'section=traffic&country=FR',
+      'section=users&status=ready',
+      'section=videos&cursor=evil',
+      'section=users&secret=x',
+      'section=videos&q=' + encodeURIComponent('x'.repeat(101)),
+    ])
+      assert.equal((await adminRequest(req('/api/admin?' + query), env)).status, 422);
+    const overview = await adminOverview(db, {
+      generations: true,
+      anonymousTrials: true,
+      imports: 'disabled',
+      email: 'local',
+      google: false,
+      origin: env.BETTER_AUTH_URL,
+    });
+    assert.equal(overview.counts.agencies, 2);
+    assert.equal(overview.counts.users, 3);
+    assert.equal(overview.counts.activeSubscriptions, 0);
   });
-  await t.test('historique des durées et domaines référents : superadmin seul, réponses privées et bornées',async()=>{
-    for(const section of ['performance','seo']){
-      for(const [cookie,expected] of [['',401],[cookies[1],403],[cookies[2],401]] as const){
-        const response=await adminRequest(req('/api/admin?section='+section,cookie),env);assert.equal(response.status,expected);assert.equal(response.headers.get('cache-control'),'private, no-store');
+  await t.test(
+    'historique des durées et domaines référents : superadmin seul, réponses privées et bornées',
+    async () => {
+      for (const section of ['performance', 'seo']) {
+        for (const [cookie, expected] of [
+          ['', 401],
+          [cookies[1], 403],
+          [cookies[2], 401],
+        ] as const) {
+          const response = await adminRequest(req('/api/admin?section=' + section, cookie), env);
+          assert.equal(response.status, expected);
+          assert.equal(response.headers.get('cache-control'), 'private, no-store');
+        }
+        const staff = await adminRequest(req('/api/admin?section=' + section, cookies[1]), {
+          ...env,
+          ADMIN_EMAIL: users[1].email,
+        });
+        assert.equal(staff.status, 403);
+        const response = await adminRequest(req('/api/admin?section=' + section), env);
+        assert.equal(response.status, 200);
+        assert.equal(response.headers.get('cache-control'), 'private, no-store');
       }
-      const staff=await adminRequest(req('/api/admin?section='+section,cookies[1]),{...env,ADMIN_EMAIL:users[1].email});assert.equal(staff.status,403);
-      const response=await adminRequest(req('/api/admin?section='+section),env);assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'private, no-store');
-    }
-    for(const days of ['7','30','90']){const response=await adminRequest(req('/api/admin?section=performance&days='+days),env);assert.equal(response.status,200);assert.equal((await response.json() as {daily:unknown[]}).daily.length,Number(days));}
+      for (const days of ['7', '30', '90']) {
+        const response = await adminRequest(req('/api/admin?section=performance&days=' + days), env);
+        assert.equal(response.status, 200);
+        assert.equal(((await response.json()) as { daily: unknown[] }).daily.length, Number(days));
+      }
+    },
+  );
+  await t.test('imports : diagnostic privé ciblé, sans payload brut ni exposition à l’import public', async () => {
+    const { row } = await beginImport(db, agency.id, 'https://fixtures.bienvu.example/vente', 'diagnostic-fixture-key');
+    await failImport(db, agency.id, row.id, 'UNSAFE_URL', {
+      stage: 'browser',
+      failureResource: {
+        stage: 'browser',
+        host: 'outside.example',
+        path: '/photo.jpg',
+        resourceType: 'image',
+        reason: 'host_not_allowed',
+      },
+      authorization: 'PRIVATE_SECRET',
+    });
+    const response = await adminRequest(req('/api/admin?section=imports'), env);
+    assert.equal(response.status, 200);
+    const page = (await response.json()) as { rows: Record<string, unknown>[] };
+    const item = page.rows.find((i) => i.id === row.id)!;
+    assert.equal(item.errorStage, 'browser');
+    assert.equal(item.blockedHost, 'outside.example');
+    assert.equal(item.blockedPath, '/photo.jpg');
+    assert.equal(item.blockReason, 'host_not_allowed');
+    assert.equal(item.resourceType, 'image');
+    assert.doesNotMatch(JSON.stringify(page), /PRIVATE_SECRET|authorization|diagnostics_json/);
+    const publicResult = importResult(await findImport(db, agency.id, row.id));
+    assert.equal(publicResult.errorCode, 'UNSAFE_URL');
+    assert.doesNotMatch(
+      JSON.stringify(publicResult),
+      /outside\.example|photo\.jpg|PRIVATE_SECRET|failureResource|diagnostics/,
+    );
   });
-  await t.test('imports : diagnostic privé ciblé, sans payload brut ni exposition à l’import public',async()=>{
-    const {row}=await beginImport(db,agency.id,'https://fixtures.bienvu.example/vente','diagnostic-fixture-key');
-    await failImport(db,agency.id,row.id,'UNSAFE_URL',{stage:'browser',failureResource:{stage:'browser',host:'outside.example',path:'/photo.jpg',resourceType:'image',reason:'host_not_allowed'},authorization:'PRIVATE_SECRET'});
-    const response=await adminRequest(req('/api/admin?section=imports'),env);assert.equal(response.status,200);
-    const page=await response.json() as {rows:Record<string,unknown>[]};const item=page.rows.find(i=>i.id===row.id)!;
-    assert.equal(item.errorStage,'browser');assert.equal(item.blockedHost,'outside.example');assert.equal(item.blockedPath,'/photo.jpg');
-    assert.equal(item.blockReason,'host_not_allowed');assert.equal(item.resourceType,'image');
-    assert.doesNotMatch(JSON.stringify(page),/PRIVATE_SECRET|authorization|diagnostics_json/);
-    const publicResult=importResult(await findImport(db,agency.id,row.id));
-    assert.equal(publicResult.errorCode,'UNSAFE_URL');assert.doesNotMatch(JSON.stringify(publicResult),/outside\.example|photo\.jpg|PRIVATE_SECRET|failureResource|diagnostics/);
-  });
-  const fixture=await seedNarrationFixture(db,'admin-test');
+  const fixture = await seedNarrationFixture(db, 'admin-test');
   // One real retained ledger entry (fixture media, no paid provider/render).
-  await db.prepare('UPDATE agencies SET owner_user_id=? WHERE id=?').bind(users[2].id,fixture.agencyId).run();
-  await db.prepare('UPDATE jobs SET status=\'failed\',error_code=\'FIXTURE_ERROR\',lease_until=NULL WHERE id=?').bind(fixture.jobId).run();
-  await t.test('coûts par requête : métriques conservées, absence inconnue et payload privé exclu',async()=>{
+  await db.prepare('UPDATE agencies SET owner_user_id=? WHERE id=?').bind(users[2].id, fixture.agencyId).run();
+  await db
+    .prepare("UPDATE jobs SET status='failed',error_code='FIXTURE_ERROR',lease_until=NULL WHERE id=?")
+    .bind(fixture.jobId)
+    .run();
+  await t.test('coûts par requête : métriques conservées, absence inconnue et payload privé exclu', async () => {
     await db.prepare('INSERT INTO narration_budget VALUES(?,2500,0)').bind(month).run();
-    await db.prepare("INSERT INTO narration_runs(job_id,agency_id,input_hash,config_hash,snapshot_json,provider_mode,job_attempt,created_at,expires_at) VALUES(?,?,?,?,'{}','real',1,?,?)")
-      .bind(fixture.jobId,fixture.agencyId,'a'.repeat(64),'b'.repeat(64),at,new Date(Date.now()+86400_000).toISOString()).run();
-    const metrics={model:'gpt-5.4-mini-2026-03-17',providerRequestId:'req_fixture',responseId:'resp_fixture',requestDurationMs:1234,usage:{inputTokens:1530,outputTokens:128,cachedInputTokens:1024},cost:{currency:'USD',priceDate:'2026-09-28',estimatedMicrosBeforeCacheDiscount:1724,actualBilledMicros:null}};
-    const stored=[['openai','script/1','done',{metrics,plan:{privatePrompt:'PRIVATE_PROMPT'},apiKey:'PRIVATE_SECRET'}],['openai','script/2','failed',null],
-      ['google','voice/1','done',{metrics:{usage:{inputCharacters:260},cost:{currency:'USD',estimatedMicrosBeforeFreeTier:7800}}}],
-      ['google','voice/2','done',{metrics:{cost:{currency:'USD',estimatedMicrosBeforeFreeTier:-1}}}]] as const;
-    for(const [provider,step,state,payload] of stored)await db.prepare("INSERT INTO narration_calls(id,agency_id,job_id,step_key,request_hash,provider,provider_mode,month,reservation_cents,state,result_json,created_at) VALUES(?,?,?,?,?,?,'real',?,5,?,?,?)")
-      .bind(crypto.randomUUID(),fixture.agencyId,fixture.jobId,step,'c'.repeat(64),provider,month,state,payload===null?null:JSON.stringify(payload),at).run();
-    const response=await adminJobRequest(req('/api/admin/jobs/'+fixture.jobId),env,fixture.jobId);assert.equal(response.status,200);
-    const detail=await response.json() as Awaited<ReturnType<typeof adminVideoDetail>>;assert.ok(detail);assert.equal(detail.calls.length,4);
-    const call=detail.calls.find(c=>c.step==='script/1')!;assert.equal(call.estimatedMicros,1724);assert.equal(call.currency,'USD');assert.equal(call.model,metrics.model);
-    assert.equal(call.inputTokens,1530);assert.equal(call.outputTokens,128);assert.equal(call.cachedInputTokens,1024);assert.equal(call.providerRequestId,'req_fixture');assert.equal(call.reservedCents,5);
-    assert.equal(detail.calls.find(c=>c.step==='script/2')!.estimatedMicros,null);assert.equal(detail.calls.find(c=>c.step==='script/2')!.inputTokens,null);
-    assert.equal(detail.calls.find(c=>c.step==='voice/1')!.estimatedMicros,7800);assert.equal(detail.calls.find(c=>c.step==='voice/2')!.estimatedMicros,null);
-    assert.doesNotMatch(JSON.stringify(detail),/PRIVATE_SECRET|PRIVATE_PROMPT|apiKey|privatePrompt|snapshot_json|result_json/);
-    const monthly=(await adminOverview(db,{generations:true,anonymousTrials:true,imports:'disabled',email:'local',google:false,origin:env.BETTER_AUTH_URL})).monthlyCosts;
-    for(const [provider,amount] of [['openai',1724],['google',7800]] as const){const c=monthly.find(c=>c.provider===provider)!;assert.equal(c.realCalls,2);assert.equal(c.measuredCalls,1);assert.equal(c.amountMicros,amount);}
-    const before=await db.prepare('SELECT sum(reservation_cents) AS n FROM narration_calls').first();await adminVideoDetail(db,fixture.jobId);
-    assert.deepEqual(await db.prepare('SELECT sum(reservation_cents) AS n FROM narration_calls').first(),before);
-    await db.prepare("UPDATE narration_calls SET result_json=? WHERE job_id=? AND step_key='script/1'").bind(JSON.stringify({metrics:{...metrics,usage:{inputTokens:0,outputTokens:0,cachedInputTokens:0},cost:{...metrics.cost,estimatedMicrosBeforeCacheDiscount:0}}}),fixture.jobId).run();
-    const zero=(await adminVideoDetail(db,fixture.jobId))!.calls.find(c=>c.step==='script/1')!;assert.equal(zero.estimatedMicros,0);assert.equal(zero.inputTokens,0);
-    await db.prepare("UPDATE narration_calls SET provider_mode='mock',reservation_cents=0 WHERE job_id=?").bind(fixture.jobId).run();
+    await db
+      .prepare(
+        "INSERT INTO narration_runs(job_id,agency_id,input_hash,config_hash,snapshot_json,provider_mode,job_attempt,created_at,expires_at) VALUES(?,?,?,?,'{}','real',1,?,?)",
+      )
+      .bind(
+        fixture.jobId,
+        fixture.agencyId,
+        'a'.repeat(64),
+        'b'.repeat(64),
+        at,
+        new Date(Date.now() + 86400_000).toISOString(),
+      )
+      .run();
+    const metrics = {
+      model: 'gpt-5.4-mini-2026-03-17',
+      providerRequestId: 'req_fixture',
+      responseId: 'resp_fixture',
+      requestDurationMs: 1234,
+      usage: { inputTokens: 1530, outputTokens: 128, cachedInputTokens: 1024 },
+      cost: {
+        currency: 'USD',
+        priceDate: '2026-09-28',
+        estimatedMicrosBeforeCacheDiscount: 1724,
+        actualBilledMicros: null,
+      },
+    };
+    const stored = [
+      ['openai', 'script/1', 'done', { metrics, plan: { privatePrompt: 'PRIVATE_PROMPT' }, apiKey: 'PRIVATE_SECRET' }],
+      ['openai', 'script/2', 'failed', null],
+      [
+        'google',
+        'voice/1',
+        'done',
+        {
+          metrics: { usage: { inputCharacters: 260 }, cost: { currency: 'USD', estimatedMicrosBeforeFreeTier: 7800 } },
+        },
+      ],
+      ['google', 'voice/2', 'done', { metrics: { cost: { currency: 'USD', estimatedMicrosBeforeFreeTier: -1 } } }],
+    ] as const;
+    for (const [provider, step, state, payload] of stored)
+      await db
+        .prepare(
+          "INSERT INTO narration_calls(id,agency_id,job_id,step_key,request_hash,provider,provider_mode,month,reservation_cents,state,result_json,created_at) VALUES(?,?,?,?,?,?,'real',?,5,?,?,?)",
+        )
+        .bind(
+          crypto.randomUUID(),
+          fixture.agencyId,
+          fixture.jobId,
+          step,
+          'c'.repeat(64),
+          provider,
+          month,
+          state,
+          payload === null ? null : JSON.stringify(payload),
+          at,
+        )
+        .run();
+    const response = await adminJobRequest(req('/api/admin/jobs/' + fixture.jobId), env, fixture.jobId);
+    assert.equal(response.status, 200);
+    const detail = (await response.json()) as Awaited<ReturnType<typeof adminVideoDetail>>;
+    assert.ok(detail);
+    assert.equal(detail.calls.length, 4);
+    const call = detail.calls.find((c) => c.step === 'script/1')!;
+    assert.equal(call.estimatedMicros, 1724);
+    assert.equal(call.currency, 'USD');
+    assert.equal(call.model, metrics.model);
+    assert.equal(call.inputTokens, 1530);
+    assert.equal(call.outputTokens, 128);
+    assert.equal(call.cachedInputTokens, 1024);
+    assert.equal(call.providerRequestId, 'req_fixture');
+    assert.equal(call.reservedCents, 5);
+    assert.equal(detail.calls.find((c) => c.step === 'script/2')!.estimatedMicros, null);
+    assert.equal(detail.calls.find((c) => c.step === 'script/2')!.inputTokens, null);
+    assert.equal(detail.calls.find((c) => c.step === 'voice/1')!.estimatedMicros, 7800);
+    assert.equal(detail.calls.find((c) => c.step === 'voice/2')!.estimatedMicros, null);
+    assert.doesNotMatch(
+      JSON.stringify(detail),
+      /PRIVATE_SECRET|PRIVATE_PROMPT|apiKey|privatePrompt|snapshot_json|result_json/,
+    );
+    const monthly = (
+      await adminOverview(db, {
+        generations: true,
+        anonymousTrials: true,
+        imports: 'disabled',
+        email: 'local',
+        google: false,
+        origin: env.BETTER_AUTH_URL,
+      })
+    ).monthlyCosts;
+    for (const [provider, amount] of [
+      ['openai', 1724],
+      ['google', 7800],
+    ] as const) {
+      const c = monthly.find((c) => c.provider === provider)!;
+      assert.equal(c.realCalls, 2);
+      assert.equal(c.measuredCalls, 1);
+      assert.equal(c.amountMicros, amount);
+    }
+    const before = await db.prepare('SELECT sum(reservation_cents) AS n FROM narration_calls').first();
+    await adminVideoDetail(db, fixture.jobId);
+    assert.deepEqual(await db.prepare('SELECT sum(reservation_cents) AS n FROM narration_calls').first(), before);
+    await db
+      .prepare("UPDATE narration_calls SET result_json=? WHERE job_id=? AND step_key='script/1'")
+      .bind(
+        JSON.stringify({
+          metrics: {
+            ...metrics,
+            usage: { inputTokens: 0, outputTokens: 0, cachedInputTokens: 0 },
+            cost: { ...metrics.cost, estimatedMicrosBeforeCacheDiscount: 0 },
+          },
+        }),
+        fixture.jobId,
+      )
+      .run();
+    const zero = (await adminVideoDetail(db, fixture.jobId))!.calls.find((c) => c.step === 'script/1')!;
+    assert.equal(zero.estimatedMicros, 0);
+    assert.equal(zero.inputTokens, 0);
+    await db
+      .prepare("UPDATE narration_calls SET provider_mode='mock',reservation_cents=0 WHERE job_id=?")
+      .bind(fixture.jobId)
+      .run();
     await db.prepare("UPDATE narration_runs SET provider_mode='mock' WHERE job_id=?").bind(fixture.jobId).run();
-    assert.ok((await adminVideoDetail(db,fixture.jobId))!.calls.every(c=>c.estimatedMicros===null&&c.reservedCents===0&&c.mode==='mock'));
+    assert.ok(
+      (await adminVideoDetail(db, fixture.jobId))!.calls.every(
+        (c) => c.estimatedMicros === null && c.reservedCents === 0 && c.mode === 'mock',
+      ),
+    );
   });
-  await t.test('pagination stable au-delà de 30, Unicode et recherche littérale, agences filtrées',async()=>{
+  await t.test('pagination stable au-delà de 30, Unicode et recherche littérale, agences filtrées', async () => {
     // Additional historical fixture jobs through the same circular FK ledger.
-    for(let n=0;n<35;n++){const id='admin-job-'+String(n).padStart(2,'0'),r='admin-res-'+n;
-      await db.batch([db.prepare("INSERT INTO jobs(id,agency_id,source_url,idempotency_key,status,stage,reservation_id,created_at,updated_at,error_code) VALUES(?,?,'','fixture-'||?,'failed','rendering',?,?,?,'FIXTURE')").bind(id,agency.id,id,r,at,at),
-        db.prepare("INSERT INTO reservations(id,agency_id,job_id,allocation_id,status,created_at,updated_at) VALUES(?,?,?,NULL,'unfunded',?,?)").bind(r,agency.id,id,at,at)]);}
-    const query=AdminQuery.parse({section:'videos'}),first=await adminPage(db,query);assert.equal(first.total,36);assert.equal(first.rows.length,30);assert.ok(first.nextCursor);
-    const second=await adminPage(db,{...query,cursor:first.nextCursor!});assert.equal(second.rows.length,6);assert.equal(second.nextCursor,null);assert.equal(new Set([...first.rows,...second.rows].map(r=>r.id)).size,36);
-    assert.equal((await adminPage(db,AdminQuery.parse({section:'videos',q:'%'}))).rows.length,0);
-    assert.equal((await adminPage(db,AdminQuery.parse({section:'videos',q:"' OR 1=1 --"}))).rows.length,0);
-    await assert.rejects(adminPage(db,{...query,q:'changed',cursor:first.nextCursor!}),/ADMIN_INVALID_QUERY/);
-    const own=await adminPage(db,AdminQuery.parse({section:'videos',agency:agency.id}));assert.equal(own.total,35);
+    for (let n = 0; n < 35; n++) {
+      const id = 'admin-job-' + String(n).padStart(2, '0'),
+        r = 'admin-res-' + n;
+      await db.batch([
+        db
+          .prepare(
+            "INSERT INTO jobs(id,agency_id,source_url,idempotency_key,status,stage,reservation_id,created_at,updated_at,error_code) VALUES(?,?,'','fixture-'||?,'failed','rendering',?,?,?,'FIXTURE')",
+          )
+          .bind(id, agency.id, id, r, at, at),
+        db
+          .prepare(
+            "INSERT INTO reservations(id,agency_id,job_id,allocation_id,status,created_at,updated_at) VALUES(?,?,?,NULL,'unfunded',?,?)",
+          )
+          .bind(r, agency.id, id, at, at),
+      ]);
+    }
+    const query = AdminQuery.parse({ section: 'videos' }),
+      first = await adminPage(db, query);
+    assert.equal(first.total, 36);
+    assert.equal(first.rows.length, 30);
+    assert.ok(first.nextCursor);
+    const second = await adminPage(db, { ...query, cursor: first.nextCursor! });
+    assert.equal(second.rows.length, 6);
+    assert.equal(second.nextCursor, null);
+    assert.equal(new Set([...first.rows, ...second.rows].map((r) => r.id)).size, 36);
+    assert.equal((await adminPage(db, AdminQuery.parse({ section: 'videos', q: '%' }))).rows.length, 0);
+    assert.equal((await adminPage(db, AdminQuery.parse({ section: 'videos', q: "' OR 1=1 --" }))).rows.length, 0);
+    await assert.rejects(adminPage(db, { ...query, q: 'changed', cursor: first.nextCursor! }), /ADMIN_INVALID_QUERY/);
+    const own = await adminPage(db, AdminQuery.parse({ section: 'videos', agency: agency.id }));
+    assert.equal(own.total, 35);
     await db.prepare("UPDATE agencies SET name='Agence Élysée' WHERE id=?").bind(agency.id).run();
-    const unicode=await adminPage(db,AdminQuery.parse({section:'videos',q:'Élysée'}));assert.ok(unicode.nextCursor);
-    assert.equal((await adminPage(db,AdminQuery.parse({section:'videos',q:'Élysée',cursor:unicode.nextCursor!}))).rows.length,5);
-    assert.ok(await adminVideoDetail(db,fixture.jobId));assert.equal(await adminVideoDetail(db,'unknown-job'),null);
+    const unicode = await adminPage(db, AdminQuery.parse({ section: 'videos', q: 'Élysée' }));
+    assert.ok(unicode.nextCursor);
+    assert.equal(
+      (await adminPage(db, AdminQuery.parse({ section: 'videos', q: 'Élysée', cursor: unicode.nextCursor! }))).rows
+        .length,
+      5,
+    );
+    assert.ok(await adminVideoDetail(db, fixture.jobId));
+    assert.equal(await adminVideoDetail(db, 'unknown-job'), null);
   });
-  await t.test('lecture MP4 privée par admin, range/HEAD et conservation sans expiration',async()=>{
-    await db.prepare('INSERT INTO generation_access(agency_id,allocation_id,enabled) VALUES(?,?,1)').bind(fixture.agencyId,'allocation-admin-test').run();
-    const ready=await admitGeneration(db,fixture.agencyId,'admin-media-ready-123456',{listingId:'listing-admin-test'},'true');
-    const f=await videoFixture(),bytes=new Uint8Array([1,2,3,4,5,6]),report=videoReport('a'.repeat(64),f.manifest,bytes),key=`agencies/${fixture.agencyId}/jobs/${ready.jobId}/video/output.mp4`;
-    await bucket.put(key,bytes,{customMetadata:{sha256:report.sha256}});
-    await db.batch([db.prepare('INSERT INTO generation_artifacts VALUES(?,?,?,?)').bind(ready.jobId,key,JSON.stringify(report),at),db.prepare("UPDATE jobs SET status='ready',lease_until=NULL WHERE id=?").bind(ready.jobId)]);
-    const path='/api/admin/jobs/'+ready.jobId+'/video';
-    const file=await adminJobRequest(req(path,cookies[0],{headers:{range:'bytes=1-3'}}),env,ready.jobId,true);assert.equal(file.status,206);assert.deepEqual(new Uint8Array(await file.arrayBuffer()),new Uint8Array([2,3,4]));
-    assert.equal(file.headers.get('cache-control'),'private, no-store');
-    const head=await adminJobRequest(req(path,cookies[0],{method:'HEAD'}),env,ready.jobId,true);assert.equal(head.status,200);assert.equal(await head.text(),'');
-    assert.equal((await adminJobRequest(req(path,cookies[1]),env,ready.jobId,true)).status,403);
-    assert.equal((await adminJobRequest(req(path+'?variant=other'),env,ready.jobId,true)).status,422);
-    await db.prepare("UPDATE generation_runs SET expires_at=? WHERE job_id=?").bind(new Date(Date.now()-1000).toISOString(),ready.jobId).run();
-    assert.equal((await adminJobRequest(req(path),env,ready.jobId,true)).status,200);
-    assert.equal((await adminVideoDetail(db,ready.jobId))?.video.expiresAt,null);
+  await t.test('lecture MP4 privée par admin, range/HEAD et conservation sans expiration', async () => {
+    await db
+      .prepare('INSERT INTO generation_access(agency_id,allocation_id,enabled) VALUES(?,?,1)')
+      .bind(fixture.agencyId, 'allocation-admin-test')
+      .run();
+    const ready = await admitGeneration(
+      db,
+      fixture.agencyId,
+      'admin-media-ready-123456',
+      { listingId: 'listing-admin-test' },
+      'true',
+    );
+    const f = await videoFixture(),
+      bytes = new Uint8Array([1, 2, 3, 4, 5, 6]),
+      report = videoReport('a'.repeat(64), f.manifest, bytes),
+      key = `agencies/${fixture.agencyId}/jobs/${ready.jobId}/video/output.mp4`;
+    await bucket.put(key, bytes, { customMetadata: { sha256: report.sha256 } });
+    await db.batch([
+      db.prepare('INSERT INTO generation_artifacts VALUES(?,?,?,?)').bind(ready.jobId, key, JSON.stringify(report), at),
+      db.prepare("UPDATE jobs SET status='ready',lease_until=NULL WHERE id=?").bind(ready.jobId),
+    ]);
+    const path = '/api/admin/jobs/' + ready.jobId + '/video';
+    const file = await adminJobRequest(
+      req(path, cookies[0], { headers: { range: 'bytes=1-3' } }),
+      env,
+      ready.jobId,
+      true,
+    );
+    assert.equal(file.status, 206);
+    assert.deepEqual(new Uint8Array(await file.arrayBuffer()), new Uint8Array([2, 3, 4]));
+    assert.equal(file.headers.get('cache-control'), 'private, no-store');
+    const head = await adminJobRequest(req(path, cookies[0], { method: 'HEAD' }), env, ready.jobId, true);
+    assert.equal(head.status, 200);
+    assert.equal(await head.text(), '');
+    assert.equal((await adminJobRequest(req(path, cookies[1]), env, ready.jobId, true)).status, 403);
+    assert.equal((await adminJobRequest(req(path + '?variant=other'), env, ready.jobId, true)).status, 422);
+    await db
+      .prepare('UPDATE generation_runs SET expires_at=? WHERE job_id=?')
+      .bind(new Date(Date.now() - 1000).toISOString(), ready.jobId)
+      .run();
+    assert.equal((await adminJobRequest(req(path), env, ready.jobId, true)).status, 200);
+    assert.equal((await adminVideoDetail(db, ready.jobId))?.video.expiresAt, null);
   });
-  await t.test('CSRF, champs supplémentaires et conflits refusés ; audit et contrôle atomiques',async()=>{
-    const action={action:'generation_gate',enabled:false,expected:true,reason:'Pause de recette'};
-    const post=(body:unknown,origin=env.BETTER_AUTH_URL)=>adminRequest(req('/api/admin',cookies[0],{method:'POST',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify(body)}),env);
-    assert.equal((await post(action,'https://evil.example')).status,403);assert.equal((await post({...action,actorId:users[1].id})).status,422);
-    assert.equal((await post(action)).status,200);assert.equal((await db.prepare('SELECT enabled FROM generation_control').first<{enabled:number}>())?.enabled,0);
-    assert.equal((await post(action)).status,409);assert.equal((await adminPage(db,AdminQuery.parse({section:'audit'}))).total,1);
-    await assert.rejects(db.prepare("DELETE FROM admin_audit").run(),/ADMIN_AUDIT_IMMUTABLE/);
-    await adminAction(db,users[0].id,{action:'generation_gate',enabled:true,expected:false,reason:'Fin de recette'});
+  await t.test('CSRF, champs supplémentaires et conflits refusés ; audit et contrôle atomiques', async () => {
+    const action = { action: 'generation_gate', enabled: false, expected: true, reason: 'Pause de recette' };
+    const post = (body: unknown, origin = env.BETTER_AUTH_URL) =>
+      adminRequest(
+        req('/api/admin', cookies[0], {
+          method: 'POST',
+          headers: { origin, 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }),
+        env,
+      );
+    assert.equal((await post(action, 'https://evil.example')).status, 403);
+    assert.equal((await post({ ...action, actorId: users[1].id })).status, 422);
+    assert.equal((await post(action)).status, 200);
+    assert.equal((await db.prepare('SELECT enabled FROM generation_control').first<{ enabled: number }>())?.enabled, 0);
+    assert.equal((await post(action)).status, 409);
+    assert.equal((await adminPage(db, AdminQuery.parse({ section: 'audit' }))).total, 1);
+    await assert.rejects(db.prepare('DELETE FROM admin_audit').run(), /ADMIN_AUDIT_IMMUTABLE/);
+    await adminAction(db, users[0].id, {
+      action: 'generation_gate',
+      enabled: true,
+      expected: false,
+      reason: 'Fin de recette',
+    });
   });
-  await t.test('quota protégé contre sous-consommation, expiration, concurrence et faux payant',async()=>{
-    const id='admin-allocation';await db.prepare("INSERT INTO allocations(id,agency_id,kind,period_key,quota_limit,consumed,reserved,valid_from,valid_until) VALUES(?,?,'free','fixture',3,1,1,?,?)")
-      .bind(id,otherAgency.id,new Date(Date.now()-1000).toISOString(),new Date(Date.now()+86400_000).toISOString()).run();
-    await assert.rejects(adminAction(db,users[0].id,{action:'quota',id,expected:3,limit:1,reason:'Sous consommation'}),/ADMIN_CONFLICT/);
-    await adminAction(db,users[0].id,{action:'quota',id,expected:3,limit:4,reason:'Compensation de recette'});
-    await assert.rejects(adminAction(db,users[0].id,{action:'quota',id,expected:3,limit:5,reason:'Version périmée'}),/ADMIN_CONFLICT/);
-    assert.equal((await db.prepare('SELECT kind FROM allocations WHERE id=?').bind(id).first<{kind:string}>())?.kind,'free');
-    await db.prepare('UPDATE allocations SET valid_until=? WHERE id=?').bind(new Date(Date.now()-100).toISOString(),id).run();
-    await assert.rejects(adminAction(db,users[0].id,{action:'quota',id,expected:4,limit:5,reason:'Période expirée'}),/ADMIN_CONFLICT/);
+  await t.test('quota protégé contre sous-consommation, expiration, concurrence et faux payant', async () => {
+    const id = 'admin-allocation';
+    await db
+      .prepare(
+        "INSERT INTO allocations(id,agency_id,kind,period_key,quota_limit,consumed,reserved,valid_from,valid_until) VALUES(?,?,'free','fixture',3,1,1,?,?)",
+      )
+      .bind(
+        id,
+        otherAgency.id,
+        new Date(Date.now() - 1000).toISOString(),
+        new Date(Date.now() + 86400_000).toISOString(),
+      )
+      .run();
+    await assert.rejects(
+      adminAction(db, users[0].id, { action: 'quota', id, expected: 3, limit: 1, reason: 'Sous consommation' }),
+      /ADMIN_CONFLICT/,
+    );
+    await adminAction(db, users[0].id, {
+      action: 'quota',
+      id,
+      expected: 3,
+      limit: 4,
+      reason: 'Compensation de recette',
+    });
+    await assert.rejects(
+      adminAction(db, users[0].id, { action: 'quota', id, expected: 3, limit: 5, reason: 'Version périmée' }),
+      /ADMIN_CONFLICT/,
+    );
+    assert.equal(
+      (await db.prepare('SELECT kind FROM allocations WHERE id=?').bind(id).first<{ kind: string }>())?.kind,
+      'free',
+    );
+    await db
+      .prepare('UPDATE allocations SET valid_until=? WHERE id=?')
+      .bind(new Date(Date.now() - 100).toISOString(), id)
+      .run();
+    await assert.rejects(
+      adminAction(db, users[0].id, { action: 'quota', id, expected: 4, limit: 5, reason: 'Période expirée' }),
+      /ADMIN_CONFLICT/,
+    );
   });
-  await t.test('signalement modifié sans effacer le contenu et acteur jamais choisi par le client',async()=>{
-    const id=crypto.randomUUID();await db.prepare("INSERT INTO generation_reports(id,job_id,author_key,category,comment,created_at,idempotency_key,input_hash) VALUES(?,?,'fixture','technical','Image décalée',?,'fixture',?)").bind(id,fixture.jobId,at,'f'.repeat(64)).run();
-    await adminAction(db,users[0].id,{action:'report_status',id,expected:'new',status:'reviewing',reason:'Analyse du signalement'});
-    const row=await db.prepare('SELECT status,comment FROM generation_reports WHERE id=?').bind(id).first();assert.deepEqual(row,{status:'reviewing',comment:'Image décalée'});
-    await assert.rejects(adminAction(db,users[0].id,{action:'report_status',id,expected:'new',status:'closed',reason:'Version ancienne'}),/ADMIN_CONFLICT/);
+  await t.test('signalement modifié sans effacer le contenu et acteur jamais choisi par le client', async () => {
+    const id = crypto.randomUUID();
+    await db
+      .prepare(
+        "INSERT INTO generation_reports(id,job_id,author_key,category,comment,created_at,idempotency_key,input_hash) VALUES(?,?,'fixture','technical','Image décalée',?,'fixture',?)",
+      )
+      .bind(id, fixture.jobId, at, 'f'.repeat(64))
+      .run();
+    await adminAction(db, users[0].id, {
+      action: 'report_status',
+      id,
+      expected: 'new',
+      status: 'reviewing',
+      reason: 'Analyse du signalement',
+    });
+    const row = await db.prepare('SELECT status,comment FROM generation_reports WHERE id=?').bind(id).first();
+    assert.deepEqual(row, { status: 'reviewing', comment: 'Image décalée' });
+    await assert.rejects(
+      adminAction(db, users[0].id, {
+        action: 'report_status',
+        id,
+        expected: 'new',
+        status: 'closed',
+        reason: 'Version ancienne',
+      }),
+      /ADMIN_CONFLICT/,
+    );
   });
-  await t.test('performance et coûts mensuels : durée figée, inconnus et fixtures distingués',async()=>{
-    const now=Date.now(),created=new Date(now-120000).toISOString(),ready=new Date(now-30000).toISOString();
-    const row=await db.prepare("SELECT j.id FROM jobs j JOIN generation_events e ON e.job_id=j.id AND e.event='ready' WHERE j.status='ready' LIMIT 1").first<{id:string}>();assert.ok(row);
-    await db.prepare('UPDATE jobs SET created_at=?,updated_at=? WHERE id=?').bind(created,ready,row.id).run();
-    await db.prepare("UPDATE generation_events SET created_at=? WHERE job_id=? AND event='ready'").bind(ready,row.id).run();
-    const config={generations:true,anonymousTrials:true,imports:'disabled',email:'local',google:false,origin:env.BETTER_AUTH_URL};
-    const before=await adminOverview(db,config,now);
-    await db.prepare('UPDATE jobs SET updated_at=? WHERE id=?').bind(new Date(now).toISOString(),row.id).run();
-    const data=await adminOverview(db,config,now);
-    assert.equal(data.performance.measuredReady,1);assert.ok(Math.abs(data.performance.averageSeconds!-90)<.01);assert.equal(data.performance.averageSeconds,before.performance.averageSeconds);
-    assert.ok(data.performance.total>=2);assert.ok(data.performance.failed>=1);
-    const cost=data.monthlyCosts.find(c=>c.provider==='google');assert.ok(cost);assert.equal(cost.amountMicros,null);assert.equal(cost.realCalls,0);assert.equal(cost.mockCalls,2);
-    assert.ok(data.counts.unverifiedUsers>=1);assert.ok(data.counts.failedToday>=1);
+  await t.test('performance et coûts mensuels : durée figée, inconnus et fixtures distingués', async () => {
+    const now = Date.now(),
+      created = new Date(now - 120000).toISOString(),
+      ready = new Date(now - 30000).toISOString();
+    const row = await db
+      .prepare(
+        "SELECT j.id FROM jobs j JOIN generation_events e ON e.job_id=j.id AND e.event='ready' WHERE j.status='ready' LIMIT 1",
+      )
+      .first<{ id: string }>();
+    assert.ok(row);
+    await db.prepare('UPDATE jobs SET created_at=?,updated_at=? WHERE id=?').bind(created, ready, row.id).run();
+    await db
+      .prepare("UPDATE generation_events SET created_at=? WHERE job_id=? AND event='ready'")
+      .bind(ready, row.id)
+      .run();
+    const config = {
+      generations: true,
+      anonymousTrials: true,
+      imports: 'disabled',
+      email: 'local',
+      google: false,
+      origin: env.BETTER_AUTH_URL,
+    };
+    const before = await adminOverview(db, config, now);
+    await db.prepare('UPDATE jobs SET updated_at=? WHERE id=?').bind(new Date(now).toISOString(), row.id).run();
+    const data = await adminOverview(db, config, now);
+    assert.equal(data.performance.measuredReady, 1);
+    assert.ok(Math.abs(data.performance.averageSeconds! - 90) < 0.01);
+    assert.equal(data.performance.averageSeconds, before.performance.averageSeconds);
+    assert.ok(data.performance.total >= 2);
+    assert.ok(data.performance.failed >= 1);
+    const cost = data.monthlyCosts.find((c) => c.provider === 'google');
+    assert.ok(cost);
+    assert.equal(cost.amountMicros, null);
+    assert.equal(cost.realCalls, 0);
+    assert.equal(cost.mockCalls, 2);
+    assert.ok(data.counts.unverifiedUsers >= 1);
+    assert.ok(data.counts.failedToday >= 1);
   });
-
 });

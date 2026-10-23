@@ -14,11 +14,11 @@ Trois appels Google Cloud Text-to-Speech **réels**, un par voix française Chir
 
 > Bonjour, voici un aperçu de ma voix. Avec BienVu, transformez les photos de votre bien en une visite qui donne envie.
 
-| Voix | Durée décodée | MP3 | RMS décodé |
-|---|---:|---:|---:|
-| Aoede | 7,360 s | 89 324 octets | −21,38 dBFS |
-| Kore | 7,280 s | 88 460 octets | −21,62 dBFS |
-| Charon | 6,280 s | 76 364 octets | −17,27 dBFS |
+| Voix   | Durée décodée |           MP3 |  RMS décodé |
+| ------ | ------------: | ------------: | ----------: |
+| Aoede  |       7,360 s | 89 324 octets | −21,38 dBFS |
+| Kore   |       7,280 s | 88 460 octets | −21,62 dBFS |
+| Charon |       6,280 s | 76 364 octets | −17,27 dBFS |
 
 FFmpeg/FFprobe Remotion existants : MP3 mono 24 kHz/96 kbit/s, décodage PCM non silencieux et durée proche du WAV original. La préparation finale produit **3 synthèses** ; sa reprise hors ligne produit **0 synthèse**, avec les mêmes hashes et les mêmes fichiers. Les WAV et journaux fournisseur restent privés dans `evidence/local/voice-previews/`, ignoré par Git. Seuls les échantillons applicatifs publics et le manifeste sont versionnés.
 

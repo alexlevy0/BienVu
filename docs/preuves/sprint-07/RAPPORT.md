@@ -14,16 +14,16 @@ Fichiers principaux : contrat `packages/contracts/src/generation.ts`, migration 
 
 Une campagne isolée dispose de deux crédits et d'une provision globale de 3,50 € réservée avant les appels. Elle protège les données et compteurs de la base principale ; ses dépenses restent incluses dans le budget global. Workers, Workflow, D1, R2 et Containers sont réels, tout comme les appels OpenAI et Google. Aucune exécution locale de Remotion n'est présentée comme un rendu hébergé.
 
-| Mesure | URL d'agence réelle | Annonce manuelle synthétique |
-|---|---|---|
-| Entrée | [Century 21, annonce 16965965448](https://www.century21.fr/trouver_logement/detail/16965965448/) | Annonce sauvegardée avec photos synthétiques |
-| Admission UTC | 21:42:35.401 | 21:46:16.629 |
-| Vidéo prête UTC | 21:45:56.970 | 21:49:27.020 |
-| Temps total | 201,569 s | 190,391 s |
-| Rendu et vérification | 164,165 s | 159,056 s |
-| MP4 | 2 837 898 octets | 7 008 391 octets |
-| Fournisseurs | 1 OpenAI + 5 Google | 1 OpenAI + 5 Google |
-| Format | 20,054 s, 600 frames, 1080 × 1920, H.264/AAC, faststart | Identique |
+| Mesure                | URL d'agence réelle                                                                              | Annonce manuelle synthétique                 |
+| --------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------- |
+| Entrée                | [Century 21, annonce 16965965448](https://www.century21.fr/trouver_logement/detail/16965965448/) | Annonce sauvegardée avec photos synthétiques |
+| Admission UTC         | 21:42:35.401                                                                                     | 21:46:16.629                                 |
+| Vidéo prête UTC       | 21:45:56.970                                                                                     | 21:49:27.020                                 |
+| Temps total           | 201,569 s                                                                                        | 190,391 s                                    |
+| Rendu et vérification | 164,165 s                                                                                        | 159,056 s                                    |
+| MP4                   | 2 837 898 octets                                                                                 | 7 008 391 octets                             |
+| Fournisseurs          | 1 OpenAI + 5 Google                                                                              | 1 OpenAI + 5 Google                          |
+| Format                | 20,054 s, 600 frames, 1080 × 1920, H.264/AAC, faststart                                          | Identique                                    |
 
 L'import Century 21 a ramené sept photos : huit requêtes, 513 798 octets source, sans Browser Run. Les filigranes présents dans les photos source sont conservés. Les crédits de recette ont le droit de sortie payé, donc pas de filigrane BienVu ; le filigrane d'essai reste démontré au sprint 06.
 

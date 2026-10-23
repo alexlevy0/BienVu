@@ -69,12 +69,12 @@ Les fichiers sont sous `agencies/{agencyId}/jobs/{jobId}/audio/`, sans URL publi
 
 `apps/pipeline/src/narration-worker.ts` utilise le même module de préparation que la recette locale. `wrangler.narration.jsonc` décrit les bindings/types, sans identifiant ni secret distant. La configuration `wrangler.staging.narration.jsonc` est générée et ignorée par Git. L'authentification protège toutes les routes, puis le couple `NARRATION_AGENCY_ID`/`NARRATION_JOB_ID` borne leur portée :
 
-| Route | Fonction |
-|---|---|
-| `GET /status` | Runtime et état d'activation, sans secret |
-| `POST /agencies/{agencyId}/jobs/{jobId}/prepare` | Corps vide, script et voix avec vrais fournisseurs uniquement |
-| `GET /agencies/{agencyId}/jobs/{jobId}` | Résultat privé persistant |
-| `GET /agencies/{agencyId}/jobs/{jobId}/audio/{audioId}` | WAV privé contrôlé par taille, durée et SHA-256 |
+| Route                                                   | Fonction                                                      |
+| ------------------------------------------------------- | ------------------------------------------------------------- |
+| `GET /status`                                           | Runtime et état d'activation, sans secret                     |
+| `POST /agencies/{agencyId}/jobs/{jobId}/prepare`        | Corps vide, script et voix avec vrais fournisseurs uniquement |
+| `GET /agencies/{agencyId}/jobs/{jobId}`                 | Résultat privé persistant                                     |
+| `GET /agencies/{agencyId}/jobs/{jobId}/audio/{audioId}` | WAV privé contrôlé par taille, durée et SHA-256               |
 
 Sans jeton : 401 ; autre agence/job : 404 ; paramètres client : 400 ; préparation en pause : 503. Aucun endpoint HTTP ne permet d'ouvrir un budget ou de changer le modèle. Les logs applicatifs contiennent identifiant de requête, statut, temps mural, compteurs et code stable ; pas de texte, clé ni corps fournisseur.
 

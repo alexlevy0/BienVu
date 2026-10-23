@@ -1,43 +1,90 @@
-import {IMPORT_PHOTO_MAXIMUM,ImportFailure, ListingUrl, importResourceDiagnostic, sourceForHost, type ImportResourceDiagnostic} from '@bienvu/contracts';
-import {isPublicIp} from './safety';
+import {
+  IMPORT_PHOTO_MAXIMUM,
+  ImportFailure,
+  ListingUrl,
+  importResourceDiagnostic,
+  sourceForHost,
+  type ImportResourceDiagnostic,
+} from '@bienvu/contracts';
+import { isPublicIp } from './safety';
 
-export const IMPORT_LIMITS = {htmlBytes: 2 * 1024 * 1024, imageBytes: 10 * 1024 * 1024,
-  totalBytes: 50 * 1024 * 1024, photos: IMPORT_PHOTO_MAXIMUM, candidates: 48, redirects: 3, requests: 44, durationMs: 60_000,
-  photoDurationMs: 50_000,imageDurationMs:8_000} as const;
+export const IMPORT_LIMITS = {
+  htmlBytes: 2 * 1024 * 1024,
+  imageBytes: 10 * 1024 * 1024,
+  totalBytes: 50 * 1024 * 1024,
+  photos: IMPORT_PHOTO_MAXIMUM,
+  candidates: 48,
+  redirects: 3,
+  requests: 44,
+  durationMs: 60_000,
+  photoDurationMs: 50_000,
+  imageDurationMs: 8_000,
+} as const;
 
 type ResourceContext = Pick<ImportResourceDiagnostic, 'stage' | 'resourceType'>;
-export function publicUrl(value: string, context: ResourceContext = {stage: 'page'}): URL {
+export function publicUrl(value: string, context: ResourceContext = { stage: 'page' }): URL {
   const parsed = ListingUrl.safeParse(value);
-  if (!parsed.success) throw new ImportFailure('UNSAFE_URL', 'URL non publique ou invalide.', undefined,
-    importResourceDiagnostic(value, context.stage, 'invalid_url', context.resourceType));
+  if (!parsed.success)
+    throw new ImportFailure(
+      'UNSAFE_URL',
+      'URL non publique ou invalide.',
+      undefined,
+      importResourceDiagnostic(value, context.stage, 'invalid_url', context.resourceType),
+    );
   const url = new URL(parsed.data);
   if (!/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(url.hostname))
-    throw new ImportFailure('UNSAFE_URL', 'Nom de domaine non pris en charge.', undefined,
-      importResourceDiagnostic(value, context.stage, 'invalid_url', context.resourceType));
+    throw new ImportFailure(
+      'UNSAFE_URL',
+      'Nom de domaine non pris en charge.',
+      undefined,
+      importResourceDiagnostic(value, context.stage, 'invalid_url', context.resourceType),
+    );
   return url;
 }
 
 // Aucun joker ni hôte fourni par le contenu de la page. Les CDN sont explicites.
 export function sourcePolicy(source: string) {
-  const host = publicUrl(source).hostname, registered = sourceForHost(host);
-  return {pageHosts: registered?.hosts ?? [host], imageHosts: registered ? [...new Set([...registered.hosts, ...registered.mediaHosts])] : [host]};
+  const host = publicUrl(source).hostname,
+    registered = sourceForHost(host);
+  return {
+    pageHosts: registered?.hosts ?? [host],
+    imageHosts: registered ? [...new Set([...registered.hosts, ...registered.mediaHosts])] : [host],
+  };
 }
-export function scopedUrl(value: string, hosts: readonly string[], context: ResourceContext = {stage: 'page'}) {
+export function scopedUrl(value: string, hosts: readonly string[], context: ResourceContext = { stage: 'page' }) {
   const url = publicUrl(value, context);
-  if (!hosts.includes(url.hostname)) throw new ImportFailure('UNSAFE_URL', 'Hôte extérieur à la source autorisée.', undefined,
-    importResourceDiagnostic(value, context.stage, 'host_not_allowed', context.resourceType));
+  if (!hosts.includes(url.hostname))
+    throw new ImportFailure(
+      'UNSAFE_URL',
+      'Hôte extérieur à la source autorisée.',
+      undefined,
+      importResourceDiagnostic(value, context.stage, 'host_not_allowed', context.resourceType),
+    );
   return url;
 }
-export function publicAddresses(addresses: readonly {address: string; family: number}[]) {
-  if (!addresses.length || !addresses.every(item => isPublicIp(item.address) && [4, 6].includes(item.family)))
+export function publicAddresses(addresses: readonly { address: string; family: number }[]) {
+  if (!addresses.length || !addresses.every((item) => isPublicIp(item.address) && [4, 6].includes(item.family)))
     throw new ImportFailure('UNSAFE_URL', 'La résolution contient une adresse privée, réservée ou non vérifiable.');
   return [...addresses].sort((a, b) => a.family - b.family);
 }
 
-export type Resource = {url: string; bytes: Uint8Array<ArrayBuffer>; mime: string; sourceBytes: number;
-  width?: number; height?: number; browserUsed?: boolean};
+export type Resource = {
+  url: string;
+  bytes: Uint8Array<ArrayBuffer>;
+  mime: string;
+  sourceBytes: number;
+  width?: number;
+  height?: number;
+  browserUsed?: boolean;
+};
 // Le transport garantit : IP épinglée, TLS, redirections contrôlées, flux bornés,
 // aucun cookie, puis décodage/réencodage raster pour les images. Pas de fetch implicite.
 export interface ImportTransport {
-  load(url: string, kind: 'page' | 'image' | 'asset', hosts: readonly string[], signal: AbortSignal, maxBytes?: number): Promise<Resource>;
+  load(
+    url: string,
+    kind: 'page' | 'image' | 'asset',
+    hosts: readonly string[],
+    signal: AbortSignal,
+    maxBytes?: number,
+  ): Promise<Resource>;
 }

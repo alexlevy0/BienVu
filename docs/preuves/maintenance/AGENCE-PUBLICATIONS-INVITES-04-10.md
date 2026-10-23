@@ -7,7 +7,6 @@ Sur `/publications`, le visiteur découvre un calendrier avec trois publications
 Les routes de sauvegarde et les API sociales conservent leurs contrôles de session et de droits. Les destinations de retour après connexion sont limitées aux pages internes du studio ; la confirmation d’adresse e-mail conserve cette destination.
 
 Vérifications locales :
-
 - Tests de connexion et confirmation d’e-mail : 14 sous-tests ; tests de navigation et contrats des exemples : 2 tests.
 - TypeScript web et tests, frontières des packages, compilation Next.js et bundle OpenNext : réussis.
 - `scripts/probe-guest-studio.mjs` : parcours formulaire → connexion → reprise des champs et du logo → sauvegarde, effacement du cache après sauvegarde, retour vers Publications après connexion, calendrier interactif à 1 536, 390 et 320 pixels. Les écritures et connexions de cette recette sont simulées.

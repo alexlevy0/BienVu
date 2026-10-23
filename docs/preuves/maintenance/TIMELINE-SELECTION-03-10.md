@@ -5,7 +5,6 @@ Le gestionnaire de la règle temporelle capturait le pointeur et déplaçait la 
 `apps/web/components/editor-timeline.tsx` annule maintenant le comportement natif dès `onPointerDown`. `apps/web/app/editeur/editor.css` interdit la sélection du texte sur `.editor-timeline-sheet`, avec `-webkit-user-select` et `user-select`. Les champs de réglage des textes sont hors de cette zone ; la capture du pointeur et le calcul de la position restent identiques.
 
 Vérifications réussies :
-
 - Build OpenNext (`pnpm build:web`), dry-run Wrangler avec la configuration existante et `git diff --check`.
 - Chromium local puis publié à **1536, 1280 et 390 px** : glissements avant/arrière sur la règle, tête de lecture à la position attendue, aucun texte sélectionné, pointeur relâché sans déplacement supplémentaire.
 - Sur ordinateur, capture maintenue lors d’un glissement hors de la règle et sélection toujours possible dans le champ de texte de l’inspecteur. Sur mobile, déplacement tactile de la tête de lecture sans sélection du texte.

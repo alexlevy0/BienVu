@@ -1,27 +1,65 @@
-import type {NextConfig} from 'next';
-import {withPostHogConfig} from '@posthog/nextjs-config';
-const release=process.env.BIENVU_RELEASE??process.env.GITHUB_SHA??'development';
+import type { NextConfig } from 'next';
+import { withPostHogConfig } from '@posthog/nextjs-config';
+const release = process.env.BIENVU_RELEASE ?? process.env.GITHUB_SHA ?? 'development';
 const config: NextConfig = {
-  env:{NEXT_PUBLIC_BIENVU_RELEASE:release},
-  deploymentId:release==='development'?undefined:release,
+  env: { NEXT_PUBLIC_BIENVU_RELEASE: release },
+  deploymentId: release === 'development' ? undefined : release,
   poweredByHeader: false,
-  experimental:{cssChunking:false,inlineCss:true},
-  transpilePackages: ['@bienvu/presentation', '@bienvu/contracts', '@bienvu/db', '@bienvu/observability', '@bienvu/importers', '@bienvu/maps', '@bienvu/notifications'],
-  async redirects() {return [{source:'/studio',destination:'/',permanent:true},{source:'/generer',destination:'/',permanent:true}];},
+  experimental: { cssChunking: false, inlineCss: true },
+  transpilePackages: [
+    '@bienvu/presentation',
+    '@bienvu/contracts',
+    '@bienvu/db',
+    '@bienvu/observability',
+    '@bienvu/importers',
+    '@bienvu/maps',
+    '@bienvu/notifications',
+  ],
+  async redirects() {
+    return [
+      { source: '/studio', destination: '/', permanent: true },
+      { source: '/generer', destination: '/', permanent: true },
+    ];
+  },
   async headers() {
-    return [{source: '/:path*', headers: [
-      {key: 'X-Content-Type-Options', value: 'nosniff'},
-      {key: 'Referrer-Policy', value: 'no-referrer'},
-      {key: 'X-Frame-Options', value: 'DENY'},
-      {key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()'},
-    ]},{source:'/api/admin/mailbox/messages/:messageId/html',headers:[{key:'X-Frame-Options',value:'SAMEORIGIN'}]},
-      {source:'/ma-vitrine/apercu',headers:[{key:'X-Frame-Options',value:'SAMEORIGIN'},{key:'Content-Security-Policy',value:"frame-ancestors 'self'"}]},
-      {source:'/beta/:path*',headers:[{key:'X-Robots-Tag',value:'noindex, follow'}]},
-      {source:'/notifications-sw.js',headers:[{key:'Cache-Control',value:'no-cache'},{key:'Service-Worker-Allowed',value:'/'}]}];
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+        ],
+      },
+      {
+        source: '/api/admin/mailbox/messages/:messageId/html',
+        headers: [{ key: 'X-Frame-Options', value: 'SAMEORIGIN' }],
+      },
+      {
+        source: '/ma-vitrine/apercu',
+        headers: [
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          { key: 'Content-Security-Policy', value: "frame-ancestors 'self'" },
+        ],
+      },
+      { source: '/beta/:path*', headers: [{ key: 'X-Robots-Tag', value: 'noindex, follow' }] },
+      {
+        source: '/notifications-sw.js',
+        headers: [
+          { key: 'Cache-Control', value: 'no-cache' },
+          { key: 'Service-Worker-Allowed', value: '/' },
+        ],
+      },
+    ];
   },
 };
 // Upload credentials are build-only, never a browser variable or Worker binding.
-export default process.env.POSTHOG_PERSONAL_API_KEY?withPostHogConfig(config,{
-  personalApiKey:process.env.POSTHOG_PERSONAL_API_KEY,projectId:'299212',host:'https://eu.posthog.com',
-  sourcemaps:{enabled:true,releaseName:'bienvu-web',releaseVersion:release,deleteAfterUpload:true},
-}):config;
+export default process.env.POSTHOG_PERSONAL_API_KEY
+  ? withPostHogConfig(config, {
+      personalApiKey: process.env.POSTHOG_PERSONAL_API_KEY,
+      projectId: '299212',
+      host: 'https://eu.posthog.com',
+      sourcemaps: { enabled: true, releaseName: 'bienvu-web', releaseVersion: release, deleteAfterUpload: true },
+    })
+  : config;

@@ -22,10 +22,10 @@ La fixture `orpi-rent.html` est synthétique. Elle vérifie vente/location, abse
 
 Les deux HTML ont été récupérés via le transport HTTPS natif borné. Après publication, deux appels réels à `/api/imports` sur bienvu.online ont utilisé une identité synthétique isolée, des données Orpi réelles et le transport Cloudflare/Container existant. **Aucune vidéo n'a été créée par cette recette.**
 
-| Annonce fournie | Résultat Cloudflare | Loyer | Surface / pièces | Photos |
-|---|---|---|---|---:|
-| [Chevilly-Larue](https://www.orpi.com/annonce-location-appartement-t1-chevilly-larue-94550-1f8c2c09-b7cc-4eb4-8de1-dbcb20ed03e0/) | `ready` | 833 €/mois charges comprises | 22,41 m² / 1 | 5 |
-| [Issy-les-Moulineaux](https://www.orpi.com/annonce-location-appartement-t2-issy-les-moulineaux-92130-e042f263-7553-4214-b80e-4e58eb105d61/) | `ready` | 1 178 €/mois charges comprises | 37,23 m² / 2 | 7 |
+| Annonce fournie                                                                                                                             | Résultat Cloudflare | Loyer                          | Surface / pièces | Photos |
+| ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | ------------------------------ | ---------------- | -----: |
+| [Chevilly-Larue](https://www.orpi.com/annonce-location-appartement-t1-chevilly-larue-94550-1f8c2c09-b7cc-4eb4-8de1-dbcb20ed03e0/)           | `ready`             | 833 €/mois charges comprises   | 22,41 m² / 1     |      5 |
+| [Issy-les-Moulineaux](https://www.orpi.com/annonce-location-appartement-t2-issy-les-moulineaux-92130-e042f263-7553-4214-b80e-4e58eb105d61/) | `ready`             | 1 178 €/mois charges comprises | 37,23 m² / 2     |      7 |
 
 Relecture de chaque import identique à la réponse initiale ; chaque photo privée a été relue par l'API, empreinte SHA-256 vérifiée et JPEG décodé, sans EXIF. Accès anonyme aux annonces refusé (401). Aucun test visuel du cadrage de ces photos ni génération d'une vidéo de location effectué. Les tests locaux antérieurs restent la preuve de refus inter-agences ; cette recette distante n'a pas ajouté une seconde agence.
 

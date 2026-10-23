@@ -3,9 +3,7 @@
   "name": "bienvu-web-probe-local",
   "main": "worker.ts",
   "compatibility_date": "2026-09-27",
-  "compatibility_flags": [
-    "nodejs_compat"
-  ],
+  "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
@@ -77,10 +75,7 @@
     }
   },
   "triggers": {
-    "crons": [
-      "23 3 * * *",
-      "* * * * *"
-    ]
+    "crons": ["23 3 * * *", "* * * * *"]
   },
   "services": [
     {

@@ -18,7 +18,6 @@ Les vérifications portent sur le nombre de lecteurs, les requêtes, la taille d
 ## Validation locale
 
 Fichiers : `apps/web/components/hero-backlight.tsx`, `home-hero-video.tsx` et `apps/web/app/landing.css`.
-
 - `pnpm --filter @bienvu/web typecheck`, `pnpm check:boundaries` et `pnpm build:web` réussis ; **519 fichiers** pour les frontières.
 - Recette des vrais composants et d’un MP4 local à **1 536, 390, 320 et 844 px**, plus mouvement réduit, API de frame vidéo indisponible et canvas indisponible. Deux vérifications spatiales supplémentaires desktop/mobile utilisent un WebM de quadrants colorés en mouvement, fabriqué localement avec MediaRecorder. **Neuf parcours passent**, sans erreur JavaScript, lecteur supplémentaire ou requête externe.
 - Pixels capturés **18 px à l’extérieur** du lecteur : bleu/cyan en haut à gauche, orange à droite, blanc en bas à gauche et rose à droite. Les assertions portent sur le halo effectivement visible, pas seulement sur le contenu du canvas sous la vidéo. À 1 536 px : bleu/cyan `(99,225,238)`, blanc `(239,243,236)` ; contrôles équivalents à 390 px.

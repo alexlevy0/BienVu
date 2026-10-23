@@ -9,10 +9,10 @@ La taille est réglable de **15 à 100 % de la largeur de la vidéo**, avec une 
 Décisions d’Alex du 09/10/2026 : **1 crédit BienVu supplémentaire** pour un ou deux passages courts ; **1 crédit par tranche entamée de 10 secondes** pour la présence continue, quel que soit le moteur autorisé.
 
 | Durée de la vidéo | Supplément avatar continu | Total avec la vidéo, sans animation |
-|---|---:|---:|
-| 20 s | 2 crédits | 3 crédits |
-| 30 s | 3 crédits | 4 crédits |
-| 40 s | 4 crédits | 5 crédits |
+| ----------------- | ------------------------: | ----------------------------------: |
+| 20 s              |                 2 crédits |                           3 crédits |
+| 30 s              |                 3 crédits |                           4 crédits |
+| 40 s              |                 4 crédits |                           5 crédits |
 
 Ce supplément s’ajoute au crédit vidéo et aux éventuelles animations de photos. Il est affiché avant le lancement et réservé atomiquement avec les autres crédits, sur les lots mensuels puis achetés. Aucun nouveau clip livré : remboursement de tout le supplément. Au moins un nouveau clip prêt : le supplément correspondant est consommé, y compris si le rendu final échoue ensuite. Une retouche qui réutilise tous les clips existants rend le supplément réservé ; les crédits vidéo et d’animation suivent leurs propres règles. Les réservations et règlements historiques restent inchangés.
 

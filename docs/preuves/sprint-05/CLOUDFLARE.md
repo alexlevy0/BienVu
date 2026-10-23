@@ -16,17 +16,17 @@ Le plafond d'import public était déjà atteint (10/jour). L'insertion initiale
 
 ## Résultat réel
 
-| Mesure | Observation |
-|---|---|
-| Préparation HTTP | 200, 10 343 ms de temps mural côté opérateur, pas une mesure CPU |
-| Texte | 1 appel OpenAI, `gpt-5.4-mini-2026-03-17`, 957 tokens d'entrée / 87 de sortie, 0 token d'entrée en cache |
-| Voix | 5 appels Google `fr-FR-Chirp3-HD-Aoede`, 267 caractères |
-| Script | Version 1, 5 scènes, aucune correction/réduction, provenance `user_provided` conservée |
-| Durées WAV | 2 920 / 3 840 / 3 080 / 2 000 / 3 440 ms, PCM 24 kHz mono |
-| Timing | 118 / 146 / 123 / 90 / 134 frames à 30 fps : **611 frames, 20,37 s** |
-| Parole / pauses | 15,28 s de parole, environ 5,09 s de pauses ; aucune phrase coupée |
-| Stockage | Script D1 relu, cinq WAV téléchargés par route privée, taille/durée/SHA-256 identiques |
-| Reprise après redéploiement | 0 appel OpenAI, 0 appel Google, résultat identique, journal de coût inchangé |
+| Mesure                      | Observation                                                                                              |
+| --------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Préparation HTTP            | 200, 10 343 ms de temps mural côté opérateur, pas une mesure CPU                                         |
+| Texte                       | 1 appel OpenAI, `gpt-5.4-mini-2026-03-17`, 957 tokens d'entrée / 87 de sortie, 0 token d'entrée en cache |
+| Voix                        | 5 appels Google `fr-FR-Chirp3-HD-Aoede`, 267 caractères                                                  |
+| Script                      | Version 1, 5 scènes, aucune correction/réduction, provenance `user_provided` conservée                   |
+| Durées WAV                  | 2 920 / 3 840 / 3 080 / 2 000 / 3 440 ms, PCM 24 kHz mono                                                |
+| Timing                      | 118 / 146 / 123 / 90 / 134 frames à 30 fps : **611 frames, 20,37 s**                                     |
+| Parole / pauses             | 15,28 s de parole, environ 5,09 s de pauses ; aucune phrase coupée                                       |
+| Stockage                    | Script D1 relu, cinq WAV téléchargés par route privée, taille/durée/SHA-256 identiques                   |
+| Reprise après redéploiement | 0 appel OpenAI, 0 appel Google, résultat identique, journal de coût inchangé                             |
 
 Les phrases portent sur l'appartement à Lyon, 42,06 m², 379 000 €, une transition de galerie et l'agence fictive. La description hostile de la fixture n'est pas envoyée au modèle. La narration et les chiffres résultent du catalogue factuel validé, sans assertions libres ajoutées.
 

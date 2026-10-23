@@ -6,32 +6,31 @@ Ces contrats sont la cible à implémenter en TypeScript avec validation runtime
 
 Extension du 02/10/2026 : `GenerationInput.aspectRatio?: '9:16' | '16:9'` choisit l’orientation ; absent conserve le vertical et les empreintes historiques. Le format fait partie de l’idempotence et de l’entrée immuable du job. `GenerationView.aspectRatio` permet de présenter l’orientation avant et après la disponibilité du résultat. Les routes d’essai anonyme appliquent la même validation stricte. Le modèle `VideoManifest.templateVersion: 'bienvu-horizontal/1'` exige exactement `width: 1920, height: 1080` ; les deux modèles verticaux restent 1080 × 1920. Un rapport carré, un aperçu de dimensions différentes du master ou un résultat ne correspondant pas au manifeste est refusé. Les nouvelles animations horizontales sont 1280 × 720, les clips verticaux historiques pouvant être recadrés lors d’une réutilisation. [Rendu et recette](VIDEO.md#format-vertical-ou-horizontal--2-octobre-2026).
 
-| Entité | Champs essentiels |
-|---|---|
-| Agence | `id`, `ownerUserId`, `name`, `logoAssetId?`, `primaryColor`, `secondaryColor`, `phone?`, `email?`, `website?`, `createdAt` |
-| Annonce | `id`, `agencyId`, `sourceUrl`, `canonicalUrl`, `sourceHost`, `sourceListingId?`, `fetchedAt`, `adapterVersion`, `description`, faits et provenance |
-| Description source | `text` en texte brut, `sourcePath`, `truncated` ; `null` si absente |
-| Fait | `value`, `sourcePath`, `rawEvidence`, `status: verified/user_provided/missing/conflicting`, unité explicite |
-| Photo | `id`, `agencyId`, `listingId`, `sourceUrl`, `objectKey`, `contentHash`, `width`, `height`, `mime`, `sizeBytes`, `sourceOrder` |
-| Import privé | `id`, `agencyId`, `idempotencyKey`, `sourceUrl`, `status`, résultat, erreur, diagnostics privés, bail et expiration |
+| Entité                | Champs essentiels                                                                                                                                             |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Agence                | `id`, `ownerUserId`, `name`, `logoAssetId?`, `primaryColor`, `secondaryColor`, `phone?`, `email?`, `website?`, `createdAt`                                    |
+| Annonce               | `id`, `agencyId`, `sourceUrl`, `canonicalUrl`, `sourceHost`, `sourceListingId?`, `fetchedAt`, `adapterVersion`, `description`, faits et provenance            |
+| Description source    | `text` en texte brut, `sourcePath`, `truncated` ; `null` si absente                                                                                           |
+| Fait                  | `value`, `sourcePath`, `rawEvidence`, `status: verified/user_provided/missing/conflicting`, unité explicite                                                   |
+| Photo                 | `id`, `agencyId`, `listingId`, `sourceUrl`, `objectKey`, `contentHash`, `width`, `height`, `mime`, `sizeBytes`, `sourceOrder`                                 |
+| Import privé          | `id`, `agencyId`, `idempotencyKey`, `sourceUrl`, `status`, résultat, erreur, diagnostics privés, bail et expiration                                           |
 | Brouillon de création | Même identifiant parent que l'import ; version, champs nullable, texte d'origine, provenance, confirmations, photos privées, expiration et état `needs_input` |
-| Script | `id`, `listingId`, `version`, `language`, `scenes[]`, `model`, `promptVersion`, `inputHash` |
-| Scène | `id`, `photoAssetId`, `narrationText`, `captionText`, `factRefs[]`, `audioAssetId`, `durationFrames` |
-| Job | `id`, `agencyId`, `idempotencyKey`, `status`, `stage`, `attempt`, `leaseUntil?`, `workflowId?`, `reservationId`, `errorCode?`, horodatages |
-| Manifeste | `schemaVersion`, `jobId`, `templateVersion`, copie de marque, scènes, résolution, fps, droits de sortie et clés d'assets |
-| Artefact vidéo | `id`, `agencyId`, `jobId`, `objectKey`, `sha256`, dimensions, codecs, durée, `watermarked`, `createdAt`, `expiresAt` |
-| Abonnement | `agencyId`, identifiants Stripe, `planCode`, `status`, début/fin de période, `cancelAtPeriodEnd`, version de synchronisation |
-| Allocation | `id`, `agencyId`, `kind: trial/paid/free`, `periodKey`, `limit`, `reserved`, `consumed`, dates de validité |
-| Réservation | `id`, `jobId`, `allocationId`, `status: unfunded/reserved/consumed/released`, timestamps |
-| Coût | `jobId?`, fournisseur, étape, quantité, unité, prix daté, devise, montant estimé/réconcilié, identifiant de requête |
-| Signalement | `jobId`, auteur ou session autorisée, catégorie, commentaire borné, statut, date et clé d'idempotence ; jamais public |
+| Script                | `id`, `listingId`, `version`, `language`, `scenes[]`, `model`, `promptVersion`, `inputHash`                                                                   |
+| Scène                 | `id`, `photoAssetId`, `narrationText`, `captionText`, `factRefs[]`, `audioAssetId`, `durationFrames`                                                          |
+| Job                   | `id`, `agencyId`, `idempotencyKey`, `status`, `stage`, `attempt`, `leaseUntil?`, `workflowId?`, `reservationId`, `errorCode?`, horodatages                    |
+| Manifeste             | `schemaVersion`, `jobId`, `templateVersion`, copie de marque, scènes, résolution, fps, droits de sortie et clés d'assets                                      |
+| Artefact vidéo        | `id`, `agencyId`, `jobId`, `objectKey`, `sha256`, dimensions, codecs, durée, `watermarked`, `createdAt`, `expiresAt`                                          |
+| Abonnement            | `agencyId`, identifiants Stripe, `planCode`, `status`, début/fin de période, `cancelAtPeriodEnd`, version de synchronisation                                  |
+| Allocation            | `id`, `agencyId`, `kind: trial/paid/free`, `periodKey`, `limit`, `reserved`, `consumed`, dates de validité                                                    |
+| Réservation           | `id`, `jobId`, `allocationId`, `status: unfunded/reserved/consumed/released`, timestamps                                                                      |
+| Coût                  | `jobId?`, fournisseur, étape, quantité, unité, prix daté, devise, montant estimé/réconcilié, identifiant de requête                                           |
+| Signalement           | `jobId`, auteur ou session autorisée, catégorie, commentaire borné, statut, date et clé d'idempotence ; jamais public                                         |
 
 Le prix immobilier est stocké en unité monétaire explicite, idéalement en centimes ; la surface en m² et les durées en millisecondes ou frames selon le contrat. Distinguer `sale` et `rent`, période du loyer et charges. `null` signifie absent ; ne pas remplacer un champ absent par zéro. Les preuves brutes sont bornées et ne contiennent ni cookies ni secrets.
 
 ## Contrat d'import
 
 L'import strict historique retourne l'un des deux résultats :
-
 - Succès : annonce normalisée, provenance, photos validées et warnings non bloquants.
 - Échec : code stable, message français, caractère temporaire ou permanent et diagnostics privés.
 
@@ -78,7 +77,6 @@ Parcours nominal : `queued → importing → scripting → voicing → rendering
 Depuis un état en cours : `retry_wait` en cas d'erreur temporaire récupérable ; `failed` après épuisement des tentatives ou erreur définitive. `retry_wait` conserve l'étape à reprendre et sa réservation. Les états `ready` et `failed` sont terminaux ; une nouvelle création possède un nouvel identifiant. Après un échec terminal, l'action utilisateur « Réessayer » crée donc un nouveau job, soumis aux contrôles de quota et de budget actuels. L'ancien échec n'a consommé aucun crédit.
 
 Règles :
-
 - Persister la réussite de chaque étape et les références des artefacts avant de passer à la suivante.
 - Réutiliser une étape déjà validée si son empreinte d'entrée est identique.
 - Au plus une nouvelle tentative automatique après un échec temporaire pour les premiers tests ; pas de retry automatique sur blocage explicite, URL dangereuse ou données contradictoires.
@@ -106,26 +104,26 @@ Garder une trace dédupliquée des événements Stripe et des factures déjà ut
 
 ## API produit proposée
 
-| Route | Contrat |
-|---|---|
-| `GET /api/me` | Utilisateur, agence et droits calculés côté serveur |
-| `PUT /api/agency` | Met à jour uniquement la marque de l'agence de la session |
-| `POST /api/agency/logo` | Upload raster authentifié, taille et contenu validés |
-| `POST /api/imports` | Corps strict `{url}` + clé d’idempotence ; import privé, sans crédit ni job ; mode local seulement à ce stade |
-| `GET /api/imports` | Imports non expirés de l’agence, limite de 30 |
-| `GET /api/imports/:id` | Résultat privé et erreur stable ; aucune donnée d’une autre agence |
-| `GET /api/imports/:id/photos/:photoId` | JPEG privé après contrôle de la session et du rattachement |
-| `DELETE /api/imports/:id` | Suppression après délai de sûreté, si aucun job ne référence l’import |
-| `POST /api/generations` | Corps `{url}` + clé d'idempotence ; crée ou retrouve le job ; réponse `202 {jobId,status}` |
-| `GET /api/generations/:id` | Statut, erreur affichable et référence d'aperçu si prêt |
-| `GET /api/generations` | Historique paginé de l'agence |
-| `POST /api/generations/:id/retry` | Reprise anticipée d'un job `retry_wait` éligible, même réservation et mêmes limites ; refuse un job terminal |
-| `GET /api/videos/:id/preview` | Accès autorisé au MP4, avec Range ; version conforme aux droits |
-| `GET /api/videos/:id/download` | Même artefact, téléchargement et contrôle d'accès |
-| `DELETE /api/videos/:id` | Suppression des objets de la vidéo et métadonnées selon la politique documentée |
-| `POST /api/billing/checkout` | `planCode` validé contre le catalogue serveur ; jamais un montant libre envoyé par le client |
-| `POST /api/billing/portal` | Session Stripe limitée au client de cette agence |
-| `POST /api/billing/webhook` | Corps brut, signature vérifiée, déduplication, traitement persistant |
+| Route                                  | Contrat                                                                                                       |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `GET /api/me`                          | Utilisateur, agence et droits calculés côté serveur                                                           |
+| `PUT /api/agency`                      | Met à jour uniquement la marque de l'agence de la session                                                     |
+| `POST /api/agency/logo`                | Upload raster authentifié, taille et contenu validés                                                          |
+| `POST /api/imports`                    | Corps strict `{url}` + clé d’idempotence ; import privé, sans crédit ni job ; mode local seulement à ce stade |
+| `GET /api/imports`                     | Imports non expirés de l’agence, limite de 30                                                                 |
+| `GET /api/imports/:id`                 | Résultat privé et erreur stable ; aucune donnée d’une autre agence                                            |
+| `GET /api/imports/:id/photos/:photoId` | JPEG privé après contrôle de la session et du rattachement                                                    |
+| `DELETE /api/imports/:id`              | Suppression après délai de sûreté, si aucun job ne référence l’import                                         |
+| `POST /api/generations`                | Corps `{url}` + clé d'idempotence ; crée ou retrouve le job ; réponse `202 {jobId,status}`                    |
+| `GET /api/generations/:id`             | Statut, erreur affichable et référence d'aperçu si prêt                                                       |
+| `GET /api/generations`                 | Historique paginé de l'agence                                                                                 |
+| `POST /api/generations/:id/retry`      | Reprise anticipée d'un job `retry_wait` éligible, même réservation et mêmes limites ; refuse un job terminal  |
+| `GET /api/videos/:id/preview`          | Accès autorisé au MP4, avec Range ; version conforme aux droits                                               |
+| `GET /api/videos/:id/download`         | Même artefact, téléchargement et contrôle d'accès                                                             |
+| `DELETE /api/videos/:id`               | Suppression des objets de la vidéo et métadonnées selon la politique documentée                               |
+| `POST /api/billing/checkout`           | `planCode` validé contre le catalogue serveur ; jamais un montant libre envoyé par le client                  |
+| `POST /api/billing/portal`             | Session Stripe limitée au client de cette agence                                                              |
+| `POST /api/billing/webhook`            | Corps brut, signature vérifiée, déduplication, traitement persistant                                          |
 
 Codes HTTP cohérents : 401 sans session ; 403/404 pour une ressource étrangère ; 409 pour conflit ; 422 pour entrée inexploitable ; 429 pour limite ou quota ; 503 pour pause de génération. Aucun message public ne contient un secret, une stack trace ou les données d'une autre agence.
 

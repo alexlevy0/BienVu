@@ -86,7 +86,6 @@ les règles serveur ne changent pas.
 `HomeImportFeedback` est rendu par `HomeCreate` sur `/` et `/beta`.
 `home-import-feedback.css` est chargé par le formulaire partagé et reste limité
 à `.home-studio .home-create-panel`. Le composant garde un chargement différé.
-
 - « Lien détecté » correspond à une URL publique valide, pendant le délai de
   préparation existant. Le domaine du lien reste visible.
 - « Lecture de votre annonce… » commence au déclenchement de la préparation

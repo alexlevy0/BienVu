@@ -17,7 +17,6 @@ L’activation ajoute un cookie de capacité `HttpOnly`, sécurisé et limité a
 ## Configuration
 
 Les deux Workers web et génération utilisent le même jeu de clés :
-
 - `WEB_PUSH_ENABLED=true` ; les configurations locales restent `false` par défaut.
 - `WEB_PUSH_PUBLIC_KEY` : clé publique P-256 non compressée, base64url.
 - `WEB_PUSH_PRIVATE_KEY` : secret VAPID privé, jamais dans Git, un argument de commande ou le navigateur.

@@ -36,7 +36,6 @@ Les premiers essais ont révélé deux erreurs de fixture/typage, corrigées pui
 ## Vérifications Cloudflare réelles
 
 Base sauvegardée localement avant migration, puis **0025 seule** appliquée sur le binding D1 existant. Octobre ouvert par la même fonction `adminAction`, via l’accès opérateur D1 et sous l’identifiant du compte Super admin confirmé, avec motif explicite. Ce chemin opérateur ne prétend pas simuler une session navigateur authentifiée distante.
-
 - **Octobre 2026** : enveloppe **100 €**, coupure **90 €**, frais fixes provisionnés **8 €**, **82 € disponibles avant coupure**, révision 1, budget ouvert.
 - Politique anonyme ouverte, plafond **90 €**, limites **5/jour et 30/mois** ; narration octobre **0 € / 25 €**, ouverte.
 - Septembre reste **30,80 € de base + 14 € d’imports = 44,80 €**, coupure **45 €** ; narration **1,20 €/2,50 €**, inchangée.

@@ -10,15 +10,15 @@ La diffusion ne coûte aucun crédit supplémentaire. Elle conserve une copie pr
 
 Les clés locales vont dans `.env.social`, à partir de `.env.social.example`. Ne jamais les mettre dans Git ou dans un champ `NEXT_PUBLIC_*`.
 
-| Champ Meta | Valeur |
-| --- | --- |
-| Domaine de l’application | `bienvu.online` |
-| Site web | `https://bienvu.online` |
-| URI de redirection OAuth valide | `https://bienvu.online/api/social/oauth/callback` |
-| Politique de confidentialité | `https://bienvu.online/confidentialite` |
-| Conditions d’utilisation | `https://bienvu.online/conditions` |
-| Rappel de désautorisation | `https://bienvu.online/api/social/meta/deauthorize` |
-| Rappel de suppression des données | `https://bienvu.online/api/social/meta/deletion` |
+| Champ Meta                        | Valeur                                              |
+| --------------------------------- | --------------------------------------------------- |
+| Domaine de l’application          | `bienvu.online`                                     |
+| Site web                          | `https://bienvu.online`                             |
+| URI de redirection OAuth valide   | `https://bienvu.online/api/social/oauth/callback`   |
+| Politique de confidentialité      | `https://bienvu.online/confidentialite`             |
+| Conditions d’utilisation          | `https://bienvu.online/conditions`                  |
+| Rappel de désautorisation         | `https://bienvu.online/api/social/meta/deauthorize` |
+| Rappel de suppression des données | `https://bienvu.online/api/social/meta/deletion`    |
 
 Activer le parcours Facebook Login adapté à l’application. Les permissions demandées sont `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`, `instagram_basic` et `instagram_content_publish`. Si une configuration Facebook Login for Business est utilisée, renseigner `META_LOGIN_CONFIG_ID` et inclure ces permissions dans sa configuration.
 
@@ -37,7 +37,6 @@ Sources techniques : [collection Facebook officielle de Meta](https://www.postma
 Appliquer `packages/db/migrations/0042_social_publishing.sql` avec le gestionnaire des migrations D1. Les tables utilisent la base et le bucket privés existants ; les Workers de génération et d’import ne changent pas.
 
 Sur le Worker web, conserver les bindings existants et ajouter :
-
 - Variables : `META_APP_ID`, `META_GRAPH_VERSION=v25.0`, `META_LOGIN_CONFIG_ID` si applicable, `SOCIAL_ENABLED=true` après configuration.
 - Secrets : `META_APP_SECRET`, `SOCIAL_TOKEN_ENCRYPTION_KEY`.
 - Cron `* * * * *`, en conservant le cron quotidien `23 3 * * *`.

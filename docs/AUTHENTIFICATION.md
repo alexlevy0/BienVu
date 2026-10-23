@@ -17,7 +17,6 @@ AUTH_EMAIL_VERIFICATION_BYPASS=true
 ```
 
 Redémarrer `pnpm preview` après modification. Ce réglage est **activé sur le poste local pour les essais** ; la valeur versionnée dans `wrangler.jsonc` et le modèle `.dev.vars.example` reste `false`.
-
 - `true` : l’inscription e-mail marque `emailVerified=1`, n’envoie aucun message de confirmation, pose la session puis ouvre `/agence`. Aucun fournisseur d’e-mails n’est nécessaire pour cette inscription.
 - Un compte local déjà en attente est marqué vérifié lors d’une connexion avec **son bon mot de passe**. Une mauvaise saisie ou une réinscription ne valide pas le compte et ne remplace jamais son mot de passe.
 - `false` ou variable absente : le parcours normal avec confirmation reste obligatoire pour les nouvelles inscriptions. Seule la chaîne exacte `true` active l’option. Les comptes déjà marqués vérifiés le restent ; il n’y a pas de modification rétroactive de la base.
@@ -84,11 +83,11 @@ Créer/configurer dans la console Google un client OAuth de type **application W
 
 Pour la recette workerd locale, utiliser exactement :
 
-| Réglage | Valeur |
-|---|---|
-| Origine JavaScript | `http://localhost:8787` |
+| Réglage            | Valeur                                           |
+| ------------------ | ------------------------------------------------ |
+| Origine JavaScript | `http://localhost:8787`                          |
 | URI de redirection | `http://localhost:8787/api/auth/callback/google` |
-| `BETTER_AUTH_URL` | `http://localhost:8787` |
+| `BETTER_AUTH_URL`  | `http://localhost:8787`                          |
 
 Dans **`apps/web/.dev.vars`**, compléter `GOOGLE_CLIENT_ID` et `GOOGLE_CLIENT_SECRET`. Conserver le `BETTER_AUTH_SECRET` aléatoire créé par `pnpm setup:local` ; minimum 32 caractères. Ne pas mettre ces secrets dans une variable `NEXT_PUBLIC_*`, une commande enregistrée dans l’historique, Git ou une conversation. Le modèle sans valeurs sensibles est `.dev.vars.example`. Redémarrer `pnpm preview` après modification. Le bouton Google reste désactivé quand ses identifiants sont absents. Le callback doit correspondre au client déclaré ; voir [l’intégration Google de Better Auth](https://better-auth.com/docs/authentication/google).
 
@@ -108,11 +107,11 @@ Le domaine acheté par Alex est rattaché au **même Worker de test**, avec les 
 
 Dans Google Auth Platform → Clients → le client Web BienVu, Alex a confirmé avoir ajouté :
 
-| Réglage | Valeur |
-|---|---|
-| Origine JavaScript | `https://bienvu.online` |
-| URI de redirection | `https://bienvu.online/api/auth/callback/google` |
-| `BETTER_AUTH_URL` distant | `https://bienvu.online` |
+| Réglage                   | Valeur                                           |
+| ------------------------- | ------------------------------------------------ |
+| Origine JavaScript        | `https://bienvu.online`                          |
+| URI de redirection        | `https://bienvu.online/api/auth/callback/google` |
+| `BETTER_AUTH_URL` distant | `https://bienvu.online`                          |
 
 Conserver les entrées locales et les anciennes entrées OAuth pour un éventuel retour arrière. Les identifiants Google restent identiques. `.dev.vars` garde son origine locale ; les cookies ne sont pas partagés entre localhost, workers.dev et bienvu.online, donc une reconnexion sur le nouveau domaine est nécessaire.
 

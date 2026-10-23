@@ -3,7 +3,6 @@
 ## Résultat et périmètre
 
 À la demande d'Alex, [bienvu.online](https://bienvu.online) est rattaché au Worker existant `bienvu-web-probe-staging`. HTTPS est opérationnel et les pages/API HTTP redirigent vers HTTPS avec un statut 308. Alex confirme avoir ajouté l'origine et le callback dans Google, puis confirme une connexion Google réussie sur le nouveau domaine avec son agence retrouvée.
-
 - Origine : `https://bienvu.online` ; callback : `https://bienvu.online/api/auth/callback/google`.
 - Version initiale du raccordement et de la recette humaine : `ea61cf31-3d98-4ea6-b5b0-61177114f970`.
 - Version finale, ajout de la redirection HTTPS : `2c2f5e24-23a4-45a0-8b4e-14ca99a11b7a`.
@@ -20,19 +19,19 @@ La sonde d'e-mails distante accepte les deux adresses connues du même Worker, m
 
 ## Vérifications distinctes
 
-| Nature | Vérification | Résultat |
-|---|---|---|
-| Fixtures locales | `pnpm exec tsx --test --test-concurrency=2 tests/https-redirect.test.ts tests/auth-config.test.ts` | 5 tests réussis : redirection, absence de boucle, maintien du HTTP local, origine invalide, protection contre les en-têtes forgés et préparation staging |
-| Local | Garde de la sonde e-mail avec l'état historique | Reprise refusée avant tout accès réseau ; preuves anciennes conservées |
-| Build et types | `pnpm build:web`, typegen web, typecheck web, `tsc -p tsconfig.tests.json`, `pnpm check:boundaries` | Réussis ; avertissement connu de fast-png sans échec de build |
-| Paquet | Dry-run Wrangler après la modification du point d'entrée ; recherche de six secrets connus dans 2 549 fichiers OpenNext | Réussi ; aucune occurrence de secret |
-| Cloudflare réel | Zone active, prévisualisation du rattachement, Custom Domain et certificat, lecture des bindings après chaque déploiement | Aucun conflit DNS ; seule l'origine change dans les bindings ; workers.dev/prévisualisations désactivés |
-| DNS réel | Comparaison MX/SPF/DKIM/DMARC avant/après | DNS d'envoi conservés ; résolution du domaine web disponible |
-| HTTPS réel | Accueil, connexion, CSS, statut auth et accès anonyme | Pages/CSS 200 ; Google/e-mail actifs ; `/api/me` anonyme 401 |
-| OAuth réel, contrôles HTTP | Démarrage Google, client, callback, code, scopes, PKCE, état, cookie et origine étrangère | Callback bienvu.online exact ; scopes identité/e-mail/profil ; cookie Secure/HttpOnly/Lax ; origine étrangère refusée avec 403 |
-| Humain, fournisseur réel | Connexion Google sur bienvu.online | Alex confirme la connexion et l'agence retrouvée sur la version initiale du raccordement |
-| HTTPS réel, version finale | Redirections de `/`, `/connexion?verified=1` et `/api/auth/status`, puis page HTTPS et démarrage OAuth | 308 vers le même chemin HTTPS ; page 200, callback et protections conservés |
-| Navigateur réel | Formulaire Google/e-mail et inspection visuelle de l'accueil sur le domaine | Application affichée correctement, mention de développement visible |
+| Nature                     | Vérification                                                                                                              | Résultat                                                                                                                                                 |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fixtures locales           | `pnpm exec tsx --test --test-concurrency=2 tests/https-redirect.test.ts tests/auth-config.test.ts`                        | 5 tests réussis : redirection, absence de boucle, maintien du HTTP local, origine invalide, protection contre les en-têtes forgés et préparation staging |
+| Local                      | Garde de la sonde e-mail avec l'état historique                                                                           | Reprise refusée avant tout accès réseau ; preuves anciennes conservées                                                                                   |
+| Build et types             | `pnpm build:web`, typegen web, typecheck web, `tsc -p tsconfig.tests.json`, `pnpm check:boundaries`                       | Réussis ; avertissement connu de fast-png sans échec de build                                                                                            |
+| Paquet                     | Dry-run Wrangler après la modification du point d'entrée ; recherche de six secrets connus dans 2 549 fichiers OpenNext   | Réussi ; aucune occurrence de secret                                                                                                                     |
+| Cloudflare réel            | Zone active, prévisualisation du rattachement, Custom Domain et certificat, lecture des bindings après chaque déploiement | Aucun conflit DNS ; seule l'origine change dans les bindings ; workers.dev/prévisualisations désactivés                                                  |
+| DNS réel                   | Comparaison MX/SPF/DKIM/DMARC avant/après                                                                                 | DNS d'envoi conservés ; résolution du domaine web disponible                                                                                             |
+| HTTPS réel                 | Accueil, connexion, CSS, statut auth et accès anonyme                                                                     | Pages/CSS 200 ; Google/e-mail actifs ; `/api/me` anonyme 401                                                                                             |
+| OAuth réel, contrôles HTTP | Démarrage Google, client, callback, code, scopes, PKCE, état, cookie et origine étrangère                                 | Callback bienvu.online exact ; scopes identité/e-mail/profil ; cookie Secure/HttpOnly/Lax ; origine étrangère refusée avec 403                           |
+| Humain, fournisseur réel   | Connexion Google sur bienvu.online                                                                                        | Alex confirme la connexion et l'agence retrouvée sur la version initiale du raccordement                                                                 |
+| HTTPS réel, version finale | Redirections de `/`, `/connexion?verified=1` et `/api/auth/status`, puis page HTTPS et démarrage OAuth                    | 308 vers le même chemin HTTPS ; page 200, callback et protections conservés                                                                              |
+| Navigateur réel            | Formulaire Google/e-mail et inspection visuelle de l'accueil sur le domaine                                               | Application affichée correctement, mention de développement visible                                                                                      |
 
 Les nouveaux fichiers locaux de preuve sont dans `evidence/remote/web-domain/`, ignorés par Git : `before/`, `preparation.json`, `probe-origin-guard.json`, `tests-local.log`, `boundaries.log`, `build.log`, `typegen.log`, `typecheck.log`, `bundle-secret-scan.json`, `dry-run.log`, `deploy.log`, `http-checks.json`, `deployed-bindings.json`, `https-dry-run.log`, `https-deploy.log`, `final-http-checks.json` et `final-deployed-bindings.json`. Les rapports n'enregistrent ni cookie, ni code OAuth, ni URL d'autorisation contenant un état.
 

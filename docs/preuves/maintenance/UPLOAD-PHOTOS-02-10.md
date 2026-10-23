@@ -3,7 +3,6 @@
 ## Incident et correction
 
 Les messages « Envoi interrompu » dans Personnaliser et « Erreur » dans Saisie manuelle masquaient les erreurs HTTP. Une tentative réelle de création de brouillon a renvoyé **429 IMPORT_LIMIT** : compteur d’import du 01/10 UTC à **10/10**, budget financier encore disponible. Le retrait appelait la création du même brouillon indisponible avant de supprimer un fichier local. Personnaliser ne proposait pas de reprise/retrait.
-
 - Migration additive `0028_manual_upload_budget.sql` : plafond **10/jour, 30/mois** appliqué aux imports URL. Les photos personnelles et copies personnalisables gardent **30 dossiers/agence**, **12 photos**, **10 Mio/fichier**, **50 Mio/dossier**, **48 requêtes** et **0,50 € de provision/dossier**. Aucun ancien compteur remis à zéro, aucun quota vidéo modifié.
 - Le front ne bloque plus une annonce préparée ou une saisie manuelle sur le plafond de scraping. Erreurs publiques explicites, réessai unique même au double clic, envoi borné à 65 s.
 - Retrait sans création de brouillon supplémentaire ; attente de la création déjà engagée uniquement. Boutons Réessayer/Retirer dans les deux vues, état Retrait… et annulation des résultats tardifs.

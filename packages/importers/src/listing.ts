@@ -1,213 +1,423 @@
-import {ImportFailure, sameSourceHost, sourceForHost, sourceListingId, type NormalizedListing} from '@bienvu/contracts';
-import {absolute, attr, children, descendants, hasClass, htmlDocument, imageCandidate, rawText, tag, text, type HtmlNode} from './html';
-import {descriptionFromNodes, descriptionFromString} from './description';
-import {IMPORT_LIMITS, publicUrl} from './network';
-import {selectAdapter} from './registry';
-import {clean, missing, numeric, unique, verified} from './facts';
-import {extractBienici} from './portals/bienici';
-import {extractFigaro} from './portals/figaro';
-import {extractLadresse} from './agencies/ladresse';
-import {extractCesarBrutus} from './agencies/cesar-brutus';
-import {extractIad} from './agencies/iad';
-import {extractRemax} from './agencies/remax';
-import {extractSafti} from './agencies/safti';
-import {extractNestenn} from './agencies/nestenn';
-import {extractHuman} from './agencies/human';
-import {extractCitya} from './agencies/citya';
-import {extractLaforet} from './agencies/laforet';
-import {extractAirbnb} from './portals/airbnb';
-export {verified, missing} from './facts';
+import {
+  ImportFailure,
+  sameSourceHost,
+  sourceForHost,
+  sourceListingId,
+  type NormalizedListing,
+} from '@bienvu/contracts';
+import {
+  absolute,
+  attr,
+  children,
+  descendants,
+  hasClass,
+  htmlDocument,
+  imageCandidate,
+  rawText,
+  tag,
+  text,
+  type HtmlNode,
+} from './html';
+import { descriptionFromNodes, descriptionFromString } from './description';
+import { IMPORT_LIMITS, publicUrl } from './network';
+import { selectAdapter } from './registry';
+import { clean, missing, numeric, unique, verified } from './facts';
+import { extractBienici } from './portals/bienici';
+import { extractFigaro } from './portals/figaro';
+import { extractLadresse } from './agencies/ladresse';
+import { extractCesarBrutus } from './agencies/cesar-brutus';
+import { extractIad } from './agencies/iad';
+import { extractRemax } from './agencies/remax';
+import { extractSafti } from './agencies/safti';
+import { extractNestenn } from './agencies/nestenn';
+import { extractHuman } from './agencies/human';
+import { extractCitya } from './agencies/citya';
+import { extractLaforet } from './agencies/laforet';
+import { extractAirbnb } from './portals/airbnb';
+export { verified, missing } from './facts';
 
 type Obj = Record<string, unknown>;
-const obj = (v: unknown): Obj => v !== null && typeof v === 'object' && !Array.isArray(v) ? v as Obj : {};
-const list = (v: unknown): unknown[] => v === undefined || v === null ? [] : Array.isArray(v) ? v : [v];
-const types = (v: Obj) => list(v['@type']).map(t => String(t).replace(/^https?:\/\/schema.org\//, ''));
-const homeTypes: Record<string, 'apartment' | 'house' | 'other'> = {Apartment: 'apartment', House: 'house', SingleFamilyResidence: 'house', Residence: 'other'};
-export type ExtractedListing = Omit<NormalizedListing, 'id' | 'agencyId' | 'photos' | 'sourceUrl' | 'fetchedAt' | 'sourceHost' | 'sourceKind'> & {photoUrls: string[]};
+const obj = (v: unknown): Obj => (v !== null && typeof v === 'object' && !Array.isArray(v) ? (v as Obj) : {});
+const list = (v: unknown): unknown[] => (v === undefined || v === null ? [] : Array.isArray(v) ? v : [v]);
+const types = (v: Obj) => list(v['@type']).map((t) => String(t).replace(/^https?:\/\/schema.org\//, ''));
+const homeTypes: Record<string, 'apartment' | 'house' | 'other'> = {
+  Apartment: 'apartment',
+  House: 'house',
+  SingleFamilyResidence: 'house',
+  Residence: 'other',
+};
+export type ExtractedListing = Omit<
+  NormalizedListing,
+  'id' | 'agencyId' | 'photos' | 'sourceUrl' | 'fetchedAt' | 'sourceHost' | 'sourceKind'
+> & { photoUrls: string[] };
 function canonical(nodes: HtmlNode[], url: string) {
-  const found = nodes.filter(n => tag(n) === 'link' && attr(n, 'rel').split(/\s+/).includes('canonical')).map(n => absolute(attr(n, 'href'), url));
+  const found = nodes
+    .filter((n) => tag(n) === 'link' && attr(n, 'rel').split(/\s+/).includes('canonical'))
+    .map((n) => absolute(attr(n, 'href'), url));
   const value = unique(found, 'Plusieurs URL canoniques.') ?? url;
-  const a = publicUrl(value), b = publicUrl(url);
+  const a = publicUrl(value),
+    b = publicUrl(url);
   const source = sourceForHost(b.hostname);
-  const samePath = a.pathname === b.pathname || (source?.id === 'orpi' || source?.id === 'airbnb') && sourceListingId(source, b.pathname) &&
-    a.pathname.replace(/\/$/, '') === b.pathname.replace(/\/$/, '');
+  const samePath =
+    a.pathname === b.pathname ||
+    ((source?.id === 'orpi' || source?.id === 'airbnb') &&
+      sourceListingId(source, b.pathname) &&
+      a.pathname.replace(/\/$/, '') === b.pathname.replace(/\/$/, ''));
   // Le canonique peut enlever la query de suivi, jamais changer de bien.
-  if (!sameSourceHost(a.hostname, b.hostname) || !samePath || a.search && a.search !== b.search)
+  if (!sameSourceHost(a.hostname, b.hostname) || !samePath || (a.search && a.search !== b.search))
     throw new ImportFailure('CONFLICTING_FACTS', 'Le canonique désigne une autre annonce.');
   return a.href;
 }
 function identity(node: Obj, url: string) {
-  for (const value of [node.url, obj(node.mainEntityOfPage)['@id']]) if (typeof value === 'string') {
-    const u = new URL(value, url), current = new URL(url);
-    if (u.protocol !== current.protocol || u.port !== current.port || u.username || u.password
-      || !sameSourceHost(u.hostname, current.hostname) || u.pathname !== current.pathname)
-      throw new ImportFailure('CONFLICTING_FACTS', 'Les données désignent une autre annonce.');
-  }
+  for (const value of [node.url, obj(node.mainEntityOfPage)['@id']])
+    if (typeof value === 'string') {
+      const u = new URL(value, url),
+        current = new URL(url);
+      if (
+        u.protocol !== current.protocol ||
+        u.port !== current.port ||
+        u.username ||
+        u.password ||
+        !sameSourceHost(u.hostname, current.hostname) ||
+        u.pathname !== current.pathname
+      )
+        throw new ImportFailure('CONFLICTING_FACTS', 'Les données désignent une autre annonce.');
+    }
 }
-function structured(documents: unknown[], url: string, canonicalUrl: string, confirmedTransaction?: ExtractedListing['transaction']): ExtractedListing {
-  const nodes = documents.flatMap(v => Array.isArray(v) ? v : list(obj(v)['@graph'] ?? v)).map(obj);
-  if (nodes.some(n => types(n).some(t => ['ItemList', 'CollectionPage', 'SearchResultsPage'].includes(t))))
+function structured(
+  documents: unknown[],
+  url: string,
+  canonicalUrl: string,
+  confirmedTransaction?: ExtractedListing['transaction'],
+): ExtractedListing {
+  const nodes = documents.flatMap((v) => (Array.isArray(v) ? v : list(obj(v)['@graph'] ?? v))).map(obj);
+  if (nodes.some((n) => types(n).some((t) => ['ItemList', 'CollectionPage', 'SearchResultsPage'].includes(t))))
     throw new ImportFailure('NOT_A_LISTING', 'Une liste de résultats ne constitue pas une annonce.', 'not_listing');
   if (nodes.length > 200) throw new ImportFailure('NOT_A_LISTING', 'Trop d’entités structurées.');
   const resolve = (v: unknown): Obj => {
-    const value = obj(v), id = value['@id'];
+    const value = obj(v),
+      id = value['@id'];
     if (Object.keys(value).length === 1 && typeof id === 'string') {
-      const matches = nodes.filter(n => n['@id'] === id && Object.keys(n).length > 1);
+      const matches = nodes.filter((n) => n['@id'] === id && Object.keys(n).length > 1);
       if (matches.length !== 1) throw new ImportFailure('CONFLICTING_FACTS', 'Référence JSON-LD ambiguë.');
       return matches[0];
     }
     return value;
   };
-  const wrappers = nodes.filter(n => types(n).includes('RealEstateListing'));
+  const wrappers = nodes.filter((n) => types(n).includes('RealEstateListing'));
   if (wrappers.length > 1) throw new ImportFailure('CONFLICTING_FACTS', 'Plusieurs annonces structurées.');
   const wrapper = wrappers[0] ?? {};
   const nested = resolve(wrapper.mainEntity ?? wrapper.about);
-  const homes = Object.keys(nested).length ? [nested] : nodes.filter(n => types(n).some(t => homeTypes[t]));
-  if (homes.length !== 1) throw new ImportFailure(homes.length ? 'CONFLICTING_FACTS' : 'NOT_A_LISTING', 'Bien unique non identifié.');
-  const home = homes[0]; identity(home, url); identity(wrapper, url);
-  const property = unique(types(home).map(t => homeTypes[t]).filter(Boolean), 'Types de bien contradictoires.');
-  const title = clean(home.name ?? wrapper.name), locality = clean(resolve(home.address).addressLocality);
+  const homes = Object.keys(nested).length ? [nested] : nodes.filter((n) => types(n).some((t) => homeTypes[t]));
+  if (homes.length !== 1)
+    throw new ImportFailure(homes.length ? 'CONFLICTING_FACTS' : 'NOT_A_LISTING', 'Bien unique non identifié.');
+  const home = homes[0];
+  identity(home, url);
+  identity(wrapper, url);
+  const property = unique(
+    types(home)
+      .map((t) => homeTypes[t])
+      .filter(Boolean),
+    'Types de bien contradictoires.',
+  );
+  const title = clean(home.name ?? wrapper.name),
+    locality = clean(resolve(home.address).addressLocality);
   // A uniquely identified listing can still be useful as a private draft when
   // one of these fields is absent. GeneratableListing remains the final gate.
   const offers = [...list(home.offers), ...list(wrapper.offers)].map(resolve);
-  const functions = offers.map(o => String(o.businessFunction ?? '')).filter(Boolean);
-  const transaction = unique([...functions.map(f => /[#/]Sell$|^Sell$/.test(f) ? 'sale' as const : /[#/]LeaseOut$|^LeaseOut$/.test(f) ? 'rent' as const : null).filter(v => v !== null),
-    ...(confirmedTransaction ? [confirmedTransaction] : [])], 'Vente et location contradictoires.');
+  const functions = offers.map((o) => String(o.businessFunction ?? '')).filter(Boolean);
+  const transaction = unique(
+    [
+      ...functions
+        .map((f) =>
+          /[#/]Sell$|^Sell$/.test(f)
+            ? ('sale' as const)
+            : /[#/]LeaseOut$|^LeaseOut$/.test(f)
+              ? ('rent' as const)
+              : null,
+        )
+        .filter((v) => v !== null),
+      ...(confirmedTransaction ? [confirmedTransaction] : []),
+    ],
+    'Vente et location contradictoires.',
+  );
   if (!transaction) throw new ImportFailure('INCOMPLETE_LISTING', 'Vente ou location non établie.');
   const warnings: string[] = [];
-  const specs = offers.flatMap(o => list(o.priceSpecification).map(resolve));
-  const currencies = [...offers, ...specs].map(o => clean(o.priceCurrency)).filter(Boolean);
+  const specs = offers.flatMap((o) => list(o.priceSpecification).map(resolve));
+  const currencies = [...offers, ...specs].map((o) => clean(o.priceCurrency)).filter(Boolean);
   const currency = unique(currencies, 'Devises contradictoires.');
-  const amounts = [...offers, ...specs].map(o => numeric(o.price)).filter(v => v !== null);
+  const amounts = [...offers, ...specs].map((o) => numeric(o.price)).filter((v) => v !== null);
   const amount = unique(amounts, 'Prix contradictoires.');
-  const periods = specs.map(s => clean(s.unitCode ?? s.unitText ?? s.billingDuration)).filter(Boolean);
-  const monthly = periods.length > 0 && periods.every(p => /^(MON|month|mois|P1M)$/i.test(p));
-  const chargeValues = [...offers, ...specs].flatMap(o => list(o.additionalProperty)).map(resolve)
-    .filter(v => /^(charges|charges incluses)$/i.test(clean(v.name))).map(v => String(v.value).toLowerCase());
+  const periods = specs.map((s) => clean(s.unitCode ?? s.unitText ?? s.billingDuration)).filter(Boolean);
+  const monthly = periods.length > 0 && periods.every((p) => /^(MON|month|mois|P1M)$/i.test(p));
+  const chargeValues = [...offers, ...specs]
+    .flatMap((o) => list(o.additionalProperty))
+    .map(resolve)
+    .filter((v) => /^(charges|charges incluses)$/i.test(clean(v.name)))
+    .map((v) => String(v.value).toLowerCase());
   const chargeRaw = unique(chargeValues, 'Charges contradictoires.');
-  const charges = ['true', 'included', 'incluses'].includes(chargeRaw ?? '') ? 'included' as const
-    : ['false', 'excluded', 'exclues'].includes(chargeRaw ?? '') ? 'excluded' as const : null;
-  const price = amount !== undefined && currency === 'EUR' && (transaction === 'sale' || monthly && charges)
-    ? verified({amountCents: Math.round(amount * 100), currency: 'EUR' as const,
-      period: transaction === 'sale' ? 'total' as const : 'month' as const,
-      charges: transaction === 'sale' ? 'not_applicable' as const : charges!}, 'EUR_cent', 'JSON-LD.mainEntity.offers', JSON.stringify(offers).slice(0, 500))
-    : missing('EUR_cent');
+  const charges = ['true', 'included', 'incluses'].includes(chargeRaw ?? '')
+    ? ('included' as const)
+    : ['false', 'excluded', 'exclues'].includes(chargeRaw ?? '')
+      ? ('excluded' as const)
+      : null;
+  const price =
+    amount !== undefined && currency === 'EUR' && (transaction === 'sale' || (monthly && charges))
+      ? verified(
+          {
+            amountCents: Math.round(amount * 100),
+            currency: 'EUR' as const,
+            period: transaction === 'sale' ? ('total' as const) : ('month' as const),
+            charges: transaction === 'sale' ? ('not_applicable' as const) : charges!,
+          },
+          'EUR_cent',
+          'JSON-LD.mainEntity.offers',
+          JSON.stringify(offers).slice(0, 500),
+        )
+      : missing('EUR_cent');
   if (price.status === 'missing') warnings.push('Prix omis : montant, devise, période ou charges non vérifiables.');
   const sizes = list(home.floorSize).map(resolve);
-  const areas = sizes.filter(s => ['MTK', 'm²', 'm2'].includes(String(s.unitCode ?? s.unitText))).map(s => numeric(s.value)).filter(v => v !== null);
+  const areas = sizes
+    .filter((s) => ['MTK', 'm²', 'm2'].includes(String(s.unitCode ?? s.unitText)))
+    .map((s) => numeric(s.value))
+    .filter((v) => v !== null);
   const area = unique(areas, 'Surfaces contradictoires.');
-  const rooms = unique(list(home.numberOfRooms).map(v => numeric(typeof v === 'object' ? obj(v).value : v)).filter(v => v !== null), 'Nombre de pièces contradictoire.');
-  const photoUrls = [...new Set([...list(home.image), ...list(wrapper.image)].map(v => typeof v === 'string' ? v : clean(obj(v).contentUrl ?? obj(v).url)).filter(Boolean).map(v => absolute(v, url)))];
+  const rooms = unique(
+    list(home.numberOfRooms)
+      .map((v) => numeric(typeof v === 'object' ? obj(v).value : v))
+      .filter((v) => v !== null),
+    'Nombre de pièces contradictoire.',
+  );
+  const photoUrls = [
+    ...new Set(
+      [...list(home.image), ...list(wrapper.image)]
+        .map((v) => (typeof v === 'string' ? v : clean(obj(v).contentUrl ?? obj(v).url)))
+        .filter(Boolean)
+        .map((v) => absolute(v, url)),
+    ),
+  ];
   const homePath = Object.keys(nested).length
-    ? `JSON-LD.RealEstateListing.${wrapper.mainEntity != null ? 'mainEntity' : 'about'}` : 'JSON-LD.property';
-  const description = descriptionFromString(home.description, `${homePath}.description`)
-    ?? descriptionFromString(wrapper.description, 'JSON-LD.RealEstateListing.description');
-  return {canonicalUrl, sourceListingId: clean(home.identifier ?? wrapper.identifier) || null, adapterVersion: 'structured/3.2', transaction, description,
-    facts: {title: title.length >= 3 ? verified(title, 'text', 'JSON-LD.mainEntity.name') : missing('text'),
+    ? `JSON-LD.RealEstateListing.${wrapper.mainEntity != null ? 'mainEntity' : 'about'}`
+    : 'JSON-LD.property';
+  const description =
+    descriptionFromString(home.description, `${homePath}.description`) ??
+    descriptionFromString(wrapper.description, 'JSON-LD.RealEstateListing.description');
+  return {
+    canonicalUrl,
+    sourceListingId: clean(home.identifier ?? wrapper.identifier) || null,
+    adapterVersion: 'structured/3.2',
+    transaction,
+    description,
+    facts: {
+      title: title.length >= 3 ? verified(title, 'text', 'JSON-LD.mainEntity.name') : missing('text'),
       propertyType: property ? verified(property, 'category', 'JSON-LD.mainEntity.@type') : missing('category'),
-      locality: locality ? verified(locality, 'text', 'JSON-LD.mainEntity.address.addressLocality') : missing('text'), price,
+      locality: locality ? verified(locality, 'text', 'JSON-LD.mainEntity.address.addressLocality') : missing('text'),
+      price,
       area: area === undefined ? missing('m2') : verified(area, 'm2', 'JSON-LD.mainEntity.floorSize'),
-      rooms: rooms === undefined || !Number.isInteger(rooms) ? missing('rooms') : verified(rooms, 'rooms', 'JSON-LD.mainEntity.numberOfRooms')},
-    photoUrls: photoUrls.slice(0, IMPORT_LIMITS.candidates), warnings};
+      rooms:
+        rooms === undefined || !Number.isInteger(rooms)
+          ? missing('rooms')
+          : verified(rooms, 'rooms', 'JSON-LD.mainEntity.numberOfRooms'),
+    },
+    photoUrls: photoUrls.slice(0, IMPORT_LIMITS.candidates),
+    warnings,
+  };
 }
 
 function microdata(root: HtmlNode): Obj {
-  const value: Obj = {'@type': attr(root, 'itemtype').split('/').pop()};
+  const value: Obj = { '@type': attr(root, 'itemtype').split('/').pop() };
   function walk(node: HtmlNode) {
     for (const child of 'childNodes' in node ? node.childNodes : []) {
       const prop = attr(child, 'itemprop');
-      const scope = 'attrs' in child && child.attrs.some(a => a.name === 'itemscope');
+      const scope = 'attrs' in child && child.attrs.some((a) => a.name === 'itemscope');
       if (prop) {
-        const item = scope ? microdata(child) : attr(child, 'content') || attr(child, 'href') || attr(child, 'src') || text(child);
-        for (const name of prop.split(/\s+/)) value[name] = value[name] === undefined ? item : [...list(value[name]), item];
+        const item = scope
+          ? microdata(child)
+          : attr(child, 'content') || attr(child, 'href') || attr(child, 'src') || text(child);
+        for (const name of prop.split(/\s+/))
+          value[name] = value[name] === undefined ? item : [...list(value[name]), item];
       }
       if (!scope) walk(child);
     }
   }
-  walk(root); return value;
+  walk(root);
+  return value;
 }
 
 function espaces(nodes: HtmlNode[], url: string, canonicalUrl: string): ExtractedListing {
   const transaction = new URL(url).pathname.startsWith('/locations/') ? 'rent' : 'sale';
-  const articleClass = transaction === 'rent' ? 'location' : 'vente', articlePath = `article.${articleClass}`;
-  const articles = nodes.filter(n => tag(n) === 'article' && hasClass(n, articleClass));
-  if (!articles.length && nodes.some(n => tag(n) === 'article' && hasClass(n, transaction === 'rent' ? 'vente' : 'location')))
+  const articleClass = transaction === 'rent' ? 'location' : 'vente',
+    articlePath = `article.${articleClass}`;
+  const articles = nodes.filter((n) => tag(n) === 'article' && hasClass(n, articleClass));
+  if (
+    !articles.length &&
+    nodes.some((n) => tag(n) === 'article' && hasClass(n, transaction === 'rent' ? 'vente' : 'location'))
+  )
     throw new ImportFailure('CONFLICTING_FACTS', 'Vente et location contradictoires.');
   if (articles.length !== 1) throw new ImportFailure('NOT_A_LISTING', 'Article d’annonce absent.');
   const scoped = descendants(articles[0]);
-  const title = text(scoped.find(n => tag(n) === 'h1' && hasClass(n, 'annonce-title')));
-  const records = nodes.filter(n => tag(n) === 'script').flatMap(n => {
-    const match = rawText(n).match(/(?:^|\s)(?:var\s+)?dataLayer\s*=\s*(\[[\s\S]*?\])\s*;/);
-    if (!match) return []; try {return list(JSON.parse(match[1])).map(obj);} catch {return [];}
-  }).filter(n => typeof n.reference === 'string' && typeof n.type_de_bien === 'string');
+  const title = text(scoped.find((n) => tag(n) === 'h1' && hasClass(n, 'annonce-title')));
+  const records = nodes
+    .filter((n) => tag(n) === 'script')
+    .flatMap((n) => {
+      const match = rawText(n).match(/(?:^|\s)(?:var\s+)?dataLayer\s*=\s*(\[[\s\S]*?\])\s*;/);
+      if (!match) return [];
+      try {
+        return list(JSON.parse(match[1])).map(obj);
+      } catch {
+        return [];
+      }
+    })
+    .filter((n) => typeof n.reference === 'string' && typeof n.type_de_bien === 'string');
   if (records.length !== 1) throw new ImportFailure('CONFLICTING_FACTS', 'Identité embarquée ambiguë.');
-  const d = records[0], reference = clean(d.reference), routeReference = selectAdapter(url).listingId!;
+  const d = records[0],
+    reference = clean(d.reference),
+    routeReference = selectAdapter(url).listingId!;
   if (!/^[a-z0-9]+$/i.test(reference)) throw new ImportFailure('CONFLICTING_FACTS', 'Référence incohérente.');
-  const referenceKey = reference.toLowerCase(), routeKey = routeReference.toLowerCase();
-  const visibleReference = unique(scoped.filter(n => hasClass(n, 'reference'))
-    .map(n => text(n).match(/^R[ÉE]F\.?\s*:?\s*([a-z0-9]+)$/i)?.[1].toLowerCase())
-    .filter((v): v is string => v !== undefined), 'Références affichées contradictoires.');
+  const referenceKey = reference.toLowerCase(),
+    routeKey = routeReference.toLowerCase();
+  const visibleReference = unique(
+    scoped
+      .filter((n) => hasClass(n, 'reference'))
+      .map((n) =>
+        text(n)
+          .match(/^R[ÉE]F\.?\s*:?\s*([a-z0-9]+)$/i)?.[1]
+          .toLowerCase(),
+      )
+      .filter((v): v is string => v !== undefined),
+    'Références affichées contradictoires.',
+  );
   // Une remise en vente peut changer la référence commerciale en conservant
   // le canonique et les photos de l'ancienne référence. Le canonique est déjà
   // contrôlé ; une référence différente doit aussi être confirmée dans l'article.
-  if (visibleReference !== undefined && visibleReference !== referenceKey
-    || referenceKey !== routeKey && visibleReference !== referenceKey)
+  if (
+    (visibleReference !== undefined && visibleReference !== referenceKey) ||
+    (referenceKey !== routeKey && visibleReference !== referenceKey)
+  )
     throw new ImportFailure('CONFLICTING_FACTS', 'Référence incohérente.');
   const expectedStatus = transaction === 'rent' ? 'enlocation' : 'envente';
   if (d.status !== expectedStatus) {
-    if (d.status === 'enlocation' || d.status === 'envente') throw new ImportFailure('CONFLICTING_FACTS', 'Vente et location contradictoires.');
+    if (d.status === 'enlocation' || d.status === 'envente')
+      throw new ImportFailure('CONFLICTING_FACTS', 'Vente et location contradictoires.');
     throw new ImportFailure('SOURCE_UNAVAILABLE', 'Annonce non disponible.');
   }
   const property = d.type_de_bien === 'Appartement' ? 'apartment' : d.type_de_bien === 'Maison' ? 'house' : null;
-  if (!title || !property || !clean(d.ville)) throw new ImportFailure('INCOMPLETE_LISTING', 'Faits essentiels absents.');
-  const priceKey = transaction === 'rent' ? 'loyer' : 'prix_vente', amount = numeric(d[priceKey]);
-  const euroAmounts = (value: string) => [...value.matchAll(/([\d\s\u00a0\u202f]+(?:[.,]\d{1,2})?)\s*€/g)]
-    .map(m => numeric(m[1])).filter((v): v is number => v !== null);
-  const displayed = scoped.filter(n => hasClass(n, 'info-resume')).flatMap(n => euroAmounts(text(n)));
+  if (!title || !property || !clean(d.ville))
+    throw new ImportFailure('INCOMPLETE_LISTING', 'Faits essentiels absents.');
+  const priceKey = transaction === 'rent' ? 'loyer' : 'prix_vente',
+    amount = numeric(d[priceKey]);
+  const euroAmounts = (value: string) =>
+    [...value.matchAll(/([\d\s\u00a0\u202f]+(?:[.,]\d{1,2})?)\s*€/g)]
+      .map((m) => numeric(m[1]))
+      .filter((v): v is number => v !== null);
+  const displayed = scoped.filter((n) => hasClass(n, 'info-resume')).flatMap((n) => euroAmounts(text(n)));
   unique([...(amount === null ? [] : [amount]), ...displayed], 'Prix affiché et embarqué contradictoires.');
   // The agency's Loyer CC/HC field describes the recurring rental amount.
   // Deposits, optional utility packages and parking fees are separate fields.
-  const rentFields = transaction === 'rent' ? scoped.filter(n => hasClass(n, 'info-cle')).flatMap(n => {
-    const label = text(descendants(n).find(child => hasClass(child, 'info-label')));
-    const match = label.match(/^Loyer(?: mensuel)?\s+(CC|HC|charges comprises|charges incluses|hors charges)$/i);
-    if (!match) return [];
-    return [{label, charges: /^(CC|charges comprises|charges incluses)$/i.test(match[1]) ? 'included' as const : 'excluded' as const,
-      amounts: euroAmounts(text(n))}];
-  }) : [];
-  const charges = unique(rentFields.map(field => field.charges), 'Charges du loyer contradictoires.');
-  const rentAmounts = rentFields.flatMap(field => field.amounts);
+  const rentFields =
+    transaction === 'rent'
+      ? scoped
+          .filter((n) => hasClass(n, 'info-cle'))
+          .flatMap((n) => {
+            const label = text(descendants(n).find((child) => hasClass(child, 'info-label')));
+            const match = label.match(
+              /^Loyer(?: mensuel)?\s+(CC|HC|charges comprises|charges incluses|hors charges)$/i,
+            );
+            if (!match) return [];
+            return [
+              {
+                label,
+                charges: /^(CC|charges comprises|charges incluses)$/i.test(match[1])
+                  ? ('included' as const)
+                  : ('excluded' as const),
+                amounts: euroAmounts(text(n)),
+              },
+            ];
+          })
+      : [];
+  const charges = unique(
+    rentFields.map((field) => field.charges),
+    'Charges du loyer contradictoires.',
+  );
+  const rentAmounts = rentFields.flatMap((field) => field.amounts);
   unique([...(amount === null ? [] : [amount]), ...rentAmounts], 'Loyer affiché et embarqué contradictoires.');
-  const price = amount && displayed.includes(amount) && (transaction === 'sale' || charges && rentAmounts.includes(amount))
-    ? verified({amountCents: Math.round(amount * 100), currency: 'EUR' as const, period: transaction === 'rent' ? 'month' as const : 'total' as const,
-      charges: transaction === 'rent' ? charges! : 'not_applicable' as const}, 'EUR_cent',
-    `dataLayer.${priceKey} + ${articlePath} .info-resume${transaction === 'rent' ? ' + .info-cle' : ''}`,
-    `${d[priceKey]} €${transaction === 'rent' ? ` ; ${rentFields.map(field => field.label).join(' / ')}` : ''}`)
-    : missing('EUR_cent');
-  const galleries = scoped.filter(n => attr(n, 'id') === 'gallery');
+  const price =
+    amount && displayed.includes(amount) && (transaction === 'sale' || (charges && rentAmounts.includes(amount)))
+      ? verified(
+          {
+            amountCents: Math.round(amount * 100),
+            currency: 'EUR' as const,
+            period: transaction === 'rent' ? ('month' as const) : ('total' as const),
+            charges: transaction === 'rent' ? charges! : ('not_applicable' as const),
+          },
+          'EUR_cent',
+          `dataLayer.${priceKey} + ${articlePath} .info-resume${transaction === 'rent' ? ' + .info-cle' : ''}`,
+          `${d[priceKey]} €${transaction === 'rent' ? ` ; ${rentFields.map((field) => field.label).join(' / ')}` : ''}`,
+        )
+      : missing('EUR_cent');
+  const galleries = scoped.filter((n) => attr(n, 'id') === 'gallery');
   const galleryReferences = new Set([referenceKey, routeKey]);
-  const photoUrls = galleries.flatMap(g => descendants(g)).filter(n => tag(n) === 'a' && hasClass(n, 'rsImg'))
-    .map(n => absolute(attr(n, 'href'), url)).filter(v => new URL(v).pathname.split('/').some(p => galleryReferences.has(p.toLowerCase())));
-  return {canonicalUrl, sourceListingId: reference, adapterVersion: 'espaces-atypiques/3.4', transaction,
-    description: descriptionFromNodes(scoped.filter(n => attr(n, 'id') === 'annonce-description'), `${articlePath} #annonce-description`),
-    facts: {title: verified(title, 'text', `${articlePath} h1.annonce-title`), propertyType: verified(property, 'category', 'dataLayer.type_de_bien'),
-      locality: verified(clean(d.ville), 'text', 'dataLayer.ville'), area: missing('m2'),
-      rooms: numeric(d.nb_pieces) && Number.isInteger(numeric(d.nb_pieces)) ? verified(numeric(d.nb_pieces)!, 'rooms', 'dataLayer.nb_pieces', d.nb_pieces) : missing('rooms'),
-      price},
-    photoUrls: [...new Set(photoUrls)].slice(0, IMPORT_LIMITS.candidates), warnings: ['Surface omise : les surfaces Carrez, au sol et pondérées ne sont pas assimilées.',
-      ...(transaction === 'rent' && price.status === 'missing' ? ['Loyer omis : le montant mensuel et ses charges ne sont pas vérifiables.'] : [])]};
+  const photoUrls = galleries
+    .flatMap((g) => descendants(g))
+    .filter((n) => tag(n) === 'a' && hasClass(n, 'rsImg'))
+    .map((n) => absolute(attr(n, 'href'), url))
+    .filter((v) => new URL(v).pathname.split('/').some((p) => galleryReferences.has(p.toLowerCase())));
+  return {
+    canonicalUrl,
+    sourceListingId: reference,
+    adapterVersion: 'espaces-atypiques/3.4',
+    transaction,
+    description: descriptionFromNodes(
+      scoped.filter((n) => attr(n, 'id') === 'annonce-description'),
+      `${articlePath} #annonce-description`,
+    ),
+    facts: {
+      title: verified(title, 'text', `${articlePath} h1.annonce-title`),
+      propertyType: verified(property, 'category', 'dataLayer.type_de_bien'),
+      locality: verified(clean(d.ville), 'text', 'dataLayer.ville'),
+      area: missing('m2'),
+      rooms:
+        numeric(d.nb_pieces) && Number.isInteger(numeric(d.nb_pieces))
+          ? verified(numeric(d.nb_pieces)!, 'rooms', 'dataLayer.nb_pieces', d.nb_pieces)
+          : missing('rooms'),
+      price,
+    },
+    photoUrls: [...new Set(photoUrls)].slice(0, IMPORT_LIMITS.candidates),
+    warnings: [
+      'Surface omise : les surfaces Carrez, au sol et pondérées ne sont pas assimilées.',
+      ...(transaction === 'rent' && price.status === 'missing'
+        ? ['Loyer omis : le montant mensuel et ses charges ne sont pas vérifiables.']
+        : []),
+    ],
+  };
 }
 
-function domAgency(nodes: HtmlNode[], url: string, canonicalUrl: string, allowPartial = false): ExtractedListing | undefined {
-  const adapter = selectAdapter(url), century = adapter.id === 'century21', orpi = adapter.id === 'orpi';
+function domAgency(
+  nodes: HtmlNode[],
+  url: string,
+  canonicalUrl: string,
+  allowPartial = false,
+): ExtractedListing | undefined {
+  const adapter = selectAdapter(url),
+    century = adapter.id === 'century21',
+    orpi = adapter.id === 'orpi';
   if (!century && !orpi) return undefined;
   const id = adapter.listingId;
   if (!id) throw new ImportFailure('NOT_A_LISTING', 'Route d’annonce non reconnue.');
-  const heads = nodes.filter(n => tag(n) === 'h1');
+  const heads = nodes.filter((n) => tag(n) === 'h1');
   if (heads.length !== 1) throw new ImportFailure('CONFLICTING_FACTS', 'Titre d’annonce ambigu.');
   const title = text(heads[0]);
   const transaction = orpi && new URL(url).pathname.startsWith('/annonce-location-') ? 'rent' : 'sale';
-  const match = century ? title.match(/^(Appartement|Maison)(?:\s+\S+)? à vendre\s+(\d+) pièces?\s*-\s*([\d.,]+) m[²2]\s+(.+?)\s*-\s*\d{5}$/i)
-    : title.match(new RegExp(`^(Appartement|Maison) à ${transaction === 'rent' ? 'louer' : 'vendre'}\\s+(\\d+) pièces?\\s*•\\s*(?:([\\d.,]+) m[²2]\\s+)?(.+)$`, 'i'));
+  const match = century
+    ? title.match(
+        /^(Appartement|Maison)(?:\s+\S+)? à vendre\s+(\d+) pièces?\s*-\s*([\d.,]+) m[²2]\s+(.+?)\s*-\s*\d{5}$/i,
+      )
+    : title.match(
+        new RegExp(
+          `^(Appartement|Maison) à ${transaction === 'rent' ? 'louer' : 'vendre'}\\s+(\\d+) pièces?\\s*•\\s*(?:([\\d.,]+) m[²2]\\s+)?(.+)$`,
+          'i',
+        ),
+      );
   if (!match) throw new ImportFailure('INCOMPLETE_LISTING', 'Type, surface ou localisation non établis.');
   const [, kind, roomsText, areaText, locality] = match;
   // Some Orpi listings omit the area entirely. Never reinterpret an invalid
@@ -217,88 +427,176 @@ function domAgency(nodes: HtmlNode[], url: string, canonicalUrl: string, allowPa
   const parent = 'parentNode' in heads[0] ? heads[0].parentNode : null;
   const header = parent && 'parentNode' in parent ? parent.parentNode : null;
   if (!header) throw new ImportFailure('INCOMPLETE_LISTING', 'En-tête de bien absent.');
-  if (orpi && unique(nodes.map(n => attr(n, 'data-estate-reference')).filter(Boolean), 'Plusieurs références Orpi.') !== id)
+  if (
+    orpi &&
+    unique(nodes.map((n) => attr(n, 'data-estate-reference')).filter(Boolean), 'Plusieurs références Orpi.') !== id
+  )
     throw new ImportFailure('CONFLICTING_FACTS', 'Référence Orpi différente de l’URL.');
-  if (century && !nodes.some(n => attr(n, 'data-property-uid') === id)) throw new ImportFailure('CONFLICTING_FACTS', 'Référence Century 21 absente.');
+  if (century && !nodes.some((n) => attr(n, 'data-property-uid') === id))
+    throw new ImportFailure('CONFLICTING_FACTS', 'Référence Century 21 absente.');
   const headerNodes = descendants(header);
-  const priceNodes = (century ? nodes : headerNodes).filter(n => century ? hasClass(n, 'c-the-property-abstract__price')
-    : tag(n) === 'strong' && hasClass(n, 'h2') && hasClass(n, 'text-primary'));
-  const prices = priceNodes.map(n => text(n));
-  const amount = unique(prices.map(p => p.match(/^([\d\s.,]+)\s*€$/)?.[1]).filter((v): v is string => Boolean(v)).map(numeric).filter(v => v !== null), 'Prix affichés contradictoires.');
-  const monthly = priceNodes.length > 0 && priceNodes.every(n => 'parentNode' in n && /^([\d\s.,]+)\s*€\s+par mois$/i.test(text(n.parentNode ?? undefined)));
-  const chargeTexts = headerNodes.filter(n => tag(n) === 'p').map(text).filter(v => /^(?:charges comprises|charges incluses|hors charges|charges non comprises)$/i.test(v));
-  const charges = unique(chargeTexts.map(v => /^(?:charges comprises|charges incluses)$/i.test(v) ? 'included' as const : 'excluded' as const), 'Charges locatives contradictoires.');
-  const price = amount !== undefined && (transaction === 'sale' || monthly && charges)
-    ? verified({amountCents: Math.round(amount * 100), currency: 'EUR' as const,
-      period: transaction === 'rent' ? 'month' as const : 'total' as const,
-      charges: transaction === 'rent' ? charges! : 'not_applicable' as const}, 'EUR_cent',
-      century ? '.c-the-property-abstract__price' : 'header strong.h2.text-primary',
-      transaction === 'rent' ? `${prices.join(' | ')} par mois ; ${chargeTexts.join(' | ')}` : prices.join(' | '))
-    : missing('EUR_cent');
-  const roots = nodes.filter(n => hasClass(n, century ? 'c-the-detail-images-no-js-carousel' : 'js-swiper-estate-media'));
+  const priceNodes = (century ? nodes : headerNodes).filter((n) =>
+    century
+      ? hasClass(n, 'c-the-property-abstract__price')
+      : tag(n) === 'strong' && hasClass(n, 'h2') && hasClass(n, 'text-primary'),
+  );
+  const prices = priceNodes.map((n) => text(n));
+  const amount = unique(
+    prices
+      .map((p) => p.match(/^([\d\s.,]+)\s*€$/)?.[1])
+      .filter((v): v is string => Boolean(v))
+      .map(numeric)
+      .filter((v) => v !== null),
+    'Prix affichés contradictoires.',
+  );
+  const monthly =
+    priceNodes.length > 0 &&
+    priceNodes.every((n) => 'parentNode' in n && /^([\d\s.,]+)\s*€\s+par mois$/i.test(text(n.parentNode ?? undefined)));
+  const chargeTexts = headerNodes
+    .filter((n) => tag(n) === 'p')
+    .map(text)
+    .filter((v) => /^(?:charges comprises|charges incluses|hors charges|charges non comprises)$/i.test(v));
+  const charges = unique(
+    chargeTexts.map((v) =>
+      /^(?:charges comprises|charges incluses)$/i.test(v) ? ('included' as const) : ('excluded' as const),
+    ),
+    'Charges locatives contradictoires.',
+  );
+  const price =
+    amount !== undefined && (transaction === 'sale' || (monthly && charges))
+      ? verified(
+          {
+            amountCents: Math.round(amount * 100),
+            currency: 'EUR' as const,
+            period: transaction === 'rent' ? ('month' as const) : ('total' as const),
+            charges: transaction === 'rent' ? charges! : ('not_applicable' as const),
+          },
+          'EUR_cent',
+          century ? '.c-the-property-abstract__price' : 'header strong.h2.text-primary',
+          transaction === 'rent' ? `${prices.join(' | ')} par mois ; ${chargeTexts.join(' | ')}` : prices.join(' | '),
+        )
+      : missing('EUR_cent');
+  const roots = nodes.filter((n) =>
+    hasClass(n, century ? 'c-the-detail-images-no-js-carousel' : 'js-swiper-estate-media'),
+  );
   if (roots.length !== 1 && !(allowPartial && roots.length === 0))
     throw new ImportFailure('INSUFFICIENT_PHOTOS', 'Galerie du bien non identifiée.');
-  const photoUrls = descendants(roots[0]).filter(n => tag(n) === 'img').map(n => imageCandidate(n, url)).filter((v): v is string => v !== null);
-  if (orpi && photoUrls.some(v => !decodeURIComponent(new URL(v).pathname).includes(id)))
+  const photoUrls = descendants(roots[0])
+    .filter((n) => tag(n) === 'img')
+    .map((n) => imageCandidate(n, url))
+    .filter((v): v is string => v !== null);
+  if (orpi && photoUrls.some((v) => !decodeURIComponent(new URL(v).pathname).includes(id)))
     throw new ImportFailure('CONFLICTING_FACTS', 'Image étrangère à la référence Orpi.');
   let description: NormalizedListing['description'] = null;
   if (century) {
-    const sections = nodes.filter(n => hasClass(n, 'c-the-property-detail-description'));
-    description = descriptionFromNodes(sections.flatMap(descendants).filter(n => hasClass(n, 'has-formated-text')),
-      '.c-the-property-detail-description .has-formated-text');
+    const sections = nodes.filter((n) => hasClass(n, 'c-the-property-detail-description'));
+    description = descriptionFromNodes(
+      sections.flatMap(descendants).filter((n) => hasClass(n, 'has-formated-text')),
+      '.c-the-property-detail-description .has-formated-text',
+    );
   } else {
-    const headings = nodes.filter(n => tag(n) === 'h2' && /^L[’']avis de l[’']agent$/i.test(text(n)));
+    const headings = nodes.filter((n) => tag(n) === 'h2' && /^L[’']avis de l[’']agent$/i.test(text(n)));
     if (headings.length === 1) {
-      const heading = headings[0], parent = 'parentNode' in heading ? heading.parentNode : null;
-      const siblings = parent ? children(parent).filter(n => tag(n)) : [], next = siblings[siblings.findIndex(n => n === heading) + 1];
-      description = descriptionFromNodes(next && tag(next) === 'div' ? descendants(next).filter(n => hasClass(n, 's-cms')) : [],
-        "h2[L'avis de l'agent] + div .s-cms");
+      const heading = headings[0],
+        parent = 'parentNode' in heading ? heading.parentNode : null;
+      const siblings: HtmlNode[] = parent ? children(parent).filter((n) => tag(n)) : [],
+        next = siblings[siblings.indexOf(heading) + 1];
+      description = descriptionFromNodes(
+        next && tag(next) === 'div' ? descendants(next).filter((n) => hasClass(n, 's-cms')) : [],
+        "h2[L'avis de l'agent] + div .s-cms",
+      );
     }
   }
-  return {canonicalUrl, sourceListingId: id, adapterVersion: century ? 'century21-dom/3.2' : 'orpi-dom/4.2', transaction, description,
-    facts: {title: verified(title, 'text', 'h1'), propertyType: verified(kind.toLowerCase() === 'maison' ? 'house' : 'apartment', 'category', 'h1', kind),
-      locality: verified(locality, 'text', 'h1.locality'), area: areaText ? verified(numeric(areaText)!, 'm2', 'h1.area', areaText) : missing('m2'),
+  return {
+    canonicalUrl,
+    sourceListingId: id,
+    adapterVersion: century ? 'century21-dom/3.2' : 'orpi-dom/4.2',
+    transaction,
+    description,
+    facts: {
+      title: verified(title, 'text', 'h1'),
+      propertyType: verified(kind.toLowerCase() === 'maison' ? 'house' : 'apartment', 'category', 'h1', kind),
+      locality: verified(locality, 'text', 'h1.locality'),
+      area: areaText ? verified(numeric(areaText)!, 'm2', 'h1.area', areaText) : missing('m2'),
       rooms: verified(Number(roomsText), 'rooms', 'h1.rooms', roomsText),
-      price},
-    photoUrls: [...new Set(photoUrls)].slice(0, IMPORT_LIMITS.candidates), warnings: [
+      price,
+    },
+    photoUrls: [...new Set(photoUrls)].slice(0, IMPORT_LIMITS.candidates),
+    warnings: [
       ...(price.status === 'missing' ? ['Prix omis : montant, période ou charges non vérifiables.'] : []),
-      ...(!areaText ? ['Surface non indiquée dans l’annonce ; vous pouvez la compléter manuellement.'] : [])]};
+      ...(!areaText ? ['Surface non indiquée dans l’annonce ; vous pouvez la compléter manuellement.'] : []),
+    ],
+  };
 }
 
-export function extractListingHtml(html: string, url: string, options: {allowPartial?: boolean} = {}): ExtractedListing {
+export function extractListingHtml(
+  html: string,
+  url: string,
+  options: { allowPartial?: boolean } = {},
+): ExtractedListing {
   const adapter = selectAdapter(url);
-  const {nodes} = htmlDocument(html), canonicalUrl = canonical(nodes, url);
-  const scripts = nodes.filter(n => tag(n) === 'script' && attr(n, 'type') === 'application/ld+json');
+  const { nodes } = htmlDocument(html),
+    canonicalUrl = canonical(nodes, url);
+  const scripts = nodes.filter((n) => tag(n) === 'script' && attr(n, 'type') === 'application/ld+json');
   if (scripts.length > 20) throw new ImportFailure('NOT_A_LISTING', 'Trop de blocs JSON-LD.');
-  const documents = scripts.flatMap(n => {const content = rawText(n); if (content.length > 128_000) throw new ImportFailure('NOT_A_LISTING', 'JSON-LD trop volumineux.'); try {return [JSON.parse(content) as unknown];} catch {return [];}});
-  const specific = adapter.id === 'airbnb' ? extractAirbnb(nodes, documents, url, canonicalUrl, adapter.listingId!)
-    : adapter.id === 'cesar-brutus' ? extractCesarBrutus(nodes, documents, url, canonicalUrl, adapter.listingId!)
-    : adapter.id === 'iad' ? extractIad(nodes, documents, url, canonicalUrl, adapter.listingId!)
-    : adapter.id === 'remax' ? extractRemax(nodes, documents, url, canonicalUrl, adapter.listingId!)
-    : adapter.id === 'safti' ? extractSafti(nodes, documents, url, canonicalUrl, adapter.listingId!)
-    : adapter.id === 'nestenn' ? extractNestenn(nodes, url, canonicalUrl, adapter.listingId!)
-    : adapter.id === 'human' ? extractHuman(nodes, documents, url, canonicalUrl, adapter.listingId!)
-    : adapter.id === 'laforet' ? extractLaforet(nodes, documents, url, canonicalUrl, adapter.listingId!)
-    : adapter.id === 'citya' ? extractCitya(nodes, documents, url, canonicalUrl, adapter.listingId!) : undefined;
+  const documents = scripts.flatMap((n) => {
+    const content = rawText(n);
+    if (content.length > 128_000) throw new ImportFailure('NOT_A_LISTING', 'JSON-LD trop volumineux.');
+    try {
+      return [JSON.parse(content) as unknown];
+    } catch {
+      return [];
+    }
+  });
+  const specific =
+    adapter.id === 'airbnb'
+      ? extractAirbnb(nodes, documents, url, canonicalUrl, adapter.listingId!)
+      : adapter.id === 'cesar-brutus'
+        ? extractCesarBrutus(nodes, documents, url, canonicalUrl, adapter.listingId!)
+        : adapter.id === 'iad'
+          ? extractIad(nodes, documents, url, canonicalUrl, adapter.listingId!)
+          : adapter.id === 'remax'
+            ? extractRemax(nodes, documents, url, canonicalUrl, adapter.listingId!)
+            : adapter.id === 'safti'
+              ? extractSafti(nodes, documents, url, canonicalUrl, adapter.listingId!)
+              : adapter.id === 'nestenn'
+                ? extractNestenn(nodes, url, canonicalUrl, adapter.listingId!)
+                : adapter.id === 'human'
+                  ? extractHuman(nodes, documents, url, canonicalUrl, adapter.listingId!)
+                  : adapter.id === 'laforet'
+                    ? extractLaforet(nodes, documents, url, canonicalUrl, adapter.listingId!)
+                    : adapter.id === 'citya'
+                      ? extractCitya(nodes, documents, url, canonicalUrl, adapter.listingId!)
+                      : undefined;
   if (specific) return checkedGallery(specific, options.allowPartial);
-  const figaro = adapter.id === 'figaro' ? extractFigaro(nodes, documents, url, canonicalUrl, adapter.listingId!) : undefined;
-  const ladresse = adapter.id === 'ladresse' ? extractLadresse(nodes, url, canonicalUrl, adapter.listingId!) : undefined;
+  const figaro =
+    adapter.id === 'figaro' ? extractFigaro(nodes, documents, url, canonicalUrl, adapter.listingId!) : undefined;
+  const ladresse =
+    adapter.id === 'ladresse' ? extractLadresse(nodes, url, canonicalUrl, adapter.listingId!) : undefined;
   const atypiques = adapter.id === 'espaces-atypiques' ? espaces(nodes, url, canonicalUrl) : undefined;
   let output: ExtractedListing | undefined;
-  try {if (documents.length) output = structured(documents, url, canonicalUrl, (figaro ?? ladresse ?? atypiques)?.transaction);} catch (error) {
-    if (!(error instanceof ImportFailure) || error.code !== 'NOT_A_LISTING' || error.reason === 'not_listing') throw error;
+  try {
+    if (documents.length)
+      output = structured(documents, url, canonicalUrl, (figaro ?? ladresse ?? atypiques)?.transaction);
+  } catch (error) {
+    if (!(error instanceof ImportFailure) || error.code !== 'NOT_A_LISTING' || error.reason === 'not_listing')
+      throw error;
   }
-  const microHomes = nodes.filter(n => /\/(House|Apartment|SingleFamilyResidence|Residence)$/.test(attr(n, 'itemtype')));
+  const microHomes = nodes.filter((n) =>
+    /\/(House|Apartment|SingleFamilyResidence|Residence)$/.test(attr(n, 'itemtype')),
+  );
   if (microHomes.length > 1) throw new ImportFailure('CONFLICTING_FACTS', 'Plusieurs biens dans le DOM.');
   if (microHomes.length === 1) {
-    const home = microHomes[0], micro = structured([microdata(home)], url, canonicalUrl, (figaro ?? ladresse ?? atypiques)?.transaction);
+    const home = microHomes[0],
+      micro = structured([microdata(home)], url, canonicalUrl, (figaro ?? ladresse ?? atypiques)?.transaction);
     micro.adapterVersion = 'microdata/3.2';
     // Le texte riche est lu dans le DOM pour conserver ses paragraphes.
-    const descriptionNodes = descendants(home).filter(n => attr(n, 'itemprop').split(/\s+/).includes('description') && attr(n, 'content') === '')
-      .filter(n => {
+    const descriptionNodes = descendants(home)
+      .filter((n) => attr(n, 'itemprop').split(/\s+/).includes('description') && attr(n, 'content') === '')
+      .filter((n) => {
         let parent = 'parentNode' in n ? n.parentNode : null;
         while (parent && parent !== home) {
-          if ('attrs' in parent && parent.attrs.some(a => a.name === 'itemscope')) return false;
+          if ('attrs' in parent && parent.attrs.some((a) => a.name === 'itemscope')) return false;
           parent = 'parentNode' in parent ? parent.parentNode : null;
         }
         return parent === home;
@@ -307,43 +605,67 @@ export function extractListingHtml(html: string, url: string, options: {allowPar
       ? descriptionFromNodes(descriptionNodes, 'microdata[property].description')
       : descriptionFromString(microdata(home).description, 'microdata[property].description');
     // Galerie exclusivement à l'intérieur du bien identifié, jamais les recommandations.
-    const gallery = descendants(home).filter(n => attr(n, 'itemprop') === 'image' || hasClass(n, 'property-gallery'));
-    micro.photoUrls = [...new Set([...micro.photoUrls, ...gallery.flatMap(g => descendants(g)).filter(n => tag(n) === 'img')
-      .map(n => imageCandidate(n, url)).filter((v): v is string => v !== null)])].slice(0, IMPORT_LIMITS.candidates);
+    const gallery = descendants(home).filter((n) => attr(n, 'itemprop') === 'image' || hasClass(n, 'property-gallery'));
+    micro.photoUrls = [
+      ...new Set([
+        ...micro.photoUrls,
+        ...gallery
+          .flatMap((g) => descendants(g))
+          .filter((n) => tag(n) === 'img')
+          .map((n) => imageCandidate(n, url))
+          .filter((v): v is string => v !== null),
+      ]),
+    ].slice(0, IMPORT_LIMITS.candidates);
     if (output) {
       for (const field of ['propertyType', 'locality', 'price', 'area'] as const) {
-        const a = output.facts[field], b = micro.facts[field];
-        if (a.status === 'verified' && b.status === 'verified') unique([a.value, b.value], `Contradiction JSON-LD/DOM : ${field}.`);
+        const a = output.facts[field],
+          b = micro.facts[field];
+        if (a.status === 'verified' && b.status === 'verified')
+          unique([a.value, b.value], `Contradiction JSON-LD/DOM : ${field}.`);
       }
       output.description ??= micro.description;
     } else output = micro;
   }
   if (atypiques) {
     const agency = atypiques;
-    if (output) for (const field of ['price', 'propertyType', 'locality'] as const) {
-      const a = output.facts[field], b = agency.facts[field];
-      if (a.status === 'verified' && b.status === 'verified') unique([a.value, b.value], `Contradiction des faits : ${field}.`);
-    }
+    if (output)
+      for (const field of ['price', 'propertyType', 'locality'] as const) {
+        const a = output.facts[field],
+          b = agency.facts[field];
+        if (a.status === 'verified' && b.status === 'verified')
+          unique([a.value, b.value], `Contradiction des faits : ${field}.`);
+      }
     agency.description ??= output?.description ?? null;
     output = agency;
   }
-  const dom = figaro ?? ladresse ?? (adapter.id === 'bienici' ? extractBienici(nodes, documents, url, canonicalUrl, adapter.listingId!)
-    : domAgency(nodes, url, canonicalUrl, options.allowPartial));
+  const dom =
+    figaro ??
+    ladresse ??
+    (adapter.id === 'bienici'
+      ? extractBienici(nodes, documents, url, canonicalUrl, adapter.listingId!)
+      : domAgency(nodes, url, canonicalUrl, options.allowPartial));
   if (dom) {
-    if (output) for (const field of ['price', 'propertyType', 'locality', 'area', 'rooms'] as const) {
-      const a = output.facts[field], b = dom.facts[field];
-      if (a?.status === 'verified' && b?.status === 'verified') unique([a.value, b.value], `Contradiction structurée/DOM : ${field}.`);
-    }
+    if (output)
+      for (const field of ['price', 'propertyType', 'locality', 'area', 'rooms'] as const) {
+        const a = output.facts[field],
+          b = dom.facts[field];
+        if (a?.status === 'verified' && b?.status === 'verified')
+          unique([a.value, b.value], `Contradiction structurée/DOM : ${field}.`);
+      }
     dom.description ??= output?.description ?? null;
     if (figaro && output) {
       for (const field of ['title', 'propertyType', 'locality', 'area', 'rooms', 'price'] as const)
         if (dom.facts[field]?.status === 'missing' && output.facts[field]?.status === 'verified')
-          Object.assign(dom.facts, {[field]: output.facts[field]});
-      if (dom.facts.price.status === 'verified') dom.warnings = dom.warnings.filter(w => !w.startsWith('Prix omis'));
-      if (dom.description?.truncated && output.description && !output.description.truncated
-        && output.description.text.startsWith(dom.description.text.replace(/(?:…|\.\.\.)$/, '').trimEnd())) {
+          Object.assign(dom.facts, { [field]: output.facts[field] });
+      if (dom.facts.price.status === 'verified') dom.warnings = dom.warnings.filter((w) => !w.startsWith('Prix omis'));
+      if (
+        dom.description?.truncated &&
+        output.description &&
+        !output.description.truncated &&
+        output.description.text.startsWith(dom.description.text.replace(/(?:…|\.\.\.)$/, '').trimEnd())
+      ) {
         dom.description = output.description;
-        dom.warnings = dom.warnings.filter(w => !w.includes('description publiée est abrégée'));
+        dom.warnings = dom.warnings.filter((w) => !w.includes('description publiée est abrégée'));
       }
       dom.photoUrls = [...new Set([...output.photoUrls, ...dom.photoUrls])].slice(0, IMPORT_LIMITS.candidates);
     }
@@ -354,7 +676,9 @@ export function extractListingHtml(html: string, url: string, options: {allowPar
 }
 function checkedGallery(output: ExtractedListing, allowPartial?: boolean) {
   // Les URLs douteuses de la galerie sont refusées avant tout téléchargement.
-  output.photoUrls = output.photoUrls.filter(v => !/(?:^|[-_.\/])(?:logo|avatar|floor.?plan|plan|dpe|ges)(?:[-_.\/]|$)/i.test(new URL(v).pathname));
+  output.photoUrls = output.photoUrls.filter(
+    (v) => !/(?:^|[-_./])(?:logo|avatar|floor.?plan|plan|dpe|ges)(?:[-_./]|$)/i.test(new URL(v).pathname),
+  );
   if (output.photoUrls.length < 3 && !allowPartial)
     throw new ImportFailure('INSUFFICIENT_PHOTOS', 'La galerie liée au bien est insuffisante.');
   return output;

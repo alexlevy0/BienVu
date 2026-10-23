@@ -4,14 +4,14 @@ La création automatique utilise une file persistante D1 et les attentes durable
 
 ## Réglages initiaux
 
-| Ressource | Limite initiale | Fonctionnement |
-|---|---:|---|
-| Préparation | 5 vidéos, dont 2 par agence | Import, carte, narration et préparation des médias. |
-| Runway | 1 au tier actuel | Minimum entre le plafond opérateur de 5 et la limite réelle de `gen4_turbo`. Les photos d’une vidéo restent traitées successivement. |
-| HeyGen | Réglage existant des avatars | Les passages non soumis attendent une place au lieu d’être marqués en échec. |
-| Rendu | 3 serveurs | Un rendu par serveur standard-4 : quatre vCPU et parallélisme Remotion de quatre. Réglable jusqu’à cinq serveurs. |
-| Demandes actives ou en attente | 40 au total, 5 par agence | Une demande au-delà du plafond est refusée avant toute réservation. |
-| Attente | 20 minutes maximum par ressource | Vérification toutes les 30 secondes, sans serveur de rendu allumé pendant l’attente. |
+| Ressource                      |                  Limite initiale | Fonctionnement                                                                                                                       |
+| ------------------------------ | -------------------------------: | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Préparation                    |      5 vidéos, dont 2 par agence | Import, carte, narration et préparation des médias.                                                                                  |
+| Runway                         |                 1 au tier actuel | Minimum entre le plafond opérateur de 5 et la limite réelle de `gen4_turbo`. Les photos d’une vidéo restent traitées successivement. |
+| HeyGen                         |     Réglage existant des avatars | Les passages non soumis attendent une place au lieu d’être marqués en échec.                                                         |
+| Rendu                          |                       3 serveurs | Un rendu par serveur standard-4 : quatre vCPU et parallélisme Remotion de quatre. Réglable jusqu’à cinq serveurs.                    |
+| Demandes actives ou en attente |        40 au total, 5 par agence | Une demande au-delà du plafond est refusée avant toute réservation.                                                                  |
+| Attente                        | 20 minutes maximum par ressource | Vérification toutes les 30 secondes, sans serveur de rendu allumé pendant l’attente.                                                 |
 
 Ces limites sont réglables dans **Superadmin → Vidéos → File et générations simultanées**. Réduire une limite laisse les traitements actifs se terminer. Le panneau affiche les nombres actifs et en attente ; le bouton Actualiser relit leur état. La modification des réglages exige une session superadmin, une origine valide et la révision courante ; elle est journalisée.
 

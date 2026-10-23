@@ -1,90 +1,184 @@
-import type {GenerationView} from '@bienvu/contracts';
-export const browserNotificationEvent='bienvu:generation-started';
-export const browserNotificationSettingsEvent='bienvu:notification-settings';
-export const notificationPreferenceKey='bienvu:browser-notifications:v1';
-const tokenKey='bienvu:push-device:v1',jobsKey='bienvu:push-pending:v1',handoffKey='bienvu:push-launch:v1';
+import type { GenerationView } from '@bienvu/contracts';
+export const browserNotificationEvent = 'bienvu:generation-started';
+export const browserNotificationSettingsEvent = 'bienvu:notification-settings';
+export const notificationPreferenceKey = 'bienvu:browser-notifications:v1';
+const tokenKey = 'bienvu:push-device:v1',
+  jobsKey = 'bienvu:push-pending:v1',
+  handoffKey = 'bienvu:push-launch:v1';
 // UI intent lives only in this document. The persisted queue is delivery work,
 // never evidence that a visitor just launched a generation after a reload.
-let launchIntent:string|null=null;
-export type NotificationPreference='enabled'|'later'|'disabled';
-export type NotificationCapability='supported'|'install-required'|'unavailable';
-export type PushConfiguration={enabled:boolean;publicKey:string|null};
-const validId=(id:unknown):id is string=>typeof id==='string'&&/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(id);
-export function notificationCapability():NotificationCapability{
-  if(typeof window==='undefined'||!window.isSecureContext)return 'unavailable';
-  const ios=/iPad|iPhone|iPod/.test(navigator.userAgent)||navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1;
-  const standalone=matchMedia('(display-mode: standalone)').matches||('standalone' in navigator&&navigator.standalone===true);
-  if(ios&&!standalone)return 'install-required';
-  return 'Notification' in window&&'serviceWorker' in navigator&&'PushManager' in window?'supported':'unavailable';
+let launchIntent: string | null = null;
+export type NotificationPreference = 'enabled' | 'later' | 'disabled';
+export type NotificationCapability = 'supported' | 'install-required' | 'unavailable';
+export type PushConfiguration = { enabled: boolean; publicKey: string | null };
+const validId = (id: unknown): id is string => typeof id === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(id);
+export function notificationCapability(): NotificationCapability {
+  if (typeof window === 'undefined' || !window.isSecureContext) return 'unavailable';
+  const ios =
+    /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const standalone =
+    matchMedia('(display-mode: standalone)').matches || ('standalone' in navigator && navigator.standalone === true);
+  if (ios && !standalone) return 'install-required';
+  return 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window
+    ? 'supported'
+    : 'unavailable';
 }
-export function notificationPreference():NotificationPreference|null{
-  try{const value=localStorage.getItem(notificationPreferenceKey);return value==='enabled'||value==='later'||value==='disabled'?value:null;}catch{return null;}
+export function notificationPreference(): NotificationPreference | null {
+  try {
+    const value = localStorage.getItem(notificationPreferenceKey);
+    return value === 'enabled' || value === 'later' || value === 'disabled' ? value : null;
+  } catch {
+    return null;
+  }
 }
-export function saveNotificationPreference(value:NotificationPreference){try{localStorage.setItem(notificationPreferenceKey,value);}catch{}}
-function notificationJobs():{id:string;at:number}[]{
-  try{const items=JSON.parse(sessionStorage.getItem(jobsKey)??'[]') as {id:string;at:number}[];
-    return Array.isArray(items)?items.filter(item=>item&&validId(item.id)&&Number.isFinite(item.at)&&item.at>Date.now()-86400_000).slice(-12):[];
-  }catch{return [];}
+export function saveNotificationPreference(value: NotificationPreference) {
+  try {
+    localStorage.setItem(notificationPreferenceKey, value);
+  } catch {}
 }
-export function pendingNotificationJobs():string[]{return notificationJobs().map(item=>item.id);}
-export function announceGenerationStarted(job:Pick<GenerationView,'id'|'status'>,{navigateToResult=false}:{navigateToResult?:boolean}={}){
-  if(typeof window==='undefined'||!validId(job.id)||['ready','failed'].includes(job.status))return;
-  const jobs=notificationJobs().filter(item=>item.id!==job.id);jobs.push({id:job.id,at:Date.now()});
-  launchIntent=navigateToResult?null:job.id;
-  try{
-    sessionStorage.setItem(jobsKey,JSON.stringify(jobs.slice(-12)));sessionStorage.removeItem(handoffKey);
-    if(navigateToResult)sessionStorage.setItem(handoffKey,JSON.stringify({id:job.id,at:Date.now()}));
-  }catch{}
+function notificationJobs(): { id: string; at: number }[] {
+  try {
+    const items = JSON.parse(sessionStorage.getItem(jobsKey) ?? '[]') as { id: string; at: number }[];
+    return Array.isArray(items)
+      ? items
+          .filter((item) => item && validId(item.id) && Number.isFinite(item.at) && item.at > Date.now() - 86400_000)
+          .slice(-12)
+      : [];
+  } catch {
+    return [];
+  }
+}
+export function pendingNotificationJobs(): string[] {
+  return notificationJobs().map((item) => item.id);
+}
+export function announceGenerationStarted(
+  job: Pick<GenerationView, 'id' | 'status'>,
+  { navigateToResult = false }: { navigateToResult?: boolean } = {},
+) {
+  if (typeof window === 'undefined' || !validId(job.id) || ['ready', 'failed'].includes(job.status)) return;
+  const jobs = notificationJobs().filter((item) => item.id !== job.id);
+  jobs.push({ id: job.id, at: Date.now() });
+  launchIntent = navigateToResult ? null : job.id;
+  try {
+    sessionStorage.setItem(jobsKey, JSON.stringify(jobs.slice(-12)));
+    sessionStorage.removeItem(handoffKey);
+    if (navigateToResult) sessionStorage.setItem(handoffKey, JSON.stringify({ id: job.id, at: Date.now() }));
+  } catch {}
   // Full-page editor navigation consumes its one-time intent on the result page.
-  if(navigateToResult)return;
+  if (navigateToResult) return;
   window.dispatchEvent(new CustomEvent(browserNotificationEvent));
 }
-export function consumeNotificationLaunch():string|null{
-  const current=launchIntent;launchIntent=null;if(current)return current;
-  try{
-    const raw=sessionStorage.getItem(handoffKey);sessionStorage.removeItem(handoffKey);const value=JSON.parse(raw??'null');
-    if(value&&validId(value.id)&&Number.isFinite(value.at)&&value.at<=Date.now()&&value.at>Date.now()-60_000
-      &&window.location.pathname===`/historique/${value.id}`&&pendingNotificationJobs().includes(value.id))return value.id;
-  }catch{}
+export function consumeNotificationLaunch(): string | null {
+  const current = launchIntent;
+  launchIntent = null;
+  if (current) return current;
+  try {
+    const raw = sessionStorage.getItem(handoffKey);
+    sessionStorage.removeItem(handoffKey);
+    const value = JSON.parse(raw ?? 'null');
+    if (
+      value &&
+      validId(value.id) &&
+      Number.isFinite(value.at) &&
+      value.at <= Date.now() &&
+      value.at > Date.now() - 60_000 &&
+      window.location.pathname === `/historique/${value.id}` &&
+      pendingNotificationJobs().includes(value.id)
+    )
+      return value.id;
+  } catch {}
   return null;
 }
-function deviceToken(){
-  const old=localStorage.getItem(tokenKey);if(old&&/^[\w-]{43}$/.test(old))return old;
-  const value=btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32)))).replaceAll('+','-').replaceAll('/','_').replaceAll('=','');
-  localStorage.setItem(tokenKey,value);return value;
+function deviceToken() {
+  const old = localStorage.getItem(tokenKey);
+  if (old && /^[\w-]{43}$/.test(old)) return old;
+  const value = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))))
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replaceAll('=', '');
+  localStorage.setItem(tokenKey, value);
+  return value;
 }
-function applicationKey(value:string){return Uint8Array.from(atob(value.replaceAll('-','+').replaceAll('_','/')),c=>c.charCodeAt(0));}
-export async function prepareBrowserNotifications(){
-  const response=await fetch('/api/notifications',{signal:AbortSignal.timeout(10_000),cache:'no-store'});
-  if(!response.ok)throw new Error('Les notifications sont momentanément indisponibles.');
-  const config=await response.json() as PushConfiguration;
-  if(!config.enabled||!config.publicKey||!/^[\w-]{87}$/.test(config.publicKey))throw new Error('Les notifications sont momentanément indisponibles.');
-  const registration=await navigator.serviceWorker.register('/notifications-sw.js',{scope:'/',updateViaCache:'none'});
+function applicationKey(value: string) {
+  return Uint8Array.from(atob(value.replaceAll('-', '+').replaceAll('_', '/')), (c) => c.charCodeAt(0));
+}
+export async function prepareBrowserNotifications() {
+  const response = await fetch('/api/notifications', { signal: AbortSignal.timeout(10_000), cache: 'no-store' });
+  if (!response.ok) throw new Error('Les notifications sont momentanément indisponibles.');
+  const config = (await response.json()) as PushConfiguration;
+  if (!config.enabled || !config.publicKey || !/^[\w-]{87}$/.test(config.publicKey))
+    throw new Error('Les notifications sont momentanément indisponibles.');
+  const registration = await navigator.serviceWorker.register('/notifications-sw.js', {
+    scope: '/',
+    updateViaCache: 'none',
+  });
   // This worker has no fetch handler and never caches private application pages.
-  await Promise.race([navigator.serviceWorker.ready,new Promise<never>((_,reject)=>setTimeout(()=>reject(new Error('Réessayez dans quelques instants.')),10_000))]);
-  return {registration,applicationKey:applicationKey(config.publicKey)};
+  await Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Réessayez dans quelques instants.')), 10_000)),
+  ]);
+  return { registration, applicationKey: applicationKey(config.publicKey) };
 }
-export async function saveBrowserSubscription(subscription:PushSubscription,{watchPending=true}:{watchPending?:boolean}={}){
-  const jobs=watchPending?pendingNotificationJobs():[];
-  const response=await fetch('/api/notifications',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'subscribe',token:deviceToken(),subscription:subscription.toJSON(),jobs}),keepalive:true,signal:AbortSignal.timeout(10_000)});
-  if(!response.ok)throw new Error('L’activation n’a pas abouti. Votre vidéo continue de se préparer.');
-  if(watchPending)saveNotificationPreference('enabled');
+export async function saveBrowserSubscription(
+  subscription: PushSubscription,
+  { watchPending = true }: { watchPending?: boolean } = {},
+) {
+  const jobs = watchPending ? pendingNotificationJobs() : [];
+  const response = await fetch('/api/notifications', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'subscribe', token: deviceToken(), subscription: subscription.toJSON(), jobs }),
+    keepalive: true,
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!response.ok) throw new Error('L’activation n’a pas abouti. Votre vidéo continue de se préparer.');
+  if (watchPending) saveNotificationPreference('enabled');
   // Acknowledge this request's snapshot only: another generation may have been
   // accepted while its subscription was being saved.
-  try{sessionStorage.setItem(jobsKey,JSON.stringify(notificationJobs().filter(job=>!jobs.includes(job.id))));}catch{}
+  try {
+    sessionStorage.setItem(jobsKey, JSON.stringify(notificationJobs().filter((job) => !jobs.includes(job.id))));
+  } catch {}
 }
-export async function watchBrowserGenerations(){
-  if(notificationPreference()!=='enabled')return;
-  const jobs=pendingNotificationJobs();if(!jobs.length)return;
-  const registration=await navigator.serviceWorker.getRegistration('/notifications-sw.js'),subscription=await registration?.pushManager.getSubscription();
-  if(!subscription)throw new Error('Réactivez les notifications pour ce navigateur.');
+export async function watchBrowserGenerations() {
+  if (notificationPreference() !== 'enabled') return;
+  const jobs = pendingNotificationJobs();
+  if (!jobs.length) return;
+  const registration = await navigator.serviceWorker.getRegistration('/notifications-sw.js'),
+    subscription = await registration?.pushManager.getSubscription();
+  if (!subscription) throw new Error('Réactivez les notifications pour ce navigateur.');
   // Renew the device and its current account binding before watching new work.
   await saveBrowserSubscription(subscription);
 }
-export async function disableBrowserNotifications(){
+export async function disableBrowserNotifications() {
   saveNotificationPreference('disabled');
-  launchIntent=null;try{sessionStorage.removeItem(jobsKey);sessionStorage.removeItem(handoffKey);}catch{}
-  let token:string|null=null;try{token=localStorage.getItem(tokenKey);}catch{}
-  const local=async()=>{if('serviceWorker' in navigator){const registration=await navigator.serviceWorker.getRegistration('/notifications-sw.js');const subscription=await registration?.pushManager.getSubscription();await subscription?.unsubscribe();}};
-  await Promise.allSettled([local(),...(token?[fetch('/api/notifications',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({token}),keepalive:true,signal:AbortSignal.timeout(5000)})]:[])]);
+  launchIntent = null;
+  try {
+    sessionStorage.removeItem(jobsKey);
+    sessionStorage.removeItem(handoffKey);
+  } catch {}
+  let token: string | null = null;
+  try {
+    token = localStorage.getItem(tokenKey);
+  } catch {}
+  const local = async () => {
+    if ('serviceWorker' in navigator) {
+      const registration = await navigator.serviceWorker.getRegistration('/notifications-sw.js');
+      const subscription = await registration?.pushManager.getSubscription();
+      await subscription?.unsubscribe();
+    }
+  };
+  await Promise.allSettled([
+    local(),
+    ...(token
+      ? [
+          fetch('/api/notifications', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token }),
+            keepalive: true,
+            signal: AbortSignal.timeout(5000),
+          }),
+        ]
+      : []),
+  ]);
 }

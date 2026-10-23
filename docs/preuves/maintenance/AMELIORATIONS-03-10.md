@@ -47,11 +47,11 @@ Sauvegarde SQL distante avant migration, puis migrations additives **0034 à 003
 
 Admission suspendue durant la migration et le déploiement, puis rétablie. **15 jobs, zéro actif** au contrôle final. Les budgets et plafonds sont strictement inchangés : base octobre **37,25 €**, imports réservés **12,50 €**, engagement **49,75 €**, coupure **90 €**, enveloppe autorisée **100 €**, aucune pause. Aucun crédit client dépensé par la recette. Les coûts de déploiement et de calcul restent soumis au rapprochement de la facture Cloudflare ; aucun surcoût fournisseur n’est assimilé à une facture nulle.
 
-| Service | Version publiée à 100 % |
-|---|---|
-| Web | `c5139089-3e90-4f37-9658-0c26f58e99c5` |
+| Service    | Version publiée à 100 %                |
+| ---------- | -------------------------------------- |
+| Web        | `c5139089-3e90-4f37-9658-0c26f58e99c5` |
 | Génération | `e0d8c664-ac27-458f-b7a4-1da4948a62af` |
-| Import | `dc96f411-4491-4c4f-8627-9d0b58a018f4` |
+| Import     | `dc96f411-4491-4c4f-8627-9d0b58a018f4` |
 
 Renderer **v16**, digest `478ed742a9b9fa18734e98cacad16ff7891b569b38509477057ce04bd354e667`, rollout `f72e9770-a275-4091-b515-adfe84afa94d` terminé, une instance saine. Capacité inchangée : maximum une instance, 1 vCPU, 6 GiB, disque 12 GB. Image d’import inchangée. Anciens bindings, secrets, dates et flags conservés ; web **25 → 32** pour cinq secrets Stripe et deux variables de mode/taxe, génération **28**, import **9**.
 

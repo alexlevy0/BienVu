@@ -2,12 +2,12 @@
 
 Publication demandée par Alex, avec conservation explicite de Solo. Les montants sont HT.
 
-| Offre | Mensuel | Crédits mensuels | Annuel, payé en une fois | Premier mois avec code bonus |
-| --- | ---: | ---: | ---: | ---: |
-| Solo | 50 € | 50 | 540 € | 60 crédits |
-| Agence | 100 € | 120 | 1 080 € | 144 crédits |
-| Équipe | 200 € | 250 | 2 160 € | 300 crédits |
-| Réseau | 500 € | 650 | 5 400 € | 780 crédits |
+| Offre  | Mensuel | Crédits mensuels | Annuel, payé en une fois | Premier mois avec code bonus |
+| ------ | ------: | ---------------: | -----------------------: | ---------------------------: |
+| Solo   |    50 € |               50 |                    540 € |                   60 crédits |
+| Agence |   100 € |              120 |                  1 080 € |                  144 crédits |
+| Équipe |   200 € |              250 |                  2 160 € |                  300 crédits |
+| Réseau |   500 € |              650 |                  5 400 € |                  780 crédits |
 
 L’annuel conserve sa réduction de 10 % et ses douze attributions mensuelles. Le bonus de 20 % reste limité à la première mensualité payée, y compris pour l’annuel, sans report. Le programme partenaires conserve 15 % des paiements HT encaissés pendant douze mois à partir du premier paiement. Aucun changement des recharges ou du barème de consommation vidéo/animations/avatar.
 

@@ -8,12 +8,12 @@
   "durationSeconds": 36,
   "bpm": 120,
   "scenes": [
-    {"id":"import","start":0,"end":6},
-    {"id":"animation","start":6,"end":10},
-    {"id":"voice-avatar","start":10,"end":16},
-    {"id":"editor","start":16,"end":22},
-    {"id":"showcase","start":22,"end":28},
-    {"id":"sharing","start":28,"end":32},
-    {"id":"signature","start":32,"end":36}
+    { "id": "import", "start": 0, "end": 6 },
+    { "id": "animation", "start": 6, "end": 10 },
+    { "id": "voice-avatar", "start": 10, "end": 16 },
+    { "id": "editor", "start": 16, "end": 22 },
+    { "id": "showcase", "start": 22, "end": 28 },
+    { "id": "sharing", "start": 28, "end": 32 },
+    { "id": "signature", "start": 32, "end": 36 }
   ]
 }

@@ -14,28 +14,28 @@ Le Workflow, les transitions du job public, la consommation définitive du quota
 
 ## Nature des preuves
 
-| Vérification | Ce qui est réel | Ce qui est une fixture / limite |
-|---|---|---|
-| Tests automatiques | Node, workerd, D1/R2 et Durable Objects SQLite locaux | Images géométriques, signal audio, moteur MP4 simulé dans les tests du contrôleur |
-| MP4 natifs | Remotion/Chromium, encodage H.264/AAC, voix Google déjà produite et approuvée | Annonce manuelle et trois images synthétiques reprises de l'accueil ; aucune annonce réelle extraite |
-| Recette visuelle | Frames de la composition et du vrai MP4 inspectées | Variante textes longs visuelle uniquement : sa voix réutilisée ne correspond pas aux textes modifiés |
-| Lecture navigateur | Vrai décodage intégral des MP4 local et Cloudflare dans Chromium 149 | Vue mobile **émulée** 390 × 844 ; pas d'appareil physique ni Safari/iOS validés |
-| Cloudflare | Vrai rendu Remotion/Chromium/FFmpeg dans Containers, Worker/DO, publication R2, arrêt et relecture après déploiement | Annonce/photos synthétiques dans la base isolée, WAV Google réels réutilisés ; aucune extraction nouvelle |
+| Vérification       | Ce qui est réel                                                                                                      | Ce qui est une fixture / limite                                                                           |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Tests automatiques | Node, workerd, D1/R2 et Durable Objects SQLite locaux                                                                | Images géométriques, signal audio, moteur MP4 simulé dans les tests du contrôleur                         |
+| MP4 natifs         | Remotion/Chromium, encodage H.264/AAC, voix Google déjà produite et approuvée                                        | Annonce manuelle et trois images synthétiques reprises de l'accueil ; aucune annonce réelle extraite      |
+| Recette visuelle   | Frames de la composition et du vrai MP4 inspectées                                                                   | Variante textes longs visuelle uniquement : sa voix réutilisée ne correspond pas aux textes modifiés      |
+| Lecture navigateur | Vrai décodage intégral des MP4 local et Cloudflare dans Chromium 149                                                 | Vue mobile **émulée** 390 × 844 ; pas d'appareil physique ni Safari/iOS validés                           |
+| Cloudflare         | Vrai rendu Remotion/Chromium/FFmpeg dans Containers, Worker/DO, publication R2, arrêt et relecture après déploiement | Annonce/photos synthétiques dans la base isolée, WAV Google réels réutilisés ; aucune extraction nouvelle |
 
 Aucun appel OpenAI, Google TTS, import de portail ou génération d'image supplémentaire. Les cinq WAV sont ceux de la [comparaison de naturel du sprint 05](../sprint-05/NATUREL.md), relus par empreinte. Après lecture du MP4 local avec filigrane présenté dans la conversation, **Alex répond : « Oui, image et voix sont bonnes »**. Cette première validation était locale. Le MP4 Cloudflare est désormais disponible et présenté à Alex ; son retour distinct reste en attente.
 
 ## Exports natifs et inspection
 
-| Mesure | Essai avec filigrane | Variante payante |
-|---|---:|---:|
-| Frames | 600 | 600 |
-| Durée FFprobe | 20,053333 s | 20,053333 s |
-| Dimensions / fréquence | 1080 × 1920 / 30 fps | Identiques |
-| Codecs | H.264 / AAC | Identiques |
-| Taille | 6 687 091 octets | 7 031 771 octets |
-| Audio décodé RMS | −24,198 dB environ | Identique |
-| `moov` avant `mdat` | Oui | Oui |
-| Filigrane dans le MP4 | Oui | Non |
+| Mesure                 | Essai avec filigrane | Variante payante |
+| ---------------------- | -------------------: | ---------------: |
+| Frames                 |                  600 |              600 |
+| Durée FFprobe          |          20,053333 s |      20,053333 s |
+| Dimensions / fréquence | 1080 × 1920 / 30 fps |       Identiques |
+| Codecs                 |          H.264 / AAC |       Identiques |
+| Taille                 |     6 687 091 octets | 7 031 771 octets |
+| Audio décodé RMS       |   −24,198 dB environ |        Identique |
+| `moov` avant `mdat`    |                  Oui |              Oui |
+| Filigrane dans le MP4  |                  Oui |              Non |
 
 Empreinte essai : `e831fd4421dcaf41182ed2b64e65d3837fd36edddf289f51780dcd466a58663a`.
 
@@ -92,7 +92,6 @@ Avant cette tranche : 24,15 € de provisions. **0,60 € ajoutés avant l'essai
 L'échec conserve sa réservation. Facture, taxes, change et consommation exacte du démarrage non rapprochés ; callback de durée absent. Aucun coût par vidéo distante utilisable calculable puisqu'aucune vidéo du sprint 06 n'a abouti à distance. Pas de réaffectation de l'enveloppe Google/OpenAI ni de remise à zéro des anciens compteurs.
 
 À cet instant, la suite prévue était :
-
 1. Rapprocher le budget avec la consommation réelle, ou faire confirmer une modification du seuil de recette avant de réserver une autre tentative. Conserver ce premier échec et ses coûts ; ne pas changer le nom du contrôleur pour contourner sa limite.
 2. Après réarmement opérateur explicite et borné, vérifier le démarrage corrigé avec logs, puis rendre le même type de manifeste sur Containers. Collecter le vrai MP4 depuis R2, comparer SHA/poids/Range et relire le résultat après redéploiement sans nouveau calcul.
 3. Lire ce fichier distant sur ordinateur et téléphone, inspecter les frames et valider à l'écoute le début/la fin des phrases et la conclusion. Une émulation mobile ou un son décodé ne remplace pas l'écoute demandée.
@@ -114,17 +113,17 @@ Version de reprise : `6b54ff2b-b07d-4306-98c4-2342b603911b`. **156 tests réussi
 
 Le calcul se termine à **21:14:08 UTC** ; publication R2 et arrêt automatique à **21:14:11 UTC**. Délai acceptation → résultat prêt : **181,83 s**, dont **169,57 s** mesurés de rendu/vérification. Démarrage/activité/arrêt observés : **177,709 s**. Instance inchangée `standard-2`, une seule active, aucun accès Internet sortant.
 
-| Mesure du fichier téléchargé depuis R2 | Résultat |
-|---|---:|
-| Dimensions / fréquence | 1080 × 1920 / 30 fps |
-| Frames | 600 |
-| Codecs | H.264 / AAC |
-| Durée FFprobe Linux | 20,054 s |
-| Durée du lecteur | 20,053333 s |
-| Taille | 6 724 146 octets |
-| Audio décodé RMS | −24,198 dBFS |
-| MP4 streaming / filigrane intégré | Oui / oui |
-| SHA-256 | `5d0e5d4b186e3c33965b97e58dbc1a37266a5fd34418b051ea8d04baccf69eaf` |
+| Mesure du fichier téléchargé depuis R2 |                                                           Résultat |
+| -------------------------------------- | -----------------------------------------------------------------: |
+| Dimensions / fréquence                 |                                               1080 × 1920 / 30 fps |
+| Frames                                 |                                                                600 |
+| Codecs                                 |                                                        H.264 / AAC |
+| Durée FFprobe Linux                    |                                                           20,054 s |
+| Durée du lecteur                       |                                                        20,053333 s |
+| Taille                                 |                                                   6 724 146 octets |
+| Audio décodé RMS                       |                                                       −24,198 dBFS |
+| MP4 streaming / filigrane intégré      |                                                          Oui / oui |
+| SHA-256                                | `5d0e5d4b186e3c33965b97e58dbc1a37266a5fd34418b051ea8d04baccf69eaf` |
 
 Le MP4 téléchargé est identique au hash/poids du rapport serveur. Relecture indépendante FFprobe sur le Mac ; frames **15, 135, 267, 352, 445, 599** extraites du vrai fichier et inspectées : photos complètes, prix/surface, logo, sous-titres, coordonnées finales et filigrane visibles, aucun texte coupé observé. La grille locale de textes longs/logos clairs et sombres reste une preuve distincte.
 

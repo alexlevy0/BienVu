@@ -7,7 +7,6 @@ Ajout du 2 octobre 2026 : Manon, Lucas et Camille dans **Personnaliser → Voix 
 Modèle **`s2.1-pro-free`**, envoyé explicitement dans l’en-tête `model` de chaque appel à `https://api.fish.audio/v1/tts`. Le contrat refuse les autres modèles ; aucune relance ou bascule payante automatique. Le tarif publié au 02/10 est zéro USD par million d’octets UTF-8. L’offre relève du Fair Use, sans garantie de disponibilité ni de latence, et les requêtes peuvent être conservées pour améliorer les modèles.
 
 Alex a déclaré le 02/10 avoir reçu l’autorisation d’utiliser l’offre gratuite pour BienVu. Cette confirmation autorise l’activation demandée ; BienVu n’a pas vérifié un contrat distinct. Les conditions publiques distinguent l’évaluation gratuite de la licence commerciale payante. Si cet accord ou l’offre change, désactiver `FISH_TTS_ENABLED` et réévaluer les conditions avant de changer le modèle.
-
 - [Offre gratuite](https://fish.audio/fr/blog/s2-1-pro-free-api/)
 - [Tarifs et limites](https://docs.fish.audio/developer-guide/models-pricing/pricing-and-rate-limits)
 - [Contrat de synthèse](https://docs.fish.audio/api-reference/endpoint/openapi-v1/text-to-speech)
@@ -15,11 +14,11 @@ Alex a déclaré le 02/10 avoir reçu l’autorisation d’utiliser l’offre gr
 
 ## Voix françaises
 
-| Voix BienVu | Référence Fish | Origine observée le 02/10 |
-| --- | --- | --- |
-| Manon | `10a3a20742114a4ea6dd441e7591850f` | Fish Official, `voice_design`, français |
-| Lucas | `f69bca092b674168a8d02d61ca20943c` | Fish Official, `voice_design`, français |
-| Camille | `3b8f4121a0d04a85bd3627ed73864f1a` | Fish Official, `voice_design`, français |
+| Voix BienVu | Référence Fish                     | Origine observée le 02/10               |
+| ----------- | ---------------------------------- | --------------------------------------- |
+| Manon       | `10a3a20742114a4ea6dd441e7591850f` | Fish Official, `voice_design`, français |
+| Lucas       | `f69bca092b674168a8d02d61ca20943c` | Fish Official, `voice_design`, français |
+| Camille     | `3b8f4121a0d04a85bd3627ed73864f1a` | Fish Official, `voice_design`, français |
 
 Il s’agit de voix conçues par l’auteur officiel, pas de clones communautaires. Elles n’ont pas le drapeau `licensed` réservé aux voix humaines licenciées ; ne pas les présenter comme telles. Le script opérateur contrôle leur auteur, source, langue et état avant l’enregistrement des démos.
 

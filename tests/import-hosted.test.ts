@@ -1,41 +1,101 @@
-import {test} from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {assertImportMode,importPorts,photoNormalizer,photoPreviewer} from '../apps/web/lib/import-transport';
-import {RequestFailure} from '../apps/web/lib/http';
-import type {Database} from '../packages/db/src/index';
+import { assertImportMode, importPorts, photoNormalizer, photoPreviewer } from '../apps/web/lib/import-transport';
+import { RequestFailure } from '../apps/web/lib/http';
+import type { Database } from '../packages/db/src/index';
 test('transport Cloudflare fermé sans origine, binding ou secret cohérents', () => {
- const request=new Request('https://bienvu.online/api/imports');
- const config={DB:{} as Database,PROBE_MODE:'remote',IMPORT_MODE:'cloudflare',BETTER_AUTH_URL:'https://bienvu.online',IMPORT_TOKEN:'a'.repeat(32),IMPORT_SERVICE:{fetch:async()=>new Response()} as unknown as Fetcher};
- assert.equal(assertImportMode(request,config),'cloudflare');
- for(const change of [{PROBE_MODE:'local'},{IMPORT_MODE:'local'},{IMPORT_TOKEN:undefined},{IMPORT_SERVICE:undefined},{BETTER_AUTH_URL:'https://elsewhere.example'}])
-  assert.throws(()=>assertImportMode(request,{...config,...change}),e=>e instanceof RequestFailure&&e.code==='IMPORTS_UNAVAILABLE');
+  const request = new Request('https://bienvu.online/api/imports');
+  const config = {
+    DB: {} as Database,
+    PROBE_MODE: 'remote',
+    IMPORT_MODE: 'cloudflare',
+    BETTER_AUTH_URL: 'https://bienvu.online',
+    IMPORT_TOKEN: 'a'.repeat(32),
+    IMPORT_SERVICE: { fetch: async () => new Response() } as unknown as Fetcher,
+  };
+  assert.equal(assertImportMode(request, config), 'cloudflare');
+  for (const change of [
+    { PROBE_MODE: 'local' },
+    { IMPORT_MODE: 'local' },
+    { IMPORT_TOKEN: undefined },
+    { IMPORT_SERVICE: undefined },
+    { BETTER_AUTH_URL: 'https://elsewhere.example' },
+  ])
+    assert.throws(
+      () => assertImportMode(request, { ...config, ...change }),
+      (e) => e instanceof RequestFailure && e.code === 'IMPORTS_UNAVAILABLE',
+    );
 });
-test('normalisation hébergée : propriétaire imposé, signal et corps borné, erreur de transfert explicite',async()=>{
- const calls:Request[]=[];
- const env={DB:{} as Database,PROBE_MODE:'remote',IMPORT_MODE:'cloudflare',BETTER_AUTH_URL:'https://bienvu.online',IMPORT_TOKEN:'a'.repeat(32),IMPORT_SERVICE:{fetch:async(request:Request)=>{calls.push(request);return new Response(null,{status:429,headers:{'X-Import-Error':'IMPORT_RESOURCE_LIMIT'}});}} as unknown as Fetcher};
- const normalize=photoNormalizer(new Request('https://bienvu.online/api/imports'),env,'agency-a','import-a');
- await assert.rejects(normalize(new Uint8Array([1,2]),'image/png',AbortSignal.timeout(1000)),e=>e instanceof RequestFailure&&e.code==='IMPORT_RESOURCE_LIMIT');
- assert.equal(calls[0].url,'https://import.internal/normalize-photo');assert.equal(calls[0].headers.get('X-Agency-ID'),'agency-a');assert.equal(calls[0].headers.get('X-Import-ID'),'import-a');
- assert.equal(calls[0].headers.get('Authorization'),`Bearer ${env.IMPORT_TOKEN}`);assert.equal(new URL(calls[0].url).search,'');
+test('normalisation hébergée : propriétaire imposé, signal et corps borné, erreur de transfert explicite', async () => {
+  const calls: Request[] = [];
+  const env = {
+    DB: {} as Database,
+    PROBE_MODE: 'remote',
+    IMPORT_MODE: 'cloudflare',
+    BETTER_AUTH_URL: 'https://bienvu.online',
+    IMPORT_TOKEN: 'a'.repeat(32),
+    IMPORT_SERVICE: {
+      fetch: async (request: Request) => {
+        calls.push(request);
+        return new Response(null, { status: 429, headers: { 'X-Import-Error': 'IMPORT_RESOURCE_LIMIT' } });
+      },
+    } as unknown as Fetcher,
+  };
+  const normalize = photoNormalizer(new Request('https://bienvu.online/api/imports'), env, 'agency-a', 'import-a');
+  await assert.rejects(
+    normalize(new Uint8Array([1, 2]), 'image/png', AbortSignal.timeout(1000)),
+    (e) => e instanceof RequestFailure && e.code === 'IMPORT_RESOURCE_LIMIT',
+  );
+  assert.equal(calls[0].url, 'https://import.internal/normalize-photo');
+  assert.equal(calls[0].headers.get('X-Agency-ID'), 'agency-a');
+  assert.equal(calls[0].headers.get('X-Import-ID'), 'import-a');
+  assert.equal(calls[0].headers.get('Authorization'), `Bearer ${env.IMPORT_TOKEN}`);
+  assert.equal(new URL(calls[0].url).search, '');
 });
-test('lecture hébergée : les limites de budget et de ressources restent distinctes d’une source inaccessible',async()=>{
- for(const code of ['IMPORT_BUDGET_LIMIT','IMPORT_RESOURCE_LIMIT'] as const){
-  const env={DB:{} as Database,PROBE_MODE:'remote',IMPORT_MODE:'cloudflare',BETTER_AUTH_URL:'https://bienvu.online',IMPORT_TOKEN:'a'.repeat(32),
-   IMPORT_SERVICE:{fetch:async()=>new Response(null,{status:code==='IMPORT_BUDGET_LIMIT'?503:429,headers:{'X-Import-Error':code}})} as unknown as Fetcher};
-  const transport=importPorts(new Request('https://bienvu.online/api/imports'),env,'agency-a').transport;
-  await assert.rejects(transport.load('https://www.orpi.com/annonce','page',[],AbortSignal.timeout(1000)),{code});
- }
+test('lecture hébergée : les limites de budget et de ressources restent distinctes d’une source inaccessible', async () => {
+  for (const code of ['IMPORT_BUDGET_LIMIT', 'IMPORT_RESOURCE_LIMIT'] as const) {
+    const env = {
+      DB: {} as Database,
+      PROBE_MODE: 'remote',
+      IMPORT_MODE: 'cloudflare',
+      BETTER_AUTH_URL: 'https://bienvu.online',
+      IMPORT_TOKEN: 'a'.repeat(32),
+      IMPORT_SERVICE: {
+        fetch: async () =>
+          new Response(null, {
+            status: code === 'IMPORT_BUDGET_LIMIT' ? 503 : 429,
+            headers: { 'X-Import-Error': code },
+          }),
+      } as unknown as Fetcher,
+    };
+    const transport = importPorts(new Request('https://bienvu.online/api/imports'), env, 'agency-a').transport;
+    await assert.rejects(transport.load('https://www.orpi.com/annonce', 'page', [], AbortSignal.timeout(1000)), {
+      code,
+    });
+  }
 });
-test('aperçu hébergé : diagnostic de route/statut/code utile, sans contenu ni en-tête privé',async()=>{
- for(const code of ['SOURCE_UNAVAILABLE','Bearer private-token-fixture']){
-  const env={DB:{} as Database,PROBE_MODE:'remote',IMPORT_MODE:'cloudflare',BETTER_AUTH_URL:'https://bienvu.online',IMPORT_TOKEN:'a'.repeat(32),
-   IMPORT_SERVICE:{fetch:async()=>new Response('private-provider-response',{status:502,headers:{'X-Import-Error':code}})} as unknown as Fetcher};
-  const preview=photoPreviewer(new Request('https://bienvu.online/api/imports'),env,'agency-a','import-a');
-  await assert.rejects(preview(new Uint8Array([1,2]),AbortSignal.timeout(1000)),error=>{
-   assert.ok(error instanceof Error&&'code' in error);
-   assert.equal(error.code,'SOURCE_UNAVAILABLE');
-   assert.equal(error.message,`Import hébergé indisponible (/photo-preview, HTTP 502, ${code==='SOURCE_UNAVAILABLE'?code:'UNKNOWN'}).`);
-   return true;
-  });
- }
+test('aperçu hébergé : diagnostic de route/statut/code utile, sans contenu ni en-tête privé', async () => {
+  for (const code of ['SOURCE_UNAVAILABLE', 'Bearer private-token-fixture']) {
+    const env = {
+      DB: {} as Database,
+      PROBE_MODE: 'remote',
+      IMPORT_MODE: 'cloudflare',
+      BETTER_AUTH_URL: 'https://bienvu.online',
+      IMPORT_TOKEN: 'a'.repeat(32),
+      IMPORT_SERVICE: {
+        fetch: async () =>
+          new Response('private-provider-response', { status: 502, headers: { 'X-Import-Error': code } }),
+      } as unknown as Fetcher,
+    };
+    const preview = photoPreviewer(new Request('https://bienvu.online/api/imports'), env, 'agency-a', 'import-a');
+    await assert.rejects(preview(new Uint8Array([1, 2]), AbortSignal.timeout(1000)), (error) => {
+      assert.ok(error instanceof Error && 'code' in error);
+      assert.equal(error.code, 'SOURCE_UNAVAILABLE');
+      assert.equal(
+        error.message,
+        `Import hébergé indisponible (/photo-preview, HTTP 502, ${code === 'SOURCE_UNAVAILABLE' ? code : 'UNKNOWN'}).`,
+      );
+      return true;
+    });
+  }
 });

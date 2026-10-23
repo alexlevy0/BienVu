@@ -35,10 +35,10 @@ Les paiements commerciaux nécessitent les clés/prix/webhook live, les informat
 
 Sauvegarde SQL D1 avant migration, permissions **0600**, **876 440 octets**, SHA-256 `2cd8550fbd4c85060e6401882ae7ea91b182a5a952c50e7c6101f0eab236821b`. Admissions suspendues avec zéro job actif, puis migrations **0039–0040** appliquées et Workers web/génération publiés. Comparaison des colonnes originales : **13 tables / 291 lignes historiques identiques** avant et après. Zéro défaut de clé étrangère ; admissions rétablies à 1, **15 jobs / zéro actif**.
 
-| Service | Version à 100 % |
-|---|---|
-| Web | `852014a8-7c50-46a5-adef-bda00caf4f75` |
-| Génération | `76d6c210-ccd1-4f3a-a8d2-0e7971ca348a` |
+| Service          | Version à 100 %                        |
+| ---------------- | -------------------------------------- |
+| Web              | `852014a8-7c50-46a5-adef-bda00caf4f75` |
+| Génération       | `76d6c210-ccd1-4f3a-a8d2-0e7971ca348a` |
 | Import, inchangé | `dc96f411-4491-4c4f-8627-9d0b58a018f4` |
 
 Bindings d’origine strictement conservés : web **32 → 35** (trois prix supplémentaires), génération **28**, import **9**. Dates/flags/variables/secrets précédents conservés. Renderer **v16**, image `478ed742a9b9fa18734e98cacad16ff7891b569b38509477057ce04bd354e667` et configuration identiques ; aucun rollout, aucune nouvelle image.

@@ -2,77 +2,484 @@
 // No remote option. Only Cloudflare's external CAPTCHA response is simulated
 // in the browser recipe; the actual contact service persists into local D1.
 import assert from 'node:assert/strict';
-import {mkdir,readFile,writeFile} from 'node:fs/promises';
-import {resolve,join} from 'node:path';
-import {createHmac,randomUUID} from 'node:crypto';
-import {spawn} from 'node:child_process';
-import {createRequire} from 'node:module';
-import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { resolve, join } from 'node:path';
+import { createHmac, randomUUID } from 'node:crypto';
+import { spawn } from 'node:child_process';
+import { createRequire } from 'node:module';
+import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 import sharp from 'sharp';
-import {ensureAgency} from '../packages/db/src/index.ts';
-import {migrateNarrationProbe} from './narration-fixtures.ts';
-import {fixtureImportTransport} from './import-fixtures.ts';
-import {normalizePhoto} from './import-transport.ts';
-import {createPrivateImport} from '../apps/web/lib/imports.ts';
-import {customizeImportedListing,patchCreationDraft} from '../apps/web/lib/creation-drafts.ts';
-import {workspaceAction} from '../apps/web/lib/agency-workspace.ts';
-import {submitShowcaseContact} from '../apps/web/lib/showcase-contacts.ts';
-import {respond} from '../apps/web/lib/http.ts';
-import {ANALYTICS_CONSENT_KEY} from '../apps/web/lib/analytics-policy.ts';
-const root=resolve('.'),folder=resolve('evidence/local/showcase'),state=join(folder,'worker-state'),port=8937,base=`http://localhost:${port}`,secret='showcase-isolated-local-secret-'+randomUUID();
-await mkdir(folder,{recursive:true});const config=JSON.parse(await readFile('apps/web/wrangler.jsonc','utf8'));
-config.main=resolve('apps/web/worker.ts');config.assets.directory=resolve('apps/web/.open-next/assets');config.d1_databases[0].migrations_dir=resolve('packages/db/migrations');
-config.vars={...config.vars,BETTER_AUTH_URL:base,AUTH_EMAIL_MODE:'disabled',TURNSTILE_SITE_KEY:'showcase-local-fixture',POSTHOG_ENABLED:'false'};delete config.send_email;
-const configFile=join(folder,'wrangler.jsonc');await writeFile(configFile,JSON.stringify(config,null,2));await writeFile(join(folder,'.dev.vars'),`BETTER_AUTH_SECRET=${secret}\nGOOGLE_CLIENT_SECRET=\nTURNSTILE_SECRET_KEY=showcase-local-secret\n`,{mode:0o600});
-const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:'export default {fetch(){return new Response("local fixture")}}',compatibilityDate:'2026-09-27',
-  d1Databases:{DB:config.d1_databases[0].database_id},r2Buckets:{MEDIA:config.r2_buckets[0].bucket_name},resourcePersistencePath:join(state,'v3')}));
-let worker,browser;const stdout=[];const report={at:new Date().toISOString(),mode:'local-next-worker-d1-r2',paidCalls:0,realEmails:0,captcha:'simulated external proof in browser; validated service; no production bypass',checks:[],screenshots:[]};
-const check=name=>{report.checks.push(name);console.log(`✓ ${name}`);};
-try{const bindings=await mf.getBindings();await migrateNarrationProbe(bindings.DB);const env={...bindings,...config.vars,BETTER_AUTH_SECRET:secret,GOOGLE_CLIENT_SECRET:'',TURNSTILE_SECRET_KEY:'showcase-local-secret'};
-  const users=['Agence Lumière','Agence Rivage'].map((name,i)=>({id:randomUUID(),name,email:`showcase-${i}-${randomUUID()}@example.invalid`,token:randomUUID()})),now=Date.now(),at=new Date(now).toISOString();
-  for(const user of users){await bindings.DB.prepare('INSERT INTO auth_user(id,name,email,emailVerified,createdAt,updatedAt) VALUES(?,?,?,1,?,?)').bind(user.id,user.name,user.email,at,at).run();await bindings.DB.prepare('INSERT INTO auth_session(id,expiresAt,token,createdAt,updatedAt,userId) VALUES(?,?,?,?,?,?)').bind(randomUUID(),now+3600000,user.token,now,now,user.id).run();user.agency=await ensureAgency(bindings.DB,{id:user.id,email:user.email});}
-  await bindings.DB.prepare('INSERT INTO hosted_import_budget VALUES(?,0,9500,0) ON CONFLICT(month) DO NOTHING').bind(at.slice(0,7)).run();
-  const photos=await Promise.all(['paris','sud','lyon','bordeaux'].map(async name=>normalizePhoto(await sharp(await readFile(`apps/web/public/images/studio-home/${name}-960.webp`)).jpeg().toBuffer(),'image/jpeg'))),properties=[];
-  for(let i=0;i<4;i++){const fixture=fixtureImportTransport(),transport={async load(url,kind,hosts,signal){if(kind==='page')return fixture.load(url,kind,hosts,signal);const index=['a.jpg','b.jpg','c.jpg'].indexOf(new URL(url).pathname.split('/').at(-1));if(index<0)throw Error('Unknown fixture photo');const photo=photos[(i+index)%4];return{url,...photo,sourceBytes:photo.bytes.length};}},source=await createPrivateImport(env,users[0].agency.id,`https://fixtures.bienvu.example/vente?bien=${i}`,randomUUID(),transport),draft=await customizeImportedListing(env,users[0].agency.id,source.id,randomUUID(),AbortSignal.timeout(20000));
-    await patchCreationDraft(env.DB,users[0].agency.id,draft.id,{version:draft.version,changes:{title:['Appartement lumineux','Maison avec piscine','Loft de caractère','Maison avec jardin'][i],locality:['Lyon 6e','Sanary-sur-Mer','Lyon','Bordeaux'][i],transaction:i===3?'rent':'sale',priceCents:[38500000,84900000,69500000,160000][i]},confirm:[]});
-    const project=await workspaceAction(env,users[0].agency.id,{action:'project',name:'Bien de recette '+i});await workspaceAction(env,users[0].agency.id,{action:'attach',projectId:project.id,kind:'draft',id:draft.id});properties.push('project:'+project.id);
+import { ensureAgency } from '../packages/db/src/index.ts';
+import { migrateNarrationProbe } from './narration-fixtures.ts';
+import { fixtureImportTransport } from './import-fixtures.ts';
+import { normalizePhoto } from './import-transport.ts';
+import { createPrivateImport } from '../apps/web/lib/imports.ts';
+import { customizeImportedListing, patchCreationDraft } from '../apps/web/lib/creation-drafts.ts';
+import { workspaceAction } from '../apps/web/lib/agency-workspace.ts';
+import { submitShowcaseContact } from '../apps/web/lib/showcase-contacts.ts';
+import { respond } from '../apps/web/lib/http.ts';
+import { ANALYTICS_CONSENT_KEY } from '../apps/web/lib/analytics-policy.ts';
+const _root = resolve('.'),
+  folder = resolve('evidence/local/showcase'),
+  state = join(folder, 'worker-state'),
+  port = 8937,
+  base = `http://localhost:${port}`,
+  secret = 'showcase-isolated-local-secret-' + randomUUID();
+await mkdir(folder, { recursive: true });
+const config = JSON.parse(await readFile('apps/web/wrangler.jsonc', 'utf8'));
+config.main = resolve('apps/web/worker.ts');
+config.assets.directory = resolve('apps/web/.open-next/assets');
+config.d1_databases[0].migrations_dir = resolve('packages/db/migrations');
+config.vars = {
+  ...config.vars,
+  BETTER_AUTH_URL: base,
+  AUTH_EMAIL_MODE: 'disabled',
+  TURNSTILE_SITE_KEY: 'showcase-local-fixture',
+  POSTHOG_ENABLED: 'false',
+};
+delete config.send_email;
+const configFile = join(folder, 'wrangler.jsonc');
+await writeFile(configFile, JSON.stringify(config, null, 2));
+await writeFile(
+  join(folder, '.dev.vars'),
+  `BETTER_AUTH_SECRET=${secret}\nGOOGLE_CLIENT_SECRET=\nTURNSTILE_SECRET_KEY=showcase-local-secret\n`,
+  { mode: 0o600 },
+);
+const mf = new Miniflare(
+  convertV4MiniflareOptions({
+    modules: true,
+    script: 'export default {fetch(){return new Response("local fixture")}}',
+    compatibilityDate: '2026-09-27',
+    d1Databases: { DB: config.d1_databases[0].database_id },
+    r2Buckets: { MEDIA: config.r2_buckets[0].bucket_name },
+    resourcePersistencePath: join(state, 'v3'),
+  }),
+);
+let worker, browser;
+const stdout = [];
+const report = {
+  at: new Date().toISOString(),
+  mode: 'local-next-worker-d1-r2',
+  paidCalls: 0,
+  realEmails: 0,
+  captcha: 'simulated external proof in browser; validated service; no production bypass',
+  checks: [],
+  screenshots: [],
+};
+const check = (name) => {
+  report.checks.push(name);
+  console.log(`✓ ${name}`);
+};
+try {
+  const bindings = await mf.getBindings();
+  await migrateNarrationProbe(bindings.DB);
+  const env = {
+    ...bindings,
+    ...config.vars,
+    BETTER_AUTH_SECRET: secret,
+    GOOGLE_CLIENT_SECRET: '',
+    TURNSTILE_SECRET_KEY: 'showcase-local-secret',
+  };
+  const users = ['Agence Lumière', 'Agence Rivage'].map((name, i) => ({
+      id: randomUUID(),
+      name,
+      email: `showcase-${i}-${randomUUID()}@example.invalid`,
+      token: randomUUID(),
+    })),
+    now = Date.now(),
+    at = new Date(now).toISOString();
+  for (const user of users) {
+    await bindings.DB.prepare(
+      'INSERT INTO auth_user(id,name,email,emailVerified,createdAt,updatedAt) VALUES(?,?,?,1,?,?)',
+    )
+      .bind(user.id, user.name, user.email, at, at)
+      .run();
+    await bindings.DB.prepare(
+      'INSERT INTO auth_session(id,expiresAt,token,createdAt,updatedAt,userId) VALUES(?,?,?,?,?,?)',
+    )
+      .bind(randomUUID(), now + 3600000, user.token, now, now, user.id)
+      .run();
+    user.agency = await ensureAgency(bindings.DB, { id: user.id, email: user.email });
   }
-  worker=spawn('pnpm',['exec','wrangler','dev','--config',configFile,'--persist-to',state,'--port',String(port),'--local'],{cwd:resolve('apps/web'),detached:true,stdio:['ignore','pipe','pipe'],env:{...process.env,WRANGLER_SEND_METRICS:'false'}});for(const stream of[worker.stdout,worker.stderr])stream.on('data',chunk=>stdout.push(chunk));
-  const ready=Date.now();while(true){assert.equal(worker.exitCode,null,'Worker startup failed; see worker.log');try{const response=await fetch(base+'/api/vitrine',{signal:AbortSignal.timeout(1500)});if(response.status===401)break;await response.body?.cancel();}catch{}assert.ok(Date.now()-ready<30000,'Local Worker readiness');await new Promise(r=>setTimeout(r,400));}
-  const cookie=user=>`bienvu.session_token=${encodeURIComponent(user.token+'.'+createHmac('sha256',secret).update(user.token).digest('base64'))}`;
-  const http=(path,user=null,options={})=>fetch(base+path,{...options,redirect:'manual',headers:{origin:base,...(user?{cookie:cookie(user)}:{}),...options.headers},signal:AbortSignal.timeout(30000)});
-  for(const path of['/api/vitrine','/api/vitrine/assets/'+randomUUID()])assert.equal((await http(path)).status,401);const unauthPreview=await http('/ma-vitrine/apercu?preview=true');assert.equal(unauthPreview.status,307);assert.match(unauthPreview.headers.get('location'),/connexion/);assert.match(unauthPreview.headers.get('Cache-Control'),/no-store/);check('Private management and preview enforce actual Worker authentication');
-  const require=createRequire(import.meta.url),{openBrowser}=createRequire(new URL('../apps/renderer/package.json',import.meta.url))('@remotion/renderer');browser=await openBrowser('chrome',{logLevel:'error'});
-  const page=await browser.newPage({context:()=>null,logLevel:'error',indent:false,pageIndex:0,onBrowserLog:()=>{},onLog:()=>{}}),cdp=page._client(),exceptions=[];cdp.on('Runtime.exceptionThrown',event=>exceptions.push(event.value?.exceptionDetails??event));
-  await cdp.send('Network.setBlockedURLs',{urls:['https://embed.tawk.to/*','https://*.posthog.com/*']});
+  await bindings.DB.prepare('INSERT INTO hosted_import_budget VALUES(?,0,9500,0) ON CONFLICT(month) DO NOTHING')
+    .bind(at.slice(0, 7))
+    .run();
+  const photos = await Promise.all(
+      ['paris', 'sud', 'lyon', 'bordeaux'].map(async (name) =>
+        normalizePhoto(
+          await sharp(await readFile(`apps/web/public/images/studio-home/${name}-960.webp`))
+            .jpeg()
+            .toBuffer(),
+          'image/jpeg',
+        ),
+      ),
+    ),
+    properties = [];
+  for (let i = 0; i < 4; i++) {
+    const fixture = fixtureImportTransport(),
+      transport = {
+        async load(url, kind, hosts, signal) {
+          if (kind === 'page') return fixture.load(url, kind, hosts, signal);
+          const index = ['a.jpg', 'b.jpg', 'c.jpg'].indexOf(new URL(url).pathname.split('/').at(-1));
+          if (index < 0) throw Error('Unknown fixture photo');
+          const photo = photos[(i + index) % 4];
+          return { url, ...photo, sourceBytes: photo.bytes.length };
+        },
+      },
+      source = await createPrivateImport(
+        env,
+        users[0].agency.id,
+        `https://fixtures.bienvu.example/vente?bien=${i}`,
+        randomUUID(),
+        transport,
+      ),
+      draft = await customizeImportedListing(
+        env,
+        users[0].agency.id,
+        source.id,
+        randomUUID(),
+        AbortSignal.timeout(20000),
+      );
+    await patchCreationDraft(env.DB, users[0].agency.id, draft.id, {
+      version: draft.version,
+      changes: {
+        title: ['Appartement lumineux', 'Maison avec piscine', 'Loft de caractère', 'Maison avec jardin'][i],
+        locality: ['Lyon 6e', 'Sanary-sur-Mer', 'Lyon', 'Bordeaux'][i],
+        transaction: i === 3 ? 'rent' : 'sale',
+        priceCents: [38500000, 84900000, 69500000, 160000][i],
+      },
+      confirm: [],
+    });
+    const project = await workspaceAction(env, users[0].agency.id, { action: 'project', name: 'Bien de recette ' + i });
+    await workspaceAction(env, users[0].agency.id, {
+      action: 'attach',
+      projectId: project.id,
+      kind: 'draft',
+      id: draft.id,
+    });
+    properties.push('project:' + project.id);
+  }
+  worker = spawn(
+    'pnpm',
+    ['exec', 'wrangler', 'dev', '--config', configFile, '--persist-to', state, '--port', String(port), '--local'],
+    {
+      cwd: resolve('apps/web'),
+      detached: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, WRANGLER_SEND_METRICS: 'false' },
+    },
+  );
+  for (const stream of [worker.stdout, worker.stderr]) stream.on('data', (chunk) => stdout.push(chunk));
+  const ready = Date.now();
+  while (true) {
+    assert.equal(worker.exitCode, null, 'Worker startup failed; see worker.log');
+    try {
+      const response = await fetch(base + '/api/vitrine', { signal: AbortSignal.timeout(1500) });
+      if (response.status === 401) break;
+      await response.body?.cancel();
+    } catch {}
+    assert.ok(Date.now() - ready < 30000, 'Local Worker readiness');
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  const cookie = (user) =>
+    `bienvu.session_token=${encodeURIComponent(user.token + '.' + createHmac('sha256', secret).update(user.token).digest('base64'))}`;
+  const http = (path, user = null, options = {}) =>
+    fetch(base + path, {
+      ...options,
+      redirect: 'manual',
+      headers: { origin: base, ...(user ? { cookie: cookie(user) } : {}), ...options.headers },
+      signal: AbortSignal.timeout(30000),
+    });
+  for (const path of ['/api/vitrine', '/api/vitrine/assets/' + randomUUID()])
+    assert.equal((await http(path)).status, 401);
+  const unauthPreview = await http('/ma-vitrine/apercu?preview=true');
+  assert.equal(unauthPreview.status, 307);
+  assert.match(unauthPreview.headers.get('location'), /connexion/);
+  assert.match(unauthPreview.headers.get('Cache-Control'), /no-store/);
+  check('Private management and preview enforce actual Worker authentication');
+  const _require = createRequire(import.meta.url),
+    { openBrowser } = createRequire(new URL('../apps/renderer/package.json', import.meta.url))('@remotion/renderer');
+  browser = await openBrowser('chrome', { logLevel: 'error' });
+  const page = await browser.newPage({
+      context: () => null,
+      logLevel: 'error',
+      indent: false,
+      pageIndex: 0,
+      onBrowserLog: () => {},
+      onLog: () => {},
+    }),
+    cdp = page._client(),
+    exceptions = [];
+  cdp.on('Runtime.exceptionThrown', (event) => exceptions.push(event.value?.exceptionDetails ?? event));
+  await cdp.send('Network.setBlockedURLs', { urls: ['https://embed.tawk.to/*', 'https://*.posthog.com/*'] });
   // Production excludes recognized robots. Use the ordinary Chrome UA only
   // for this isolated browser fixture to exercise consented visitor counters.
-  await cdp.send('Network.setUserAgentOverride',{userAgent:'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36'});
-  const evaluate=async expression=>{const response=await cdp.send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true,userGesture:true});assert.ok(!response.value.exceptionDetails,JSON.stringify(response.value.exceptionDetails));return response.value.result.value;};
-  const wait=async expression=>{const start=Date.now();while(!await evaluate(`Boolean(${expression})`)){assert.ok(Date.now()-start<20000,expression);await new Promise(r=>setTimeout(r,80));}};
-  const click=text=>evaluate(`(()=>{const text=${JSON.stringify(text)},b=[...document.querySelectorAll('button')].find(n=>n.textContent.trim()===text||n.textContent.trim().startsWith(text+' '));if(!b)throw Error('Button not found: '+text);b.click();})()`);
-  const field=async(label,value,tag='HTMLInputElement',type='input')=>{await evaluate(`(()=>{const l=[...document.querySelectorAll('label')].find(n=>n.firstChild?.textContent?.trim()===${JSON.stringify(label)});const e=l?.querySelector('input,textarea,select');if(!e)throw Error('Field missing '+${JSON.stringify(label)});Object.getOwnPropertyDescriptor(${tag}.prototype,'value').set.call(e,${JSON.stringify(value)});e.dispatchEvent(new Event(${JSON.stringify(type)},{bubbles:true}));})()`);};
-  const shot=async(name,width,anchor=null)=>{await page.setViewport({width,height:1000,deviceScaleFactor:1});await evaluate(anchor?`document.querySelector(${JSON.stringify(anchor)}).scrollIntoView({block:'start'})`:'scrollTo(0,0)');await new Promise(r=>setTimeout(r,200));const response=await cdp.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});await writeFile(join(folder,`${name}-${width}.png`),Buffer.from(response.value.data,'base64'));report.screenshots.push(`${name}-${width}.png`);assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth+1'),true,`${name} ${width} overflow`);};
-  const setSession=async user=>{await cdp.send('Network.clearBrowserCookies');if(user){const [name,value]=cookie(user).split('=');await cdp.send('Network.setCookie',{name,value,url:base,httpOnly:true,sameSite:'Lax'});}};
-  await setSession(users[0]);await page.setViewport({width:1536,height:1080,deviceScaleFactor:1});await page.goto({url:base+'/ma-vitrine',timeout:30000,options:{waitUntil:'load'}});await wait('document.querySelector(".vitrine-config")');
-  assert.equal(await evaluate('[...document.querySelectorAll(".home-navigation a")].some(a=>a.textContent.includes("Ma vitrine"))'),true);await field('Nom public de l’agence','Agence Lumière');await field('Adresse publique','agence-lumiere-'+users[0].id.slice(0,8));await field('Accroche','Des lieux à vivre. Des projets à partager.');await field('Présentation','Notre équipe vous accompagne à Lyon et dans ses quartiers. Découvrez les biens que nous avons choisis pour vous, puis parlons de votre projet.','HTMLTextAreaElement');await field('Ville','Lyon');await field('Téléphone public','04 72 00 00 00');await click('Enregistrer le brouillon');await wait('document.querySelector(".vitrine-notice")?.textContent.includes("Présentation enregistrée")');check('Existing agency prefill, real draft save and private navigation');
-  await click('Biens (0)');await wait('document.querySelectorAll(".vitrine-candidate").length===4');for(let i=0;i<4;i++){await evaluate(`document.querySelectorAll('.vitrine-candidate>header>button')[${i}].click()`);await wait('document.querySelector(".vitrine-property-editor")');await evaluate(`(()=>{const choices=[...document.querySelectorAll('.vitrine-photo-choices input')];choices[0].click();choices[1].click();})()`);await click('Enregistrer la sélection');await wait(`document.querySelectorAll('.vitrine-selected-row').length===${i+1}`);}
-  await shot('management',1536);await shot('management',390);await click('Publier ma vitrine');await wait('document.querySelector(".vitrine-status").textContent.includes("Publiée")');check('Explicit property/media selection and actual publication from the UI');
-  const privateData=await(await http('/api/vitrine',users[0])).json(),slug=privateData.published.slug,property=privateData.items[0];assert.equal((await http('/api/vitrine?propertyId='+encodeURIComponent(properties[0]),users[1])).status,404);assert.equal((await http('/api/vitrine/assets/'+property.published.photos[0].id,users[1])).status,404);check('Two agencies: no cross-agency reads of properties or retained assets');
-  const preview=await http('/ma-vitrine/apercu?frame=1',users[0]);assert.equal(preview.status,200);assert.equal(preview.headers.get('X-Frame-Options'),'SAMEORIGIN');const previewHtml=await preview.text();assert.match(previewHtml,/noindex/);assert.match(previewHtml,/Formulaire désactivé/);
-  await page.goto({url:base+'/ma-vitrine/apercu',timeout:30000,options:{waitUntil:'load'}});await wait('document.querySelector("iframe")?.contentDocument?.querySelector(".showcase-public")');await shot('preview',1536);await click('Mobile');await wait('document.querySelector("iframe.is-mobile")?.clientWidth<=390');await shot('preview',390);check('Authenticated desktop/mobile iframe preview, no indexing, no contact sending');
-  await setSession(null);const agencyResponse=await http('/agences/'+slug),html=await agencyResponse.text();assert.equal(agencyResponse.status,200);assert.match(html,/<h1/);assert.match(html,/Agence Lumière/);assert.match(html,/<link rel="canonical"/);assert.match(html,/<meta property="og:image"/);assert.match(agencyResponse.headers.get('Cache-Control'),/no-store/);assert.doesNotMatch(html,/home-sidebar/);const robots=await(await http('/robots.txt')).text();assert.match(robots,/Allow: \/agences\//);assert.match(robots,/Disallow: \/ma-vitrine/);const sitemap=await(await http('/sitemap.xml')).text();assert.ok(sitemap.includes('/agences/'+slug+'/biens/'+property.id));check('Anonymous server-rendered gallery, metadata, sitemap and adapted visitor navigation');
-  await page.goto({url:base+'/agences/'+slug,timeout:30000,options:{waitUntil:'load'}});await wait('document.querySelectorAll(".showcase-property-card").length===4');for(const width of[1536,390,320])await shot('gallery',width);
-  await evaluate(`localStorage.setItem(${JSON.stringify(ANALYTICS_CONSENT_KEY)},JSON.stringify({version:2,analytics:true,replay:false,at:Date.now()}));window.dispatchEvent(new Event('bienvu:consent-changed'));`);
-  await evaluate('document.querySelector(".showcase-filter-panel>summary").click()');await field('Transaction','rent','HTMLSelectElement','change');await evaluate('document.querySelector(".showcase-filters button").click()');await wait('document.querySelectorAll(".showcase-property-card").length===1');assert.ok(await evaluate('document.querySelector(".showcase-property-card").textContent.includes("Maison avec jardin")'));check('Real server-side catalogue filters and no video autoplay');
-  await page.goto({url:base+`/agences/${slug}/biens/${property.id}`,timeout:30000,options:{waitUntil:'load'}});await wait('document.querySelector(".showcase-property-information")');for(const width of[1536,390])await shot('property',width);assert.equal(await evaluate('document.querySelectorAll("video[autoplay]").length'),0);
-  const detail=await http(`/agences/${slug}/biens/${property.id}`);assert.match(await detail.text(),/DPE/);check('Public property without video, chosen photos, real facts and useful missing information');
-  await cdp.send('Fetch.enable',{patterns:[{urlPattern:'https://challenges.cloudflare.com/*',requestStage:'Request'},{urlPattern:base+'/api/vitrines/*/contact',requestStage:'Request'}]});cdp.on('Fetch.requestPaused',async event=>{const e=event.value??event;try{let body,code=200,headers=[{name:'Content-Type',value:'application/javascript'}];if(e.request.url.startsWith('https://challenges.cloudflare.com/'))body=`window.turnstile={render(el,o){setTimeout(()=>o.callback(${JSON.stringify('isolated-local-human-proof-'+randomUUID())}),30);return 'fixture';},remove(){},reset(){}};`;else if(e.request.method==='POST'){const requestHeaders=new Headers(e.request.headers);requestHeaders.set('origin',base);const request=new Request(e.request.url,{method:'POST',headers:requestHeaders,body:e.request.postData});const response=await respond(()=>submitShowcaseContact(request,env,slug,false,async()=>Response.json({success:true,hostname:'localhost',action:'showcase_contact',challenge_ts:new Date().toISOString()})));body=await response.text();code=response.status;headers=[{name:'Content-Type',value:'application/json'}];}else{await cdp.send('Fetch.continueRequest',{requestId:e.requestId});return;}await cdp.send('Fetch.fulfillRequest',{requestId:e.requestId,responseCode:code,responseHeaders:headers,body:Buffer.from(body).toString('base64')});}catch(error){console.error('Local browser proof adapter failed:',error.message);await cdp.send('Fetch.failRequest',{requestId:e.requestId,errorReason:'Failed'});}});
-  await evaluate('document.querySelector(".showcase-property-information>a.showcase-primary").click()');await wait('document.querySelector(".showcase-contact-panel").open');await evaluate('document.querySelector(".showcase-contact-form").scrollIntoView()');await new Promise(r=>setTimeout(r,500));await field('Votre nom','Prospect de recette');await field('Votre e-mail','prospect-fixture@example.invalid');await field('Votre message','Je souhaite des informations sur ce bien et organiser une visite.','HTMLTextAreaElement');await click('Envoyer ma demande');await wait('window.turnstile');await new Promise(r=>setTimeout(r,200));await click('Envoyer ma demande');await wait('document.querySelector(".showcase-receipt")');await cdp.send('Fetch.disable');
-  const inbox=await(await http('/api/vitrine',users[0])).json();assert.equal(inbox.leads.length,1);assert.equal(inbox.leads[0].propertyId,property.id);assert.equal(inbox.leads[0].notification,'disabled');assert.equal(inbox.stats.requests,1);assert.equal((await(await http('/api/vitrine',users[1])).json()).leads.length,0);check('Browser contact receipt matches a durable scoped D1 lead; email disabled, no fake delivery');await shot('contact-receipt',390,'.showcase-contact-form');
-  assert.ok(inbox.stats.agencyViews>=1);assert.ok(inbox.stats.propertyViews>=1);check('Real browser view events respect the existing consent and feed agency counters');
-  await setSession(users[0]);await page.goto({url:base+'/ma-vitrine#demandes',timeout:30000,options:{waitUntil:'load'}});await wait('document.querySelector(".vitrine-lead")');await field('Statut','treated','HTMLSelectElement','change');await wait('document.querySelector(".vitrine-lead header>span").textContent==="Traitée"');await shot('inbox',390);await shot('inbox-detail',390,'.vitrine-lead');check('Private inbox status changes persist with real authentication');
-  await page.goto({url:base+'/ma-vitrine',timeout:30000,options:{waitUntil:'load'}});await wait('document.querySelector(".vitrine-config")');await click('Mettre hors ligne');await wait('document.querySelector(".vitrine-status").textContent.includes("Hors ligne")');const removed=await http('/agences/'+slug);assert.equal(removed.status,404);assert.match(removed.headers.get('Cache-Control'),/no-store/);assert.equal((await http(`/api/vitrines/${slug}/biens/${property.id}/media/${property.published.photos[0].id}`,null,{headers:{'If-None-Match':'previous-cache'}})).status,404);check('Offline storefront and direct media URLs revoke cached anonymous access');
-  await cdp.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});await cdp.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});assert.ok(await evaluate('document.activeElement!==document.body'));assert.equal(exceptions.length,0,JSON.stringify(exceptions));report.pass=true;
-  await writeFile(join(folder,'browser.json'),JSON.stringify(report,null,2));console.log('Ma vitrine : recette locale complète réussie.');
-}finally{await browser?.close({silent:true});if(worker?.pid)try{process.kill(-worker.pid,'SIGTERM');}catch{}await writeFile(join(folder,'worker.log'),Buffer.concat(stdout),{mode:0o600});await mf.dispose();}
+  await cdp.send('Network.setUserAgentOverride', {
+    userAgent:
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
+  });
+  const evaluate = async (expression) => {
+    const response = await cdp.send('Runtime.evaluate', {
+      expression,
+      returnByValue: true,
+      awaitPromise: true,
+      userGesture: true,
+    });
+    assert.ok(!response.value.exceptionDetails, JSON.stringify(response.value.exceptionDetails));
+    return response.value.result.value;
+  };
+  const wait = async (expression) => {
+    const start = Date.now();
+    while (!(await evaluate(`Boolean(${expression})`))) {
+      assert.ok(Date.now() - start < 20000, expression);
+      await new Promise((r) => setTimeout(r, 80));
+    }
+  };
+  const click = (text) =>
+    evaluate(
+      `(()=>{const text=${JSON.stringify(text)},b=[...document.querySelectorAll('button')].find(n=>n.textContent.trim()===text||n.textContent.trim().startsWith(text+' '));if(!b)throw Error('Button not found: '+text);b.click();})()`,
+    );
+  const field = async (label, value, tag = 'HTMLInputElement', type = 'input') => {
+    await evaluate(
+      `(()=>{const l=[...document.querySelectorAll('label')].find(n=>n.firstChild?.textContent?.trim()===${JSON.stringify(label)});const e=l?.querySelector('input,textarea,select');if(!e)throw Error('Field missing '+${JSON.stringify(label)});Object.getOwnPropertyDescriptor(${tag}.prototype,'value').set.call(e,${JSON.stringify(value)});e.dispatchEvent(new Event(${JSON.stringify(type)},{bubbles:true}));})()`,
+    );
+  };
+  const shot = async (name, width, anchor = null) => {
+    await page.setViewport({ width, height: 1000, deviceScaleFactor: 1 });
+    await evaluate(
+      anchor ? `document.querySelector(${JSON.stringify(anchor)}).scrollIntoView({block:'start'})` : 'scrollTo(0,0)',
+    );
+    await new Promise((r) => setTimeout(r, 200));
+    const response = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+    await writeFile(join(folder, `${name}-${width}.png`), Buffer.from(response.value.data, 'base64'));
+    report.screenshots.push(`${name}-${width}.png`);
+    assert.equal(
+      await evaluate('document.documentElement.scrollWidth<=innerWidth+1'),
+      true,
+      `${name} ${width} overflow`,
+    );
+  };
+  const setSession = async (user) => {
+    await cdp.send('Network.clearBrowserCookies');
+    if (user) {
+      const [name, value] = cookie(user).split('=');
+      await cdp.send('Network.setCookie', { name, value, url: base, httpOnly: true, sameSite: 'Lax' });
+    }
+  };
+  await setSession(users[0]);
+  await page.setViewport({ width: 1536, height: 1080, deviceScaleFactor: 1 });
+  await page.goto({ url: base + '/ma-vitrine', timeout: 30000, options: { waitUntil: 'load' } });
+  await wait('document.querySelector(".vitrine-config")');
+  assert.equal(
+    await evaluate(
+      '[...document.querySelectorAll(".home-navigation a")].some(a=>a.textContent.includes("Ma vitrine"))',
+    ),
+    true,
+  );
+  await field('Nom public de l’agence', 'Agence Lumière');
+  await field('Adresse publique', 'agence-lumiere-' + users[0].id.slice(0, 8));
+  await field('Accroche', 'Des lieux à vivre. Des projets à partager.');
+  await field(
+    'Présentation',
+    'Notre équipe vous accompagne à Lyon et dans ses quartiers. Découvrez les biens que nous avons choisis pour vous, puis parlons de votre projet.',
+    'HTMLTextAreaElement',
+  );
+  await field('Ville', 'Lyon');
+  await field('Téléphone public', '04 72 00 00 00');
+  await click('Enregistrer le brouillon');
+  await wait('document.querySelector(".vitrine-notice")?.textContent.includes("Présentation enregistrée")');
+  check('Existing agency prefill, real draft save and private navigation');
+  await click('Biens (0)');
+  await wait('document.querySelectorAll(".vitrine-candidate").length===4');
+  for (let i = 0; i < 4; i++) {
+    await evaluate(`document.querySelectorAll('.vitrine-candidate>header>button')[${i}].click()`);
+    await wait('document.querySelector(".vitrine-property-editor")');
+    await evaluate(
+      `(()=>{const choices=[...document.querySelectorAll('.vitrine-photo-choices input')];choices[0].click();choices[1].click();})()`,
+    );
+    await click('Enregistrer la sélection');
+    await wait(`document.querySelectorAll('.vitrine-selected-row').length===${i + 1}`);
+  }
+  await shot('management', 1536);
+  await shot('management', 390);
+  await click('Publier ma vitrine');
+  await wait('document.querySelector(".vitrine-status").textContent.includes("Publiée")');
+  check('Explicit property/media selection and actual publication from the UI');
+  const privateData = await (await http('/api/vitrine', users[0])).json(),
+    slug = privateData.published.slug,
+    property = privateData.items[0];
+  assert.equal((await http('/api/vitrine?propertyId=' + encodeURIComponent(properties[0]), users[1])).status, 404);
+  assert.equal((await http('/api/vitrine/assets/' + property.published.photos[0].id, users[1])).status, 404);
+  check('Two agencies: no cross-agency reads of properties or retained assets');
+  const preview = await http('/ma-vitrine/apercu?frame=1', users[0]);
+  assert.equal(preview.status, 200);
+  assert.equal(preview.headers.get('X-Frame-Options'), 'SAMEORIGIN');
+  const previewHtml = await preview.text();
+  assert.match(previewHtml, /noindex/);
+  assert.match(previewHtml, /Formulaire désactivé/);
+  await page.goto({ url: base + '/ma-vitrine/apercu', timeout: 30000, options: { waitUntil: 'load' } });
+  await wait('document.querySelector("iframe")?.contentDocument?.querySelector(".showcase-public")');
+  await shot('preview', 1536);
+  await click('Mobile');
+  await wait('document.querySelector("iframe.is-mobile")?.clientWidth<=390');
+  await shot('preview', 390);
+  check('Authenticated desktop/mobile iframe preview, no indexing, no contact sending');
+  await setSession(null);
+  const agencyResponse = await http('/agences/' + slug),
+    html = await agencyResponse.text();
+  assert.equal(agencyResponse.status, 200);
+  assert.match(html, /<h1/);
+  assert.match(html, /Agence Lumière/);
+  assert.match(html, /<link rel="canonical"/);
+  assert.match(html, /<meta property="og:image"/);
+  assert.match(agencyResponse.headers.get('Cache-Control'), /no-store/);
+  assert.doesNotMatch(html, /home-sidebar/);
+  const robots = await (await http('/robots.txt')).text();
+  assert.match(robots, /Allow: \/agences\//);
+  assert.match(robots, /Disallow: \/ma-vitrine/);
+  const sitemap = await (await http('/sitemap.xml')).text();
+  assert.ok(sitemap.includes('/agences/' + slug + '/biens/' + property.id));
+  check('Anonymous server-rendered gallery, metadata, sitemap and adapted visitor navigation');
+  await page.goto({ url: base + '/agences/' + slug, timeout: 30000, options: { waitUntil: 'load' } });
+  await wait('document.querySelectorAll(".showcase-property-card").length===4');
+  for (const width of [1536, 390, 320]) await shot('gallery', width);
+  await evaluate(
+    `localStorage.setItem(${JSON.stringify(ANALYTICS_CONSENT_KEY)},JSON.stringify({version:2,analytics:true,replay:false,at:Date.now()}));window.dispatchEvent(new Event('bienvu:consent-changed'));`,
+  );
+  await evaluate('document.querySelector(".showcase-filter-panel>summary").click()');
+  await field('Transaction', 'rent', 'HTMLSelectElement', 'change');
+  await evaluate('document.querySelector(".showcase-filters button").click()');
+  await wait('document.querySelectorAll(".showcase-property-card").length===1');
+  assert.ok(
+    await evaluate('document.querySelector(".showcase-property-card").textContent.includes("Maison avec jardin")'),
+  );
+  check('Real server-side catalogue filters and no video autoplay');
+  await page.goto({
+    url: base + `/agences/${slug}/biens/${property.id}`,
+    timeout: 30000,
+    options: { waitUntil: 'load' },
+  });
+  await wait('document.querySelector(".showcase-property-information")');
+  for (const width of [1536, 390]) await shot('property', width);
+  assert.equal(await evaluate('document.querySelectorAll("video[autoplay]").length'), 0);
+  const detail = await http(`/agences/${slug}/biens/${property.id}`);
+  assert.match(await detail.text(), /DPE/);
+  check('Public property without video, chosen photos, real facts and useful missing information');
+  await cdp.send('Fetch.enable', {
+    patterns: [
+      { urlPattern: 'https://challenges.cloudflare.com/*', requestStage: 'Request' },
+      { urlPattern: base + '/api/vitrines/*/contact', requestStage: 'Request' },
+    ],
+  });
+  cdp.on('Fetch.requestPaused', async (event) => {
+    const e = event.value ?? event;
+    try {
+      let body,
+        code = 200,
+        headers = [{ name: 'Content-Type', value: 'application/javascript' }];
+      if (e.request.url.startsWith('https://challenges.cloudflare.com/'))
+        body = `window.turnstile={render(el,o){setTimeout(()=>o.callback(${JSON.stringify('isolated-local-human-proof-' + randomUUID())}),30);return 'fixture';},remove(){},reset(){}};`;
+      else if (e.request.method === 'POST') {
+        const requestHeaders = new Headers(e.request.headers);
+        requestHeaders.set('origin', base);
+        const request = new Request(e.request.url, {
+          method: 'POST',
+          headers: requestHeaders,
+          body: e.request.postData,
+        });
+        const response = await respond(() =>
+          submitShowcaseContact(request, env, slug, false, async () =>
+            Response.json({
+              success: true,
+              hostname: 'localhost',
+              action: 'showcase_contact',
+              challenge_ts: new Date().toISOString(),
+            }),
+          ),
+        );
+        body = await response.text();
+        code = response.status;
+        headers = [{ name: 'Content-Type', value: 'application/json' }];
+      } else {
+        await cdp.send('Fetch.continueRequest', { requestId: e.requestId });
+        return;
+      }
+      await cdp.send('Fetch.fulfillRequest', {
+        requestId: e.requestId,
+        responseCode: code,
+        responseHeaders: headers,
+        body: Buffer.from(body).toString('base64'),
+      });
+    } catch (error) {
+      console.error('Local browser proof adapter failed:', error.message);
+      await cdp.send('Fetch.failRequest', { requestId: e.requestId, errorReason: 'Failed' });
+    }
+  });
+  await evaluate('document.querySelector(".showcase-property-information>a.showcase-primary").click()');
+  await wait('document.querySelector(".showcase-contact-panel").open');
+  await evaluate('document.querySelector(".showcase-contact-form").scrollIntoView()');
+  await new Promise((r) => setTimeout(r, 500));
+  await field('Votre nom', 'Prospect de recette');
+  await field('Votre e-mail', 'prospect-fixture@example.invalid');
+  await field(
+    'Votre message',
+    'Je souhaite des informations sur ce bien et organiser une visite.',
+    'HTMLTextAreaElement',
+  );
+  await click('Envoyer ma demande');
+  await wait('window.turnstile');
+  await new Promise((r) => setTimeout(r, 200));
+  await click('Envoyer ma demande');
+  await wait('document.querySelector(".showcase-receipt")');
+  await cdp.send('Fetch.disable');
+  const inbox = await (await http('/api/vitrine', users[0])).json();
+  assert.equal(inbox.leads.length, 1);
+  assert.equal(inbox.leads[0].propertyId, property.id);
+  assert.equal(inbox.leads[0].notification, 'disabled');
+  assert.equal(inbox.stats.requests, 1);
+  assert.equal((await (await http('/api/vitrine', users[1])).json()).leads.length, 0);
+  check('Browser contact receipt matches a durable scoped D1 lead; email disabled, no fake delivery');
+  await shot('contact-receipt', 390, '.showcase-contact-form');
+  assert.ok(inbox.stats.agencyViews >= 1);
+  assert.ok(inbox.stats.propertyViews >= 1);
+  check('Real browser view events respect the existing consent and feed agency counters');
+  await setSession(users[0]);
+  await page.goto({ url: base + '/ma-vitrine#demandes', timeout: 30000, options: { waitUntil: 'load' } });
+  await wait('document.querySelector(".vitrine-lead")');
+  await field('Statut', 'treated', 'HTMLSelectElement', 'change');
+  await wait('document.querySelector(".vitrine-lead header>span").textContent==="Traitée"');
+  await shot('inbox', 390);
+  await shot('inbox-detail', 390, '.vitrine-lead');
+  check('Private inbox status changes persist with real authentication');
+  await page.goto({ url: base + '/ma-vitrine', timeout: 30000, options: { waitUntil: 'load' } });
+  await wait('document.querySelector(".vitrine-config")');
+  await click('Mettre hors ligne');
+  await wait('document.querySelector(".vitrine-status").textContent.includes("Hors ligne")');
+  const removed = await http('/agences/' + slug);
+  assert.equal(removed.status, 404);
+  assert.match(removed.headers.get('Cache-Control'), /no-store/);
+  assert.equal(
+    (
+      await http(`/api/vitrines/${slug}/biens/${property.id}/media/${property.published.photos[0].id}`, null, {
+        headers: { 'If-None-Match': 'previous-cache' },
+      })
+    ).status,
+    404,
+  );
+  check('Offline storefront and direct media URLs revoke cached anonymous access');
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+  assert.ok(await evaluate('document.activeElement!==document.body'));
+  assert.equal(exceptions.length, 0, JSON.stringify(exceptions));
+  report.pass = true;
+  await writeFile(join(folder, 'browser.json'), JSON.stringify(report, null, 2));
+  console.log('Ma vitrine : recette locale complète réussie.');
+} finally {
+  await browser?.close({ silent: true });
+  if (worker?.pid)
+    try {
+      process.kill(-worker.pid, 'SIGTERM');
+    } catch {}
+  await writeFile(join(folder, 'worker.log'), Buffer.concat(stdout), { mode: 0o600 });
+  await mf.dispose();
+}

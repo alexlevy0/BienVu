@@ -16,15 +16,15 @@ Une alerte ne bloque pas la vidéo et n'affirme pas qu'elle est erronée : une s
 
 ## Événements et traces
 
-| Événement | Signification |
-| --- | --- |
-| `$ai_generation` | Une requête LLM existante d'extraction ou de sélection de narration, avec usage lorsqu'il est connu. |
-| `$ai_trace`, `$ai_span` | Traitement vidéo et étapes voix, animation, compilation finale, carte et rendu. Les fournisseurs non LLM ne deviennent pas de fausses générations. |
-| `ai_quality_run` | Une tentative terminée, réussie ou échouée, et son bilan. |
-| `ai_quality_check` | Un contrôle versionné et son résultat pass/fail/na/error. |
-| `ai_quality_review` | Verdict humain : problème, faux positif, choix volontaire, validation. |
-| `ai_stage_completed` | Durée mesurée disponible d'une étape. |
-| `ai_import_completed`, `ai_publication_completed` | Résultat serveur d'un import ou d'une destination sociale. Le délai de publication comprend l'attente d'une programmation. |
+| Événement                                         | Signification                                                                                                                                      |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `$ai_generation`                                  | Une requête LLM existante d'extraction ou de sélection de narration, avec usage lorsqu'il est connu.                                               |
+| `$ai_trace`, `$ai_span`                           | Traitement vidéo et étapes voix, animation, compilation finale, carte et rendu. Les fournisseurs non LLM ne deviennent pas de fausses générations. |
+| `ai_quality_run`                                  | Une tentative terminée, réussie ou échouée, et son bilan.                                                                                          |
+| `ai_quality_check`                                | Un contrôle versionné et son résultat pass/fail/na/error.                                                                                          |
+| `ai_quality_review`                               | Verdict humain : problème, faux positif, choix volontaire, validation.                                                                             |
+| `ai_stage_completed`                              | Durée mesurée disponible d'une étape.                                                                                                              |
+| `ai_import_completed`, `ai_publication_completed` | Résultat serveur d'un import ou d'une destination sociale. Le délai de publication comprend l'attente d'une programmation.                         |
 
 La trace vidéo est stable par job/tentative. Une requête fournisseur reste dédoublonnée par son identifiant de journal, même lors d'une reprise. Les appels historiques sans prompt conservé sont explicitement marqués comme reconstruits ; leur contexte ne prétend pas être le prompt original. Les nouvelles requêtes conservent leur entrée/sortie exacte, expurgée des secrets avant transport. La narration finale compilée est présentée séparément de la sélection LLM brute.
 

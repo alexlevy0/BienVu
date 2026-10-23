@@ -25,15 +25,15 @@ Lecture opérateur D1 des **cinq jobs existants** via la même projection `admin
 
 Avec la **vraie session Chrome du propriétaire**, ouverture du dernier appartement de Lyon sur le domaine :
 
-| Mesure affichée | Valeur |
-| --- | --- |
-| OpenAI, un appel mesuré | 0,001863 USD |
-| Modèle | gpt-5.4-mini-2026-03-17 |
-| Tokens entrée / sortie / cache | 1 367 / 186 / 0 |
-| Durée de l’appel | 2 690 ms |
-| Date du tarif conservé | 2026-09-28 |
-| Google, cinq appels mesurés | 0,007710 USD |
-| Provision de ces six appels | 0,30 EUR |
+| Mesure affichée                | Valeur                  |
+| ------------------------------ | ----------------------- |
+| OpenAI, un appel mesuré        | 0,001863 USD            |
+| Modèle                         | gpt-5.4-mini-2026-03-17 |
+| Tokens entrée / sortie / cache | 1 367 / 186 / 0         |
+| Durée de l’appel               | 2 690 ms                |
+| Date du tarif conservé         | 2026-09-28              |
+| Google, cinq appels mesurés    | 0,007710 USD            |
+| Provision de ces six appels    | 0,30 EUR                |
 
 Les identifiants OpenAI sont visibles dans le panneau privé. La vidéo existante charge correctement : `readyState=4`, durée **20,053 s**, aucune erreur du lecteur. Aucun débordement de page. Ces observations de production sont distinctes des fixtures ordinateur/mobile ; aucune nouvelle écoute humaine n’est revendiquée.
 

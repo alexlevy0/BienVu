@@ -97,20 +97,20 @@ Le diagnostic navigateur et l’import complet restent distincts : Le Figaro fou
 
 ### Plafonds conservés
 
-| Limite | Valeur |
-|---|---|
-| Durée d’un import / d’une ressource | 60 s / 12 s |
-| Fenêtre photo après extraction | 50 s maximum, limitée au temps global restant moins 2 s |
-| HTML / image source / total de corps source | 2 Mio / 10 Mio / 50 Mio |
-| Description normalisée | 20 000 caractères ; troncature indiquée dans le résultat et l’interface |
-| Redirections par ressource | 3, contrôlées à chaque étape |
-| Ressources / candidats / photos conservées | 44 / 48 / 40 ; sélection vidéo de 3 à 12 |
-| Image décodée | 16 millions de pixels maximum ; minimum 640×360 |
-| JPEG stocké | 2 048×2 048 maximum, ratio préservé |
-| Imports URL actifs / dossiers stockés par agence | 1 / 30, tous modes pour le stockage |
-| Tentatives d’import, toutes agences | 40 par jour UTC / 300 par mois UTC |
-| Récupérations simultanées du pont/conteneur | 2 |
-| Conservation / bail / délai avant purge | 30 jours / 90 s URL, 15 min saisie / bail + 5 min |
+| Limite                                           | Valeur                                                                  |
+| ------------------------------------------------ | ----------------------------------------------------------------------- |
+| Durée d’un import / d’une ressource              | 60 s / 12 s                                                             |
+| Fenêtre photo après extraction                   | 50 s maximum, limitée au temps global restant moins 2 s                 |
+| HTML / image source / total de corps source      | 2 Mio / 10 Mio / 50 Mio                                                 |
+| Description normalisée                           | 20 000 caractères ; troncature indiquée dans le résultat et l’interface |
+| Redirections par ressource                       | 3, contrôlées à chaque étape                                            |
+| Ressources / candidats / photos conservées       | 44 / 48 / 40 ; sélection vidéo de 3 à 12                                |
+| Image décodée                                    | 16 millions de pixels maximum ; minimum 640×360                         |
+| JPEG stocké                                      | 2 048×2 048 maximum, ratio préservé                                     |
+| Imports URL actifs / dossiers stockés par agence | 1 / 30, tous modes pour le stockage                                     |
+| Tentatives d’import, toutes agences              | 40 par jour UTC / 300 par mois UTC                                      |
+| Récupérations simultanées du pont/conteneur      | 2                                                                       |
+| Conservation / bail / délai avant purge          | 30 jours / 90 s URL, 15 min saisie / bail + 5 min                       |
 
 Une récupération échouée garde toute sa réservation d’octets, car son volume reçu peut être inconnu. La dernière requête reçoit seulement le budget restant. Les limites de tentatives sont atomiques dans D1 et persistantes après purge ; un rejeu idempotent ne les consomme pas à nouveau. Ce sont des limites techniques de recette, pas les quotas des abonnements ni une garantie de facture. Les sondes locales isolées peuvent retirer leurs tentatives synthétiques ; la recette Cloudflare conserve toutes ses tentatives et réservations après nettoyage. Aucun remboursement n’existe dans la purge produit.
 
@@ -136,14 +136,14 @@ Les fichiers d’import ne sont pas directement acceptés comme médias de rendu
 
 ## API locale et Cloudflare
 
-| Route | Résultat |
-|---|---|
-| `POST /api/imports` | `{url}` strict + `Idempotency-Key` ; import de l’agence connectée |
-| `GET /api/imports` | Imports non expirés de cette agence, pages de 30 : `{imports,nextCursor}`. `?cursor=…` poursuit la lecture ; `?drafts=1` sélectionne les brouillons avant pagination |
-| `GET /api/imports/:id` | État et résultat privé, 404 pour une autre agence ou un import expiré |
-| `GET /api/imports/:id/photos/:photoId` | JPEG privé, taille et empreinte de métadonnées contrôlées |
-| `DELETE /api/imports/:id` | Purge explicite après le délai de sûreté, refus si un job le référence |
-| `DELETE /api/imports/:id/draft` | Suppression logique immédiate du brouillon de l'agence, nettoyage R2 puis réconciliation différée ; 401 sans session, 404 hors agence, 409 si déjà finalisé |
+| Route                                  | Résultat                                                                                                                                                             |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/imports`                    | `{url}` strict + `Idempotency-Key` ; import de l’agence connectée                                                                                                    |
+| `GET /api/imports`                     | Imports non expirés de cette agence, pages de 30 : `{imports,nextCursor}`. `?cursor=…` poursuit la lecture ; `?drafts=1` sélectionne les brouillons avant pagination |
+| `GET /api/imports/:id`                 | État et résultat privé, 404 pour une autre agence ou un import expiré                                                                                                |
+| `GET /api/imports/:id/photos/:photoId` | JPEG privé, taille et empreinte de métadonnées contrôlées                                                                                                            |
+| `DELETE /api/imports/:id`              | Purge explicite après le délai de sûreté, refus si un job le référence                                                                                               |
+| `DELETE /api/imports/:id/draft`        | Suppression logique immédiate du brouillon de l'agence, nettoyage R2 puis réconciliation différée ; 401 sans session, 404 hors agence, 409 si déjà finalisé          |
 
 Une création attend le résultat borné : `200` avec `status=ready` ou `failed` et code d’échec persistant ; un rejeu pendant le travail renvoie `202 importing`. Les refus avant création utilisent 401, 403, 409, 422, 429 ou 503. Pas de retry automatique. `IMPORTS_UNAVAILABLE` ferme le chemin non configuré ; `IMPORT_LIMIT` signale le plafond. Les messages d’import restent français et ne contiennent pas de stack ou de secret.
 

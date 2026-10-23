@@ -65,13 +65,13 @@ La recette et ses limites sont décrites dans [la preuve du 03/10](preuves/maint
 
 Les quatre premières améliorations sont implémentées : **fréquentation par pays/pages**, **alertes avec accès direct**, **performance réelle du pipeline** et **coûts mensuels détaillés**. Elles exploitent les registres existants et des compteurs agrégés, sans lancer d’import ou de génération supplémentaires.
 
-| Proposition suivante | Intérêt | Donnée manquante / préalable |
-| --- | --- | --- |
-| Journal de livraison des e-mails | Expliquer une inscription bloquée, distinguer demande/envoi accepté/rejet/bounce | Registre des envois et événements du fournisseur ; un envoi accepté ne prouve pas la réception |
-| Santé des imports par portail | Identifier les blocages Orpi et les changements d’extracteur | Résultats agrégés persistants des imports, y compris ceux purgés, avec version de l’adaptateur |
-| Parcours essai → compte → téléchargement | Repérer les abandons et vérifier la récupération anonyme | Définir les cohortes et compléter les événements existants ; les pages servies ne sont pas des personnes uniques |
-| Revenus, impayés et résiliations | Gérer l’activité commerciale et rapprocher les factures | Sprint Stripe et paiements réellement enregistrés ; aucun chiffre d’affaires déduit des quotas |
-| Stockage réel et état des purges | Détecter des objets orphelins et suivre la conservation | Inventaire R2 borné et dernier résultat des nettoyages ; les métadonnées D1 ne couvrent pas tout le bucket |
+| Proposition suivante                     | Intérêt                                                                          | Donnée manquante / préalable                                                                                     |
+| ---------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Journal de livraison des e-mails         | Expliquer une inscription bloquée, distinguer demande/envoi accepté/rejet/bounce | Registre des envois et événements du fournisseur ; un envoi accepté ne prouve pas la réception                   |
+| Santé des imports par portail            | Identifier les blocages Orpi et les changements d’extracteur                     | Résultats agrégés persistants des imports, y compris ceux purgés, avec version de l’adaptateur                   |
+| Parcours essai → compte → téléchargement | Repérer les abandons et vérifier la récupération anonyme                         | Définir les cohortes et compléter les événements existants ; les pages servies ne sont pas des personnes uniques |
+| Revenus, impayés et résiliations         | Gérer l’activité commerciale et rapprocher les factures                          | Sprint Stripe et paiements réellement enregistrés ; aucun chiffre d’affaires déduit des quotas                   |
+| Stockage réel et état des purges         | Détecter des objets orphelins et suivre la conservation                          | Inventaire R2 borné et dernier résultat des nettoyages ; les métadonnées D1 ne couvrent pas tout le bucket       |
 
 Priorité proposée : livraison e-mail, santé des imports, parcours anonyme, puis finances dès l’ouverture des paiements. Aucune notification externe, facturation ou reprise payante automatique n’est ajoutée.
 

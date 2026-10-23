@@ -3,10 +3,10 @@
 Alex demande un présentateur visible pendant toute la vidéo et confirme **1 crédit supplémentaire par tranche de 10 secondes**. L’option est facultative, réservée aux comptes connectés, proposée dans Personnaliser → Avatar IA et dans les réglages audio de l’Éditeur.
 
 | Durée | Supplément continu | Total sans animation de photo |
-|---|---:|---:|
-| 20 s | 2 crédits | 3 crédits |
-| 30 s | 3 crédits | 4 crédits |
-| 40 s | 4 crédits | 5 crédits |
+| ----- | -----------------: | ----------------------------: |
+| 20 s  |          2 crédits |                     3 crédits |
+| 30 s  |          3 crédits |                     4 crédits |
+| 40 s  |          4 crédits |                     5 crédits |
 
 L’ouverture, la conclusion ou les deux restent à +1 crédit. Le coût affiché, le calculateur des offres, les ressources d’éditeur et le simulateur de rentabilité utilisent ce barème. Les avertissements voix féminine/avatar masculin et voix masculine/avatar féminin restent non bloquants.
 

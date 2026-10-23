@@ -25,9 +25,9 @@ Dans **Personnaliser → Voix et texte**, la proposition locale s'adapte aussi �
 La description fournie par Alex est reprise dans une annonce de recette aux identifiants et contacts fictifs, dans une base D1/R2 locale isolée. Aucun compte, quota, annonce ou vidéo client n'est modifié.
 
 | Vidéo choisie | Mots | Scènes | Parole WAV mesurée | Aperçu audio assemblé |
-|---|---:|---:|---:|---:|
-| 20 secondes | 30 | 4 | 12,440 s | 600 frames / 20 s |
-| 40 secondes | 49 | 6 | 17,680 s | 1 200 frames / 40 s |
+| ------------- | ---: | -----: | -----------------: | --------------------: |
+| 20 secondes   |   30 |      4 |           12,440 s |     600 frames / 20 s |
+| 40 secondes   |   49 |      6 |           17,680 s |   1 200 frames / 40 s |
 
 Le texte de 20 s présente l'appartement à Lyon 9, le séjour exposé sud avec balcon, le rafraîchissement à prévoir et le contact. Celui de 40 s ajoute des informations de proximité et les valeurs exactes de surface/prix. Les phrases et les réserves source restent complètes. Aoede, sa configuration et le modèle `gpt-5.4-mini-2026-03-17` sont conservés.
 

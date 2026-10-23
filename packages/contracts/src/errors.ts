@@ -1,9 +1,15 @@
-import {z} from 'zod';
+import type { z } from 'zod';
 
 export const publicErrors = {
   AVATAR_LOGIN_REQUIRED: [401, 'Connectez-vous pour ajouter un avatar IA à votre vidéo.'],
-  AVATAR_UNAVAILABLE: [503, 'Ce présentateur ou ses réglages sont momentanément indisponibles. Choisissez un autre avatar ou désactivez cette option.'],
-  AVATAR_TRANSPARENCY_UNSUPPORTED: [422, 'Ce présentateur ne permet pas la silhouette sans fond. Choisissez un médaillon, un cadre portrait ou un autre avatar.'],
+  AVATAR_UNAVAILABLE: [
+    503,
+    'Ce présentateur ou ses réglages sont momentanément indisponibles. Choisissez un autre avatar ou désactivez cette option.',
+  ],
+  AVATAR_TRANSPARENCY_UNSUPPORTED: [
+    422,
+    'Ce présentateur ne permet pas la silhouette sans fond. Choisissez un médaillon, un cadre portrait ou un autre avatar.',
+  ],
   AVATAR_BUDGET_LIMIT: [429, 'Le budget des avatars IA est atteint. Vous pouvez créer votre vidéo sans avatar.'],
   AVATAR_BUSY: [429, 'Les présentateurs sont en cours de préparation. Réessayez dans quelques instants.'],
   MAP_UNAVAILABLE: [503, 'La carte est momentanément indisponible. Réessayez ou désactivez la séquence de carte.'],
@@ -14,7 +20,10 @@ export const publicErrors = {
   TRIAL_USED: [429, 'L’essai de ce navigateur a déjà été utilisé. Connectez-vous pour retrouver vos vidéos.'],
   TRIAL_LIMIT: [429, 'La limite des essais est atteinte. Réessayez plus tard ou connectez-vous.'],
   TRIAL_EXPIRED: [410, 'Cet essai a expiré. Aucun nouveau traitement ne sera lancé automatiquement.'],
-  TRIAL_SOURCE_UNSUPPORTED: [422, 'Ce lien ne peut pas être importé. Vous pouvez ajouter les informations et photos du bien en saisie manuelle, même sans compte.'],
+  TRIAL_SOURCE_UNSUPPORTED: [
+    422,
+    'Ce lien ne peut pas être importé. Vous pouvez ajouter les informations et photos du bien en saisie manuelle, même sans compte.',
+  ],
   BOT_VERIFICATION_FAILED: [422, 'La vérification a expiré ou échoué. Validez à nouveau puis réessayez.'],
   INVALID_URL: [422, 'Le lien de l’annonce est invalide.'],
   UNSAFE_URL: [422, 'Ce lien ne peut pas être consulté en toute sécurité.'],
@@ -24,13 +33,22 @@ export const publicErrors = {
   INCOMPLETE_LISTING: [422, 'Les informations de l’annonce sont insuffisantes pour créer une vidéo.'],
   CONFLICTING_FACTS: [422, 'Des informations contradictoires empêchent la création de la vidéo.'],
   INSUFFICIENT_PHOTOS: [422, 'Au moins trois photos distinctes du bien sont nécessaires.'],
-  INVALID_PHOTO: [422, 'Photo invalide : utilisez un JPEG, PNG ou WebP de 640 × 360 pixels minimum, 16 millions de pixels maximum.'],
+  INVALID_PHOTO: [
+    422,
+    'Photo invalide : utilisez un JPEG, PNG ou WebP de 640 × 360 pixels minimum, 16 millions de pixels maximum.',
+  ],
   PHOTO_TOO_LARGE: [413, 'Une photo dépasse la limite de 10 Mo.'],
   DUPLICATE_PHOTO: [422, 'Ces photos contiennent une image identique. Choisissez des photos différentes du bien.'],
   IMPORT_TIMEOUT: [422, 'L’annonce met trop de temps à répondre. Réessayez plus tard.'],
   IMPORTS_UNAVAILABLE: [503, 'L’import des annonces est momentanément indisponible. Réessayez plus tard.'],
-  IMPORT_LIMIT: [429, 'La limite des imports par lien est atteinte. Réessayez plus tard ou utilisez la saisie manuelle.'],
-  IMPORT_BUDGET_LIMIT: [503, 'Le traitement de nouveaux fichiers est momentanément indisponible. Vous pouvez continuer à préparer votre projet.'],
+  IMPORT_LIMIT: [
+    429,
+    'La limite des imports par lien est atteinte. Réessayez plus tard ou utilisez la saisie manuelle.',
+  ],
+  IMPORT_BUDGET_LIMIT: [
+    503,
+    'Le traitement de nouveaux fichiers est momentanément indisponible. Vous pouvez continuer à préparer votre projet.',
+  ],
   IMPORT_RESOURCE_LIMIT: [429, 'Ce transfert a atteint la limite de fichiers ou de volume autorisée.'],
   PROJECT_RATE_LIMIT: [429, 'Vous avez créé beaucoup de projets récemment. Réessayez dans une heure.'],
   VALIDATION_ERROR: [422, 'Les données fournies sont incomplètes ou incohérentes.'],
@@ -40,7 +58,10 @@ export const publicErrors = {
   AUTH_FAILED: [400, 'La connexion n’a pas abouti. Réessayez depuis la page de connexion.'],
   AUTH_CREDENTIALS: [400, 'L’adresse e-mail ou le mot de passe est incorrect.'],
   EMAIL_UNAVAILABLE: [503, 'L’envoi des e-mails est momentanément indisponible. Réessayez plus tard.'],
-  EMAIL_NOT_VERIFIED: [403, 'Confirmez votre adresse e-mail avant de vous connecter. Vous pouvez demander un nouveau lien.'],
+  EMAIL_NOT_VERIFIED: [
+    403,
+    'Confirmez votre adresse e-mail avant de vous connecter. Vous pouvez demander un nouveau lien.',
+  ],
   AUTH_LINK_INVALID: [400, 'Ce lien est invalide ou expiré. Demandez un nouveau lien.'],
   FILE_TOO_LARGE: [413, 'Le fichier dépasse la limite de 2 Mo.'],
   INVALID_LOGO: [422, 'Choisissez une image PNG ou JPEG valide, de 16 à 1 024 pixels par côté et de 2 Mo maximum.'],
@@ -48,19 +69,40 @@ export const publicErrors = {
   RATE_LIMITED: [429, 'Trop de demandes. Patientez une minute avant de réessayer.'],
   NOT_FOUND: [404, 'Cet élément est introuvable.'],
   CONFLICT: [409, 'Cette opération entre en conflit avec un traitement existant.'],
-  QUOTA_EXHAUSTED: [429, 'Vous n’avez pas assez de crédits pour cette vidéo. Réduisez les photos animées ou consultez vos crédits.'],
-  RUNWAY_LOGIN_REQUIRED: [401, 'Connectez-vous pour animer des photos avec l’IA. Votre essai offert permet une vidéo avec les mouvements de caméra inclus.'],
+  QUOTA_EXHAUSTED: [
+    429,
+    'Vous n’avez pas assez de crédits pour cette vidéo. Réduisez les photos animées ou consultez vos crédits.',
+  ],
+  RUNWAY_LOGIN_REQUIRED: [
+    401,
+    'Connectez-vous pour animer des photos avec l’IA. Votre essai offert permet une vidéo avec les mouvements de caméra inclus.',
+  ],
   GENERATIONS_PAUSED: [503, 'La génération de vidéos est temporairement indisponible. Aucun crédit n’a été utilisé.'],
   GENERATION_BUSY: [409, 'Une vidéo est déjà en préparation. Retrouvez-la dans votre historique.'],
-  GENERATION_QUEUE_FULL: [429, 'La file de création est pleine. Vos vidéos en cours restent disponibles dans Mes biens. Réessayez dans quelques minutes.'],
-  GENERATION_QUEUE_TIMEOUT: [422, 'L’attente a dépassé le délai autorisé. Les crédits non utilisés ont été libérés. Votre saisie est conservée pour réessayer.'],
+  GENERATION_QUEUE_FULL: [
+    429,
+    'La file de création est pleine. Vos vidéos en cours restent disponibles dans Mes biens. Réessayez dans quelques minutes.',
+  ],
+  GENERATION_QUEUE_TIMEOUT: [
+    422,
+    'L’attente a dépassé le délai autorisé. Les crédits non utilisés ont été libérés. Votre saisie est conservée pour réessayer.',
+  ],
   GENERATION_BUDGET_LIMIT: [429, 'Le budget des générations de développement est atteint.'],
   GENERATION_FAILED: [422, 'La vidéo n’a pas pu être terminée. Votre crédit vidéo a été libéré.'],
-  SCRIPT_INVALID: [422, 'La rédaction de la narration a échoué. Votre crédit vidéo a été libéré. Vous pouvez réessayer depuis votre annonce.'],
-  VOICE_FREE_LIMIT: [429, 'Le quota gratuit du fournisseur de voix est atteint. Choisissez une autre voix ou réessayez après son renouvellement.'],
+  SCRIPT_INVALID: [
+    422,
+    'La rédaction de la narration a échoué. Votre crédit vidéo a été libéré. Vous pouvez réessayer depuis votre annonce.',
+  ],
+  VOICE_FREE_LIMIT: [
+    429,
+    'Le quota gratuit du fournisseur de voix est atteint. Choisissez une autre voix ou réessayez après son renouvellement.',
+  ],
   VOICE_BUSY: [429, 'Deux générations audio sont déjà en cours. Réessayez dans un instant.'],
   VOICE_SAMPLE_FAILED: [502, 'Cet extrait n’a pas pu être généré. Vérifiez la configuration du fournisseur.'],
-  VOICE_SAMPLE_REVIEW: [409, 'Cet extrait est en cours ou son appel doit être vérifié. Aucun nouvel appel automatique n’a été lancé.'],
+  VOICE_SAMPLE_REVIEW: [
+    409,
+    'Cet extrait est en cours ou son appel doit être vérifié. Aucun nouvel appel automatique n’a été lancé.',
+  ],
   GENERATION_TIMEOUT: [422, 'La préparation a dépassé le délai autorisé. Votre crédit vidéo a été libéré.'],
   BILLING_UNAVAILABLE: [503, 'Les paiements sont momentanément indisponibles. Aucun paiement n’a été lancé.'],
   FEATURE_UNAVAILABLE: [503, 'Cette fonctionnalité est en cours de développement.'],
@@ -70,13 +112,13 @@ export type PublicErrorCode = keyof typeof publicErrors;
 
 export function publicFailure(code: PublicErrorCode, requestId: string) {
   const [status, message] = publicErrors[code];
-  return {status, body: {error: {code, message, requestId}}};
+  return { status, body: { error: { code, message, requestId } } };
 }
 
 export function parseContract<T extends z.ZodType>(schema: T, input: unknown): z.infer<T> {
   const result = schema.safeParse(input);
   if (!result.success) {
-    const explicit = result.error.issues.find(issue => issue.code === 'custom')?.message;
+    const explicit = result.error.issues.find((issue) => issue.code === 'custom')?.message;
     // Ne jamais renvoyer l'entrée, un diagnostic SQL ou une stack au client.
     throw new Error(explicit ?? publicErrors.VALIDATION_ERROR[1]);
   }

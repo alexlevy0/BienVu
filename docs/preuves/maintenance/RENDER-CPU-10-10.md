@@ -17,16 +17,16 @@ Pendant cette recette, la production est restée sur **1 vCPU / 6 GiB**, avec le
 
 ## Mesures du moteur
 
-| Cas | CPU / parallélisme | Rendu + vérification | CPU actif mesuré | Calcul estimé en USD |
-|---|---|---:|---:|---:|
-| Classique, passage A | 1 / 1 | 162,74 s | 162,05 vCPU-s | 0,005819 |
-| Classique, passage B | 1 / 1 | 148,06 s | 144,91 vCPU-s | 0,005243 |
-| Classique, passage A | 2 / 2 | 92,94 s | 156,88 vCPU-s | 0,005101 |
-| Classique, passage B | 2 / 2 | 97,05 s | 165,43 vCPU-s | 0,005358 |
-| Classique, contrôle | 2 / 1 | 95,89 s | 148,12 vCPU-s | 0,004988 |
-| Avatar continu | 1 / 1 | 186,04 s | 183,38 vCPU-s | 0,006615 |
-| Avatar continu | 2 / 2 | 104,33 s | 195,42 vCPU-s | 0,006112 |
-| Avatar continu, contrôle | 2 / 1 | 120,81 s | 187,65 vCPU-s | 0,006305 |
+| Cas                      | CPU / parallélisme | Rendu + vérification | CPU actif mesuré | Calcul estimé en USD |
+| ------------------------ | ------------------ | -------------------: | ---------------: | -------------------: |
+| Classique, passage A     | 1 / 1              |             162,74 s |    162,05 vCPU-s |             0,005819 |
+| Classique, passage B     | 1 / 1              |             148,06 s |    144,91 vCPU-s |             0,005243 |
+| Classique, passage A     | 2 / 2              |              92,94 s |    156,88 vCPU-s |             0,005101 |
+| Classique, passage B     | 2 / 2              |              97,05 s |    165,43 vCPU-s |             0,005358 |
+| Classique, contrôle      | 2 / 1              |              95,89 s |    148,12 vCPU-s |             0,004988 |
+| Avatar continu           | 1 / 1              |             186,04 s |    183,38 vCPU-s |             0,006615 |
+| Avatar continu           | 2 / 2              |             104,33 s |    195,42 vCPU-s |             0,006112 |
+| Avatar continu, contrôle | 2 / 1              |             120,81 s |    187,65 vCPU-s |             0,006305 |
 
 Moyennes classiques : **155,40 → 94,99 s**, soit **−38,9 %** et **0,005531 → 0,005229 USD** (**−5,5 %**). Avatar : **186,04 → 104,33 s**, soit **−43,9 %** et **−7,6 %** de calcul estimé. Le contrôle confirme que deux cœurs accélèrent déjà le code actuel ; le parallélisme de deux images apporte davantage sur l’avatar (**120,81 → 104,33 s**) que sur les photos seules.
 

@@ -6,16 +6,16 @@
 
 ## Résultats démontrés
 
-| Risque | Preuve réelle | Limite |
-|---|---|---|
-| Next.js/OpenNext | Production déployée sur Workers ; démarrage au déploiement 19 ms ; six contrôles distants réussis | Sonde opérateur, pas le SaaS complet ni Better Auth |
-| D1/R2/cookie | Migration distante, écritures/lectures concordantes, cookie Secure/HttpOnly/Strict, refus sans secret/cookie, nettoyage | Isolation inter-agences et auth client hors sprint |
-| Agence Espaces Atypiques | Référence 16624, titre, Paris, vente, prix 949 000 €, trois JPEG distincts de 1620 ou 1621×1080 téléchargés, décodés chez Cloudflare, hachés et stockés dans R2 | Un cas statique avec galerie HTML ; ne prouve pas une couverture générale des agences |
-| Le Figaro 108944355 | Tentative Browser Run distante : `SOURCE_BLOCKED`, accès refusé par la source | Annonce non qualifiée de retirée ; aucun contournement |
-| Remotion natif | MP4 synthétiques 6 s et 30 s, H.264/AAC, 1080×1920, 30 fps ; vrai protocole HTTP asynchrone contrôlé | Ne valide pas Linux/Containers ni une voix française |
-| Linux amd64 / Containers | Docker local 6 s ; Containers 30 s en 105,940 s de calcul/vérification, réseau externe désactivé | Un seul succès distant, sans voix off ni annonce réelle ; corrections du transfert comprises dans le cycle de 300,184 s |
-| Confidentialité/arrêt | R2 privé, rétention `probes/` 30 jours ; sommeil Containers et téléchargement sans réveil ; pause et plafond de cinq vérifiés | Facture et métriques complètes à rapprocher |
-| Budget | Aucun appel IA/TTS, aucune activation payante ; consommation navigateur mesurée par le fournisseur | Facture non consultée ; gratuité estimée à partir des quotas et de la consommation |
+| Risque                   | Preuve réelle                                                                                                                                                   | Limite                                                                                                                  |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Next.js/OpenNext         | Production déployée sur Workers ; démarrage au déploiement 19 ms ; six contrôles distants réussis                                                               | Sonde opérateur, pas le SaaS complet ni Better Auth                                                                     |
+| D1/R2/cookie             | Migration distante, écritures/lectures concordantes, cookie Secure/HttpOnly/Strict, refus sans secret/cookie, nettoyage                                         | Isolation inter-agences et auth client hors sprint                                                                      |
+| Agence Espaces Atypiques | Référence 16624, titre, Paris, vente, prix 949 000 €, trois JPEG distincts de 1620 ou 1621×1080 téléchargés, décodés chez Cloudflare, hachés et stockés dans R2 | Un cas statique avec galerie HTML ; ne prouve pas une couverture générale des agences                                   |
+| Le Figaro 108944355      | Tentative Browser Run distante : `SOURCE_BLOCKED`, accès refusé par la source                                                                                   | Annonce non qualifiée de retirée ; aucun contournement                                                                  |
+| Remotion natif           | MP4 synthétiques 6 s et 30 s, H.264/AAC, 1080×1920, 30 fps ; vrai protocole HTTP asynchrone contrôlé                                                            | Ne valide pas Linux/Containers ni une voix française                                                                    |
+| Linux amd64 / Containers | Docker local 6 s ; Containers 30 s en 105,940 s de calcul/vérification, réseau externe désactivé                                                                | Un seul succès distant, sans voix off ni annonce réelle ; corrections du transfert comprises dans le cycle de 300,184 s |
+| Confidentialité/arrêt    | R2 privé, rétention `probes/` 30 jours ; sommeil Containers et téléchargement sans réveil ; pause et plafond de cinq vérifiés                                   | Facture et métriques complètes à rapprocher                                                                             |
+| Budget                   | Aucun appel IA/TTS, aucune activation payante ; consommation navigateur mesurée par le fournisseur                                                              | Facture non consultée ; gratuité estimée à partir des quotas et de la consommation                                      |
 
 URL web : [laboratoire de staging](https://bienvu-web-probe-staging.alexlevy0.workers.dev). Cette page décrit les sondes, sans achat, compte client ou éditeur. L'interface a été vue dans le navigateur intégré ; pas de recette responsive exhaustive.
 
@@ -23,13 +23,13 @@ URL web : [laboratoire de staging](https://bienvu-web-probe-staging.alexlevy0.wo
 
 Source : [Espaces Atypiques, annonce 16624](https://www.espaces-atypiques.com/ventes/75015-paris-appartement-bourgeois-avec-vue-panoramique-16624/). L'identité canonique, la référence, le titre et le prix affiché sont confrontés aux données embarquées. La surface est omise parce que la page distingue plusieurs définitions.
 
-| Cas | Durée de la sonde | Résultat |
-|---|---:|---|
-| `agency` | 26,697 s | Galerie absente du DOM transformé ; échec conservé |
-| `figaro` | 3,287 s | Accès source refusé ; navigateur fermé normalement |
-| `agency-gallery-check` | 5,591 s | 17 liens retrouvés dans le HTML initial, mais aucun transfert de photo abouti |
-| `agency-static-check` | 60,224 s | Deux photos stockées ; timeouts réseau et fermeture fournisseur `BrowserIdle` |
-| `agency-keepalive-check` | 6,828 s | **Succès : trois photos**, sans rejet ; fermeture demandée dans `finally` |
+| Cas                      | Durée de la sonde | Résultat                                                                      |
+| ------------------------ | ----------------: | ----------------------------------------------------------------------------- |
+| `agency`                 |          26,697 s | Galerie absente du DOM transformé ; échec conservé                            |
+| `figaro`                 |           3,287 s | Accès source refusé ; navigateur fermé normalement                            |
+| `agency-gallery-check`   |           5,591 s | 17 liens retrouvés dans le HTML initial, mais aucun transfert de photo abouti |
+| `agency-static-check`    |          60,224 s | Deux photos stockées ; timeouts réseau et fermeture fournisseur `BrowserIdle` |
+| `agency-keepalive-check` |           6,828 s | **Succès : trois photos**, sans rejet ; fermeture demandée dans `finally`     |
 
 Le diagnostic HTTP isolé d'une photo a renvoyé 200 et 501 918 octets, sans ouvrir de navigateur. Le coût des ressources auxiliaires sur Workers Free était une hypothèse d'investigation, pas une erreur fournisseur prouvée. Le correctif limite la navigation au document pour ce cas et règle l'inactivité navigateur à 60 s ; le timer de session active reste de 60 s. La collecte s'arrête à trois photos. Un script externe nécessaire à une autre agence demanderait un cas distinct.
 
@@ -46,10 +46,10 @@ Preuves : `browser-agency-first.json`, `browser-agency-gallery.json`, `browser-a
 
 ## Vidéos natives réellement produites
 
-| Artefact local | Durée vidéo / conteneur MP4 | Taille | Rendu et vérification | Audio RMS |
-|---|---|---:|---:|---:|
-| `node-1790536106820.mp4` | 6 s / 6,058667 s | 735 464 octets | 39,321 s | −32,79 dBFS |
-| `local-target-reprise-03.mp4` | 30 s / 30,058667 s | 2 500 320 octets | 177,000 s | −32,76 dBFS |
+| Artefact local                | Durée vidéo / conteneur MP4 |           Taille | Rendu et vérification |   Audio RMS |
+| ----------------------------- | --------------------------- | ---------------: | --------------------: | ----------: |
+| `node-1790536106820.mp4`      | 6 s / 6,058667 s            |   735 464 octets |              39,321 s | −32,79 dBFS |
+| `local-target-reprise-03.mp4` | 30 s / 30,058667 s          | 2 500 320 octets |             177,000 s | −32,76 dBFS |
 
 Fichiers dans `evidence/local/renderer/`, hors Git. Images géométriques générées localement et signal WAV de synthèse : aucune vraie annonce et aucun TTS. Vérifications : codecs H.264/AAC, dimensions, cadence, durée, décodage de l'AAC en PCM non silencieux, taille et SHA-256.
 

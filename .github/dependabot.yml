@@ -9,8 +9,8 @@ updates:
     groups:
       cloudflare:
         patterns:
-          - '@cloudflare/*'
-          - '@opennextjs/*'
+          - "@cloudflare/*"
+          - "@opennextjs/*"
           - miniflare
           - wrangler
         update-types:
@@ -18,14 +18,14 @@ updates:
           - patch
       remotion:
         patterns:
-          - '@remotion/*'
+          - "@remotion/*"
           - remotion
         update-types:
           - minor
           - patch
       application:
         patterns:
-          - '*'
+          - "*"
         update-types:
           - minor
           - patch

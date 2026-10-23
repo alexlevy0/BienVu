@@ -26,11 +26,11 @@ Commandes : tests ciblés, `pnpm check`, `pnpm db:migrate` puis réapplication, 
 
 `pnpm exec tsx scripts/probe-import-descriptions.ts --real` : trois pages publiques depuis le Mac, une tentative par page, sans relance ni photo téléchargée. Mesures (`docs/preuves/sprint-03/description-real-sources.json`). Ce contrôle d’extraction est distinct du stockage testé sur fixtures et des imports complets du [rapport initial](RAPPORT.md).
 
-| Source | Description | Durée page + extraction | Troncature |
-|---|---:|---:|---|
-| Espaces Atypiques 14713 | 2 141 caractères | 345 ms | Non |
-| Orpi, Paris 12 | 1 456 caractères | 867 ms | Non |
-| Century 21 16965965448 | 1 251 caractères | 424 ms | Non |
+| Source                  |      Description | Durée page + extraction | Troncature |
+| ----------------------- | ---------------: | ----------------------: | ---------- |
+| Espaces Atypiques 14713 | 2 141 caractères |                  345 ms | Non        |
+| Orpi, Paris 12          | 1 456 caractères |                  867 ms | Non        |
+| Century 21 16965965448  | 1 251 caractères |                  424 ms | Non        |
 
 HTML et textes complets restent dans `evidence/local/sprint-03/descriptions/`, hors Git. Le rapport versionné contient URL, version, provenance, taille, durée et empreinte. Cet échantillon ne prouve pas la prise en charge de toutes les annonces.
 

@@ -1,57 +1,631 @@
 'use client';
-import {useEffect,useState} from 'react';
-import {useAccount} from './account';
-import {AdminCommandSearch,AdminWorkspaceBoard,AdminAudience,AdminRecovery} from './admin-workspace';
-import type {AdminPage,AdminRow} from '@bienvu/contracts';
-import type {OperationsData} from '../lib/admin-operations';
-import {AdminVideoProfit} from './admin-finance';
-import {AgencyNotes,OpsBadge,OpsCard,adminDate,adminAgencyHref,adminVideoHref,operationLabels,useOperations,opsAnchor} from './admin-operations';
+import { useEffect, useState } from 'react';
+import { useAccount } from './account';
+import { AdminCommandSearch, AdminWorkspaceBoard, AdminAudience, AdminRecovery } from './admin-workspace';
+import type { AdminPage, AdminRow } from '@bienvu/contracts';
+import type { OperationsData } from '../lib/admin-operations';
+import { AdminVideoProfit } from './admin-finance';
+import {
+  AgencyNotes,
+  OpsBadge,
+  OpsCard,
+  adminDate,
+  adminAgencyHref,
+  adminVideoHref,
+  operationLabels,
+  useOperations,
+  opsAnchor,
+} from './admin-operations';
 
-const value=(v:unknown)=>v==null||v===''?'—':String(v);
-const elapsed=(from:string,to:string|null)=>to&&Date.parse(to)>=Date.parse(from)?Math.round((Date.parse(to)-Date.parse(from))/1000)+' s':'Non mesuré';
-export function AdminRecordPage({kind,id}:{kind:'video'|'agency';id:string}){
- const {data,error,busy,refresh}=useOperations(kind,{id});const [copied,setCopied]=useState(false);
- async function copy(){try{await navigator.clipboard.writeText(location.href);setCopied(true);}catch{setCopied(false);}}
- return <div className="admin-shell ops-record"><AdminRecordNavigation kind={kind} id={id}/><header className="admin-heading"><div><span className="admin-eyebrow">{kind==='video'?'DIAGNOSTIC DE GÉNÉRATION':'VUE AGENCE À 360°'}</span><h1>{data&&'detail' in data&&data.detail?value(data.detail.video.title):data&&'agency' in data&&data.agency?value(data.agency.agency):'Dossier'}</h1><p className="ops-id">{id}</p></div><div className="ops-record-actions"><button className="admin-button" type="button" onClick={()=>void copy()}>{copied?'Lien copié ✓':'Copier le lien'}</button><button className="admin-button" type="button" disabled={busy} onClick={refresh}>Actualiser</button></div></header>
- <AdminCommandSearch/><nav className="admin-record-toc" aria-label="Sections du dossier">{(kind==='video'?['La vidéo','Chronologie complète','Animations des photos','Narration retenue','Récupération guidée','Suivi de ce dossier']:['Identité et abonnement','Crédits de l’agence','Dernières vidéos','Classification du compte','Suivi de ce dossier']).map(title=><a key={title} href={'#'+opsAnchor(title)}>{title}</a>)}</nav>
- {error&&<p className="admin-error" role="alert">{error}</p>}{busy&&!data&&<p role="status">Lecture du dossier…</p>}
- {data&&'detail' in data&&data.detail&&<VideoRecord data={data}/>}
- {data&&'agency' in data&&data.agency&&<AgencyRecord data={data} refresh={refresh}/>}
- {data&&<AdminWorkspaceBoard target={{targetKind:kind,target:id}} showAlerts={false}/>}
- </div>;
+const value = (v: unknown) => (v == null || v === '' ? '—' : String(v));
+const elapsed = (from: string, to: string | null) =>
+  to && Date.parse(to) >= Date.parse(from)
+    ? Math.round((Date.parse(to) - Date.parse(from)) / 1000) + ' s'
+    : 'Non mesuré';
+export function AdminRecordPage({ kind, id }: { kind: 'video' | 'agency'; id: string }) {
+  const { data, error, busy, refresh } = useOperations(kind, { id });
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(location.href);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  }
+  return (
+    <div className="admin-shell ops-record">
+      <AdminRecordNavigation kind={kind} id={id} />
+      <header className="admin-heading">
+        <div>
+          <span className="admin-eyebrow">{kind === 'video' ? 'DIAGNOSTIC DE GÉNÉRATION' : 'VUE AGENCE À 360°'}</span>
+          <h1>
+            {data && 'detail' in data && data.detail
+              ? value(data.detail.video.title)
+              : data && 'agency' in data && data.agency
+                ? value(data.agency.agency)
+                : 'Dossier'}
+          </h1>
+          <p className="ops-id">{id}</p>
+        </div>
+        <div className="ops-record-actions">
+          <button className="admin-button" type="button" onClick={() => void copy()}>
+            {copied ? 'Lien copié ✓' : 'Copier le lien'}
+          </button>
+          <button className="admin-button" type="button" disabled={busy} onClick={refresh}>
+            Actualiser
+          </button>
+        </div>
+      </header>
+      <AdminCommandSearch />
+      <nav className="admin-record-toc" aria-label="Sections du dossier">
+        {(kind === 'video'
+          ? [
+              'La vidéo',
+              'Chronologie complète',
+              'Animations des photos',
+              'Narration retenue',
+              'Récupération guidée',
+              'Suivi de ce dossier',
+            ]
+          : [
+              'Identité et abonnement',
+              'Crédits de l’agence',
+              'Dernières vidéos',
+              'Classification du compte',
+              'Suivi de ce dossier',
+            ]
+        ).map((title) => (
+          <a key={title} href={'#' + opsAnchor(title)}>
+            {title}
+          </a>
+        ))}
+      </nav>
+      {error && (
+        <p className="admin-error" role="alert">
+          {error}
+        </p>
+      )}
+      {busy && !data && <p role="status">Lecture du dossier…</p>}
+      {data && 'detail' in data && data.detail && <VideoRecord data={data} />}
+      {data && 'agency' in data && data.agency && <AgencyRecord data={data} refresh={refresh} />}
+      {data && <AdminWorkspaceBoard target={{ targetKind: kind, target: id }} showAlerts={false} />}
+    </div>
+  );
 }
-function Facts({row,fields}:{row:AdminRow;fields:[string,string][]}){return <dl className="admin-facts">{fields.map(([key,label])=><div key={key}><dt>{label}</dt><dd>{key.endsWith('At')||key==='lastVideo'?adminDate(String(row[key]??'')):['status','stage','audience','plan'].includes(key)?operationLabels[String(row[key])]??value(row[key]):value(row[key])}</dd></div>)}</dl>;}
-function VideoRecord({data}:{data:Extract<OperationsData,{detail:unknown}>}){
- const {video,events,calls,animations,reports}=data.detail;
- const timeline=[
- ...events.map(e=>({at:String(e.at),title:operationLabels[String(e.event)]??String(e.event),body:'Événement de génération'})),
- ...data.stages.map(s=>({at:s.at,title:operationLabels[s.stage]??s.stage,body:(operationLabels[s.status]??s.status)+(s.error?' · '+s.error:'')})),
- ...calls.map(c=>({at:c.at,title:c.provider==='openai'?'Rédaction du script':'Voix off · '+c.provider,body:`${operationLabels[c.state]??c.state} · ${c.requestDurationMs==null?'Durée non mesurée':Math.round(c.requestDurationMs)+' ms'}${c.error?' · '+c.error:''}`})),
- ...data.preparation.map(p=>({at:p.at,title:operationLabels[p.step]??p.step,body:`${operationLabels[p.state]??p.state} · ${elapsed(p.startedAt,p.at)}${p.error?' · '+p.error:''}`})),
- ...data.avatars.map(a=>({at:a.at,title:'Avatar · '+a.moment,body:(operationLabels[a.state]??a.state)+(a.error?' · '+a.error:'')})),
- ...data.push.map(p=>({at:p.at,title:operationLabels[p.event]??p.event,body:p.attempt>0?'Notification · tentative '+p.attempt:'Inscription au suivi'})),
- ].sort((a,b)=>a.at.localeCompare(b.at));
- return <><div className="ops-record-layout"><OpsCard title="La vidéo"><OpsBadge value={String(video.status)}/>{Number(video.master)||Number(video.preview)?<video className="ops-player" controls playsInline preload="metadata" src={'/api/admin/jobs/'+encodeURIComponent(String(video.id))+'/video?variant='+(Number(video.master)?'master':'preview')}/>:<p className="ops-video-empty">Le fichier est indisponible, en cours de génération ou expiré. Son historique reste consultable.</p>}<Facts row={video} fields={[["audience","Origine"],["createdAt","Création"],["updatedAt","Dernier changement"],["stage","Étape actuelle"],["error","Erreur"],["attempt","Tentative"],["sourceUrl","Source importée"],["creditsReserved","Crédits réservés"],["creditsUsed","Crédits consommés"],["creditsRefunded","Crédits restitués"]]}/>{video.agencyId&&<a className="admin-button" href={adminAgencyHref(String(video.agencyId))}>Ouvrir l’agence →</a>}</OpsCard>
- <OpsCard title="Chronologie complète" note="Import, narration, voix, préparation, assemblage et notification. Les événements sont horodatés ; les anciennes vidéos peuvent n’avoir qu’un historique partiel.">
- {data.source&&<p className="admin-notice">Import : {data.source.status}{data.source.error?' · '+data.source.error:''} · {adminDate(data.source.at)}</p>}
- <ol className="ops-timeline">{timeline.map((e,i)=><li key={e.at+':'+i}><time>{adminDate(e.at)}</time><strong>{e.title}</strong><p>{e.body}</p></li>)}</ol>{!timeline.length&&<p>Aucun événement conservé.</p>}</OpsCard></div>
- <OpsCard title="Attente et traitement par ressource"><div className="admin-table-scroll"><table className="admin-table"><thead><tr><th>Ressource</th><th>État</th><th>Entrée en file</th><th>Début de traitement</th><th>Attente</th><th>Traitement observé</th></tr></thead><tbody>{data.queue.map(q=><tr key={q.resource}><td>{operationLabels[q.resource]??q.resource}</td><td><OpsBadge value={q.state}/></td><td>{adminDate(q.at)}</td><td>{adminDate(q.startedAt)}</td><td>{elapsed(q.at,q.startedAt)}</td><td>{q.startedAt&&q.state==='released'?elapsed(q.startedAt,q.updatedAt):'En cours / non mesuré'}</td></tr>)}</tbody></table></div>{!data.queue.length&&<p>Aucune mesure de file pour cette vidéo.</p>}<p className="admin-muted">Les ressources peuvent se chevaucher. La libération peut intervenir à la clôture du job : le temps observé inclut alors la conservation du créneau, pas uniquement du calcul.</p></OpsCard>
- <OpsCard title="Animations des photos">{data.detail.animationIssue&&<p className="admin-error">{data.detail.animationIssue}</p>}<div className="admin-table-scroll"><table className="admin-table"><thead><tr><th>Photo</th><th>Modèle</th><th>État</th><th>Crédits API</th><th>Tâche fournisseur</th><th>Erreur</th></tr></thead><tbody>{animations?.map(a=><tr key={String(a.id)}><td><img className="admin-animation-thumb" loading="lazy" width={96} height={72} src={'/api/admin/jobs/'+encodeURIComponent(String(video.id))+'/photos/'+encodeURIComponent(String(a.photoId))} alt={'Photo de l’animation '+(Number(a.photoSlot)+1)} onError={e=>{e.currentTarget.hidden=true;}}/><span>Animation {Number(a.photoSlot)+1}</span><small>{value(a.photoId)}</small></td><td>{value(a.model)}<small>{a.mode==='mock'?'Simulation':'Réel'}</small></td><td><OpsBadge value={String(a.state)}/></td><td>{value(a.credits)}</td><td>{value(a.taskId)}</td><td>{value(a.error)}</td></tr>)}</tbody></table></div>{!animations?.length&&<p>Aucun appel d’animation enregistré.</p>}</OpsCard>
- <OpsCard title="Narration retenue">{data.script.length?data.script.map((s,i)=><article className="ops-note" key={s.id??i}><strong>Séquence {i+1}</strong><p>{s.text}</p><small>Texte affiché : {s.caption}</small></article>):<p>Aucun script conservé pour cette vidéo.</p>}<p className="admin-muted">Dernier script conservé par la préparation. Les éventuelles normalisations de prononciation du fournisseur ne sont pas reconstituées.</p></OpsCard>
- <OpsCard title="Appels de narration et voix"><div className="admin-table-scroll"><table className="admin-table"><thead><tr><th>Étape</th><th>Fournisseur / modèle</th><th>État</th><th>Durée</th><th>Texte / tokens</th><th>Erreur</th></tr></thead><tbody>{calls.map(c=><tr key={c.id}><td>{c.step}<small>{adminDate(c.at)}</small></td><td>{c.provider} · {c.model??'—'}<small>{c.mode==='mock'?'Simulation':'Réel'}</small></td><td><OpsBadge value={c.state}/></td><td>{c.requestDurationMs==null?'Non mesurée':c.requestDurationMs+' ms'}</td><td>{c.inputCharacters==null?'—':c.inputCharacters+' caractères'}<small>{c.inputTokens??'—'} tokens entrants · {c.outputTokens??'—'} sortants</small></td><td>{c.error??'—'}</td></tr>)}</tbody></table></div></OpsCard>
- <OpsCard title="Notification navigateur" note="« Accepté » signifie que le service push a accepté l’envoi, sans preuve d’affichage ou de lecture sur l’appareil. Aucun identifiant ou secret d’appareil n’est affiché.">{data.currentPush.map((p,i)=><p key={i}><OpsBadge value={p.status}/> · {p.attempts} tentative(s) · {adminDate(p.sentAt??p.at)}</p>)}{!data.currentPush.length&&!data.push.length&&<p>Aucune demande de notification conservée pour cette génération.</p>}{data.push.some(p=>p.event==='device_disabled')&&<p className="admin-notice">Un appareil a été désactivé ou son abonnement push a expiré. L’utilisateur peut réactiver les notifications dans son navigateur.</p>}<p className="admin-muted">Le suivi détaillé est disponible à partir de la mise en service de ce diagnostic.</p></OpsCard>
- <AdminRecovery id={String(video.id)}/><AdminVideoProfit jobId={String(video.id)}/><OpsCard title="Signalements liés">{reports.length?reports.map(r=><article className="ops-note" key={String(r.id)}><OpsBadge value={String(r.status)}/><p>{value(r.comment)}</p><small>{value(r.category)} · {adminDate(String(r.at))}</small></article>):<p>Aucun signalement.</p>}<a href={'/admin?view=reports&agency='+encodeURIComponent(String(video.agencyId??''))} className="admin-text-button">Traiter les signalements →</a></OpsCard></>;
+function Facts({ row, fields }: { row: AdminRow; fields: [string, string][] }) {
+  return (
+    <dl className="admin-facts">
+      {fields.map(([key, label]) => (
+        <div key={key}>
+          <dt>{label}</dt>
+          <dd>
+            {key.endsWith('At') || key === 'lastVideo'
+              ? adminDate(String(row[key] ?? ''))
+              : ['status', 'stage', 'audience', 'plan'].includes(key)
+                ? (operationLabels[String(row[key])] ?? value(row[key]))
+                : value(row[key])}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
 }
-function AgencyRecord({data,refresh}:{data:Extract<OperationsData,{agency:unknown}>;refresh:()=>void}){const a=data.agency;return <><div className="ops-record-layout"><OpsCard title="Identité et abonnement"><Facts row={a} fields={[["owner","Propriétaire"],["email","E-mail du compte"],["contactEmail","Contact agence"],["phone","Téléphone"],["city","Ville"],["createdAt","Inscription"],["plan","Offre"],["status","Statut abonnement"],["videos","Vidéos"],["ready","Vidéos prêtes"],["lastVideo","Dernière création"]]}/><div className="ops-links"><a href={'/admin?view=subscriptions&agency='+a.id}>Abonnement →</a><a href={'/admin?view=quotas&agency='+a.id}>Gérer les crédits →</a><a href={'/admin?view=reports&agency='+a.id}>Signalements →</a></div></OpsCard><AgencyNotes id={String(a.id)} notes={data.notes} refresh={refresh}/></div>
- <AdminAudience id={String(a.id)}/><OpsCard title="Crédits de l’agence" note="Solde utilisable déjà inscrit au registre, incluant recharges, bonus et reports. Cette consultation n’accorde aucun crédit.">{data.balance&&<div className="admin-summary-lines"><p><span>Crédits disponibles</span><strong>{data.balance.available}</strong></p><p><span>Actuellement réservés</span><strong>{data.balance.reserved}</strong></p><p><span>Dont crédits à l’unité</span><strong>{data.balance.purchased}</strong></p><p><span>Dont bonus</span><strong>{data.balance.bonus}</strong></p><p><span>Dont reportés</span><strong>{data.balance.rollover}</strong></p></div>}<details className="ops-details"><summary>Historique des périodes de crédits</summary><RecordTable page={data.quotas} fields={[["status","Type"],["quota","Accordés"],["consumed","Consommés"],["reserved","Réservés"],["remaining","Disponibles"],["end","Fin de période"]]}/></details></OpsCard>
- <OpsCard title="Dernières vidéos"><RecordTable page={data.videos} kind="video" fields={[["title","Vidéo"],["status","État"],["error","Erreur"],["createdAt","Création"],["creditsUsed","Crédits utilisés"]]}/><a className="admin-text-button" href={'/admin?view=videos&agency='+a.id}>Toutes les vidéos de l’agence →</a></OpsCard>
- <div className="ops-grid"><OpsCard title="Signalements récents"><RecordTable page={data.reports} fields={[["category","Motif"],["status","Traitement"],["comment","Message"]]}/></OpsCard><OpsCard title="Échanges avec le propriétaire" note="Correspondance par adresse e-mail du compte ; jusqu’à 30 conversations récentes.">{data.messages.length?data.messages.map(m=><a className="ops-action" key={m.id} href={'/admin?view=mailbox&q='+encodeURIComponent(String(a.email??''))}><span>{m.subject}<small>{adminDate(m.at)}</small></span><span>Messagerie →</span></a>):<p>Aucun échange associé à cette adresse.</p>}</OpsCard></div></>;}
-function RecordTable({page,fields,kind}:{page:AdminPage;fields:[string,string][];kind?:'video'}){return <>{page.rows.length?<div className="admin-table-scroll"><table className="admin-table"><thead><tr>{fields.map(([key,label])=><th key={key}>{label}</th>)}{kind&&<th>Action</th>}</tr></thead><tbody>{page.rows.map(r=><tr key={String(r.id)}>{fields.map(([key])=><td key={key}>{key==='status'?<OpsBadge value={String(r[key])}/>:key.endsWith('At')||key==='end'?adminDate(String(r[key]??'')):value(r[key])}</td>)}{kind&&<td><a className="admin-row-button" href={adminVideoHref(String(r.id))}>Diagnostic →</a></td>}</tr>)}</tbody></table></div>:<p>Aucun élément.</p>}{page.nextCursor&&<p className="admin-muted">{page.rows.length} éléments affichés sur {page.total}. Ouvrez la rubrique correspondante pour consulter la suite.</p>}</>;}
+function VideoRecord({ data }: { data: Extract<OperationsData, { detail: unknown }> }) {
+  const { video, events, calls, animations, reports } = data.detail;
+  const timeline = [
+    ...events.map((e) => ({
+      at: String(e.at),
+      title: operationLabels[String(e.event)] ?? String(e.event),
+      body: 'Événement de génération',
+    })),
+    ...data.stages.map((s) => ({
+      at: s.at,
+      title: operationLabels[s.stage] ?? s.stage,
+      body: (operationLabels[s.status] ?? s.status) + (s.error ? ' · ' + s.error : ''),
+    })),
+    ...calls.map((c) => ({
+      at: c.at,
+      title: c.provider === 'openai' ? 'Rédaction du script' : 'Voix off · ' + c.provider,
+      body: `${operationLabels[c.state] ?? c.state} · ${c.requestDurationMs == null ? 'Durée non mesurée' : Math.round(c.requestDurationMs) + ' ms'}${c.error ? ' · ' + c.error : ''}`,
+    })),
+    ...data.preparation.map((p) => ({
+      at: p.at,
+      title: operationLabels[p.step] ?? p.step,
+      body: `${operationLabels[p.state] ?? p.state} · ${elapsed(p.startedAt, p.at)}${p.error ? ' · ' + p.error : ''}`,
+    })),
+    ...data.avatars.map((a) => ({
+      at: a.at,
+      title: 'Avatar · ' + a.moment,
+      body: (operationLabels[a.state] ?? a.state) + (a.error ? ' · ' + a.error : ''),
+    })),
+    ...data.push.map((p) => ({
+      at: p.at,
+      title: operationLabels[p.event] ?? p.event,
+      body: p.attempt > 0 ? 'Notification · tentative ' + p.attempt : 'Inscription au suivi',
+    })),
+  ].sort((a, b) => a.at.localeCompare(b.at));
+  return (
+    <>
+      <div className="ops-record-layout">
+        <OpsCard title="La vidéo">
+          <OpsBadge value={String(video.status)} />
+          {Number(video.master) || Number(video.preview) ? (
+            <video
+              className="ops-player"
+              controls
+              playsInline
+              preload="metadata"
+              src={
+                '/api/admin/jobs/' +
+                encodeURIComponent(String(video.id)) +
+                '/video?variant=' +
+                (Number(video.master) ? 'master' : 'preview')
+              }
+            />
+          ) : (
+            <p className="ops-video-empty">
+              Le fichier est indisponible, en cours de génération ou expiré. Son historique reste consultable.
+            </p>
+          )}
+          <Facts
+            row={video}
+            fields={[
+              ['audience', 'Origine'],
+              ['createdAt', 'Création'],
+              ['updatedAt', 'Dernier changement'],
+              ['stage', 'Étape actuelle'],
+              ['error', 'Erreur'],
+              ['attempt', 'Tentative'],
+              ['sourceUrl', 'Source importée'],
+              ['creditsReserved', 'Crédits réservés'],
+              ['creditsUsed', 'Crédits consommés'],
+              ['creditsRefunded', 'Crédits restitués'],
+            ]}
+          />
+          {video.agencyId && (
+            <a className="admin-button" href={adminAgencyHref(String(video.agencyId))}>
+              Ouvrir l’agence →
+            </a>
+          )}
+        </OpsCard>
+        <OpsCard
+          title="Chronologie complète"
+          note="Import, narration, voix, préparation, assemblage et notification. Les événements sont horodatés ; les anciennes vidéos peuvent n’avoir qu’un historique partiel."
+        >
+          {data.source && (
+            <p className="admin-notice">
+              Import : {data.source.status}
+              {data.source.error ? ' · ' + data.source.error : ''} · {adminDate(data.source.at)}
+            </p>
+          )}
+          <ol className="ops-timeline">
+            {timeline.map((e, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: Position identifies a fixed visual slot or read-only snapshot row; editable/reorderable records use IDs.
+              <li key={e.at + ':' + i}>
+                <time>{adminDate(e.at)}</time>
+                <strong>{e.title}</strong>
+                <p>{e.body}</p>
+              </li>
+            ))}
+          </ol>
+          {!timeline.length && <p>Aucun événement conservé.</p>}
+        </OpsCard>
+      </div>
+      <OpsCard title="Attente et traitement par ressource">
+        <div className="admin-table-scroll">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Ressource</th>
+                <th>État</th>
+                <th>Entrée en file</th>
+                <th>Début de traitement</th>
+                <th>Attente</th>
+                <th>Traitement observé</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.queue.map((q) => (
+                <tr key={q.resource}>
+                  <td>{operationLabels[q.resource] ?? q.resource}</td>
+                  <td>
+                    <OpsBadge value={q.state} />
+                  </td>
+                  <td>{adminDate(q.at)}</td>
+                  <td>{adminDate(q.startedAt)}</td>
+                  <td>{elapsed(q.at, q.startedAt)}</td>
+                  <td>
+                    {q.startedAt && q.state === 'released'
+                      ? elapsed(q.startedAt, q.updatedAt)
+                      : 'En cours / non mesuré'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {!data.queue.length && <p>Aucune mesure de file pour cette vidéo.</p>}
+        <p className="admin-muted">
+          Les ressources peuvent se chevaucher. La libération peut intervenir à la clôture du job : le temps observé
+          inclut alors la conservation du créneau, pas uniquement du calcul.
+        </p>
+      </OpsCard>
+      <OpsCard title="Animations des photos">
+        {data.detail.animationIssue && <p className="admin-error">{data.detail.animationIssue}</p>}
+        <div className="admin-table-scroll">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Photo</th>
+                <th>Modèle</th>
+                <th>État</th>
+                <th>Crédits API</th>
+                <th>Tâche fournisseur</th>
+                <th>Erreur</th>
+              </tr>
+            </thead>
+            <tbody>
+              {animations?.map((a) => (
+                <tr key={String(a.id)}>
+                  <td>
+                    <img
+                      className="admin-animation-thumb"
+                      loading="lazy"
+                      width={96}
+                      height={72}
+                      src={
+                        '/api/admin/jobs/' +
+                        encodeURIComponent(String(video.id)) +
+                        '/photos/' +
+                        encodeURIComponent(String(a.photoId))
+                      }
+                      alt={'Photo de l’animation ' + (Number(a.photoSlot) + 1)}
+                      onError={(e) => {
+                        e.currentTarget.hidden = true;
+                      }}
+                    />
+                    <span>Animation {Number(a.photoSlot) + 1}</span>
+                    <small>{value(a.photoId)}</small>
+                  </td>
+                  <td>
+                    {value(a.model)}
+                    <small>{a.mode === 'mock' ? 'Simulation' : 'Réel'}</small>
+                  </td>
+                  <td>
+                    <OpsBadge value={String(a.state)} />
+                  </td>
+                  <td>{value(a.credits)}</td>
+                  <td>{value(a.taskId)}</td>
+                  <td>{value(a.error)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {!animations?.length && <p>Aucun appel d’animation enregistré.</p>}
+      </OpsCard>
+      <OpsCard title="Narration retenue">
+        {data.script.length ? (
+          data.script.map((s, i) => (
+            <article className="ops-note" key={s.id ?? i}>
+              <strong>Séquence {i + 1}</strong>
+              <p>{s.text}</p>
+              <small>Texte affiché : {s.caption}</small>
+            </article>
+          ))
+        ) : (
+          <p>Aucun script conservé pour cette vidéo.</p>
+        )}
+        <p className="admin-muted">
+          Dernier script conservé par la préparation. Les éventuelles normalisations de prononciation du fournisseur ne
+          sont pas reconstituées.
+        </p>
+      </OpsCard>
+      <OpsCard title="Appels de narration et voix">
+        <div className="admin-table-scroll">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Étape</th>
+                <th>Fournisseur / modèle</th>
+                <th>État</th>
+                <th>Durée</th>
+                <th>Texte / tokens</th>
+                <th>Erreur</th>
+              </tr>
+            </thead>
+            <tbody>
+              {calls.map((c) => (
+                <tr key={c.id}>
+                  <td>
+                    {c.step}
+                    <small>{adminDate(c.at)}</small>
+                  </td>
+                  <td>
+                    {c.provider} · {c.model ?? '—'}
+                    <small>{c.mode === 'mock' ? 'Simulation' : 'Réel'}</small>
+                  </td>
+                  <td>
+                    <OpsBadge value={c.state} />
+                  </td>
+                  <td>{c.requestDurationMs == null ? 'Non mesurée' : c.requestDurationMs + ' ms'}</td>
+                  <td>
+                    {c.inputCharacters == null ? '—' : c.inputCharacters + ' caractères'}
+                    <small>
+                      {c.inputTokens ?? '—'} tokens entrants · {c.outputTokens ?? '—'} sortants
+                    </small>
+                  </td>
+                  <td>{c.error ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </OpsCard>
+      <OpsCard
+        title="Notification navigateur"
+        note="« Accepté » signifie que le service push a accepté l’envoi, sans preuve d’affichage ou de lecture sur l’appareil. Aucun identifiant ou secret d’appareil n’est affiché."
+      >
+        {data.currentPush.map((p, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: Position identifies a fixed visual slot or read-only snapshot row; editable/reorderable records use IDs.
+          <p key={i}>
+            <OpsBadge value={p.status} /> · {p.attempts} tentative(s) · {adminDate(p.sentAt ?? p.at)}
+          </p>
+        ))}
+        {!data.currentPush.length && !data.push.length && (
+          <p>Aucune demande de notification conservée pour cette génération.</p>
+        )}
+        {data.push.some((p) => p.event === 'device_disabled') && (
+          <p className="admin-notice">
+            Un appareil a été désactivé ou son abonnement push a expiré. L’utilisateur peut réactiver les notifications
+            dans son navigateur.
+          </p>
+        )}
+        <p className="admin-muted">Le suivi détaillé est disponible à partir de la mise en service de ce diagnostic.</p>
+      </OpsCard>
+      <AdminRecovery id={String(video.id)} />
+      <AdminVideoProfit jobId={String(video.id)} />
+      <OpsCard title="Signalements liés">
+        {reports.length ? (
+          reports.map((r) => (
+            <article className="ops-note" key={String(r.id)}>
+              <OpsBadge value={String(r.status)} />
+              <p>{value(r.comment)}</p>
+              <small>
+                {value(r.category)} · {adminDate(String(r.at))}
+              </small>
+            </article>
+          ))
+        ) : (
+          <p>Aucun signalement.</p>
+        )}
+        <a
+          href={'/admin?view=reports&agency=' + encodeURIComponent(String(video.agencyId ?? ''))}
+          className="admin-text-button"
+        >
+          Traiter les signalements →
+        </a>
+      </OpsCard>
+    </>
+  );
+}
+function AgencyRecord({ data, refresh }: { data: Extract<OperationsData, { agency: unknown }>; refresh: () => void }) {
+  const a = data.agency;
+  return (
+    <>
+      <div className="ops-record-layout">
+        <OpsCard title="Identité et abonnement">
+          <Facts
+            row={a}
+            fields={[
+              ['owner', 'Propriétaire'],
+              ['email', 'E-mail du compte'],
+              ['contactEmail', 'Contact agence'],
+              ['phone', 'Téléphone'],
+              ['city', 'Ville'],
+              ['createdAt', 'Inscription'],
+              ['plan', 'Offre'],
+              ['status', 'Statut abonnement'],
+              ['videos', 'Vidéos'],
+              ['ready', 'Vidéos prêtes'],
+              ['lastVideo', 'Dernière création'],
+            ]}
+          />
+          <div className="ops-links">
+            <a href={'/admin?view=subscriptions&agency=' + a.id}>Abonnement →</a>
+            <a href={'/admin?view=quotas&agency=' + a.id}>Gérer les crédits →</a>
+            <a href={'/admin?view=reports&agency=' + a.id}>Signalements →</a>
+          </div>
+        </OpsCard>
+        <AgencyNotes id={String(a.id)} notes={data.notes} refresh={refresh} />
+      </div>
+      <AdminAudience id={String(a.id)} />
+      <OpsCard
+        title="Crédits de l’agence"
+        note="Solde utilisable déjà inscrit au registre, incluant recharges, bonus et reports. Cette consultation n’accorde aucun crédit."
+      >
+        {data.balance && (
+          <div className="admin-summary-lines">
+            <p>
+              <span>Crédits disponibles</span>
+              <strong>{data.balance.available}</strong>
+            </p>
+            <p>
+              <span>Actuellement réservés</span>
+              <strong>{data.balance.reserved}</strong>
+            </p>
+            <p>
+              <span>Dont crédits à l’unité</span>
+              <strong>{data.balance.purchased}</strong>
+            </p>
+            <p>
+              <span>Dont bonus</span>
+              <strong>{data.balance.bonus}</strong>
+            </p>
+            <p>
+              <span>Dont reportés</span>
+              <strong>{data.balance.rollover}</strong>
+            </p>
+          </div>
+        )}
+        <details className="ops-details">
+          <summary>Historique des périodes de crédits</summary>
+          <RecordTable
+            page={data.quotas}
+            fields={[
+              ['status', 'Type'],
+              ['quota', 'Accordés'],
+              ['consumed', 'Consommés'],
+              ['reserved', 'Réservés'],
+              ['remaining', 'Disponibles'],
+              ['end', 'Fin de période'],
+            ]}
+          />
+        </details>
+      </OpsCard>
+      <OpsCard title="Dernières vidéos">
+        <RecordTable
+          page={data.videos}
+          kind="video"
+          fields={[
+            ['title', 'Vidéo'],
+            ['status', 'État'],
+            ['error', 'Erreur'],
+            ['createdAt', 'Création'],
+            ['creditsUsed', 'Crédits utilisés'],
+          ]}
+        />
+        <a className="admin-text-button" href={'/admin?view=videos&agency=' + a.id}>
+          Toutes les vidéos de l’agence →
+        </a>
+      </OpsCard>
+      <div className="ops-grid">
+        <OpsCard title="Signalements récents">
+          <RecordTable
+            page={data.reports}
+            fields={[
+              ['category', 'Motif'],
+              ['status', 'Traitement'],
+              ['comment', 'Message'],
+            ]}
+          />
+        </OpsCard>
+        <OpsCard
+          title="Échanges avec le propriétaire"
+          note="Correspondance par adresse e-mail du compte ; jusqu’à 30 conversations récentes."
+        >
+          {data.messages.length ? (
+            data.messages.map((m) => (
+              <a
+                className="ops-action"
+                key={m.id}
+                href={'/admin?view=mailbox&q=' + encodeURIComponent(String(a.email ?? ''))}
+              >
+                <span>
+                  {m.subject}
+                  <small>{adminDate(m.at)}</small>
+                </span>
+                <span>Messagerie →</span>
+              </a>
+            ))
+          ) : (
+            <p>Aucun échange associé à cette adresse.</p>
+          )}
+        </OpsCard>
+      </div>
+    </>
+  );
+}
+function RecordTable({ page, fields, kind }: { page: AdminPage; fields: [string, string][]; kind?: 'video' }) {
+  return (
+    <>
+      {page.rows.length ? (
+        <div className="admin-table-scroll">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                {fields.map(([key, label]) => (
+                  <th key={key}>{label}</th>
+                ))}
+                {kind && <th>Action</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {page.rows.map((r) => (
+                <tr key={String(r.id)}>
+                  {fields.map(([key]) => (
+                    <td key={key}>
+                      {key === 'status' ? (
+                        <OpsBadge value={String(r[key])} />
+                      ) : key.endsWith('At') || key === 'end' ? (
+                        adminDate(String(r[key] ?? ''))
+                      ) : (
+                        value(r[key])
+                      )}
+                    </td>
+                  ))}
+                  {kind && (
+                    <td>
+                      <a className="admin-row-button" href={adminVideoHref(String(r.id))}>
+                        Diagnostic →
+                      </a>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p>Aucun élément.</p>
+      )}
+      {page.nextCursor && (
+        <p className="admin-muted">
+          {page.rows.length} éléments affichés sur {page.total}. Ouvrez la rubrique correspondante pour consulter la
+          suite.
+        </p>
+      )}
+    </>
+  );
+}
 
-function AdminRecordNavigation({kind,id}:{kind:'video'|'agency';id:string}){
- const {me}=useAccount(),accountId=me?.user.id;
- const [context,setContext]=useState<{href:string;ids:string[]}|null>(null);
- useEffect(()=>{if(!accountId)return;try{const c=JSON.parse(sessionStorage.getItem('bv:admin:return:'+accountId)??'null');if(c?.kind===kind&&typeof c.href==='string'&&/^\/admin\?/.test(c.href)&&!c.href.includes('\\')&&Array.isArray(c.ids)&&c.ids.every((v:unknown)=>typeof v==='string'&&/^[a-zA-Z0-9_-]{1,64}$/.test(v))&&c.at>Date.now()-300000)setContext(c);}catch{}},[kind,id,accountId]);
- const position=context?.ids.indexOf(id)??-1,href=(id:string)=>kind==='video'?adminVideoHref(id):adminAgencyHref(id);
- return <nav className="admin-record-context" aria-label="Navigation entre dossiers"><a className="ops-back" href={context?.href??('/admin?view='+(kind==='video'?'videos':'agencies'))}>← Retour à la liste{context?' filtrée':''}</a>{context&&position>=0&&<span>{position>0&&<a href={href(context.ids[position-1])}>← Précédent</a>}<small>{position+1} / {context.ids.length}</small>{position<context.ids.length-1&&<a href={href(context.ids[position+1])}>Suivant →</a>}</span>}</nav>;
+function AdminRecordNavigation({ kind, id }: { kind: 'video' | 'agency'; id: string }) {
+  const { me } = useAccount(),
+    accountId = me?.user.id;
+  const [context, setContext] = useState<{ href: string; ids: string[] } | null>(null);
+  useEffect(() => {
+    if (!accountId) return;
+    try {
+      const c = JSON.parse(sessionStorage.getItem('bv:admin:return:' + accountId) ?? 'null');
+      if (
+        c?.kind === kind &&
+        typeof c.href === 'string' &&
+        /^\/admin\?/.test(c.href) &&
+        !c.href.includes('\\') &&
+        Array.isArray(c.ids) &&
+        c.ids.every((v: unknown) => typeof v === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(v)) &&
+        c.at > Date.now() - 300000
+      )
+        setContext(c);
+    } catch {}
+  }, [kind, id, accountId]);
+  const position = context?.ids.indexOf(id) ?? -1,
+    href = (id: string) => (kind === 'video' ? adminVideoHref(id) : adminAgencyHref(id));
+  return (
+    <nav className="admin-record-context" aria-label="Navigation entre dossiers">
+      <a className="ops-back" href={context?.href ?? '/admin?view=' + (kind === 'video' ? 'videos' : 'agencies')}>
+        ← Retour à la liste{context ? ' filtrée' : ''}
+      </a>
+      {context && position >= 0 && (
+        <span>
+          {position > 0 && <a href={href(context.ids[position - 1])}>← Précédent</a>}
+          <small>
+            {position + 1} / {context.ids.length}
+          </small>
+          {position < context.ids.length - 1 && <a href={href(context.ids[position + 1])}>Suivant →</a>}
+        </span>
+      )}
+    </nav>
+  );
 }

@@ -13,7 +13,6 @@ Cette maintenance améliore le **brouillon connecté** (`POST /api/imports`, `al
 ## Code et recette locale
 
 Fichiers principaux : `packages/importers/src/portals/figaro.ts`, `listing.ts`, `import-listing.ts`, `network.ts`, `packages/contracts/src/import-sources.ts`, message d'erreur dans `apps/web/components/home-create.tsx`, fixture Figaro, `tests/import-partial.test.ts` et sonde UI.
-
 - **64 tests ciblés réussis, zéro échec**, dont huit nouveaux scénarios : faits sans photos, contradictions, JSON-LD sans `businessFunction` mais transaction vérifiée dans le titre, produit/photo étrangers, description complète, loyer/charges, refus et délais d'images, fenêtre photo indépendante, CDN ignoré sans requête, URL privées/annulation/panne de stockage fatales. D1/R2 locaux vérifient la persistance, le rejeu idempotent et l'isolation entre agences sans créer de job.
 - **Interface sur fixtures**, en 1536 et 390 px : import sans photos, ouverture automatique de Photos, retour aux Détails, prix **280 000 €**, surface **268 m²**, **12 pièces**, ville et description en deux paragraphes dans leurs champs. Captures inspectées, aucun débordement horizontal. Le HTML de `fixtures/imports/portals/figaro-partial.html` est **reconstruit**, avec une ville et une référence fictives ; ce n'est pas une capture du portail ni une preuve de sa disponibilité.
 - TypeScript complet, frontières **188 fichiers**, build Next/OpenNext final, trois dry-runs Wrangler et vérification du diff réussis. Un premier scénario de CDN utilisait trois URL identiques, dédupliquées en une seule : correction de la fixture vers trois URL distinctes puis réexécution réussie des 64 tests. Le premier sélecteur UI visait une métadonnée plutôt que le textarea : sonde corrigée et recette ordinateur/mobile réexécutée.
@@ -45,10 +44,10 @@ Un **seul import réel après publication**, à **10:42 UTC**, utilise une ident
 
 Versions publiées, chacune **100 %**, configuration/bindings/variables/secrets comparés avant/après et identiques :
 
-| Worker | Version |
-|---|---|
-| `bienvu-import-staging` | `9a451648-c4af-46c1-80b8-e6f421415d34` |
-| `bienvu-generation-development` | `eb2781e5-3ea8-46dc-bd32-bc4536135a9f` |
+| Worker                                              | Version                                |
+| --------------------------------------------------- | -------------------------------------- |
+| `bienvu-import-staging`                             | `9a451648-c4af-46c1-80b8-e6f421415d34` |
+| `bienvu-generation-development`                     | `eb2781e5-3ea8-46dc-bd32-bc4536135a9f` |
 | `bienvu-web-probe-staging`, domaine `bienvu.online` | `75183891-30c8-4a46-85a3-227c40c141b1` |
 
 Les images Container existantes sont conservées : import **`b58fd9b…5ff8`**, renderer **`60e2c46…f78ead`**. Aucun rebuild ou rollout d'image, aucune migration D1. Accueil/Explorer **200**, **14 CSS/JS distants** identiques au build par SHA-256, API imports/générations/admin sans session **401**. Sept jobs existants, aucun actif, Browser Run sans bail, générations toujours activées.

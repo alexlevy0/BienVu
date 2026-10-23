@@ -1,292 +1,616 @@
-import {WorkflowEntrypoint,type WorkflowEvent,type WorkflowStep} from 'cloudflare:workers';
-import {EntityId,GenerationRequest,GenerationAnimationOmissionReason,VideoReport,publicErrors,videoObjectKey,videoPreviewKey,DEFAULT_VIDEO_VOICE,MAX_RENDER_SERVERS} from '@bienvu/contracts';
-import {admitGeneration,findGeneration,generationView,GenerationFailure,failGeneration,setGenerationStage,setGenerationProgress,setGenerationPreparation,releaseGenerationResource,adminGenerationQueue,type GenerationRow} from '@bienvu/db';
-import {authorized,json} from './auth';
-import {VideoRenderer} from './video-worker';
-import {getJobVideo,prepareJobVideo} from './video-manifest';
-import {prepareJobNarration} from './narration';
-import {realProviders,type FishVoiceEnv} from './narration-worker';
-import {cleanupAnimations} from './animation-cleanup';
-import {cleanupAnonymousTrials} from './trial-cleanup';
-import {extractDescription,EXTRACTION_TEXT_MAX} from '@bienvu/narration';
-import {loadGenerationListing} from './generation-import';
-import {prepareJobAnimations,type AnimationAttempt} from './photo-animations';
-import {animateWorkflowPhotos} from './animation-workflow';
-import {prepareGenerationMap,MapConfirmationRequired} from './default-video-map';
-import {safeAiEvent} from '@bienvu/observability';
-import {submitJobAvatars,pollJobAvatars,timeoutJobAvatars,reconcileAvatarTasks} from './avatars';
-import {waitForWorkflowAvatars} from './avatar-workflow';
-import type {HeygenEnvironment} from '@bienvu/avatars';
-import {generationController,waitForGenerationResource,syncRunwayLimits} from './generation-queue';
-import {sendGenerationNotifications,type BrowserPushEnvironment} from '@bienvu/notifications';
-import {nextAdminRecovery,recoverKnownAnimations} from './admin-recovery';
-export {VideoRenderer};
-export type GenerationEnv=VideoEnv&Pick<NarrationEnv,'GOOGLE_SERVICE_ACCOUNT_JSON'|'GOOGLE_CLOUD_PROJECT'|'GOOGLE_TTS_VOICE'|'OPENAI_API_KEY'|'SCRIPT_MODEL'>&FishVoiceEnv&HeygenEnvironment&BrowserPushEnvironment&{
-  GENERATIONS_ENABLED:string;GENERATION_TOKEN:string;IMPORT_TOKEN:string;IMPORT_SERVICE:Fetcher;GENERATION_WORKFLOW:Workflow<{agencyId:string;jobId:string}>;
-  RUNWAY_ENABLED?:string;RUNWAYML_API_SECRET?:string;RUNWAY_TEST_AGENCY_ID?:string;
+import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from 'cloudflare:workers';
+import {
+  EntityId,
+  GenerationRequest,
+  GenerationAnimationOmissionReason,
+  VideoReport,
+  publicErrors,
+  videoObjectKey,
+  videoPreviewKey,
+  DEFAULT_VIDEO_VOICE,
+  MAX_RENDER_SERVERS,
+} from '@bienvu/contracts';
+import {
+  admitGeneration,
+  findGeneration,
+  generationView,
+  GenerationFailure,
+  failGeneration,
+  setGenerationStage,
+  setGenerationProgress,
+  setGenerationPreparation,
+  releaseGenerationResource,
+  adminGenerationQueue,
+  type GenerationRow,
+} from '@bienvu/db';
+import { authorized, json } from './auth';
+import { VideoRenderer } from './video-worker';
+import { getJobVideo, prepareJobVideo } from './video-manifest';
+import { prepareJobNarration } from './narration';
+import { realProviders, type FishVoiceEnv } from './narration-worker';
+import { cleanupAnimations } from './animation-cleanup';
+import { cleanupAnonymousTrials } from './trial-cleanup';
+import { extractDescription, EXTRACTION_TEXT_MAX } from '@bienvu/narration';
+import { loadGenerationListing } from './generation-import';
+import { prepareJobAnimations, type AnimationAttempt } from './photo-animations';
+import { animateWorkflowPhotos } from './animation-workflow';
+import { prepareGenerationMap, MapConfirmationRequired } from './default-video-map';
+import { safeAiEvent } from '@bienvu/observability';
+import { submitJobAvatars, pollJobAvatars, timeoutJobAvatars, reconcileAvatarTasks } from './avatars';
+import { waitForWorkflowAvatars } from './avatar-workflow';
+import type { HeygenEnvironment } from '@bienvu/avatars';
+import { generationController, waitForGenerationResource, syncRunwayLimits } from './generation-queue';
+import { sendGenerationNotifications, type BrowserPushEnvironment } from '@bienvu/notifications';
+import { nextAdminRecovery, recoverKnownAnimations } from './admin-recovery';
+export { VideoRenderer };
+export type GenerationEnv = VideoEnv &
+  Pick<
+    NarrationEnv,
+    'GOOGLE_SERVICE_ACCOUNT_JSON' | 'GOOGLE_CLOUD_PROJECT' | 'GOOGLE_TTS_VOICE' | 'OPENAI_API_KEY' | 'SCRIPT_MODEL'
+  > &
+  FishVoiceEnv &
+  HeygenEnvironment &
+  BrowserPushEnvironment & {
+    GENERATIONS_ENABLED: string;
+    GENERATION_TOKEN: string;
+    IMPORT_TOKEN: string;
+    IMPORT_SERVICE: Fetcher;
+    GENERATION_WORKFLOW: Workflow<{ agencyId: string; jobId: string }>;
+    RUNWAY_ENABLED?: string;
+    RUNWAYML_API_SECRET?: string;
+    RUNWAY_TEST_AGENCY_ID?: string;
+  };
+const diagnosticCode = (error: unknown) => {
+  if (
+    error &&
+    typeof error === 'object' &&
+    'code' in error &&
+    typeof error.code === 'string' &&
+    /^[A-Z_]{3,80}$/.test(error.code)
+  )
+    return error.code;
+  return error instanceof Error
+    ? (/^(?:[A-Za-z]+: )?([A-Z_]{3,80})$/.exec(error.message)?.[1] ?? 'UNCLASSIFIED')
+    : 'UNCLASSIFIED';
 };
-const diagnosticCode=(error:unknown)=>{
-  if(error&&typeof error==='object'&&'code' in error&&typeof error.code==='string'&&/^[A-Z_]{3,80}$/.test(error.code))return error.code;
-  return error instanceof Error?/^(?:[A-Za-z]+: )?([A-Z_]{3,80})$/.exec(error.message)?.[1]??'UNCLASSIFIED':'UNCLASSIFIED';
+const safeCode = (error: unknown) => {
+  const code = diagnosticCode(error);
+  return code in publicErrors ? code : 'GENERATION_FAILED';
 };
-const safeCode=(error:unknown)=>{const code=diagnosticCode(error);return code in publicErrors?code:'GENERATION_FAILED';};
-const controller=generationController;
-async function active(env:GenerationEnv,agencyId:string,jobId:string){
-  const row=await findGeneration(env.DB,agencyId,jobId);
-  if(!row||row.retention!=='available'||['ready','failed'].includes(row.status))throw new Error('GENERATION_TERMINAL');
-  if(row.deadline<=new Date().toISOString())throw new Error('GENERATION_TIMEOUT');
-  const gate=await env.DB.prepare("SELECT enabled FROM generation_control WHERE id='generations'").first<{enabled:number}>();
-  if(env.GENERATIONS_ENABLED!=='true'||gate?.enabled!==1)throw new GenerationFailure('GENERATIONS_PAUSED');
+const controller = generationController;
+async function active(env: GenerationEnv, agencyId: string, jobId: string) {
+  const row = await findGeneration(env.DB, agencyId, jobId);
+  if (row?.retention !== 'available' || ['ready', 'failed'].includes(row.status))
+    throw new Error('GENERATION_TERMINAL');
+  if (row.deadline <= new Date().toISOString()) throw new Error('GENERATION_TIMEOUT');
+  const gate = await env.DB.prepare("SELECT enabled FROM generation_control WHERE id='generations'").first<{
+    enabled: number;
+  }>();
+  if (env.GENERATIONS_ENABLED !== 'true' || gate?.enabled !== 1) throw new GenerationFailure('GENERATIONS_PAUSED');
   return row;
 }
-export async function launchGeneration(env:GenerationEnv,row:GenerationRow){
-  if(['ready','failed'].includes(row.status)||row.launchStatus!=='pending')return;
+export async function launchGeneration(env: GenerationEnv, row: GenerationRow) {
+  if (['ready', 'failed'].includes(row.status) || row.launchStatus !== 'pending') return;
   // createBatch est idempotent côté plateforme : même identifiant après une perte de réponse.
-  await env.GENERATION_WORKFLOW.createBatch([{id:row.workflowId,params:{agencyId:row.agencyId,jobId:row.jobId}}]);
-  await env.DB.prepare("UPDATE job_launch_intents SET status='started',attempts=attempts+1,updated_at=? WHERE job_id=? AND status='pending'")
-    .bind(new Date().toISOString(),row.jobId).run();
+  await env.GENERATION_WORKFLOW.createBatch([
+    { id: row.workflowId, params: { agencyId: row.agencyId, jobId: row.jobId } },
+  ]);
+  await env.DB.prepare(
+    "UPDATE job_launch_intents SET status='started',attempts=attempts+1,updated_at=? WHERE job_id=? AND status='pending'",
+  )
+    .bind(new Date().toISOString(), row.jobId)
+    .run();
 }
-async function settleVideo(env:GenerationEnv,row:GenerationRow,result:unknown){
-  if(row.retention!=='available')return false;
-  const data=result as {status?:string;report?:unknown;objectKey?:string};if(data?.status!=='ready')return false;
-  const frozen=await getJobVideo(env.DB,row.agencyId,row.jobId);if(!frozen)throw new Error('VIDEO_NOT_PREPARED');
-  const report=VideoReport.parse(data.report),key=videoObjectKey(frozen.manifest,frozen.hash);
-  if(data.objectKey!==key||report.id!==frozen.hash||report.manifestHash!==frozen.hash||report.watermarked!==frozen.manifest.rights.watermarked)throw new Error('VIDEO_REPORT_INVALID');
-  const head=await env.MEDIA.head(key);if(!head||head.size!==report.sizeBytes||head.customMetadata?.sha256!==report.sha256||head.customMetadata?.manifestHash!==frozen.hash)throw new Error('VIDEO_ARTIFACT_INVALID');
-  const previewKey=videoPreviewKey(frozen.manifest,frozen.hash);
-  if(row.anonymousSessionId){
-    if(!report.preview?.watermarked||report.watermarked)throw new Error('VIDEO_PREVIEW_INVALID');
-    const preview=await env.MEDIA.head(previewKey);
-    if(!preview||preview.size!==report.preview.sizeBytes||preview.customMetadata?.sha256!==report.preview.sha256||preview.customMetadata?.manifestHash!==frozen.hash)throw new Error('VIDEO_PREVIEW_INVALID');
+async function settleVideo(env: GenerationEnv, row: GenerationRow, result: unknown) {
+  if (row.retention !== 'available') return false;
+  const data = result as { status?: string; report?: unknown; objectKey?: string };
+  if (data?.status !== 'ready') return false;
+  const frozen = await getJobVideo(env.DB, row.agencyId, row.jobId);
+  if (!frozen) throw new Error('VIDEO_NOT_PREPARED');
+  const report = VideoReport.parse(data.report),
+    key = videoObjectKey(frozen.manifest, frozen.hash);
+  if (
+    data.objectKey !== key ||
+    report.id !== frozen.hash ||
+    report.manifestHash !== frozen.hash ||
+    report.watermarked !== frozen.manifest.rights.watermarked
+  )
+    throw new Error('VIDEO_REPORT_INVALID');
+  const head = await env.MEDIA.head(key);
+  if (
+    !head ||
+    head.size !== report.sizeBytes ||
+    head.customMetadata?.sha256 !== report.sha256 ||
+    head.customMetadata?.manifestHash !== frozen.hash
+  )
+    throw new Error('VIDEO_ARTIFACT_INVALID');
+  const previewKey = videoPreviewKey(frozen.manifest, frozen.hash);
+  if (row.anonymousSessionId) {
+    if (!report.preview?.watermarked || report.watermarked) throw new Error('VIDEO_PREVIEW_INVALID');
+    const preview = await env.MEDIA.head(previewKey);
+    if (
+      !preview ||
+      preview.size !== report.preview.sizeBytes ||
+      preview.customMetadata?.sha256 !== report.preview.sha256 ||
+      preview.customMetadata?.manifestHash !== frozen.hash
+    )
+      throw new Error('VIDEO_PREVIEW_INVALID');
   }
-  const at=new Date().toISOString();
+  const at = new Date().toISOString();
   // L'artefact et la consommation de crédit sont publiés dans une transaction D1.
   await env.DB.batch([
-    ...(row.anonymousSessionId?[env.DB.prepare(`INSERT INTO generation_previews(job_id,object_key,report_json,created_at) VALUES(?,?,?,?) ON CONFLICT(job_id) DO NOTHING`).bind(row.jobId,previewKey,JSON.stringify(report.preview),at)]:[]),
+    ...(row.anonymousSessionId
+      ? [
+          env.DB.prepare(
+            `INSERT INTO generation_previews(job_id,object_key,report_json,created_at) VALUES(?,?,?,?) ON CONFLICT(job_id) DO NOTHING`,
+          ).bind(row.jobId, previewKey, JSON.stringify(report.preview), at),
+        ]
+      : []),
     env.DB.prepare(`INSERT INTO generation_artifacts(job_id,object_key,report_json,created_at)
-      SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM jobs WHERE id=? AND status NOT IN ('failed')) ON CONFLICT(job_id) DO NOTHING`)
-      .bind(row.jobId,key,JSON.stringify(report),at,row.jobId),
-    env.DB.prepare("UPDATE jobs SET status='ready',stage='rendering',progress_percent=100,lease_until=NULL,error_code=NULL,updated_at=? WHERE id=? AND agency_id=? AND status NOT IN ('ready','failed')")
-      .bind(at,row.jobId,row.agencyId),
+      SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM jobs WHERE id=? AND status NOT IN ('failed')) ON CONFLICT(job_id) DO NOTHING`).bind(
+      row.jobId,
+      key,
+      JSON.stringify(report),
+      at,
+      row.jobId,
+    ),
+    env.DB.prepare(
+      "UPDATE jobs SET status='ready',stage='rendering',progress_percent=100,lease_until=NULL,error_code=NULL,updated_at=? WHERE id=? AND agency_id=? AND status NOT IN ('ready','failed')",
+    ).bind(at, row.jobId, row.agencyId),
   ]);
   // The MP4 and credits are already committed. Push failures never fail a video;
   // durable leases and the web cron recover a missed or interrupted delivery.
-  try{await sendGenerationNotifications(env,row.jobId);}catch{console.warn(JSON.stringify({event:'browser_push_dispatch_failed'}));}
+  try {
+    await sendGenerationNotifications(env, row.jobId);
+  } catch {
+    console.warn(JSON.stringify({ event: 'browser_push_dispatch_failed' }));
+  }
   return true;
 }
-export async function reconcileGeneration(env:GenerationEnv,row:GenerationRow,code='GENERATION_TIMEOUT'){
-  if(['ready','failed'].includes(row.status))return;
-  const frozen=await getJobVideo(env.DB,row.agencyId,row.jobId);
-  if(frozen){
-    const status=await controller(env,row).fetch(`https://video/status/${frozen.hash}`);
-    if(status.ok&&await settleVideo(env,row,await status.json()))return;
+export async function reconcileGeneration(env: GenerationEnv, row: GenerationRow, code = 'GENERATION_TIMEOUT') {
+  if (['ready', 'failed'].includes(row.status)) return;
+  const frozen = await getJobVideo(env.DB, row.agencyId, row.jobId);
+  if (frozen) {
+    const status = await controller(env, row).fetch(`https://video/status/${frozen.hash}`);
+    if (status.ok && (await settleVideo(env, row, await status.json()))) return;
     // Arrêt confirmé avant libération du quota ; une panne conserve la réservation.
-    const cancelled=await controller(env,row).fetch(`https://video/cancel/${frozen.hash}`,{method:'POST'});
-    if(!cancelled.ok)throw new Error('GENERATION_CANCEL_UNCERTAIN');
-    if(await settleVideo(env,row,await cancelled.json()))return;
+    const cancelled = await controller(env, row).fetch(`https://video/cancel/${frozen.hash}`, { method: 'POST' });
+    if (!cancelled.ok) throw new Error('GENERATION_CANCEL_UNCERTAIN');
+    if (await settleVideo(env, row, await cancelled.json())) return;
   }
-  await failGeneration(env.DB,row,code);
+  await failGeneration(env.DB, row, code);
 }
-export class GenerationWorkflow extends WorkflowEntrypoint<GenerationEnv,{agencyId:string;jobId:string}>{
-  protected diagnostic(_error:unknown){}
-  protected providers(voiceName?:string,voiceEnabled=true){return realProviders(this.env,voiceName,voiceEnabled);}
-  protected animations(agencyId:string,jobId:string,attempt:AnimationAttempt){return prepareJobAnimations(this.env,agencyId,jobId,undefined,attempt);}
-  protected defaultMap(row:GenerationRow){return prepareGenerationMap(this.env,row);}
-  protected avatars(agency:string,job:string){return submitJobAvatars(this.env,agency,job);}
-  protected pollAvatars(agency:string,job:string){return pollJobAvatars(this.env,agency,job);}
-  async run(event:WorkflowEvent<{agencyId:string;jobId:string}>,step:WorkflowStep){
-    const {agencyId,jobId}=event.payload;
-    const once={retries:{limit:0,delay:'1 second' as const},timeout:'10 minutes' as const};
+export class GenerationWorkflow extends WorkflowEntrypoint<GenerationEnv, { agencyId: string; jobId: string }> {
+  protected diagnostic(_error: unknown) {}
+  protected providers(voiceName?: string, voiceEnabled = true) {
+    return realProviders(this.env, voiceName, voiceEnabled);
+  }
+  protected animations(agencyId: string, jobId: string, attempt: AnimationAttempt) {
+    return prepareJobAnimations(this.env, agencyId, jobId, undefined, attempt);
+  }
+  protected defaultMap(row: GenerationRow) {
+    return prepareGenerationMap(this.env, row);
+  }
+  protected avatars(agency: string, job: string) {
+    return submitJobAvatars(this.env, agency, job);
+  }
+  protected pollAvatars(agency: string, job: string) {
+    return pollJobAvatars(this.env, agency, job);
+  }
+  async run(event: WorkflowEvent<{ agencyId: string; jobId: string }>, step: WorkflowStep) {
+    const { agencyId, jobId } = event.payload;
+    const once = { retries: { limit: 0, delay: '1 second' as const }, timeout: '10 minutes' as const };
     try {
-      await waitForGenerationResource(this.env,step,agencyId,jobId,'preparation');
-      await step.do('import-or-load',once,async()=>{const row=await active(this.env,agencyId,jobId);await setGenerationStage(this.env.DB,row,'importing');
-        return loadGenerationListing(this.env,row);});
-      const resolveMap=async()=>{
-        const row=await active(this.env,agencyId,jobId),input=GenerationRequest.parse(JSON.parse(row.input));
-        const requested=Boolean(row.defaultMap||input.customization?.map?.location);
-        if(requested)await setGenerationPreparation(this.env.DB,row,'map','working');
-        try{
-          const map=await this.defaultMap(row);
-          if(requested)await setGenerationPreparation(this.env.DB,row,'map',map?'ready':'skipped');
-          return {waiting:false,expiresAt:null};
-        }catch(cause){if(cause instanceof MapConfirmationRequired)return {waiting:true,expiresAt:cause.expiresAt};throw cause;}
+      await waitForGenerationResource(this.env, step, agencyId, jobId, 'preparation');
+      await step.do('import-or-load', once, async () => {
+        const row = await active(this.env, agencyId, jobId);
+        await setGenerationStage(this.env.DB, row, 'importing');
+        return loadGenerationListing(this.env, row);
+      });
+      const resolveMap = async () => {
+        const row = await active(this.env, agencyId, jobId),
+          input = GenerationRequest.parse(JSON.parse(row.input));
+        const requested = Boolean(row.defaultMap || input.customization?.map?.location);
+        if (requested) await setGenerationPreparation(this.env.DB, row, 'map', 'working');
+        try {
+          const map = await this.defaultMap(row);
+          if (requested) await setGenerationPreparation(this.env.DB, row, 'map', map ? 'ready' : 'skipped');
+          return { waiting: false, expiresAt: null };
+        } catch (cause) {
+          if (cause instanceof MapConfirmationRequired) return { waiting: true, expiresAt: cause.expiresAt };
+          throw cause;
+        }
       };
-      let mapState=await step.do('resolve-default-map',{...once,timeout:'3 minutes'},resolveMap);
+      let mapState = await step.do('resolve-default-map', { ...once, timeout: '3 minutes' }, resolveMap);
       // Durable sleeps leave no Worker running while the user chooses a city.
       // D1 is authoritative, so a committed choice survives a lost HTTP reply.
-      for(let poll=0;mapState.waiting&&poll<60;poll++){
-        await step.sleep(`map-confirmation-wait-${poll}`,'5 seconds');
-        mapState=await step.do(`map-confirmation-check-${poll}`,{...once,timeout:'3 minutes'},resolveMap);
+      for (let poll = 0; mapState.waiting && poll < 60; poll++) {
+        await step.sleep(`map-confirmation-wait-${poll}`, '5 seconds');
+        mapState = await step.do(`map-confirmation-check-${poll}`, { ...once, timeout: '3 minutes' }, resolveMap);
       }
-      if(mapState.waiting){
-        await step.sleepUntil('map-confirmation-expiry',new Date(mapState.expiresAt!));
-        await step.do('map-confirmation-timeout',{...once,timeout:'3 minutes'},resolveMap);
+      if (mapState.waiting) {
+        await step.sleepUntil('map-confirmation-expiry', new Date(mapState.expiresAt!));
+        await step.do('map-confirmation-timeout', { ...once, timeout: '3 minutes' }, resolveMap);
       }
-      const narration=await step.do('script-and-voice-checkpoints',once,async()=>{
-        const row=await active(this.env,agencyId,jobId);await setGenerationStage(this.env.DB,row,'scripting');
-        const input=GenerationRequest.parse(JSON.parse(row.input));
-        const providers=await this.providers(input.customization?.voice??row.selectedVoice??DEFAULT_VIDEO_VOICE,input.voiceEnabled!==false),guard=()=>active(this.env,agencyId,jobId);
-        const source=providers.script,voice=providers.voice;
-        providers.script={...source,plan:async(...args)=>{await guard();return source.plan(...args);}};
-        providers.voice={...voice,synthesize:async(text,callId)=>{await guard();return voice.synthesize(text,callId);}};
-        await prepareJobNarration(this.env,agencyId,jobId,providers,{brand:JSON.parse(row.brand),onVoicing:()=>setGenerationStage(this.env.DB,row,'voicing')});
-        return {prepared:true,avatarRequested:Boolean(row.avatarCredits)};
-      });
-      if(narration.avatarRequested){
-        await waitForGenerationResource(this.env,step,agencyId,jobId,'avatar');
-        await step.do('prepare-avatar-clips',{...once,timeout:'3 minutes'},async()=>{
-          const row=await active(this.env,agencyId,jobId);await setGenerationPreparation(this.env.DB,row,'avatar','working');return this.avatars(agencyId,jobId);});
-        const done=await waitForWorkflowAvatars(step,async()=>(await active(this.env,agencyId,jobId)).deadline,async maySubmit=>{
-          const row=await active(this.env,agencyId,jobId);
-          if(maySubmit)await this.avatars(agencyId,jobId);
-          const status=await this.pollAvatars(agencyId,jobId);
-          if(status.done)await setGenerationPreparation(this.env.DB,row,'avatar',status.ready?'ready':'skipped');
-          return status.done;
+      const narration = await step.do('script-and-voice-checkpoints', once, async () => {
+        const row = await active(this.env, agencyId, jobId);
+        await setGenerationStage(this.env.DB, row, 'scripting');
+        const input = GenerationRequest.parse(JSON.parse(row.input));
+        const providers = await this.providers(
+            input.customization?.voice ?? row.selectedVoice ?? DEFAULT_VIDEO_VOICE,
+            input.voiceEnabled !== false,
+          ),
+          guard = () => active(this.env, agencyId, jobId);
+        const source = providers.script,
+          voice = providers.voice;
+        providers.script = {
+          ...source,
+          plan: async (...args) => {
+            await guard();
+            return source.plan(...args);
+          },
+        };
+        providers.voice = {
+          ...voice,
+          synthesize: async (text, callId) => {
+            await guard();
+            return voice.synthesize(text, callId);
+          },
+        };
+        await prepareJobNarration(this.env, agencyId, jobId, providers, {
+          brand: JSON.parse(row.brand),
+          onVoicing: () => setGenerationStage(this.env.DB, row, 'voicing'),
         });
-        if(!done)await step.do('avatar-timeout',once,async()=>{
-          await timeoutJobAvatars(this.env,agencyId,jobId);
-          const row=await active(this.env,agencyId,jobId);await setGenerationPreparation(this.env.DB,row,'avatar',row.avatarReady?'ready':'skipped');return {done:true};});
-        await step.do('release-avatar-slot',once,async()=>{await releaseGenerationResource(this.env.DB,agencyId,jobId,'avatar');return {released:true};});
-      }
-      const needsRunway=await step.do('runway-queue-required',once,async()=>{
-        const row=await active(this.env,agencyId,jobId);return {required:(row.animationsRequested??0)>(row.animationsReused??0)};});
-      if(needsRunway.required){
-        await step.do('read-runway-limits',{...once,timeout:'30 seconds'},()=>syncRunwayLimits(this.env));
-        await waitForGenerationResource(this.env,step,agencyId,jobId,'runway');
-        await step.do('read-runway-balance',{...once,timeout:'30 seconds'},()=>syncRunwayLimits(this.env,true));
-      }
-      const animationCount=await step.do('begin-photo-animations',once,async()=>{
-        const row=await active(this.env,agencyId,jobId);
-        if(row.animationsRequested)await setGenerationPreparation(this.env.DB,row,'animations','working');
-        return {requested:row.animationsRequested??0};
+        return { prepared: true, avatarRequested: Boolean(row.avatarCredits) };
       });
-      await animateWorkflowPhotos(step,animationCount.requested,async attempt=>{
-        const row=await active(this.env,agencyId,jobId),result=await this.animations(agencyId,jobId,attempt);
-        const reason=GenerationAnimationOmissionReason.safeParse(result.reason);
-        if(reason.success)await setGenerationPreparation(this.env.DB,row,'animations','working',reason.data);
+      if (narration.avatarRequested) {
+        await waitForGenerationResource(this.env, step, agencyId, jobId, 'avatar');
+        await step.do('prepare-avatar-clips', { ...once, timeout: '3 minutes' }, async () => {
+          const row = await active(this.env, agencyId, jobId);
+          await setGenerationPreparation(this.env.DB, row, 'avatar', 'working');
+          return this.avatars(agencyId, jobId);
+        });
+        const done = await waitForWorkflowAvatars(
+          step,
+          async () => (await active(this.env, agencyId, jobId)).deadline,
+          async (maySubmit) => {
+            const row = await active(this.env, agencyId, jobId);
+            if (maySubmit) await this.avatars(agencyId, jobId);
+            const status = await this.pollAvatars(agencyId, jobId);
+            if (status.done)
+              await setGenerationPreparation(this.env.DB, row, 'avatar', status.ready ? 'ready' : 'skipped');
+            return status.done;
+          },
+        );
+        if (!done)
+          await step.do('avatar-timeout', once, async () => {
+            await timeoutJobAvatars(this.env, agencyId, jobId);
+            const row = await active(this.env, agencyId, jobId);
+            await setGenerationPreparation(this.env.DB, row, 'avatar', row.avatarReady ? 'ready' : 'skipped');
+            return { done: true };
+          });
+        await step.do('release-avatar-slot', once, async () => {
+          await releaseGenerationResource(this.env.DB, agencyId, jobId, 'avatar');
+          return { released: true };
+        });
+      }
+      const needsRunway = await step.do('runway-queue-required', once, async () => {
+        const row = await active(this.env, agencyId, jobId);
+        return { required: (row.animationsRequested ?? 0) > (row.animationsReused ?? 0) };
+      });
+      if (needsRunway.required) {
+        await step.do('read-runway-limits', { ...once, timeout: '30 seconds' }, () => syncRunwayLimits(this.env));
+        await waitForGenerationResource(this.env, step, agencyId, jobId, 'runway');
+        await step.do('read-runway-balance', { ...once, timeout: '30 seconds' }, () =>
+          syncRunwayLimits(this.env, true),
+        );
+      }
+      const animationCount = await step.do('begin-photo-animations', once, async () => {
+        const row = await active(this.env, agencyId, jobId);
+        if (row.animationsRequested) await setGenerationPreparation(this.env.DB, row, 'animations', 'working');
+        return { requested: row.animationsRequested ?? 0 };
+      });
+      await animateWorkflowPhotos(step, animationCount.requested, async (attempt) => {
+        const row = await active(this.env, agencyId, jobId),
+          result = await this.animations(agencyId, jobId, attempt);
+        const reason = GenerationAnimationOmissionReason.safeParse(result.reason);
+        if (reason.success) await setGenerationPreparation(this.env.DB, row, 'animations', 'working', reason.data);
         return result;
       });
-      await step.do('finish-photo-animations',once,async()=>{
-        const row=await active(this.env,agencyId,jobId);
-        if(row.animationsRequested)await setGenerationPreparation(this.env.DB,row,'animations',
-          (row.animationsReady??0)+(row.animationsReused??0)>0?'ready':'skipped');
-        return {finished:true};
+      await step.do('finish-photo-animations', once, async () => {
+        const row = await active(this.env, agencyId, jobId);
+        if (row.animationsRequested)
+          await setGenerationPreparation(
+            this.env.DB,
+            row,
+            'animations',
+            (row.animationsReady ?? 0) + (row.animationsReused ?? 0) > 0 ? 'ready' : 'skipped',
+          );
+        return { finished: true };
       });
-      await step.do('release-preparation-slots',once,async()=>{
-        await releaseGenerationResource(this.env.DB,agencyId,jobId,'runway');
-        await releaseGenerationResource(this.env.DB,agencyId,jobId,'preparation');return {released:true};});
-      await waitForGenerationResource(this.env,step,agencyId,jobId,'render');
-      const render=await step.do('prepare-and-submit-render',once,async()=>{
-        const row=await active(this.env,agencyId,jobId),frozen=await prepareJobVideo(this.env,agencyId,jobId);
-        await setGenerationStage(this.env.DB,row,'rendering');
-        await active(this.env,agencyId,jobId);
-        const response=await controller(this.env,row).fetch('https://video/render',{method:'POST',body:JSON.stringify(frozen.manifest)});
-        if(!response.ok)throw new Error('VIDEO_SUBMIT_FAILED');await response.body?.cancel();return {hash:frozen.hash};
+      await step.do('release-preparation-slots', once, async () => {
+        await releaseGenerationResource(this.env.DB, agencyId, jobId, 'runway');
+        await releaseGenerationResource(this.env.DB, agencyId, jobId, 'preparation');
+        return { released: true };
       });
-      for(let poll=0;poll<120;poll++){
-        await step.sleep(`render-wait-${poll}`,'5 seconds');
-        const result=await step.do(`render-status-${poll}`,{retries:{limit:1,delay:'2 seconds'},timeout:'2 minutes'},async()=>{
-          const row=await findGeneration(this.env.DB,agencyId,jobId);if(!row)throw new Error('GENERATION_NOT_FOUND');
-          if(['ready','failed'].includes(row.status))return {done:true};
-          if(row.deadline<=new Date().toISOString())throw new Error('GENERATION_TIMEOUT');
-          const response=await controller(this.env,row).fetch(`https://video/status/${render.hash}`);if(!response.ok)throw new Error('VIDEO_STATE_UNAVAILABLE');
-          const data=await response.json() as {status:string;progressPercent?:number};if(data.status==='failed')throw new Error('VIDEO_RENDER_FAILED');
-          if(data.status==='rendering'||data.status==='publishing')await setGenerationProgress(this.env.DB,row,data.progressPercent??0);
-          return {done:await settleVideo(this.env,row,data)};
+      await waitForGenerationResource(this.env, step, agencyId, jobId, 'render');
+      const render = await step.do('prepare-and-submit-render', once, async () => {
+        const row = await active(this.env, agencyId, jobId),
+          frozen = await prepareJobVideo(this.env, agencyId, jobId);
+        await setGenerationStage(this.env.DB, row, 'rendering');
+        await active(this.env, agencyId, jobId);
+        const response = await controller(this.env, row).fetch('https://video/render', {
+          method: 'POST',
+          body: JSON.stringify(frozen.manifest),
         });
-        if(result.done)return {jobId,completed:true};
+        if (!response.ok) throw new Error('VIDEO_SUBMIT_FAILED');
+        await response.body?.cancel();
+        return { hash: frozen.hash };
+      });
+      for (let poll = 0; poll < 120; poll++) {
+        await step.sleep(`render-wait-${poll}`, '5 seconds');
+        const result = await step.do(
+          `render-status-${poll}`,
+          { retries: { limit: 1, delay: '2 seconds' }, timeout: '2 minutes' },
+          async () => {
+            const row = await findGeneration(this.env.DB, agencyId, jobId);
+            if (!row) throw new Error('GENERATION_NOT_FOUND');
+            if (['ready', 'failed'].includes(row.status)) return { done: true };
+            if (row.deadline <= new Date().toISOString()) throw new Error('GENERATION_TIMEOUT');
+            const response = await controller(this.env, row).fetch(`https://video/status/${render.hash}`);
+            if (!response.ok) throw new Error('VIDEO_STATE_UNAVAILABLE');
+            const data = (await response.json()) as { status: string; progressPercent?: number };
+            if (data.status === 'failed') throw new Error('VIDEO_RENDER_FAILED');
+            if (data.status === 'rendering' || data.status === 'publishing')
+              await setGenerationProgress(this.env.DB, row, data.progressPercent ?? 0);
+            return { done: await settleVideo(this.env, row, data) };
+          },
+        );
+        if (result.done) return { jobId, completed: true };
       }
       throw new Error('GENERATION_TIMEOUT');
-    }catch(error){
+    } catch (error) {
       this.diagnostic(error);
-      await step.do('reconcile-failure',{retries:{limit:1,delay:'5 seconds'},timeout:'3 minutes'},async()=>{
-        const row=await findGeneration(this.env.DB,agencyId,jobId);if(row)await reconcileGeneration(this.env,row,safeCode(error));
-        console.log(JSON.stringify({event:'generation_failed',jobId,stage:row?.stage,code:safeCode(error),diagnostic:diagnosticCode(error)}));return {jobId,failed:true};
-      });return {jobId,failed:true};
+      await step.do(
+        'reconcile-failure',
+        { retries: { limit: 1, delay: '5 seconds' }, timeout: '3 minutes' },
+        async () => {
+          const row = await findGeneration(this.env.DB, agencyId, jobId);
+          if (row) await reconcileGeneration(this.env, row, safeCode(error));
+          console.log(
+            JSON.stringify({
+              event: 'generation_failed',
+              jobId,
+              stage: row?.stage,
+              code: safeCode(error),
+              diagnostic: diagnosticCode(error),
+            }),
+          );
+          return { jobId, failed: true };
+        },
+      );
+      return { jobId, failed: true };
     }
   }
 }
-export async function reconcileBatch(env:GenerationEnv){
-  const rows=await env.DB.prepare(`SELECT g.agency_id AS agencyId,g.job_id AS jobId FROM generation_runs g JOIN jobs j ON j.id=g.job_id
+export async function reconcileBatch(env: GenerationEnv) {
+  const rows =
+    await env.DB.prepare(`SELECT g.agency_id AS agencyId,g.job_id AS jobId FROM generation_runs g JOIN jobs j ON j.id=g.job_id
     JOIN job_launch_intents l ON l.job_id=j.id WHERE j.status NOT IN ('ready','failed') AND (g.deadline<=? OR l.status='pending' OR j.updated_at<=?) ORDER BY g.created_at LIMIT 10`)
-    .bind(new Date().toISOString(),new Date(Date.now()-60_000).toISOString()).all<{agencyId:string;jobId:string}>();
-  for(const ref of rows.results){const row=await findGeneration(env.DB,ref.agencyId,ref.jobId);if(!row)continue;
-    try{if(row.deadline<=new Date().toISOString())await reconcileGeneration(env,row);else if(row.launchStatus==='pending')await launchGeneration(env,row);
-      else {const frozen=await getJobVideo(env.DB,row.agencyId,row.jobId);if(frozen){const response=await controller(env,row).fetch(`https://video/status/${frozen.hash}`);if(response.ok)await settleVideo(env,row,await response.json());}}}
-    catch{console.log(JSON.stringify({event:'generation_reconcile_pending',jobId:row.jobId,stage:row.stage}));}}
+      .bind(new Date().toISOString(), new Date(Date.now() - 60_000).toISOString())
+      .all<{ agencyId: string; jobId: string }>();
+  for (const ref of rows.results) {
+    const row = await findGeneration(env.DB, ref.agencyId, ref.jobId);
+    if (!row) continue;
+    try {
+      if (row.deadline <= new Date().toISOString()) await reconcileGeneration(env, row);
+      else if (row.launchStatus === 'pending') await launchGeneration(env, row);
+      else {
+        const frozen = await getJobVideo(env.DB, row.agencyId, row.jobId);
+        if (frozen) {
+          const response = await controller(env, row).fetch(`https://video/status/${frozen.hash}`);
+          if (response.ok) await settleVideo(env, row, await response.json());
+        }
+      }
+    } catch {
+      console.log(JSON.stringify({ event: 'generation_reconcile_pending', jobId: row.jobId, stage: row.stage }));
+    }
+  }
 }
-async function runAdminRecovery(env:GenerationEnv){
- const next=await nextAdminRecovery(env.DB);if(!next)return;
- const result=await recoverKnownAnimations(env,next.id);if(!result?.done)return;
- const row=await findGeneration(env.DB,result.job.agencyId,result.job.jobId);
- if(!row||['ready','failed'].includes(row.status)||row.retention!=='available'||Date.parse(row.deadline)<=Date.now())return;
- // Reconcile existing work only; never cancel a running renderer or buy media.
- if(row.launchStatus==='pending'&&row.status==='queued'){const gate=await env.DB.prepare("SELECT enabled FROM generation_control WHERE id='generations'").first<{enabled:number}>();if(env.GENERATIONS_ENABLED==='true'&&gate?.enabled===1)await launchGeneration(env,row);return;}
- const frozen=await getJobVideo(env.DB,row.agencyId,row.jobId);if(!frozen)return;
- const response=await controller(env,row).fetch(`https://video/status/${frozen.hash}`);if(response.ok)await settleVideo(env,row,await response.json());
+async function runAdminRecovery(env: GenerationEnv) {
+  const next = await nextAdminRecovery(env.DB);
+  if (!next) return;
+  const result = await recoverKnownAnimations(env, next.id);
+  if (!result?.done) return;
+  const row = await findGeneration(env.DB, result.job.agencyId, result.job.jobId);
+  if (
+    !row ||
+    ['ready', 'failed'].includes(row.status) ||
+    row.retention !== 'available' ||
+    Date.parse(row.deadline) <= Date.now()
+  )
+    return;
+  // Reconcile existing work only; never cancel a running renderer or buy media.
+  if (row.launchStatus === 'pending' && row.status === 'queued') {
+    const gate = await env.DB.prepare("SELECT enabled FROM generation_control WHERE id='generations'").first<{
+      enabled: number;
+    }>();
+    if (env.GENERATIONS_ENABLED === 'true' && gate?.enabled === 1) await launchGeneration(env, row);
+    return;
+  }
+  const frozen = await getJobVideo(env.DB, row.agencyId, row.jobId);
+  if (!frozen) return;
+  const response = await controller(env, row).fetch(`https://video/status/${frozen.hash}`);
+  if (response.ok) await settleVideo(env, row, await response.json());
 }
 export default {
-  async fetch(request:Request,env:GenerationEnv){
-    if(!authorized(request,env.GENERATION_TOKEN))return json({error:'UNAUTHORIZED'},401);
-    const agencyId=request.headers.get('X-Agency-ID'),path=new URL(request.url).pathname;
-    if(!EntityId.safeParse(agencyId).success)return json({error:'UNAUTHORIZED'},401);
-    try{
-      if(path==='/operator/state'&&request.method==='GET'){
-        const renderers=await Promise.all([null,...Array.from({length:MAX_RENDER_SERVERS},(_,slot)=>slot)].map(async slot=>{
-          const response=await controller(env,{renderSlot:slot}).fetch('https://video/state');
-          if(!response.ok)throw Error('VIDEO_STATE_UNAVAILABLE');
-          return {slot,...await response.json() as {active:string|null;[key:string]:unknown}};
-        }));
-        const active=renderers.filter(r=>r.active);
-        return json({...renderers[0],active:active[0]?.active??null,activeCount:active.length,renderers});
+  async fetch(request: Request, env: GenerationEnv) {
+    if (!authorized(request, env.GENERATION_TOKEN)) return json({ error: 'UNAUTHORIZED' }, 401);
+    const agencyId = request.headers.get('X-Agency-ID'),
+      path = new URL(request.url).pathname;
+    if (!EntityId.safeParse(agencyId).success) return json({ error: 'UNAUTHORIZED' }, 401);
+    try {
+      if (path === '/operator/state' && request.method === 'GET') {
+        const renderers = await Promise.all(
+          [null, ...Array.from({ length: MAX_RENDER_SERVERS }, (_, slot) => slot)].map(async (slot) => {
+            const response = await controller(env, { renderSlot: slot }).fetch('https://video/state');
+            if (!response.ok) throw Error('VIDEO_STATE_UNAVAILABLE');
+            return { slot, ...((await response.json()) as { active: string | null; [key: string]: unknown }) };
+          }),
+        );
+        const active = renderers.filter((r) => r.active);
+        return json({ ...renderers[0], active: active[0]?.active ?? null, activeCount: active.length, renderers });
       }
-      if(path==='/operator/queue'&&request.method==='GET')return json(await adminGenerationQueue(env.DB));
-      if(path==='/operator/queue/runway'&&request.method==='POST'){await syncRunwayLimits(env,true);return json(await adminGenerationQueue(env.DB));}
-      if(path==='/operator/pause'&&request.method==='POST'){
-        await env.DB.prepare("UPDATE generation_control SET enabled=0,updated_at=? WHERE id='generations'").bind(new Date().toISOString()).run();return json({paused:true});
+      if (path === '/operator/queue' && request.method === 'GET') return json(await adminGenerationQueue(env.DB));
+      if (path === '/operator/queue/runway' && request.method === 'POST') {
+        await syncRunwayLimits(env, true);
+        return json(await adminGenerationQueue(env.DB));
       }
-      if(path==='/operator/reconcile'&&request.method==='POST'){await reconcileBatch(env);return json({reconciled:true});}
-      if(path==='/operator/avatars/reconcile'&&request.method==='POST')return json(await reconcileAvatarTasks(env));
-      if(path==='/extract'&&request.method==='POST'){
-        const limit=EXTRACTION_TEXT_MAX*4+200,reader=request.body?.getReader();
-        if(!reader||Number(request.headers.get('content-length'))>limit)return json({error:'VALIDATION_ERROR'},422);
-        const chunks:Uint8Array[]=[],size={value:0};try{for(;;){const part=await reader.read();if(part.done)break;
-          size.value+=part.value.byteLength;if(size.value>limit)return json({error:'VALIDATION_ERROR'},422);chunks.push(part.value);}}
-        finally{await reader.cancel().catch(()=>{});reader.releaseLock();}
-        const bytes=new Uint8Array(size.value);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}
-        const body=new TextDecoder('utf-8',{fatal:true}).decode(bytes);
-        const input=JSON.parse(body) as {text?:unknown};
-        if(!input||typeof input.text!=='string'||input.text.length<15||input.text.length>EXTRACTION_TEXT_MAX)
-          return json({error:'VALIDATION_ERROR'},422);
-        const extractionId=request.headers.get('X-AI-Extraction-ID'),trace=extractionId&&EntityId.safeParse(extractionId).success?'bv-extract-'+extractionId:null,started=Date.now();
-        try{const result=await extractDescription(input.text,env.OPENAI_API_KEY,env.SCRIPT_MODEL);
-          if(trace)await safeAiEvent(env.DB,trace,'$ai_generation',trace,{distinct_id:'bv-agency-'+agencyId,bv_app:'bienvu',bv_stage:'extraction',bv_extraction_id:extractionId,
-            bv_listing_id:request.headers.get('X-AI-Listing-ID'),$ai_span_id:extractionId,$ai_span_name:'Extraction annonce',$ai_provider:'openai',$ai_model:env.SCRIPT_MODEL,
-            $ai_input:result.telemetry.input,$ai_output_choices:result.telemetry.output,
-            $ai_input_tokens:result.usage?.inputTokens,$ai_output_tokens:result.usage?.outputTokens,$ai_latency:(Date.now()-started)/1000,
-            bv_cost_estimated_usd:result.usage?(result.usage.inputTokens*.75+result.usage.outputTokens*4.5)/1e6:null,bv_cost_actual_usd:null});
-          return json({data:result.data,usage:result.usage});}
-        catch{if(trace)await safeAiEvent(env.DB,trace,'$ai_generation',trace,{distinct_id:'bv-agency-'+agencyId,bv_app:'bienvu',bv_stage:'extraction',bv_extraction_id:extractionId,
-          $ai_span_id:extractionId,$ai_provider:'openai',$ai_model:env.SCRIPT_MODEL,$ai_input:[{role:'user',content:input.text}],$ai_is_error:true,$ai_error:'EXTRACTION_UNAVAILABLE',$ai_latency:(Date.now()-started)/1000});
-          return json({error:'SOURCE_UNAVAILABLE'},502);}
+      if (path === '/operator/pause' && request.method === 'POST') {
+        await env.DB.prepare("UPDATE generation_control SET enabled=0,updated_at=? WHERE id='generations'")
+          .bind(new Date().toISOString())
+          .run();
+        return json({ paused: true });
       }
-      if(path==='/generations'&&request.method==='POST'){
-        const body=await request.text();if(body.length>32_000)return json({error:'VALIDATION_ERROR'},422);
-        const input=GenerationRequest.safeParse(JSON.parse(body));if(!input.success)return json({error:'VALIDATION_ERROR'},422);
-        const row=await admitGeneration(env.DB,agencyId!,request.headers.get('Idempotency-Key')??'',input.data,env.GENERATIONS_ENABLED,Date.now(),async listing=>{
-          for(const photo of listing.photos){const head=await env.MEDIA.head(photo.objectKey);if(!head||head.size!==photo.sizeBytes||head.customMetadata?.sha256&&head.customMetadata.sha256!==photo.contentHash)throw new GenerationFailure('INVALID_PHOTO');}
-        });
-        try{await launchGeneration(env,row);}catch{/* Intention durable : reprise cron, aucune deuxième admission. */}
-        return json(generationView((await findGeneration(env.DB,agencyId!,row.jobId))!),202);
+      if (path === '/operator/reconcile' && request.method === 'POST') {
+        await reconcileBatch(env);
+        return json({ reconciled: true });
       }
-      const retry=/^\/generations\/([a-zA-Z0-9_-]+)\/retry$/.exec(path);
-      if(retry&&request.method==='POST'){
-        const row=await findGeneration(env.DB,agencyId!,retry[1]);if(!row)return json({error:'NOT_FOUND'},404);
-        if(row.status!=='queued'||row.launchStatus!=='pending')return json({error:'CONFLICT'},409);
-        await active(env,agencyId!,row.jobId);await launchGeneration(env,row);return json(generationView(row),202);
+      if (path === '/operator/avatars/reconcile' && request.method === 'POST')
+        return json(await reconcileAvatarTasks(env));
+      if (path === '/extract' && request.method === 'POST') {
+        const limit = EXTRACTION_TEXT_MAX * 4 + 200,
+          reader = request.body?.getReader();
+        if (!reader || Number(request.headers.get('content-length')) > limit)
+          return json({ error: 'VALIDATION_ERROR' }, 422);
+        const chunks: Uint8Array[] = [],
+          size = { value: 0 };
+        try {
+          for (;;) {
+            const part = await reader.read();
+            if (part.done) break;
+            size.value += part.value.byteLength;
+            if (size.value > limit) return json({ error: 'VALIDATION_ERROR' }, 422);
+            chunks.push(part.value);
+          }
+        } finally {
+          await reader.cancel().catch(() => {});
+          reader.releaseLock();
+        }
+        const bytes = new Uint8Array(size.value);
+        let offset = 0;
+        for (const chunk of chunks) {
+          bytes.set(chunk, offset);
+          offset += chunk.length;
+        }
+        const body = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+        const input = JSON.parse(body) as { text?: unknown };
+        if (
+          !input ||
+          typeof input.text !== 'string' ||
+          input.text.length < 15 ||
+          input.text.length > EXTRACTION_TEXT_MAX
+        )
+          return json({ error: 'VALIDATION_ERROR' }, 422);
+        const extractionId = request.headers.get('X-AI-Extraction-ID'),
+          trace = extractionId && EntityId.safeParse(extractionId).success ? 'bv-extract-' + extractionId : null,
+          started = Date.now();
+        try {
+          const result = await extractDescription(input.text, env.OPENAI_API_KEY, env.SCRIPT_MODEL);
+          if (trace)
+            await safeAiEvent(env.DB, trace, '$ai_generation', trace, {
+              distinct_id: 'bv-agency-' + agencyId,
+              bv_app: 'bienvu',
+              bv_stage: 'extraction',
+              bv_extraction_id: extractionId,
+              bv_listing_id: request.headers.get('X-AI-Listing-ID'),
+              $ai_span_id: extractionId,
+              $ai_span_name: 'Extraction annonce',
+              $ai_provider: 'openai',
+              $ai_model: env.SCRIPT_MODEL,
+              $ai_input: result.telemetry.input,
+              $ai_output_choices: result.telemetry.output,
+              $ai_input_tokens: result.usage?.inputTokens,
+              $ai_output_tokens: result.usage?.outputTokens,
+              $ai_latency: (Date.now() - started) / 1000,
+              bv_cost_estimated_usd: result.usage
+                ? (result.usage.inputTokens * 0.75 + result.usage.outputTokens * 4.5) / 1e6
+                : null,
+              bv_cost_actual_usd: null,
+            });
+          return json({ data: result.data, usage: result.usage });
+        } catch {
+          if (trace)
+            await safeAiEvent(env.DB, trace, '$ai_generation', trace, {
+              distinct_id: 'bv-agency-' + agencyId,
+              bv_app: 'bienvu',
+              bv_stage: 'extraction',
+              bv_extraction_id: extractionId,
+              $ai_span_id: extractionId,
+              $ai_provider: 'openai',
+              $ai_model: env.SCRIPT_MODEL,
+              $ai_input: [{ role: 'user', content: input.text }],
+              $ai_is_error: true,
+              $ai_error: 'EXTRACTION_UNAVAILABLE',
+              $ai_latency: (Date.now() - started) / 1000,
+            });
+          return json({ error: 'SOURCE_UNAVAILABLE' }, 502);
+        }
       }
-      return json({error:'NOT_FOUND'},404);
-    }catch(error){const code=error instanceof GenerationFailure?error.code:'INTERNAL_ERROR';return json({error:code},publicErrors[code][0]);}
+      if (path === '/generations' && request.method === 'POST') {
+        const body = await request.text();
+        if (body.length > 32_000) return json({ error: 'VALIDATION_ERROR' }, 422);
+        const input = GenerationRequest.safeParse(JSON.parse(body));
+        if (!input.success) return json({ error: 'VALIDATION_ERROR' }, 422);
+        const row = await admitGeneration(
+          env.DB,
+          agencyId!,
+          request.headers.get('Idempotency-Key') ?? '',
+          input.data,
+          env.GENERATIONS_ENABLED,
+          Date.now(),
+          async (listing) => {
+            for (const photo of listing.photos) {
+              const head = await env.MEDIA.head(photo.objectKey);
+              if (
+                !head ||
+                head.size !== photo.sizeBytes ||
+                (head.customMetadata?.sha256 && head.customMetadata.sha256 !== photo.contentHash)
+              )
+                throw new GenerationFailure('INVALID_PHOTO');
+            }
+          },
+        );
+        try {
+          await launchGeneration(env, row);
+        } catch {
+          /* Intention durable : reprise cron, aucune deuxième admission. */
+        }
+        return json(generationView((await findGeneration(env.DB, agencyId!, row.jobId))!), 202);
+      }
+      const retry = /^\/generations\/([a-zA-Z0-9_-]+)\/retry$/.exec(path);
+      if (retry && request.method === 'POST') {
+        const row = await findGeneration(env.DB, agencyId!, retry[1]);
+        if (!row) return json({ error: 'NOT_FOUND' }, 404);
+        if (row.status !== 'queued' || row.launchStatus !== 'pending') return json({ error: 'CONFLICT' }, 409);
+        await active(env, agencyId!, row.jobId);
+        await launchGeneration(env, row);
+        return json(generationView(row), 202);
+      }
+      return json({ error: 'NOT_FOUND' }, 404);
+    } catch (error) {
+      const code = error instanceof GenerationFailure ? error.code : 'INTERNAL_ERROR';
+      return json({ error: code }, publicErrors[code][0]);
+    }
   },
-  scheduled(_event:ScheduledController,env:GenerationEnv,ctx:ExecutionContext){ctx.waitUntil(syncRunwayLimits(env).then(()=>reconcileBatch(env)).then(()=>reconcileAvatarTasks(env)).then(()=>runAdminRecovery(env)).then(()=>cleanupAnonymousTrials(env)).then(()=>cleanupAnimations(env)));},
+  scheduled(_event: ScheduledController, env: GenerationEnv, ctx: ExecutionContext) {
+    ctx.waitUntil(
+      syncRunwayLimits(env)
+        .then(() => reconcileBatch(env))
+        .then(() => reconcileAvatarTasks(env))
+        .then(() => runAdminRecovery(env))
+        .then(() => cleanupAnonymousTrials(env))
+        .then(() => cleanupAnimations(env)),
+    );
+  },
 };

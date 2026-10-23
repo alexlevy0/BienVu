@@ -6,22 +6,22 @@ Recette du **28 septembre 2026**. Registre, diagnostics, adaptateur de DOM Bien�
 
 Sept URL distinctes d’annonces, une navigation HTTPS depuis Node local par URL, sans relance. Transport produit à IP épinglée, vérification TLS, redirections et corps bornés. Les liens SeLoger/Leboncoin viennent d’Alex ; les paramètres de suivi SeLoger sont supprimés pour ce diagnostic. Aucun cookie ou compte de portail, proxy, solveur de CAPTCHA ou appel IA. Deux consultations de pages de recherche pour trouver les liens sont comptées séparément.
 
-| Portail | Annonces tentées | Imports complets | Résultat constaté | Date / environnement |
-|---|---:|---:|---|---|
-| Le Figaro Immobilier | 3 | 0 | Deux accès refusés ; un ancien lien redirige vers une page de recherche | 28/09, HTTPS Node local |
-| SeLoger | 1 | 0 | Accès refusé sur le lien fourni par Alex | 28/09, HTTPS Node local |
-| Leboncoin | 1 | 0 | Accès refusé sur le lien fourni par Alex | 28/09, HTTPS Node local |
-| Bien’ici | 2 | 0 | HTML initial sans faits/galerie exploitables, JavaScript requis ; acquisition automatique non démontrée | 28/09, HTTPS Node local |
+| Portail              | Annonces tentées | Imports complets | Résultat constaté                                                                                       | Date / environnement    |
+| -------------------- | ---------------: | ---------------: | ------------------------------------------------------------------------------------------------------- | ----------------------- |
+| Le Figaro Immobilier |                3 |                0 | Deux accès refusés ; un ancien lien redirige vers une page de recherche                                 | 28/09, HTTPS Node local |
+| SeLoger              |                1 |                0 | Accès refusé sur le lien fourni par Alex                                                                | 28/09, HTTPS Node local |
+| Leboncoin            |                1 |                0 | Accès refusé sur le lien fourni par Alex                                                                | 28/09, HTTPS Node local |
+| Bien’ici             |                2 |                0 | HTML initial sans faits/galerie exploitables, JavaScript requis ; acquisition automatique non démontrée | 28/09, HTTPS Node local |
 
-| Cas / URL publique | Heure UTC | Durée | Observation |
-|---|---|---:|---|
-| [Figaro vente 108944355](https://immobilier.lefigaro.fr/annonces/annonce-108944355.html) | 15:40:54 | 387 ms | `SOURCE_BLOCKED` |
-| [Figaro ancien lien location 107461633](https://immobilier.lefigaro.fr/annonces/annonce-107461633.html) | 15:40:54 | 1 003 ms | Redirection vers `immobilier-vente-appartement-paris+9eme+75009.html`, 1 767 369 octets ; résultat de recherche, pas une annonce |
-| [Figaro location 109267703](https://immobilier.lefigaro.fr/annonces/annonce-109267703.html) | 15:42:26 | 204 ms | `SOURCE_BLOCKED` |
-| [SeLoger vente Lyon 26M7SYHC5MVH](https://www.seloger.com/annonce/achat/auvergne-rhone-alpes/rhone-69/lyon-69000/26M7SYHC5MVH) | 15:44:06 | 199 ms | `SOURCE_BLOCKED` |
-| [Leboncoin vente 3222183771](https://www.leboncoin.fr/ad/ventes_immobilieres/3222183771) | 15:44:06 | 235 ms | `SOURCE_BLOCKED` |
-| [Bien’ici vente Nice apimo-86775374](https://www.bienici.com/annonce/vente/nice/appartement/2pieces/apimo-86775374) | 15:40:55 | 176 ms | HTML d’amorçage, 15 063 octets |
-| [Bien’ici location Clamart mgc-ancien-602_0602_009784](https://www.bienici.com/annonce/location/clamart/appartement/2pieces/mgc-ancien-602_0602_009784) | 15:40:55 | 85 ms | HTML d’amorçage, 15 063 octets |
+| Cas / URL publique                                                                                                                                      | Heure UTC |    Durée | Observation                                                                                                                      |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | -------: | -------------------------------------------------------------------------------------------------------------------------------- |
+| [Figaro vente 108944355](https://immobilier.lefigaro.fr/annonces/annonce-108944355.html)                                                                | 15:40:54  |   387 ms | `SOURCE_BLOCKED`                                                                                                                 |
+| [Figaro ancien lien location 107461633](https://immobilier.lefigaro.fr/annonces/annonce-107461633.html)                                                 | 15:40:54  | 1 003 ms | Redirection vers `immobilier-vente-appartement-paris+9eme+75009.html`, 1 767 369 octets ; résultat de recherche, pas une annonce |
+| [Figaro location 109267703](https://immobilier.lefigaro.fr/annonces/annonce-109267703.html)                                                             | 15:42:26  |   204 ms | `SOURCE_BLOCKED`                                                                                                                 |
+| [SeLoger vente Lyon 26M7SYHC5MVH](https://www.seloger.com/annonce/achat/auvergne-rhone-alpes/rhone-69/lyon-69000/26M7SYHC5MVH)                          | 15:44:06  |   199 ms | `SOURCE_BLOCKED`                                                                                                                 |
+| [Leboncoin vente 3222183771](https://www.leboncoin.fr/ad/ventes_immobilieres/3222183771)                                                                | 15:44:06  |   235 ms | `SOURCE_BLOCKED`                                                                                                                 |
+| [Bien’ici vente Nice apimo-86775374](https://www.bienici.com/annonce/vente/nice/appartement/2pieces/apimo-86775374)                                     | 15:40:55  |   176 ms | HTML d’amorçage, 15 063 octets                                                                                                   |
+| [Bien’ici location Clamart mgc-ancien-602_0602_009784](https://www.bienici.com/annonce/location/clamart/appartement/2pieces/mgc-ancien-602_0602_009784) | 15:40:55  |    85 ms | HTML d’amorçage, 15 063 octets                                                                                                   |
 
 La collecte initiale conservait le code stable `SOURCE_BLOCKED`, sans distinguer HTTP 401/403/429. **Ne pas en déduire un CAPTCHA ou un code HTTP précis.** Le corps des refus n’a pas été conservé. Les nouveaux motifs privés sont vérifiés séparément avec ports injectés et fixture de transport.
 
@@ -30,7 +30,6 @@ Deux requêtes de découverte supplémentaires : recherche SeLoger Lyon (267 ms)
 ## Bien’ici : DOM public et import automatique distincts
 
 Les deux pages Bien’ici ont aussi été ouvertes dans un navigateur ordinaire, sans connexion et après refus des cookies facultatifs. Leur DOM public est capturé localement, puis relu hors ligne par l’adaptateur. Ce navigateur n’est pas le Browser Run du produit ; sa consultation ne valide ni les restrictions réseau du pipeline ni un stockage de photos.
-
 - Vente : extraction du DOM réel réussie, appartement à Nice, 57 m², deux pièces, 498 000 €, description de 755 caractères et 17 candidats de galerie. Seul le premier original est fourni dans le JSON-LD ; les 16 autres URL observées demandent une largeur de 600 px. Aucun paramètre n’est retiré pour deviner un original. **Aucune photo téléchargée/décodée ni persistance D1/R2 de ce bien dans cette campagne.**
 - Location : DOM réel refusé `CONFLICTING_FACTS`, prix affiché 1 164 € contre 1 164,01 € dans `Product.offers.priceSpecification`. L’écart n’est ni arrondi silencieusement ni attribué aux charges par supposition.
 - HTML initial des deux pages : `NOT_A_LISTING`, motif `structure_changed`, qui signifie ici « structure non exploitable sans JavaScript », pas une preuve que le portail vient de changer.
@@ -67,12 +66,12 @@ Image déployée : `sha256:b58fd9b8dc719fc958c84b364674312ad29a748800db586ca2dcc
 
 `node scripts/probe-portals-cloudflare.mjs init`, puis un lancement `import <portail>` par ligne, via l’API authentifiée sur `https://bienvu.online`. Les deux comptes sont synthétiques, les quatre annonces sont publiques et réelles ; aucun e-mail envoyé. Les URL réutilisent les cas locaux ci-dessus : Figaro location actuelle, SeLoger et Leboncoin fournis par Alex, Bien’ici vente. **0/4 imports complets.**
 
-| Portail | Début UTC le 28/09 | Durée HTTP totale | Résultat privé | Browser Run |
-|---|---|---:|---|---|
-| figaro | 16:38:08.407 | 5097 ms | `SOURCE_BLOCKED` / access_denied | Non |
-| seloger | 16:38:54.878 | 7385 ms | `SOURCE_BLOCKED` / access_denied | Non |
-| leboncoin | 16:39:06.234 | 2491 ms | `SOURCE_BLOCKED` / access_denied | Non |
-| bienici | 16:39:25.411 | 4571 ms | `UNSAFE_URL` / garde réseau du navigateur | Oui, une session |
+| Portail   | Début UTC le 28/09 | Durée HTTP totale | Résultat privé                            | Browser Run      |
+| --------- | ------------------ | ----------------: | ----------------------------------------- | ---------------- |
+| figaro    | 16:38:08.407       |           5097 ms | `SOURCE_BLOCKED` / access_denied          | Non              |
+| seloger   | 16:38:54.878       |           7385 ms | `SOURCE_BLOCKED` / access_denied          | Non              |
+| leboncoin | 16:39:06.234       |           2491 ms | `SOURCE_BLOCKED` / access_denied          | Non              |
+| bienici   | 16:39:25.411       |           4571 ms | `UNSAFE_URL` / garde réseau du navigateur | Oui, une session |
 
 Pour les trois refus : une ressource réclamée en D1, aucun navigateur et aucune relance. Les corps de refus sont abandonnés ; les 2 Mio conservés dans `hosted_import_costs.source_bytes` sont la borne réservée avant la ressource échouée, **pas un téléchargement mesuré**. Bien’ici : deux ressources, 30 126 octets comptés (HTML de 15 063 octets chargé directement puis dans le navigateur), aucune photo. Le garde-fou réseau s’active pendant la navigation ; la sous-requête exacte n’est pas journalisée. L’hôte JS public `res.bienici.com` observé hors ligne est exclu de la liste actuelle, mais on ne lui attribue pas à lui seul la cause exacte de l’échec distant sans trace supplémentaire.
 
@@ -92,11 +91,11 @@ Documentation officielle étudiée à la demande d’Alex. **Crawlee n’a été
 
 ## Alternatives et coût
 
-| Limite | Option concrète | Coût / état |
-|---|---|---|
-| Figaro, SeLoger, Leboncoin refusés | Utiliser le lien public du même bien sur le site de son agence ; sinon renseigner le bien et ses photos dans le formulaire existant | Pas de fournisseur supplémentaire ; limites habituelles BienVu inchangées |
-| Bien’ici JavaScript/galerie/prix | Même alternative ; conserver l’adaptateur expérimental et planifier une seule investigation bornée | Aucun abonnement externe ajouté ; estimation distante à réserver avant essai |
-| Import commercial plus large | Étudier un flux explicitement autorisé par l’agence/portail | Accès et tarif non obtenus ; aucun achat ni message à un tiers envoyé |
+| Limite                             | Option concrète                                                                                                                     | Coût / état                                                                  |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Figaro, SeLoger, Leboncoin refusés | Utiliser le lien public du même bien sur le site de son agence ; sinon renseigner le bien et ses photos dans le formulaire existant | Pas de fournisseur supplémentaire ; limites habituelles BienVu inchangées    |
+| Bien’ici JavaScript/galerie/prix   | Même alternative ; conserver l’adaptateur expérimental et planifier une seule investigation bornée                                  | Aucun abonnement externe ajouté ; estimation distante à réserver avant essai |
+| Import commercial plus large       | Étudier un flux explicitement autorisé par l’agence/portail                                                                         | Accès et tarif non obtenus ; aucun achat ni message à un tiers envoyé        |
 
 **Provision supplémentaire de cette recette : 4 × 0,50 € = 2 €.** Cumul prudent **22 €** (8 € fixes + 2,50 € rendus + 6 € domaine + 5,50 € imports/opérateur), **8 € de marge sur 30 €** ; alerte à 20 €, coupure à 25 €. Facture réelle/TTC et allocations restantes non rapprochées. Les coûts des quatre échecs ne sont pas remboursés par le nettoyage. Aucun rendu, e-mail ou appel IA/TTS nouveau. L’absence de succès des portails ne bloque pas les prochains sprints vidéo sur les agences déjà testées et la saisie manuelle, mais reste une limite explicite du lancement.
 

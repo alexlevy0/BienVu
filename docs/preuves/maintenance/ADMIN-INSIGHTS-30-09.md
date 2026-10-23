@@ -3,7 +3,6 @@
 ## Résultat publié et propositions
 
 Quatre améliorations sont disponibles dans [Super admin](https://bienvu.online/admin) :
-
 - **Fréquentation** : chargements HTML publics par jour, page et pays, sur 7/30 jours UTC.
 - **Points d’attention** : budget, échéances dépassées, échecs du jour, signalements, abonnements en retard, comptes non vérifiés et fermeture des lancements. Les cartes ouvrent les vues utiles avec leurs filtres.
 - **Performance** : réussite parmi les jobs finalisés créés sur 30 jours, jobs actifs séparés et durée moyenne de la création à l’événement réel `ready`.
@@ -44,18 +43,18 @@ HTTP distant : accueil/robots 200, admin anonyme 307 vers connexion, API admin a
 
 Lecture D1 réelle et vraie session Chrome du propriétaire :
 
-| Indicateur | Mesure observée |
-| --- | --- |
-| Jobs finalisés sur 30 jours | 4 prêts, 1 échec, aucun actif |
-| Réussite | 80 % |
-| Durée moyenne, 4 vidéos chronométrées | 202,453 s, affichée 202 s |
-| OpenAI, septembre | 0,005361 USD, **3 appels mesurés sur 4**, partiel |
-| Google, septembre | 0,023370 USD, **15 appels mesurés sur 20**, partiel |
-| Points d’attention | Budget à surveiller ; un compte non vérifié |
-| Carte des comptes à suivre | Ouvre Comptes avec « Non vérifié » sélectionné |
-| Fréquentation initiale | Aucune mesure, collecte active |
+| Indicateur                            | Mesure observée                                      |
+| ------------------------------------- | ---------------------------------------------------- |
+| Jobs finalisés sur 30 jours           | 4 prêts, 1 échec, aucun actif                        |
+| Réussite                              | 80 %                                                 |
+| Durée moyenne, 4 vidéos chronométrées | 202,453 s, affichée 202 s                            |
+| OpenAI, septembre                     | 0,005361 USD, **3 appels mesurés sur 4**, partiel    |
+| Google, septembre                     | 0,023370 USD, **15 appels mesurés sur 20**, partiel  |
+| Points d’attention                    | Budget à surveiller ; un compte non vérifié          |
+| Carte des comptes à suivre            | Ouvre Comptes avec « Non vérifié » sélectionné       |
+| Fréquentation initiale                | Aucune mesure, collecte active                       |
 | Après un vrai chargement de l’accueil | **1 page, FR/France, home**, premier jour 2026-09-30 |
-| Période 7 jours | Même agrégat réel visible |
+| Période 7 jours                       | Même agrégat réel visible                            |
 
 Les treize rubriques et l’absence de débordement ont été contrôlées dans le navigateur réel. Le chargement de l’accueil de recette est inclus dans la fréquentation, pas présenté comme un visiteur client. Aucun historique de visites antérieures n’est reconstitué. La relecture opérateur D1 avait reçu un 403 ; après contrôle d’authentification Wrangler, elle a réussi. La page privée continuait à fonctionner pendant ce refus opérateur.
 

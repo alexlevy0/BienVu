@@ -15,7 +15,6 @@ Fichiers : `landing-page.tsx`, `landing.css`, `home-create.tsx`, `home-icons.tsx
 ## Vérification
 
 TypeScript web, build OpenNext, dry-run Wrangler et `git diff --check` réussis. Contrôles Chrome à **1536 / 390 / 320 px**, en local puis sur les assets publiés, avec API métier interceptées et écritures API bloquées côté navigateur en production :
-
 - absence de débordement horizontal ; captures d’accueil et formulaire inspectées ;
 - lecture de la démonstration réelle : 28 s, 600 px de large, lecture effective ;
 - passage vers la saisie manuelle et annulation, aperçu masqué et même nœud d’input conservé ;

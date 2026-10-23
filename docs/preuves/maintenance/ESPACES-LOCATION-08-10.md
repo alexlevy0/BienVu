@@ -37,11 +37,11 @@ Les 11 JPEG privés sont relus par l’API et contrôlés : taille, dimensions, 
 
 ## Publication
 
-| Worker | Version publiée à 100 % | Bindings inchangés |
-| --- | --- | --- |
-| Web, `bienvu.online` | `a3fa16c3-ac3c-4281-8a2e-9510f6f2771d` | 50 |
-| Service d’import | `4ac52bb8-a67b-4b6a-9d46-4fd993e0eff8` | 9 |
-| Service de génération | `5a389a95-35a4-44fa-8b4e-b49e1302f333` | 30 |
+| Worker                | Version publiée à 100 %                | Bindings inchangés |
+| --------------------- | -------------------------------------- | ------------------ |
+| Web, `bienvu.online`  | `a3fa16c3-ac3c-4281-8a2e-9510f6f2771d` | 50                 |
+| Service d’import      | `4ac52bb8-a67b-4b6a-9d46-4fd993e0eff8` | 9                  |
+| Service de génération | `5a389a95-35a4-44fa-8b4e-b49e1302f333` | 30                 |
 
 Comparaison complète des bindings et du runtime avant/après : identiques. Images des conteneurs existantes conservées avec `--containers-rollout none`. Le Worker web contient lui aussi l’extracteur ; le service de génération reçoit le registre pour admettre ces mêmes liens dans l’essai sans compte. Aucune génération anonyme ou connectée n’est déclenchée pour cette recette.
 

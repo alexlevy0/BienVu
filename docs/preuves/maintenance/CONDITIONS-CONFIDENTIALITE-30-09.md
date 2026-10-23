@@ -21,7 +21,6 @@ L'état précédent du dépôt a d'abord été commité et poussé sur `main` : 
 ## Vérification Cloudflare réelle
 
 Worker **bienvu-web-probe-staging**, domaine **bienvu.online**, version **ce6c0e10-01f8-48c4-acda-b5d79957679e**, active à **100 %**. Déploiement avec `--keep-vars --strict` sur les ressources existantes.
-
 - `/conditions` et `/confidentialite` : **HTTP 200 sans cookie**, français, titre et huit sections directement dans le HTML, canonical sur le bon domaine, absence de `noindex/nofollow`. Feuilles CSS publiées accessibles en 200 et contenant les styles des documents.
 - `/`, `/connexion`, `/abonnement`, `/sitemap.xml`, `/llms.txt` : **200**, chacun contient les deux liens attendus.
 - API d'administration sans session : **401**.

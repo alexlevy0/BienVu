@@ -81,11 +81,9 @@ Les interruptions faute de budget/solde ou de lecture sont enregistrées et expl
 
 ### Historique du prépaiement initial
 
-
 Tarif consulté le 01/10 : **5 crédits/seconde** pour Gen-4 Turbo, **25 crédits / clip**, **0,25 USD avant taxes**. Deux clips = 50 crédits / 0,50 USD. [Tarifs officiels](https://docs.dev.runwayml.com/guides/pricing/) · [Modèles](https://docs.dev.runwayml.com/guides/models/).
 
 Migration additive **`0026_runway_animations.sql`** :
-
 - `runway_budget` rattache l'achat à un mois déjà ouvert. Au maximum 1 000 centimes et 1 000 crédits, avec solde API à vérifier ; aucun mois ou budget Runway n'est ouvert automatiquement.
 - L'achat déclaré de 10 € est ajouté **une seule fois** à la base globale lors de la création de cette enveloppe. Les provisions par clip ne sont pas ajoutées une seconde fois à la dépense globale.
 - Chaque tentative réelle garde 25 crédits et **0,35 € de provision prudente** dans cette enveloppe prépayée, même en cas d'échec ou de réponse inconnue. Ce montant est un garde-fou, pas une conversion/facture. Le plus bas des limites crédits, prépaiement et budget global s'applique. Avec 10 € provisionnés, 28 tentatives au maximum, sous réserve du solde API et des autres limites.

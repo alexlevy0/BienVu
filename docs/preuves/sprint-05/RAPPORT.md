@@ -18,17 +18,17 @@ Première synthèse isolée à 18:05 UTC : 347 caractères, 19,52 s avec Aoede. 
 
 À **18:29:04 UTC**, `pnpm probe:narration --real` réussit depuis le Mac avec une **annonce synthétique** :
 
-| Mesure | Résultat réel |
-|---|---|
-| OpenAI | 1 appel, 944 tokens d'entrée, 86 de sortie, 0 token mis en cache retourné |
-| Script | 5 scènes, version 1 ; aucune correction ni raccourcissement |
-| Google | 5 synthèses Aoede, 260 caractères au total |
-| Pistes | PCM 16 bits, 24 kHz mono ; 2 640 / 3 840 / 2 880 / 1 640 / 3 280 ms |
-| Parole totale | 14 280 ms ; les pauses et maintiens des images portent le timing à 30 s |
-| Frames | 174 / 210 / 181 / 143 / 192, total 900 à 30 fps |
-| Faits | Appartement à vendre à Lyon, 42,06 m², 379 000 €, contact d'agence fictif |
-| Coûts estimés | OpenAI 0,001095 USD + Google 0,0078 USD, avant gratuité Google |
-| Facturation effective | Inconnue ; pas assimilée à zéro |
+| Mesure                | Résultat réel                                                             |
+| --------------------- | ------------------------------------------------------------------------- |
+| OpenAI                | 1 appel, 944 tokens d'entrée, 86 de sortie, 0 token mis en cache retourné |
+| Script                | 5 scènes, version 1 ; aucune correction ni raccourcissement               |
+| Google                | 5 synthèses Aoede, 260 caractères au total                                |
+| Pistes                | PCM 16 bits, 24 kHz mono ; 2 640 / 3 840 / 2 880 / 1 640 / 3 280 ms       |
+| Parole totale         | 14 280 ms ; les pauses et maintiens des images portent le timing à 30 s   |
+| Frames                | 174 / 210 / 181 / 143 / 192, total 900 à 30 fps                           |
+| Faits                 | Appartement à vendre à Lyon, 42,06 m², 379 000 €, contact d'agence fictif |
+| Coûts estimés         | OpenAI 0,001095 USD + Google 0,0078 USD, avant gratuité Google            |
+| Facturation effective | Inconnue ; pas assimilée à zéro                                           |
 
 Les prix/quantités proviennent de la fixture et ne constituent pas la recette d'une annonce de portail. Le script, les cinq WAV et les journaux sont privés et ignorés par Git. Le fournisseur Google ne retourne pas d'identifiant de requête ni d'usage facturé : `null`, avec un identifiant local et les caractères de la requête comptés séparément.
 
@@ -65,7 +65,6 @@ Vérification finale : `pnpm check` **145 tests réussis, 0 échec**, types comp
 Alex confirme **0 € d'achat de crédits OpenAI ce mois-ci**. Après les 0,15 € de campagne vocale isolée, 0,70 € sont réservés globalement **avant** la campagne texte/voix. Total prudent **23,35 € sur 30 €**, marge 6,65 €, coupure des tests à 25 €. Les 0,30 € du journal local sont inclus dans les 0,70 €, sans double comptage. Estimations cumulées des deux essais API : **0,019305 USD avant gratuité Google**, facture réelle inconnue. Les échecs de reprise réseau bloqué ne créent aucun nouvel usage fournisseur. Aucun achat ni modification de facturation.
 
 Restant à la fin de cette première tranche (le point 1 est depuis validé dans la [recette Cloudflare](CLOUDFLARE.md)) :
-
 1. Appliquer 0011 et tester les vrais connecteurs/secrets depuis Cloudflare dans une campagne bornée ; pas de déploiement dans cette tranche.
 2. Sprint 06 : convertir `PreparedNarration` vers le manifeste vidéo, appliquer photos/charte/sous-titres/filigrane et inspecter le MP4 avec son.
 3. Sprint 07 : raccorder le Workflow, les statuts/échecs des jobs, libération des réservations client, contrôle global et journal des coûts. `narration_runs` persiste déjà son échec ; l'étape seule ne modifie pas le statut global du job.

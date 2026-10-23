@@ -3,9 +3,7 @@
   "name": "bienvu-generation-local",
   "main": "src/generation-worker.ts",
   "compatibility_date": "2026-09-27",
-  "compatibility_flags": [
-    "nodejs_compat"
-  ],
+  "compatibility_flags": ["nodejs_compat"],
   "vars": {
     "WEB_PUSH_ENABLED": "false",
     "WEB_PUSH_PUBLIC_KEY": "",
@@ -48,9 +46,7 @@
   "migrations": [
     {
       "tag": "v1",
-      "new_sqlite_classes": [
-        "VideoRenderer"
-      ]
+      "new_sqlite_classes": ["VideoRenderer"]
     }
   ],
   "d1_databases": [
@@ -88,8 +84,6 @@
     }
   ],
   "triggers": {
-    "crons": [
-      "*/5 * * * *"
-    ]
+    "crons": ["*/5 * * * *"]
   }
 }

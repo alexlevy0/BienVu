@@ -14,15 +14,15 @@
 
 ## Vérifications exécutées
 
-| Contrôle | Résultat | Nature |
-|---|---|---|
-| `pnpm exec tsx --test tests/voice.test.ts` | 11 tests réussis | Réponses fournisseur simulées, signature RSA et lecture WAV réellement exécutées |
-| `pnpm check` | 128 tests, 0 échec ; types et frontières 87 fichiers réussis | Suite locale complète, pas d'API payante |
-| `pnpm probe:voice --mock`, deux exécutions | 1 piste créée, puis `cached: true` | Signal synthétique 1 000 ms, 24 kHz mono, RMS −19,34 dBFS ; aucune voix |
-| `pnpm probe:voice:worker` | Bundle Wrangler dry-run et exécution workerd réussis | OAuth/TTS simulés ; toute sortie réseau interdite ; aucun `nodejs_compat` |
-| `pnpm exec tsc -p tsconfig.tests.json` après la fixture Worker | Réussi | Types de la fixture inclus |
-| `pnpm probe:voice --check` | Refus attendu `VOICE_CONFIG_INVALID` | ID et clé serveur non configurés ; aucun appel réseau |
-| Git | Clé `.secrets/google-tts.json` et `.env.voice` ignorés ; `git diff --check` réussi | Aucun commit/push ni clé réelle dans les fichiers créés |
+| Contrôle                                                       | Résultat                                                                           | Nature                                                                           |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `pnpm exec tsx --test tests/voice.test.ts`                     | 11 tests réussis                                                                   | Réponses fournisseur simulées, signature RSA et lecture WAV réellement exécutées |
+| `pnpm check`                                                   | 128 tests, 0 échec ; types et frontières 87 fichiers réussis                       | Suite locale complète, pas d'API payante                                         |
+| `pnpm probe:voice --mock`, deux exécutions                     | 1 piste créée, puis `cached: true`                                                 | Signal synthétique 1 000 ms, 24 kHz mono, RMS −19,34 dBFS ; aucune voix          |
+| `pnpm probe:voice:worker`                                      | Bundle Wrangler dry-run et exécution workerd réussis                               | OAuth/TTS simulés ; toute sortie réseau interdite ; aucun `nodejs_compat`        |
+| `pnpm exec tsc -p tsconfig.tests.json` après la fixture Worker | Réussi                                                                             | Types de la fixture inclus                                                       |
+| `pnpm probe:voice --check`                                     | Refus attendu `VOICE_CONFIG_INVALID`                                               | ID et clé serveur non configurés ; aucun appel réseau                            |
+| Git                                                            | Clé `.secrets/google-tts.json` et `.env.voice` ignorés ; `git diff --check` réussi | Aucun commit/push ni clé réelle dans les fichiers créés                          |
 
 Preuves brutes locales : `evidence/local/sprint-05/check.log`, `mock-first.log`, `mock-replay.log`, `check-config.log`, `worker-build/report.json`. La sonde workerd retourne un WAV de 48 044 octets, empreinte `e88bd66a90532dd0694d7d1e87242e21b530148b04eadc12996fd697d8761279`, un échange de jeton et une synthèse **simulés** ; un second accès réutilise le jeton.
 
@@ -49,17 +49,17 @@ Deux échanges OAuth et deux lectures de voix, plus une lecture de facturation o
 
 Alex fournit un résultat `pnpm probe:voice --voices` réussi : 30 voix françaises et `configuredVoiceAvailable: true`. Le refus de facturation initial est levé. Après rapprochement du budget, `pnpm probe:voice --real` effectue un échange OAuth, une consultation de voix et **une synthèse Google réelle**, sans retry.
 
-| Mesure | Résultat |
-|---|---|
-| Voix | `fr-FR-Chirp3-HD-Aoede`, `google-chirp3/1` |
-| Texte | Fictif, écrit à la main ; 347 caractères, 358 octets UTF-8 |
-| Réponse de synthèse | 2 909 ms ; identifiant fournisseur non retourné (`null`) |
-| Audio | PCM 16 bits, 24 kHz mono ; 937 004 octets |
-| Mesure sur échantillons PCM | 19 520 ms, 468 480 échantillons, RMS −20,50 dBFS |
-| SHA-256 audio | `aae90aa593f8618ef338c13270b69d3259f76e92d946b921bc0250a38467a2d4` |
-| Cache | Rejeu CLI avec `fetch` interdit : `cached: true`, fichier/rapport identiques, une seule entrée du journal |
-| Écoute humaine | Alex confirme : « Oui, la voix et les informations sont claires » pour Lyon, Saint-Étienne, 42,06 m², 379 000 € et 1 200 €/mois |
-| Coût | Estimation brute 0,01041 USD avant gratuité ; facture et allocation restante inconnues |
+| Mesure                      | Résultat                                                                                                                        |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Voix                        | `fr-FR-Chirp3-HD-Aoede`, `google-chirp3/1`                                                                                      |
+| Texte                       | Fictif, écrit à la main ; 347 caractères, 358 octets UTF-8                                                                      |
+| Réponse de synthèse         | 2 909 ms ; identifiant fournisseur non retourné (`null`)                                                                        |
+| Audio                       | PCM 16 bits, 24 kHz mono ; 937 004 octets                                                                                       |
+| Mesure sur échantillons PCM | 19 520 ms, 468 480 échantillons, RMS −20,50 dBFS                                                                                |
+| SHA-256 audio               | `aae90aa593f8618ef338c13270b69d3259f76e92d946b921bc0250a38467a2d4`                                                              |
+| Cache                       | Rejeu CLI avec `fetch` interdit : `cached: true`, fichier/rapport identiques, une seule entrée du journal                       |
+| Écoute humaine              | Alex confirme : « Oui, la voix et les informations sont claires » pour Lyon, Saint-Étienne, 42,06 m², 379 000 € et 1 200 €/mois |
+| Coût                        | Estimation brute 0,01041 USD avant gratuité ; facture et allocation restante inconnues                                          |
 
 Le WAV et les journaux restent ignorés et privés (WAV 0600), sous `evidence/local/sprint-05/google-tts/real/`. Preuves : `real-first.log`, `real-cache-replay.log`, `real-verification.json`, `google-tts-campaign-budget.json` et `budget-after-real.json`. Aucune clé, adresse de compte de service ou réponse OAuth brute dans ces traces. Les tests workerd précédents restent des **fixtures sans fournisseur réel** ; cet appel réel part du Mac, pas de Cloudflare. La durée de cet échantillon ne prouve pas encore le timing d'une vidéo à plusieurs scènes.
 

@@ -1,1 +1,1 @@
-export {cameraMotion} from '@bienvu/presentation';
+export { cameraMotion } from '@bienvu/presentation';

@@ -1,19 +1,86 @@
 /* Finite entrances are driven by Motion Mini after first paint. CSS remains
    fully visible without JS, with no permanent compositor layers or scroll loop. */
-@media (hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference){
- .home-studio-home .home-render-card,.home-studio-home .home-share-example{transition:translate .24s cubic-bezier(.22,1,.36,1),box-shadow .24s,border-color .24s}
- .home-studio-home .home-render-card:hover{translate:0 -3px;box-shadow:0 9px 25px #243d2115}
- .home-studio-home .home-share-example:hover{translate:0 -2px}
- .home-studio-home :is(.home-vitrine-browser,.home-vitrine-mobile){transition:translate .3s cubic-bezier(.22,1,.36,1),box-shadow .25s}
- .home-studio-home .home-vitrine-devices:hover .home-vitrine-browser{translate:0 -2px}
- .home-studio-home .home-vitrine-devices:hover .home-vitrine-mobile{translate:0 -4px}
- .home-studio-home :is(.home-avatars-benefit-icon,.home-life-feature-icon,.home-editor-demo-feature-icon,.home-vitrine-benefits>article>svg){transition:translate .24s cubic-bezier(.22,1,.36,1)}
- .home-studio-home :is(.home-avatars-benefits,.home-life-features,.home-editor-demo-features,.home-vitrine-benefits)>article:hover :is(.home-avatars-benefit-icon,.home-life-feature-icon,.home-editor-demo-feature-icon),.home-studio-home .home-vitrine-benefits>article:hover>svg{translate:0 -2px}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .home-studio-home .home-render-card,
+  .home-studio-home .home-share-example {
+    transition:
+      translate 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.24s,
+      border-color 0.24s;
+  }
+  .home-studio-home .home-render-card:hover {
+    translate: 0 -3px;
+    box-shadow: 0 9px 25px #243d2115;
+  }
+  .home-studio-home .home-share-example:hover {
+    translate: 0 -2px;
+  }
+  .home-studio-home :is(.home-vitrine-browser, .home-vitrine-mobile) {
+    transition:
+      translate 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.25s;
+  }
+  .home-studio-home .home-vitrine-devices:hover .home-vitrine-browser {
+    translate: 0 -2px;
+  }
+  .home-studio-home .home-vitrine-devices:hover .home-vitrine-mobile {
+    translate: 0 -4px;
+  }
+  .home-studio-home
+    :is(
+      .home-avatars-benefit-icon,
+      .home-life-feature-icon,
+      .home-editor-demo-feature-icon,
+      .home-vitrine-benefits > article > svg
+    ) {
+    transition: translate 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .home-studio-home
+    :is(.home-avatars-benefits, .home-life-features, .home-editor-demo-features, .home-vitrine-benefits)
+    > article:hover
+    :is(.home-avatars-benefit-icon, .home-life-feature-icon, .home-editor-demo-feature-icon),
+  .home-studio-home .home-vitrine-benefits > article:hover > svg {
+    translate: 0 -2px;
+  }
 }
-@media(prefers-reduced-motion:no-preference){
- .home-studio-home :is(.home-avatars-action,.home-kit-create,.home-comparison-create,.home-render-choose,.home-vitrine-create,.home-vitrine-example-link,.home-share-cta button,.home-life-cta-actions button,.home-editor-demo-cta button,.home-editor-demo-cta a)>svg:last-child{transition:translate .22s cubic-bezier(.22,1,.36,1)}
- .home-studio-home :is(.home-avatars-action,.home-kit-create,.home-comparison-create,.home-render-choose,.home-vitrine-create,.home-vitrine-example-link,.home-share-cta button,.home-life-cta-actions button,.home-editor-demo-cta button,.home-editor-demo-cta a):is(:hover,:focus-visible)>svg:last-child{translate:3px 0}
+@media (prefers-reduced-motion: no-preference) {
+  .home-studio-home
+    :is(
+      .home-avatars-action,
+      .home-kit-create,
+      .home-comparison-create,
+      .home-render-choose,
+      .home-vitrine-create,
+      .home-vitrine-example-link,
+      .home-share-cta button,
+      .home-life-cta-actions button,
+      .home-editor-demo-cta button,
+      .home-editor-demo-cta a
+    )
+    > svg:last-child {
+    transition: translate 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .home-studio-home
+    :is(
+      .home-avatars-action,
+      .home-kit-create,
+      .home-comparison-create,
+      .home-render-choose,
+      .home-vitrine-create,
+      .home-vitrine-example-link,
+      .home-share-cta button,
+      .home-life-cta-actions button,
+      .home-editor-demo-cta button,
+      .home-editor-demo-cta a
+    ):is(:hover, :focus-visible)
+    > svg:last-child {
+    translate: 3px 0;
+  }
 }
-@media(prefers-reduced-motion:reduce){
- .home-studio-home [data-home-reveal]{opacity:1!important;translate:none!important;will-change:auto!important}
+@media (prefers-reduced-motion: reduce) {
+  .home-studio-home [data-home-reveal] {
+    opacity: 1 !important;
+    translate: none !important;
+    will-change: auto !important;
+  }
 }

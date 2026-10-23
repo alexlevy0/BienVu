@@ -16,11 +16,11 @@ Les brouillons conservent leur sélection et chaque nouveau job fige sa voix au 
 
 Comparaison **réelle** sur le même texte de 880 caractères d’une annonce déjà importée :
 
-| Fournisseur / voix | Durée WAV | Réécoute |
-| --- | ---: | --- |
-| Cartesia / Inès | 52,720 s | Cache privé, aucun nouvel appel |
-| Fish Audio / Manon | 57,653 s | Cache privé, aucun nouvel appel |
-| Google / Aoede | 61,640 s | Cache privé, aucun nouvel appel |
+| Fournisseur / voix | Durée WAV | Réécoute                        |
+| ------------------ | --------: | ------------------------------- |
+| Cartesia / Inès    |  52,720 s | Cache privé, aucun nouvel appel |
+| Fish Audio / Manon |  57,653 s | Cache privé, aucun nouvel appel |
+| Google / Aoede     |  61,640 s | Cache privé, aucun nouvel appel |
 
 Les écoutes publiques courtes ont utilisé **4 059 caractères Cartesia** ; la comparaison réelle en a utilisé **880**. Le registre interne conserve **4 939 / 20 000 caractères**, soit **15 061 disponibles** sur 31 jours glissants, au contrôle final. Aucun abonnement fournisseur n’a été créé ou modifié et aucun crédit client BienVu n’a été décompté par cette recette. Le quota interne ne constitue pas le solde ni la facture Cartesia.
 
@@ -28,10 +28,10 @@ Les écoutes publiques courtes ont utilisé **4 059 caractères Cartesia** ; la 
 
 Migration `0048_cartesia_voices.sql` appliquée avant activation. Les **73 appels de narration historiques** ont une empreinte identique avant/après : `cdee54f45d4d9f9f8c38dc00fe35623455bf2ea29c61fe56c65ff1c8cb5d2469`. Les trois registres financiers contrôlés sont restés vides ; aucun défaut de clé étrangère détecté. Aucun nouveau rendu vidéo client ou appel d’animation n’a été lancé.
 
-| Worker | Version finale | Bindings |
-| --- | --- | ---: |
-| Web | `37e50720-5f6c-4270-8802-335f180a7ea7` | 44 → 50 |
-| Génération | `71f063d1-da2d-4ce4-9490-c5ecf03f94e1` | 28 → 30 |
+| Worker     | Version finale                         | Bindings |
+| ---------- | -------------------------------------- | -------: |
+| Web        | `37e50720-5f6c-4270-8802-335f180a7ea7` |  44 → 50 |
+| Génération | `71f063d1-da2d-4ce4-9490-c5ecf03f94e1` |  28 → 30 |
 
 Les bindings existants, dates de compatibilité, flags, observabilité et limites sont conservés. Les ajouts concernent exclusivement les fournisseurs TTS ; aucune reconstruction ni modification du conteneur renderer. Le Worker de génération utilise `--containers-rollout none`.
 

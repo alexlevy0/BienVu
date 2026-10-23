@@ -35,11 +35,11 @@ Le vrai import local avec la méthode initiale native, sans HTML de capture inje
 
 Image Linux/AMD64 construite sur le Node 24.17.0 déjà épinglé, **Chromium `154.0.8037.92-1~deb12u1`** et **Playwright-core 1.62.1**. La couche contenant le transport final est reconstruite après le typage, et son fichier embarqué est comparé au source. L’essai d’exécution locale AMD64 sous émulation n’a pas terminé dans sa fenêtre de 60 secondes ; il ne remplace pas la recette réelle Cloudflare réussie. Image publiée et épinglée : `registry.cloudflare.com/5fd251f918593d6bd7594889c4ec8343/bienvu-human-native@sha256:d08e544db56787586dcbad33f61fa07bcff01a1bb31cdc7a71119c11646032b6`.
 
-| Worker | Correctif natif à 100 % | Bindings conservés |
-| --- | --- | --- |
-| Web | `7fe8bc55-ca57-4eee-95a8-a7cd673116f5` | 50 |
-| Import | `a1fa978f-453b-48dd-8162-e165d3a2d2fa` | 9 |
-| Génération | `6c814e81-e850-45dc-b489-0f8c3088f113` | 30 |
+| Worker     | Correctif natif à 100 %                | Bindings conservés |
+| ---------- | -------------------------------------- | ------------------ |
+| Web        | `7fe8bc55-ca57-4eee-95a8-a7cd673116f5` | 50                 |
+| Import     | `a1fa978f-453b-48dd-8162-e165d3a2d2fa` | 9                  |
+| Génération | `6c814e81-e850-45dc-b489-0f8c3088f113` | 30                 |
 
 Bindings complets et paramètres runtime comparés avant/après : identiques. Le conteneur d’import reçoit la nouvelle image, avec capacité **un `basic`** et configuration réseau conservées. Aucun traitement réseau ou de génération actif lors du déploiement ; les 24 brouillons en cours de saisie restent conservés. Le renderer garde son image et `--containers-rollout none`. Aucune migration, nouvelle clé ou nouvelle ressource Cloudflare.
 
@@ -68,11 +68,11 @@ pnpm build:web
 
 Typage complet, frontières **427 fichiers**, build Next/OpenNext et dry-runs des trois Workers réussis. Le typage lancé simultanément avec le premier build a rencontré des fichiers générés `.next/types` momentanément supprimés ; il est relancé après la fin du build et passe. Ce problème de vérification n’a nécessité aucun changement applicatif.
 
-| Worker | Version initiale de l’adaptateur à 100 % | Bindings conservés |
-| --- | --- | --- |
-| Web | `eea386d2-57bd-44a5-9c58-58be0c219d87` | 50 |
-| Import | `a485ece6-a961-41a6-a644-cb1f0c95b816` | 9 |
-| Génération | `ea8d9982-1b73-4acf-81af-a7253dd8f664` | 30 |
+| Worker     | Version initiale de l’adaptateur à 100 % | Bindings conservés |
+| ---------- | ---------------------------------------- | ------------------ |
+| Web        | `eea386d2-57bd-44a5-9c58-58be0c219d87`   | 50                 |
+| Import     | `a485ece6-a961-41a6-a644-cb1f0c95b816`   | 9                  |
+| Génération | `ea8d9982-1b73-4acf-81af-a7253dd8f664`   | 30                 |
 
 Bindings complets et runtime comparés avant/après : identiques. Images des conteneurs existants conservées avec `--containers-rollout none`. Pas de migration, nouvelle clé ou ressource Cloudflare.
 

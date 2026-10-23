@@ -32,7 +32,6 @@ Chrome **local puis sur bienvu.online**, à **1536/390 px**, avec compte et job 
 ## Publication et contrôle distant
 
 Déploiement avec `--keep-vars --strict`, pipeline avec `--containers-rollout none` :
-
 - Génération **`d8f6af0c-bfb5-4ad6-a310-9074a5f1c6e1`**, web **`81c8f1a1-360f-415d-957d-572bcc728123`**, chacun **100 %**.
 - **28/25 bindings**, variables, secrets et compatibilité conservés. Image renderer **v13 / `9ba35b60…48bcdc`** inchangée, aucune migration ni remise à zéro.
 - Accueil/connexion **200**, API admin visiteur **401**. Le chunk client modifié servi par le domaine correspond au SHA-256 du build.

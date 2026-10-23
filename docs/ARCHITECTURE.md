@@ -4,19 +4,19 @@ Statut : comptes/imports et narration démontrés sur Cloudflare ; composition v
 
 ## Services
 
-| Composant | Choix proposé | Responsabilité |
-|---|---|---|
-| Application | Next.js standard + adaptateur Cloudflare sur Workers | Interface, sessions, routes serveur et accès autorisé aux fichiers |
-| Import | Worker TypeScript + Browser Run + Container privé Node/Sharp | TLS à IP épinglée, extraction structurée et photos réencodées |
-| Traitement durable | Cloudflare Workflows | Enchaînement des étapes, reprises et statut des jobs |
-| Données | Cloudflare D1 | Agences, annonces, jobs, abonnements, écritures de quota et coûts |
-| Fichiers | R2 privé | Photos validées, narration, manifeste et MP4 |
-| Rendu | Remotion dans Cloudflare Containers | Chromium et encodage vidéo dans un environnement Linux/Node |
-| Authentification | Better Auth + D1 ; e-mail/mot de passe et Google | Sessions et identité vérifiée ; deux modes demandés par Alex |
-| E-mails de compte | Binding Cloudflare Email Service | Confirmation et récupération ; simulateur local, domaine et Workers Paid requis pour le réel |
-| Texte | OpenAI Responses, `gpt-5.4-mini-2026-03-17` proposé/configurable | Sélection de formulations factuelles validées ; vrais appels depuis le Mac et Cloudflare validés au sprint 05 |
-| Voix | Google Cloud Text-to-Speech, Chirp 3 HD choisi par Alex le 28/09 | Synthèse française configurable ; [configuration et limites](VOIX-GOOGLE.md) |
-| Abonnements | Stripe Checkout + Billing + Customer Portal | Paiement récurrent et gestion client |
+| Composant          | Choix proposé                                                    | Responsabilité                                                                                                |
+| ------------------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Application        | Next.js standard + adaptateur Cloudflare sur Workers             | Interface, sessions, routes serveur et accès autorisé aux fichiers                                            |
+| Import             | Worker TypeScript + Browser Run + Container privé Node/Sharp     | TLS à IP épinglée, extraction structurée et photos réencodées                                                 |
+| Traitement durable | Cloudflare Workflows                                             | Enchaînement des étapes, reprises et statut des jobs                                                          |
+| Données            | Cloudflare D1                                                    | Agences, annonces, jobs, abonnements, écritures de quota et coûts                                             |
+| Fichiers           | R2 privé                                                         | Photos validées, narration, manifeste et MP4                                                                  |
+| Rendu              | Remotion dans Cloudflare Containers                              | Chromium et encodage vidéo dans un environnement Linux/Node                                                   |
+| Authentification   | Better Auth + D1 ; e-mail/mot de passe et Google                 | Sessions et identité vérifiée ; deux modes demandés par Alex                                                  |
+| E-mails de compte  | Binding Cloudflare Email Service                                 | Confirmation et récupération ; simulateur local, domaine et Workers Paid requis pour le réel                  |
+| Texte              | OpenAI Responses, `gpt-5.4-mini-2026-03-17` proposé/configurable | Sélection de formulations factuelles validées ; vrais appels depuis le Mac et Cloudflare validés au sprint 05 |
+| Voix               | Google Cloud Text-to-Speech, Chirp 3 HD choisi par Alex le 28/09 | Synthèse française configurable ; [configuration et limites](VOIX-GOOGLE.md)                                  |
+| Abonnements        | Stripe Checkout + Billing + Customer Portal                      | Paiement récurrent et gestion client                                                                          |
 
 « Tout Cloudflare » concerne l'hébergement applicatif, les données et le calcul. Stripe, Google OAuth et l'API d'IA sont des services externes proposés, pas des hébergeurs supplémentaires pour le code de BienVu. Ces choix restent documentés et remplaçables.
 
@@ -36,20 +36,20 @@ Le conteneur est un service privé de calcul déclenché à la demande, avec une
 
 ## Organisation cible du monorepo
 
-| Chemin proposé | Contenu |
-|---|---|
-| `apps/web` | Next.js, interface, Better Auth, routes utilisateur et webhook Stripe |
-| `apps/pipeline` | Worker d'import, Workflow et accès privé au contrôleur de rendu |
-| `apps/importer` | Transport Node TLS et décodage Sharp, Container privé `basic` |
-| `apps/renderer` | Serveur Node du conteneur, Remotion renderer, mesure audio et vérification MP4 |
-| `packages/contracts` | Types TypeScript et schémas de validation partagés, sans dépendance Node native |
-| `packages/narration`, `packages/voice` | Script et provenance, APIs texte/TTS, mesure PCM et timing compatibles Workers |
-| `packages/video` | Composition React Remotion et primitives visuelles |
-| `packages/db` | Schéma D1, migrations et fonctions d'accès côté serveur |
-| `packages/importers` | Extraction générique et adaptateurs par source |
-| `packages/voice` | Connecteur Google TTS et authentification compatibles Web APIs, mesure audio séparée dans Node |
-| `fixtures` | Petits échantillons autorisés ou synthétiques, expurgés et déterministes |
-| `docs/bienvu` | Ce dossier, suivi et rapports de sprint |
+| Chemin proposé                         | Contenu                                                                                        |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `apps/web`                             | Next.js, interface, Better Auth, routes utilisateur et webhook Stripe                          |
+| `apps/pipeline`                        | Worker d'import, Workflow et accès privé au contrôleur de rendu                                |
+| `apps/importer`                        | Transport Node TLS et décodage Sharp, Container privé `basic`                                  |
+| `apps/renderer`                        | Serveur Node du conteneur, Remotion renderer, mesure audio et vérification MP4                 |
+| `packages/contracts`                   | Types TypeScript et schémas de validation partagés, sans dépendance Node native                |
+| `packages/narration`, `packages/voice` | Script et provenance, APIs texte/TTS, mesure PCM et timing compatibles Workers                 |
+| `packages/video`                       | Composition React Remotion et primitives visuelles                                             |
+| `packages/db`                          | Schéma D1, migrations et fonctions d'accès côté serveur                                        |
+| `packages/importers`                   | Extraction générique et adaptateurs par source                                                 |
+| `packages/voice`                       | Connecteur Google TTS et authentification compatibles Web APIs, mesure audio séparée dans Node |
+| `fixtures`                             | Petits échantillons autorisés ou synthétiques, expurgés et déterministes                       |
+| `docs/bienvu`                          | Ce dossier, suivi et rapports de sprint                                                        |
 
 Un dépôt pnpm suffit ; n'ajouter un orchestrateur de monorepo que s'il résout un besoin identifié. Les Dockerfiles couvrent le renderer, le transport d'import privé et les outils locaux Linux. L'extension au transport d'import est motivée dans l'[ADR 0003](adr/0003-transport-import-cloudflare.md).
 

@@ -2,18 +2,18 @@
 
 État après la clôture du renderer (06) et du parcours durable Cloudflare (07), avec confirmation humaine du nouveau MP4 distant. Les anciens rapports conservent leurs résultats datés ; fixtures locales, données synthétiques sur infrastructure distante et vraies annonces restent distinguées.
 
-| Sprint | État | Suite |
-|---|---|---|
-| [00 — Faisabilité](sprints/SPRINT-00-FAISABILITE.md) | Technique démontrée | Facture/métriques du compte à rapprocher ; pas de nouvelle vidéo dans cette tranche |
-| [01 — Fondations](sprints/SPRINT-01-FONDATIONS.md) | Terminé | CI du commit accueil `01b67bf` réussie ; prochain lot à vérifier après push |
-| [02 — Comptes et marque](sprints/SPRINT-02-COMPTES-MARQUE.md) | Terminé, recette distante complétée | Marque appliquée aux vidéos aux sprints 06–07 ; ouverture des e-mails et exploitation au lancement |
-| [03 — Import agences](sprints/SPRINT-03-IMPORT-AGENCES.md) | Terminé, recette Cloudflare validée | Portails au sprint 04 ; échantillon réel limité à trois ventes |
-| [04 — Portails](sprints/SPRINT-04-PORTAILS.md) | Tranche déployée et recettée ; non clôturé | Sept liens explorés localement et quatre essais Cloudflare sans succès complet ; acquisition/galerie Bien’ici non validées (04.3) |
-| [05 — Texte/voix](sprints/SPRINT-05-TEXTE-VOIX.md) | Terminé, recette Cloudflare validée | Naturel et rythme de 20 s approuvés par Alex ; vrais appels depuis Workers, D1/R2 privés, reprise 0/0 ; Workflow désormais validé au sprint 07 |
-| [06 — Vidéo produit](sprints/SPRINT-06-VIDEO.md) | Terminé, rendu réel et confirmation humaine distante | Même renderer validé par le nouvel export du sprint 07 ; téléphone physique/Safari non vérifiés |
-| [07 — Parcours complet](sprints/SPRINT-07-PARCOURS.md) | Terminé, déployé sous accès de développement | Deux vidéos Cloudflare, Workflow, reprise, historique privé et téléchargement ; un crédit pour Alex, essai public au sprint 08 |
-| [08 — Abonnements](sprints/SPRINT-08-ABONNEMENTS.md) | À faire | Stripe test, quotas atomiques et attribution de l'essai unique |
-| [09 — Lancement](sprints/SPRINT-09-LANCEMENT.md) | À faire | Recette payante, conservation, exploitation, pages et décision commerciale |
+| Sprint                                                        | État                                                 | Suite                                                                                                                                          |
+| ------------------------------------------------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| [00 — Faisabilité](sprints/SPRINT-00-FAISABILITE.md)          | Technique démontrée                                  | Facture/métriques du compte à rapprocher ; pas de nouvelle vidéo dans cette tranche                                                            |
+| [01 — Fondations](sprints/SPRINT-01-FONDATIONS.md)            | Terminé                                              | CI du commit accueil `01b67bf` réussie ; prochain lot à vérifier après push                                                                    |
+| [02 — Comptes et marque](sprints/SPRINT-02-COMPTES-MARQUE.md) | Terminé, recette distante complétée                  | Marque appliquée aux vidéos aux sprints 06–07 ; ouverture des e-mails et exploitation au lancement                                             |
+| [03 — Import agences](sprints/SPRINT-03-IMPORT-AGENCES.md)    | Terminé, recette Cloudflare validée                  | Portails au sprint 04 ; échantillon réel limité à trois ventes                                                                                 |
+| [04 — Portails](sprints/SPRINT-04-PORTAILS.md)                | Tranche déployée et recettée ; non clôturé           | Sept liens explorés localement et quatre essais Cloudflare sans succès complet ; acquisition/galerie Bien’ici non validées (04.3)              |
+| [05 — Texte/voix](sprints/SPRINT-05-TEXTE-VOIX.md)            | Terminé, recette Cloudflare validée                  | Naturel et rythme de 20 s approuvés par Alex ; vrais appels depuis Workers, D1/R2 privés, reprise 0/0 ; Workflow désormais validé au sprint 07 |
+| [06 — Vidéo produit](sprints/SPRINT-06-VIDEO.md)              | Terminé, rendu réel et confirmation humaine distante | Même renderer validé par le nouvel export du sprint 07 ; téléphone physique/Safari non vérifiés                                                |
+| [07 — Parcours complet](sprints/SPRINT-07-PARCOURS.md)        | Terminé, déployé sous accès de développement         | Deux vidéos Cloudflare, Workflow, reprise, historique privé et téléchargement ; un crédit pour Alex, essai public au sprint 08                 |
+| [08 — Abonnements](sprints/SPRINT-08-ABONNEMENTS.md)          | À faire                                              | Stripe test, quotas atomiques et attribution de l'essai unique                                                                                 |
+| [09 — Lancement](sprints/SPRINT-09-LANCEMENT.md)              | À faire                                              | Recette payante, conservation, exploitation, pages et décision commerciale                                                                     |
 
 ## Sprint 02
 
@@ -27,16 +27,16 @@ Les callbacks OAuth négatifs sont des requêtes de test ; les consentements ré
 
 Le pont Node local est désormais réutilisé dans un **Cloudflare Container privé `basic`**, connecté par Service Binding. Il épingle les IP validées avec TLS, contrôle les redirections et décode/réencode les photos avec Sharp. Browser Run délègue son trafic autorisé au même transport. Le renderer vidéo et ses compteurs restent en pause. [ADR 0003](adr/0003-transport-import-cloudflare.md).
 
-| Critère | Preuve |
-|---|---|
-| Fixtures extraction | Vente/location, prix absent, contradictions, doublons et hors annonce ; tests locaux déterministes |
-| Trois agences réelles | Espaces Atypiques / Orpi / Century 21 : 12 / 11 / 7 photos, descriptions persistantes, D1/R2 privés relus |
-| Réseau | Vrais refus distants d'IP privées, DNS loopback, redirection privée et sous-requête Browser Run ; rebinding/mixte/flux hostiles avec ports injectés |
-| Navigateur | Page JS synthétique importée par le parcours produit ; quatre cycles réels avec défauts injectés ; six fermetures normales dans l'historique fournisseur |
-| Sans IA | Aucun appel texte/TTS/image IA dans cette tranche |
-| Description | Source et paragraphes conservés, provenance séparée des faits vérifiés ; relecture D1/API/interface |
-| Saisie manuelle | Location/photos synthétiques, vrai transport hébergé, reprise, normalisation, isolation et consultation |
-| Purge | Cron dix minutes, dossiers abandonnés/expirés, refus des écritures tardives et protection par job ; rapport détaillé de recette |
+| Critère               | Preuve                                                                                                                                                   |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fixtures extraction   | Vente/location, prix absent, contradictions, doublons et hors annonce ; tests locaux déterministes                                                       |
+| Trois agences réelles | Espaces Atypiques / Orpi / Century 21 : 12 / 11 / 7 photos, descriptions persistantes, D1/R2 privés relus                                                |
+| Réseau                | Vrais refus distants d'IP privées, DNS loopback, redirection privée et sous-requête Browser Run ; rebinding/mixte/flux hostiles avec ports injectés      |
+| Navigateur            | Page JS synthétique importée par le parcours produit ; quatre cycles réels avec défauts injectés ; six fermetures normales dans l'historique fournisseur |
+| Sans IA               | Aucun appel texte/TTS/image IA dans cette tranche                                                                                                        |
+| Description           | Source et paragraphes conservés, provenance séparée des faits vérifiés ; relecture D1/API/interface                                                      |
+| Saisie manuelle       | Location/photos synthétiques, vrai transport hébergé, reprise, normalisation, isolation et consultation                                                  |
+| Purge                 | Cron dix minutes, dossiers abandonnés/expirés, refus des écritures tardives et protection par job ; rapport détaillé de recette                          |
 
 Les locations et la page JS sont synthétiques. L'échantillon d'agences ne démontre ni compatibilité nationale ni adaptation aux portails. Les photographies des agences conservent leurs filigranes. [Résultats, coûts et preuves](preuves/sprint-03/CLOUDFLARE.md).
 

@@ -5,7 +5,6 @@ La page `/abonnement` reprend la maquette transmise par Alex : grand titre séri
 Les tarifs et contrats de crédits restent ceux déjà confirmés : 3/40/120 crédits mensuels à 0/19/49 € HT, packs 10/30/100 à 7/19/59 € HT, essai anonyme, portefeuille, historique paginé et gestion d’abonnement. Les recharges et informations du compte suivent les blocs de la maquette. Le choix d’un abonnement fait défiler la page vers sa confirmation, en respectant la préférence de mouvement réduit. Consentement et contrôle des rôles conservés ; Stripe reste en mode test.
 
 Vérifications réalisées :
-
 - `pnpm build:web` : compilation Next.js, TypeScript et bundle OpenNext réussis. Dry-run Wrangler avec la configuration existante et `git diff --check` réussis.
 - Chromium local puis sur les assets publiés : **12 scénarios**. Visiteur à **1536/1280/1024/900/768/620/390/320 px**, propriétaire à **1536/390 px**, rôle éditeur à **390 px**, abonnement actif à **1536 px**.
 - Tarifs et quotas, estimateur de 0 à 12 et retour à 0, équivalences à 5 crédits, boutons aux limites, absence de débordement, offre actuelle, solde mensuel/rechargé, confirmations d’abonnement et de recharge avec consentement/annulation, historique paginé, FAQ, droits d’achat et bouton de gestion vérifiés. Navigation vers l’Éditeur puis retour sans changement de largeur ou de taille des textes du menu.

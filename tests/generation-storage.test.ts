@@ -1,154 +1,312 @@
-import {test} from 'node:test';
-import {URL_IMPORT_QUOTAS} from '../packages/contracts/src/import-quotas';
+import { test } from 'node:test';
+import { URL_IMPORT_QUOTAS } from '../packages/contracts/src/import-quotas';
 import assert from 'node:assert/strict';
-import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
-import {migrateNarrationProbe,seedNarrationFixture} from '../scripts/narration-fixtures';
-import {admitGeneration,findGeneration,failGeneration,generationView,listGenerations,generationRights} from '../packages/db/src/index';
-import {generationVideo} from '../apps/web/lib/generations';
-import {generationPoster,findPublic,listPublic,ownerShares,publishGeneration,revokeGeneration,publicSitemapVideos} from '../apps/web/lib/sharing';
-import {generationSourcePhoto} from '../apps/web/lib/generation-source-photo';
-import {findImport} from '../packages/db/src/index';
-import {GeneratableListing} from '../packages/contracts/src/index';
-import {VideoManifest,videoManifestHash} from '../packages/contracts/src/video';
-import {videoReport,videoFixture} from '../fixtures/video';
-import {getJobVideo} from '../apps/pipeline/src/video-manifest';
+import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
+import { migrateNarrationProbe, seedNarrationFixture } from '../scripts/narration-fixtures';
+import {
+  admitGeneration,
+  findGeneration,
+  failGeneration,
+  generationView,
+  listGenerations,
+  generationRights,
+} from '../packages/db/src/index';
+import { generationVideo } from '../apps/web/lib/generations';
+import {
+  generationPoster,
+  findPublic,
+  listPublic,
+  ownerShares,
+  publishGeneration,
+  revokeGeneration,
+  publicSitemapVideos,
+} from '../apps/web/lib/sharing';
+import { generationSourcePhoto } from '../apps/web/lib/generation-source-photo';
+import { findImport } from '../packages/db/src/index';
+import { GeneratableListing } from '../packages/contracts/src/index';
+import { VideoManifest, videoManifestHash } from '../packages/contracts/src/video';
+import { videoReport, videoFixture } from '../fixtures/video';
+import { getJobVideo } from '../apps/pipeline/src/video-manifest';
 
-test('admission D1 atomique : idempotence, budget, isolation, quota et résultat tardif',async t=>{
-  const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:'export default {fetch(){return new Response("fixture")}}',compatibilityDate:'2026-09-27',d1Databases:['DB'],r2Buckets:['MEDIA']}));t.after(()=>mf.dispose());
-  const env=await mf.getBindings<{DB:D1Database;MEDIA:R2Bucket}>();await migrateNarrationProbe(env.DB);
-  const {agencyId,jobId}=await seedNarrationFixture(env.DB,'admission',true);
-  await env.DB.prepare('UPDATE agencies SET city=? WHERE id=?').bind('Lyon',agencyId).run();
-  await env.DB.prepare("UPDATE jobs SET status='failed',error_code='FIXTURE',lease_until=NULL WHERE id=?").bind(jobId).run();
-  const now=new Date().toISOString();await env.DB.prepare('INSERT INTO hosted_import_budget(month,baseline_cents,ceiling_cents,paused) VALUES(?,0,3500,0)').bind(now.slice(0,7)).run();
-  await env.DB.exec("UPDATE generation_control SET enabled=1");
-  await env.DB.prepare('INSERT INTO generation_access(agency_id,allocation_id,enabled) VALUES(?,?,1)').bind(agencyId,'allocation-admission').run();
-  await env.DB.prepare('INSERT INTO import_usage(day,attempts) VALUES(?,?) ON CONFLICT(day) DO UPDATE SET attempts=excluded.attempts').bind(now.slice(0,10),URL_IMPORT_QUOTAS.daily).run();
-  await assert.rejects(admitGeneration(env.DB,agencyId,'import-full-before-cost',{url:'https://agence.example/annonce/1'},'true'),/IMPORT_LIMIT/);
-  assert.equal((await env.DB.prepare('SELECT baseline_cents AS n FROM hosted_import_budget').first<{n:number}>())!.n,0);
-  assert.ok((await generationRights(env.DB,agencyId,'true')).importRetryAt);
+test('admission D1 atomique : idempotence, budget, isolation, quota et résultat tardif', async (t) => {
+  const mf = new Miniflare(
+    convertV4MiniflareOptions({
+      modules: true,
+      script: 'export default {fetch(){return new Response("fixture")}}',
+      compatibilityDate: '2026-09-27',
+      d1Databases: ['DB'],
+      r2Buckets: ['MEDIA'],
+    }),
+  );
+  t.after(() => mf.dispose());
+  const env = await mf.getBindings<{ DB: D1Database; MEDIA: R2Bucket }>();
+  await migrateNarrationProbe(env.DB);
+  const { agencyId, jobId } = await seedNarrationFixture(env.DB, 'admission', true);
+  await env.DB.prepare('UPDATE agencies SET city=? WHERE id=?').bind('Lyon', agencyId).run();
+  await env.DB.prepare("UPDATE jobs SET status='failed',error_code='FIXTURE',lease_until=NULL WHERE id=?")
+    .bind(jobId)
+    .run();
+  const now = new Date().toISOString();
+  await env.DB.prepare('INSERT INTO hosted_import_budget(month,baseline_cents,ceiling_cents,paused) VALUES(?,0,3500,0)')
+    .bind(now.slice(0, 7))
+    .run();
+  await env.DB.exec('UPDATE generation_control SET enabled=1');
+  await env.DB.prepare('INSERT INTO generation_access(agency_id,allocation_id,enabled) VALUES(?,?,1)')
+    .bind(agencyId, 'allocation-admission')
+    .run();
+  await env.DB.prepare(
+    'INSERT INTO import_usage(day,attempts) VALUES(?,?) ON CONFLICT(day) DO UPDATE SET attempts=excluded.attempts',
+  )
+    .bind(now.slice(0, 10), URL_IMPORT_QUOTAS.daily)
+    .run();
+  await assert.rejects(
+    admitGeneration(env.DB, agencyId, 'import-full-before-cost', { url: 'https://agence.example/annonce/1' }, 'true'),
+    /IMPORT_LIMIT/,
+  );
+  assert.equal(
+    (await env.DB.prepare('SELECT baseline_cents AS n FROM hosted_import_budget').first<{ n: number }>())!.n,
+    0,
+  );
+  assert.ok((await generationRights(env.DB, agencyId, 'true')).importRetryAt);
   // A prepared listing still generates even while scraping has exhausted its
   // daily quota. Personal uploads and existing listings do not scrape a portal.
-  const body={listingId:'listing-admission',subtitlesEnabled:false},key='same-admission-key-123456';
-  const [a,b]=await Promise.all([1,2].map(()=>admitGeneration(env.DB,agencyId,key,body,'true')));
-  assert.equal(a.jobId,b.jobId);assert.equal(a.status,'queued');assert.equal(a.workflowId,`generation-${a.jobId}`);
-  assert.equal(JSON.parse(a.input).subtitlesEnabled,false);
-  await assert.rejects(admitGeneration(env.DB,agencyId,key,{...body,subtitlesEnabled:true},'true'),/CONFLICT/);
+  const body = { listingId: 'listing-admission', subtitlesEnabled: false },
+    key = 'same-admission-key-123456';
+  const [a, b] = await Promise.all([1, 2].map(() => admitGeneration(env.DB, agencyId, key, body, 'true')));
+  assert.equal(a.jobId, b.jobId);
+  assert.equal(a.status, 'queued');
+  assert.equal(a.workflowId, `generation-${a.jobId}`);
+  assert.equal(JSON.parse(a.input).subtitlesEnabled, false);
+  await assert.rejects(admitGeneration(env.DB, agencyId, key, { ...body, subtitlesEnabled: true }, 'true'), /CONFLICT/);
   assert.equal(Object.hasOwn(JSON.parse(a.brand), 'city'), false); // Le moteur vidéo déjà déployé lit encore l’ancien contrat de marque.
-  assert.equal((await env.DB.prepare('SELECT reserved FROM allocations WHERE agency_id=?').bind(agencyId).first<{reserved:number}>())!.reserved,1);
-  assert.equal((await env.DB.prepare('SELECT baseline_cents AS n FROM hosted_import_budget').first<{n:number}>())!.n,120);
-  assert.equal((await env.DB.prepare('SELECT count(*) AS n FROM job_launch_intents').first<{n:number}>())!.n,1);
-  await assert.rejects(admitGeneration(env.DB,agencyId,key,{url:'https://agence.example/annonce/1'},'true'),/CONFLICT/);
-  await assert.rejects(admitGeneration(env.DB,agencyId,'another-key-12345678',body,'true'),/QUOTA_EXHAUSTED/);
-  await assert.rejects(admitGeneration(env.DB,agencyId,'spoofing-1234567890',{...body,agencyId:'another'},'true'),/VALIDATION_ERROR/);
-  assert.equal(await findGeneration(env.DB,'another-agency',a.jobId),null);
-  assert.deepEqual((await listGenerations(env.DB,'another-agency')).jobs,[]);
-  assert.equal((await listGenerations(env.DB,agencyId)).jobs.length,1);
-  const initial=await findGeneration(env.DB,agencyId,a.jobId);assert.equal(generationView(initial!).videoUrl,null);
-  assert.equal(generationView(initial!).sourceKind,'manual');
-  const imported=await findImport(env.DB,agencyId,'listing-admission');
-  const source=GeneratableListing.parse(JSON.parse(imported!.result!)).photos[0]!;
-  const sourceBytes=new Uint8Array(source.sizeBytes).fill(31);
-  await env.MEDIA.put(source.objectKey,sourceBytes,{customMetadata:{sha256:source.contentHash}});
-  const privatePhoto=await generationSourcePhoto(env,initial!);
-  assert.equal(privatePhoto.headers.get('Cache-Control'),'private, no-store');
-  assert.deepEqual(new Uint8Array(await privatePhoto.arrayBuffer()),sourceBytes);
-  await assert.rejects(generationSourcePhoto(env,{...initial!,listingId:'listing-elsewhere'}),/NOT_FOUND/);
+  assert.equal(
+    (await env.DB.prepare('SELECT reserved FROM allocations WHERE agency_id=?')
+      .bind(agencyId)
+      .first<{ reserved: number }>())!.reserved,
+    1,
+  );
+  assert.equal(
+    (await env.DB.prepare('SELECT baseline_cents AS n FROM hosted_import_budget').first<{ n: number }>())!.n,
+    120,
+  );
+  assert.equal((await env.DB.prepare('SELECT count(*) AS n FROM job_launch_intents').first<{ n: number }>())!.n, 1);
+  await assert.rejects(
+    admitGeneration(env.DB, agencyId, key, { url: 'https://agence.example/annonce/1' }, 'true'),
+    /CONFLICT/,
+  );
+  await assert.rejects(admitGeneration(env.DB, agencyId, 'another-key-12345678', body, 'true'), /QUOTA_EXHAUSTED/);
+  await assert.rejects(
+    admitGeneration(env.DB, agencyId, 'spoofing-1234567890', { ...body, agencyId: 'another' }, 'true'),
+    /VALIDATION_ERROR/,
+  );
+  assert.equal(await findGeneration(env.DB, 'another-agency', a.jobId), null);
+  assert.deepEqual((await listGenerations(env.DB, 'another-agency')).jobs, []);
+  assert.equal((await listGenerations(env.DB, agencyId)).jobs.length, 1);
+  const initial = await findGeneration(env.DB, agencyId, a.jobId);
+  assert.equal(generationView(initial!).videoUrl, null);
+  assert.equal(generationView(initial!).sourceKind, 'manual');
+  const imported = await findImport(env.DB, agencyId, 'listing-admission');
+  const source = GeneratableListing.parse(JSON.parse(imported!.result!)).photos[0]!;
+  const sourceBytes = new Uint8Array(source.sizeBytes).fill(31);
+  await env.MEDIA.put(source.objectKey, sourceBytes, { customMetadata: { sha256: source.contentHash } });
+  const privatePhoto = await generationSourcePhoto(env, initial!);
+  assert.equal(privatePhoto.headers.get('Cache-Control'), 'private, no-store');
+  assert.deepEqual(new Uint8Array(await privatePhoto.arrayBuffer()), sourceBytes);
+  await assert.rejects(generationSourcePhoto(env, { ...initial!, listingId: 'listing-elsewhere' }), /NOT_FOUND/);
   await env.DB.exec('UPDATE generation_control SET enabled=0');
-  assert.equal((await admitGeneration(env.DB,agencyId,key,body,'false')).jobId,a.jobId);
-  assert.equal((await generationRights(env.DB,agencyId,'true')).generationEnabled,false);
-  await assert.rejects(admitGeneration(env.DB,agencyId,'new-paused-12345678',body,'true'),/GENERATIONS_PAUSED/);
-  await failGeneration(env.DB,a,'GENERATION_TIMEOUT');await failGeneration(env.DB,a,'GENERATION_FAILED');
-  const quota=await env.DB.prepare('SELECT reserved,consumed FROM allocations WHERE agency_id=?').bind(agencyId).first();assert.deepEqual(quota,{reserved:0,consumed:0});
-  await assert.rejects(env.DB.prepare("UPDATE jobs SET status='ready',error_code=NULL WHERE id=?").bind(a.jobId).run(),/GENERATION_TERMINAL/);
-  await assert.rejects(generationVideo(new Request('https://test/video'),env,agencyId,a.jobId),/NOT_FOUND/);
-  assert.equal((await env.DB.prepare('SELECT baseline_cents AS n FROM hosted_import_budget').first<{n:number}>())!.n,120);
+  assert.equal((await admitGeneration(env.DB, agencyId, key, body, 'false')).jobId, a.jobId);
+  assert.equal((await generationRights(env.DB, agencyId, 'true')).generationEnabled, false);
+  await assert.rejects(admitGeneration(env.DB, agencyId, 'new-paused-12345678', body, 'true'), /GENERATIONS_PAUSED/);
+  await failGeneration(env.DB, a, 'GENERATION_TIMEOUT');
+  await failGeneration(env.DB, a, 'GENERATION_FAILED');
+  const quota = await env.DB.prepare('SELECT reserved,consumed FROM allocations WHERE agency_id=?')
+    .bind(agencyId)
+    .first();
+  assert.deepEqual(quota, { reserved: 0, consumed: 0 });
+  await assert.rejects(
+    env.DB.prepare("UPDATE jobs SET status='ready',error_code=NULL WHERE id=?").bind(a.jobId).run(),
+    /GENERATION_TERMINAL/,
+  );
+  await assert.rejects(generationVideo(new Request('https://test/video'), env, agencyId, a.jobId), /NOT_FOUND/);
+  assert.equal(
+    (await env.DB.prepare('SELECT baseline_cents AS n FROM hosted_import_budget').first<{ n: number }>())!.n,
+    120,
+  );
   await env.DB.exec('UPDATE generation_control SET enabled=1');
-  const ready=await admitGeneration(env.DB,agencyId,'ready-video-12345678',body,'true');
-  await assert.rejects(env.DB.prepare("UPDATE jobs SET status='ready',lease_until=NULL WHERE id=?").bind(ready.jobId).run(),/GENERATION_ARTIFACT_REQUIRED/);
-  const f=await videoFixture('trial',8),bytes=new Uint8Array([1,2,3,4,5,6]),report=videoReport('a'.repeat(64),f.manifest,bytes);
-  const objectKey=`agencies/${agencyId}/jobs/${ready.jobId}/video/output.mp4`;
-  await env.MEDIA.put(objectKey,bytes,{customMetadata:{sha256:report.sha256}});
-  await env.DB.batch([env.DB.prepare('INSERT INTO generation_artifacts VALUES(?,?,?,?)').bind(ready.jobId,objectKey,JSON.stringify(report),now),
-    env.DB.prepare("UPDATE jobs SET status='ready',lease_until=NULL WHERE id=?").bind(ready.jobId)]);
-  assert.deepEqual(await env.DB.prepare('SELECT reserved,consumed FROM allocations WHERE agency_id=?').bind(agencyId).first(),{reserved:0,consumed:1});
+  const ready = await admitGeneration(env.DB, agencyId, 'ready-video-12345678', body, 'true');
+  await assert.rejects(
+    env.DB.prepare("UPDATE jobs SET status='ready',lease_until=NULL WHERE id=?").bind(ready.jobId).run(),
+    /GENERATION_ARTIFACT_REQUIRED/,
+  );
+  const f = await videoFixture('trial', 8),
+    bytes = new Uint8Array([1, 2, 3, 4, 5, 6]),
+    report = videoReport('a'.repeat(64), f.manifest, bytes);
+  const objectKey = `agencies/${agencyId}/jobs/${ready.jobId}/video/output.mp4`;
+  await env.MEDIA.put(objectKey, bytes, { customMetadata: { sha256: report.sha256 } });
+  await env.DB.batch([
+    env.DB.prepare('INSERT INTO generation_artifacts VALUES(?,?,?,?)').bind(
+      ready.jobId,
+      objectKey,
+      JSON.stringify(report),
+      now,
+    ),
+    env.DB.prepare("UPDATE jobs SET status='ready',lease_until=NULL WHERE id=?").bind(ready.jobId),
+  ]);
+  assert.deepEqual(
+    await env.DB.prepare('SELECT reserved,consumed FROM allocations WHERE agency_id=?').bind(agencyId).first(),
+    { reserved: 0, consumed: 1 },
+  );
   await env.DB.exec('UPDATE generation_control SET enabled=0');
-  const file=await generationVideo(new Request('https://test/video',{headers:{Range:'bytes=1-3'}}),env,agencyId,ready.jobId);
-  assert.equal(file.status,206);assert.equal(file.headers.get('Content-Range'),'bytes 1-3/6');assert.deepEqual([...new Uint8Array(await file.arrayBuffer())],[2,3,4]);
-  assert.equal((await generationVideo(new Request('https://test/video',{headers:{Range:'bytes=80-100'}}),env,agencyId,ready.jobId)).status,416);
-  const download=await generationVideo(new Request('https://test/video?download=1'),env,agencyId,ready.jobId);assert.deepEqual([...new Uint8Array(await download.arrayBuffer())],[1,2,3,4,5,6]);
-  await assert.rejects(generationVideo(new Request('https://test/video'),env,'another-agency',ready.jobId),/NOT_FOUND/);
-  const prefix=`agencies/${agencyId}/jobs/${ready.jobId}/`,original=`agencies/${f.manifest.agencyId}/jobs/${f.manifest.jobId}/`;
-  const manifest=VideoManifest.parse({...f.manifest,agencyId,jobId:ready.jobId,listingId:'listing-admission',
-    brand:{...f.manifest.brand,id:agencyId},rights:{...f.manifest.rights,allocationId:'allocation-admission'},
-    photos:f.manifest.photos.map(photo=>({...photo,objectKey:photo.objectKey.replace(original,prefix)})),
-    audio:f.manifest.audio.map(track=>({...track,objectKey:track.objectKey.replace(original,prefix)}))});
-  const hash=await videoManifestHash(manifest),firstPhoto=manifest.photos[0],photoBytes=f.files.get(firstPhoto.id)!;
-  await env.MEDIA.put(firstPhoto.objectKey,photoBytes,{customMetadata:{manifestHash:hash}});
-  await env.DB.prepare("INSERT INTO video_manifests(job_id,agency_id,job_attempt,manifest_hash,manifest_json,sources_json,state,created_at,expires_at) VALUES(?,?,?,?,?,?,'prepared',?,?)")
-    .bind(ready.jobId,agencyId,1,hash,JSON.stringify(manifest),'[]',now,new Date(Date.now()+86400_000).toISOString()).run();
-  const poster=await generationPoster(env,agencyId,ready.jobId);
-  assert.equal(manifest.photos.length,8);assert.equal(manifest.photoTimeline?.length,8);
-  assert.equal(poster.headers.get('Content-Type'),'image/png');
-  assert.deepEqual(new Uint8Array(await poster.arrayBuffer()),new Uint8Array(photoBytes));
-  await assert.rejects(generationPoster(env,'another-agency',ready.jobId),/NOT_FOUND/);
-  const readyRow=(await findGeneration(env.DB,agencyId,ready.jobId))!;
-  assert.equal((await listGenerations(env.DB,agencyId,undefined,{status:'ready'})).jobs[0]?.id,ready.jobId);
-  assert.equal((await listGenerations(env.DB,agencyId,undefined,{status:'active'})).jobs.length,0);
-  assert.equal((await listGenerations(env.DB,agencyId,undefined,{query:readyRow.title.slice(0,9).toUpperCase()})).jobs.length,2);
-  const oldest=(await listGenerations(env.DB,agencyId,undefined,{sort:'oldest'})).jobs;
-  assert.equal(oldest.length,2);assert.ok(oldest[0]!.createdAt<=oldest[1]!.createdAt);
-  assert.deepEqual((await listPublic(env.DB)).videos,[]);
-  assert.deepEqual(await publicSitemapVideos(env.DB),[]);
-  await assert.rejects(publishGeneration(env,'another-agency',ready.jobId),/NOT_FOUND/);
-  await assert.rejects(publishGeneration(env,agencyId,a.jobId),/NOT_FOUND/);
-  await assert.rejects(publishGeneration(env,agencyId,ready.jobId),/CONFLICT/,'Explorer désactivé bloque les nouvelles publications');
-  await env.DB.exec("UPDATE site_feature_settings SET features_json='{\"explorer\":true}'");
-  const shared=await publishGeneration(env,agencyId,ready.jobId);
-  assert.equal((await publishGeneration(env,agencyId,ready.jobId)).id,shared.id);
-  assert.deepEqual(await ownerShares(env.DB,agencyId),[{jobId:ready.jobId,id:shared.id}]);
-  assert.deepEqual(await ownerShares(env.DB,'another-agency'),[]);
-  const listed=(await listPublic(env.DB)).videos;
-  assert.equal(listed.length,1);assert.equal(listed[0]?.id,shared.id);
-  assert.deepEqual((await publicSitemapVideos(env.DB)).map(video=>video.id),[shared.id]);
-  assert.equal(listed[0]?.title,readyRow.title);
-  assert.equal(listed[0]?.locality,'Lyon');
-  assert.equal(listed[0]?.propertyType,'apartment');
-  assert.equal((await listPublic(env.DB,undefined,{query:'Lyon'})).videos.length,1);
-  assert.equal((await listPublic(env.DB,undefined,{query:'Aucune ville'})).videos.length,0);
-  assert.equal((await listPublic(env.DB,undefined,{category:'apartments'})).videos.length,1);
-  assert.equal((await listPublic(env.DB,undefined,{category:'houses'})).videos.length,0);
-  assert.equal((await listPublic(env.DB,undefined,{category:'exceptional'})).videos.length,0);
-  assert.equal((await listPublic(env.DB,undefined,{sort:'oldest'})).videos[0]?.id,shared.id);
-  await assert.rejects(listPublic(env.DB,undefined,{query:'a'.repeat(81)}),/VALIDATION_ERROR/);
-  assert.equal((await findPublic(env.DB,shared.id)).row.agencyId,agencyId);
-  const publicFile=await generationVideo(new Request('https://test/video',{headers:{Range:'bytes=1-3'}}),env,
-    (await findPublic(env.DB,shared.id)).row.agencyId,(await findPublic(env.DB,shared.id)).row.jobId);
-  assert.equal(publicFile.status,206);assert.deepEqual([...new Uint8Array(await publicFile.arrayBuffer())],[2,3,4]);
-  await assert.rejects(revokeGeneration(env.DB,'another-agency',ready.jobId),/NOT_FOUND/);
-  await env.DB.exec("UPDATE site_feature_settings SET features_json='{\"explorer\":false}'");
-  assert.equal((await findPublic(env.DB,shared.id)).view.id,shared.id,'Un lien existant reste accessible');
-  await assert.rejects(publishGeneration(env,agencyId,ready.jobId),/CONFLICT/);
-  await revokeGeneration(env.DB,agencyId,ready.jobId);
-  await env.DB.exec("UPDATE site_feature_settings SET features_json='{\"explorer\":true}'");
-  assert.deepEqual(await publicSitemapVideos(env.DB),[]);
-  assert.deepEqual((await listPublic(env.DB)).videos,[]);
-  await assert.rejects(findPublic(env.DB,shared.id),/NOT_FOUND/);
-  assert.deepEqual(await ownerShares(env.DB,agencyId),[]);
-  const republished=await publishGeneration(env,agencyId,ready.jobId);
-  assert.notEqual(republished.id,shared.id);
-  await assert.rejects(findPublic(env.DB,shared.id),/NOT_FOUND/);
-  await env.DB.prepare('UPDATE generation_runs SET expires_at=? WHERE job_id=?').bind(new Date(Date.now()-1000).toISOString(),ready.jobId).run();
-  await env.DB.prepare('UPDATE video_manifests SET expires_at=? WHERE job_id=?').bind(new Date(Date.now()-1000).toISOString(),ready.jobId).run();
-  await env.DB.prepare('UPDATE listing_imports SET expires_at=? WHERE id=?').bind(new Date(Date.now()-1000).toISOString(),'listing-admission').run();
-  const retained=(await findGeneration(env.DB,agencyId,ready.jobId))!;
-  assert.equal(retained.expiresAt,null);
-  assert.equal(generationView(retained,Date.now()+365*86400_000).downloadUrl,`/api/generations/${ready.jobId}/video?download=1`);
-  assert.equal((await listPublic(env.DB)).videos[0]?.id,republished.id);
-  assert.equal((await findPublic(env.DB,republished.id)).view.expiresAt,null);
-  assert.equal((await publishGeneration(env,agencyId,ready.jobId)).id,republished.id);
-  assert.equal((await generationVideo(new Request('https://test/video'),env,agencyId,ready.jobId)).status,200);
-  assert.equal((await generationPoster(env,agencyId,ready.jobId)).status,200);
-  assert.equal((await generationSourcePhoto(env,retained)).status,200);
-  assert.equal((await getJobVideo(env.DB,agencyId,ready.jobId))?.hash,hash);
-  await assert.rejects(env.DB.prepare('UPDATE generation_runs SET storage_permanent=0 WHERE job_id=?').bind(ready.jobId).run(),/FORBIDDEN/);
+  const file = await generationVideo(
+    new Request('https://test/video', { headers: { Range: 'bytes=1-3' } }),
+    env,
+    agencyId,
+    ready.jobId,
+  );
+  assert.equal(file.status, 206);
+  assert.equal(file.headers.get('Content-Range'), 'bytes 1-3/6');
+  assert.deepEqual([...new Uint8Array(await file.arrayBuffer())], [2, 3, 4]);
+  assert.equal(
+    (
+      await generationVideo(
+        new Request('https://test/video', { headers: { Range: 'bytes=80-100' } }),
+        env,
+        agencyId,
+        ready.jobId,
+      )
+    ).status,
+    416,
+  );
+  const download = await generationVideo(new Request('https://test/video?download=1'), env, agencyId, ready.jobId);
+  assert.deepEqual([...new Uint8Array(await download.arrayBuffer())], [1, 2, 3, 4, 5, 6]);
+  await assert.rejects(
+    generationVideo(new Request('https://test/video'), env, 'another-agency', ready.jobId),
+    /NOT_FOUND/,
+  );
+  const prefix = `agencies/${agencyId}/jobs/${ready.jobId}/`,
+    original = `agencies/${f.manifest.agencyId}/jobs/${f.manifest.jobId}/`;
+  const manifest = VideoManifest.parse({
+    ...f.manifest,
+    agencyId,
+    jobId: ready.jobId,
+    listingId: 'listing-admission',
+    brand: { ...f.manifest.brand, id: agencyId },
+    rights: { ...f.manifest.rights, allocationId: 'allocation-admission' },
+    photos: f.manifest.photos.map((photo) => ({ ...photo, objectKey: photo.objectKey.replace(original, prefix) })),
+    audio: f.manifest.audio.map((track) => ({ ...track, objectKey: track.objectKey.replace(original, prefix) })),
+  });
+  const hash = await videoManifestHash(manifest),
+    firstPhoto = manifest.photos[0],
+    photoBytes = f.files.get(firstPhoto.id)!;
+  await env.MEDIA.put(firstPhoto.objectKey, photoBytes, { customMetadata: { manifestHash: hash } });
+  await env.DB.prepare(
+    "INSERT INTO video_manifests(job_id,agency_id,job_attempt,manifest_hash,manifest_json,sources_json,state,created_at,expires_at) VALUES(?,?,?,?,?,?,'prepared',?,?)",
+  )
+    .bind(
+      ready.jobId,
+      agencyId,
+      1,
+      hash,
+      JSON.stringify(manifest),
+      '[]',
+      now,
+      new Date(Date.now() + 86400_000).toISOString(),
+    )
+    .run();
+  const poster = await generationPoster(env, agencyId, ready.jobId);
+  assert.equal(manifest.photos.length, 8);
+  assert.equal(manifest.photoTimeline?.length, 8);
+  assert.equal(poster.headers.get('Content-Type'), 'image/png');
+  assert.deepEqual(new Uint8Array(await poster.arrayBuffer()), new Uint8Array(photoBytes));
+  await assert.rejects(generationPoster(env, 'another-agency', ready.jobId), /NOT_FOUND/);
+  const readyRow = (await findGeneration(env.DB, agencyId, ready.jobId))!;
+  assert.equal((await listGenerations(env.DB, agencyId, undefined, { status: 'ready' })).jobs[0]?.id, ready.jobId);
+  assert.equal((await listGenerations(env.DB, agencyId, undefined, { status: 'active' })).jobs.length, 0);
+  assert.equal(
+    (await listGenerations(env.DB, agencyId, undefined, { query: readyRow.title.slice(0, 9).toUpperCase() })).jobs
+      .length,
+    2,
+  );
+  const oldest = (await listGenerations(env.DB, agencyId, undefined, { sort: 'oldest' })).jobs;
+  assert.equal(oldest.length, 2);
+  assert.ok(oldest[0]!.createdAt <= oldest[1]!.createdAt);
+  assert.deepEqual((await listPublic(env.DB)).videos, []);
+  assert.deepEqual(await publicSitemapVideos(env.DB), []);
+  await assert.rejects(publishGeneration(env, 'another-agency', ready.jobId), /NOT_FOUND/);
+  await assert.rejects(publishGeneration(env, agencyId, a.jobId), /NOT_FOUND/);
+  await assert.rejects(
+    publishGeneration(env, agencyId, ready.jobId),
+    /CONFLICT/,
+    'Explorer désactivé bloque les nouvelles publications',
+  );
+  await env.DB.exec('UPDATE site_feature_settings SET features_json=\'{"explorer":true}\'');
+  const shared = await publishGeneration(env, agencyId, ready.jobId);
+  assert.equal((await publishGeneration(env, agencyId, ready.jobId)).id, shared.id);
+  assert.deepEqual(await ownerShares(env.DB, agencyId), [{ jobId: ready.jobId, id: shared.id }]);
+  assert.deepEqual(await ownerShares(env.DB, 'another-agency'), []);
+  const listed = (await listPublic(env.DB)).videos;
+  assert.equal(listed.length, 1);
+  assert.equal(listed[0]?.id, shared.id);
+  assert.deepEqual(
+    (await publicSitemapVideos(env.DB)).map((video) => video.id),
+    [shared.id],
+  );
+  assert.equal(listed[0]?.title, readyRow.title);
+  assert.equal(listed[0]?.locality, 'Lyon');
+  assert.equal(listed[0]?.propertyType, 'apartment');
+  assert.equal((await listPublic(env.DB, undefined, { query: 'Lyon' })).videos.length, 1);
+  assert.equal((await listPublic(env.DB, undefined, { query: 'Aucune ville' })).videos.length, 0);
+  assert.equal((await listPublic(env.DB, undefined, { category: 'apartments' })).videos.length, 1);
+  assert.equal((await listPublic(env.DB, undefined, { category: 'houses' })).videos.length, 0);
+  assert.equal((await listPublic(env.DB, undefined, { category: 'exceptional' })).videos.length, 0);
+  assert.equal((await listPublic(env.DB, undefined, { sort: 'oldest' })).videos[0]?.id, shared.id);
+  await assert.rejects(listPublic(env.DB, undefined, { query: 'a'.repeat(81) }), /VALIDATION_ERROR/);
+  assert.equal((await findPublic(env.DB, shared.id)).row.agencyId, agencyId);
+  const publicFile = await generationVideo(
+    new Request('https://test/video', { headers: { Range: 'bytes=1-3' } }),
+    env,
+    (await findPublic(env.DB, shared.id)).row.agencyId,
+    (await findPublic(env.DB, shared.id)).row.jobId,
+  );
+  assert.equal(publicFile.status, 206);
+  assert.deepEqual([...new Uint8Array(await publicFile.arrayBuffer())], [2, 3, 4]);
+  await assert.rejects(revokeGeneration(env.DB, 'another-agency', ready.jobId), /NOT_FOUND/);
+  await env.DB.exec('UPDATE site_feature_settings SET features_json=\'{"explorer":false}\'');
+  assert.equal((await findPublic(env.DB, shared.id)).view.id, shared.id, 'Un lien existant reste accessible');
+  await assert.rejects(publishGeneration(env, agencyId, ready.jobId), /CONFLICT/);
+  await revokeGeneration(env.DB, agencyId, ready.jobId);
+  await env.DB.exec('UPDATE site_feature_settings SET features_json=\'{"explorer":true}\'');
+  assert.deepEqual(await publicSitemapVideos(env.DB), []);
+  assert.deepEqual((await listPublic(env.DB)).videos, []);
+  await assert.rejects(findPublic(env.DB, shared.id), /NOT_FOUND/);
+  assert.deepEqual(await ownerShares(env.DB, agencyId), []);
+  const republished = await publishGeneration(env, agencyId, ready.jobId);
+  assert.notEqual(republished.id, shared.id);
+  await assert.rejects(findPublic(env.DB, shared.id), /NOT_FOUND/);
+  await env.DB.prepare('UPDATE generation_runs SET expires_at=? WHERE job_id=?')
+    .bind(new Date(Date.now() - 1000).toISOString(), ready.jobId)
+    .run();
+  await env.DB.prepare('UPDATE video_manifests SET expires_at=? WHERE job_id=?')
+    .bind(new Date(Date.now() - 1000).toISOString(), ready.jobId)
+    .run();
+  await env.DB.prepare('UPDATE listing_imports SET expires_at=? WHERE id=?')
+    .bind(new Date(Date.now() - 1000).toISOString(), 'listing-admission')
+    .run();
+  const retained = (await findGeneration(env.DB, agencyId, ready.jobId))!;
+  assert.equal(retained.expiresAt, null);
+  assert.equal(
+    generationView(retained, Date.now() + 365 * 86400_000).downloadUrl,
+    `/api/generations/${ready.jobId}/video?download=1`,
+  );
+  assert.equal((await listPublic(env.DB)).videos[0]?.id, republished.id);
+  assert.equal((await findPublic(env.DB, republished.id)).view.expiresAt, null);
+  assert.equal((await publishGeneration(env, agencyId, ready.jobId)).id, republished.id);
+  assert.equal((await generationVideo(new Request('https://test/video'), env, agencyId, ready.jobId)).status, 200);
+  assert.equal((await generationPoster(env, agencyId, ready.jobId)).status, 200);
+  assert.equal((await generationSourcePhoto(env, retained)).status, 200);
+  assert.equal((await getJobVideo(env.DB, agencyId, ready.jobId))?.hash, hash);
+  await assert.rejects(
+    env.DB.prepare('UPDATE generation_runs SET storage_permanent=0 WHERE job_id=?').bind(ready.jobId).run(),
+    /FORBIDDEN/,
+  );
 });

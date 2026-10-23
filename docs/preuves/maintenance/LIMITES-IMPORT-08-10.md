@@ -3,7 +3,6 @@
 ## Changement demandé
 
 Alex a consommé 55 imports le 8 octobre et souhaite disposer d’une marge pour finir le mois. Le plafond partagé passe de **60 à 300 tentatives par mois UTC** ; les **20 tentatives quotidiennes UTC** restent en place. Ce quota est distinct des crédits vidéo et du budget financier. Il s’applique aux mois suivants également.
-
 - Migration additive `0053_monthly_import_allowance.sql` : remplacement transactionnel du trigger `import_budget`, sans modifier `import_usage` ni les coûts provisionnés. L’admission reste atomique entre agences.
 - Contrat `URL_IMPORT_QUOTAS` partagé par les droits d’import, l’admission de génération, l’affichage superadmin et les sondes opérateur. Le service de génération est publié aussi, car il utilise les droits avant d’admettre une URL.
 - Les dossiers manuels et démonstrations restent hors compteur de scraping ; leurs protections financières, limites de photos et cadence de création sont conservées. Les échecs restent comptés et un rejeu idempotent ne consomme pas de nouvelle tentative.
@@ -32,10 +31,10 @@ Sauvegarde SQL privée avant migration : **1 421 406 octets**, SHA-256 `5025c8cf
 
 Versions publiées à **100 %** :
 
-| Worker | Version | Bindings conservés |
-| --- | --- | --- |
-| Web, `bienvu.online` | `6d500470-9f6e-4756-a875-00d7c6f9a63c` | 50 |
-| Génération | `ca1e8dd6-4e10-4a9d-b5be-02e1a9ba9365` | 30 |
+| Worker               | Version                                | Bindings conservés |
+| -------------------- | -------------------------------------- | ------------------ |
+| Web, `bienvu.online` | `6d500470-9f6e-4756-a875-00d7c6f9a63c` | 50                 |
+| Génération           | `ca1e8dd6-4e10-4a9d-b5be-02e1a9ba9365` | 30                 |
 
 Les bindings avant/après sont identiques, y compris les variables, secrets, ressources et services. Le déploiement de génération utilise `--containers-rollout none` : image du renderer conservée, aucun nouveau rendu. Importer inchangé.
 

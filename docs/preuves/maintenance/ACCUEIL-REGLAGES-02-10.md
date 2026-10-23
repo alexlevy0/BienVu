@@ -9,7 +9,6 @@ Demande d’Alex : retirer la ligne sous « Votre studio immobilier », ajouter 
 ## Recette locale
 
 TypeScript web, build OpenNext, dry-run Wrangler et diff réussis. Chrome à **1536 / 390 px**, connecté puis anonyme sur API simulées :
-
 - en-tête sans bordure et ombre présente ;
 - ouverture, fermeture au second clic et réouverture ;
 - style Cinéma, voix désactivée, sous-titres désactivés et durée de 40 s conservés ;

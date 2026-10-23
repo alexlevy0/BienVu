@@ -1,9 +1,9 @@
-import {EntityId, JobStage, publicErrors, type PublicErrorCode} from '@bienvu/contracts';
+import { EntityId, JobStage, publicErrors, type PublicErrorCode } from '@bienvu/contracts';
 export * from './ai';
 
 export function requestContext() {
   // Ne pas faire confiance à un identifiant fourni par le navigateur.
-  return {requestId: crypto.randomUUID(), startedAt: Date.now()};
+  return { requestId: crypto.randomUUID(), startedAt: Date.now() };
 }
 
 export type RequestContext = ReturnType<typeof requestContext>;
@@ -19,12 +19,14 @@ export function diagnosticRecord(context: RequestContext, input: Diagnostic) {
   // Liste blanche : ni Request, ni headers, URL, corps, message d'exception ou stack.
   return {
     requestId: context.requestId,
-    event: ['request_completed', 'request_failed', 'generation_paused'].includes(input.event) ? input.event : 'request_failed',
+    event: ['request_completed', 'request_failed', 'generation_paused'].includes(input.event)
+      ? input.event
+      : 'request_failed',
     status: Number.isInteger(input.status) && input.status >= 100 && input.status <= 599 ? input.status : 500,
     durationMs: Math.max(0, Date.now() - context.startedAt),
-    ...(input.code && Object.hasOwn(publicErrors, input.code) ? {code: input.code} : {}),
-    ...(input.jobId && EntityId.safeParse(input.jobId).success ? {jobId: input.jobId} : {}),
-    ...(input.stage && JobStage.safeParse(input.stage).success ? {stage: input.stage} : {}),
+    ...(input.code && Object.hasOwn(publicErrors, input.code) ? { code: input.code } : {}),
+    ...(input.jobId && EntityId.safeParse(input.jobId).success ? { jobId: input.jobId } : {}),
+    ...(input.stage && JobStage.safeParse(input.stage).success ? { stage: input.stage } : {}),
   };
 }
 

@@ -1,105 +1,420 @@
 'use client';
-import {analyticsFetch as fetch} from '../lib/product-analytics';
-import type {VideoCustomization,VideoDuration,VideoAspectRatio} from '@bienvu/contracts';
-import {useCallback,useEffect,useRef,useState} from 'react';
+import { analyticsFetch as fetch } from '../lib/product-analytics';
+import type { VideoCustomization, VideoDuration, VideoAspectRatio } from '@bienvu/contracts';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import {GenerationView,publicErrors,requestedAnimations,type PublicErrorCode} from '@bienvu/contracts';
-import {generationActive} from './generation-progress-state';
-import {generationSteps,generationMapOmissionText,generationAnimationOmissionText} from '../lib/generation-steps';
-import {GenerationAnimationCounter} from './generation-animation-counter';
-import {GenerationMapConfirmation} from './generation-map-confirmation';
-import {GenerationQueueNotice} from './generation-queue-notice';
-import {GenerationCelebration} from './generation-celebration';
-import {anonymousGenerationScope,useGenerationStore} from './generation-store';
-import {submitTrialManual,TrialManualFailure,type TrialManualSettings,type TrialManualInput,type TrialManualIntent} from '../lib/anonymous-manual-client';
-import {TurnstileCheck} from './turnstile-check';
-import {announceGenerationStarted} from '../lib/browser-notification-client';
+import { GenerationView, publicErrors, requestedAnimations, type PublicErrorCode } from '@bienvu/contracts';
+import { generationActive } from './generation-progress-state';
+import { generationSteps, generationMapOmissionText, generationAnimationOmissionText } from '../lib/generation-steps';
+import { GenerationAnimationCounter } from './generation-animation-counter';
+import { GenerationMapConfirmation } from './generation-map-confirmation';
+import { GenerationQueueNotice } from './generation-queue-notice';
+import { GenerationCelebration } from './generation-celebration';
+import { anonymousGenerationScope, useGenerationStore } from './generation-store';
+import {
+  submitTrialManual,
+  TrialManualFailure,
+  type TrialManualSettings,
+  type TrialManualInput,
+  type TrialManualIntent,
+} from '../lib/anonymous-manual-client';
+import { TurnstileCheck } from './turnstile-check';
+import { announceGenerationStarted } from '../lib/browser-notification-client';
 // The token lives only in memory. The HttpOnly session is the ownership proof.
-type TrialReply={error?:{message?:string};enabled:boolean;siteKey:string|null;used:boolean;job:unknown};
-async function value(response:Response){const body=await response.json() as TrialReply;if(!response.ok)throw new Error(body.error?.message??'La demande a été interrompue. Réessayez.');return body;}
-export function useAnonymousTrial(enabled:boolean) {
-  const {setJob:storeJob}=useGenerationStore();
-  const [job,setJob]=useState<GenerationView|null>(null),[siteKey,setSiteKey]=useState<string|null>(null),[available,setAvailable]=useState(false),[used,setUsed]=useState(false),[failure,setFailure]=useState(''),[loaded,setLoaded]=useState(false);
-  const [token,setToken]=useState(''),[challenge,setChallenge]=useState(false),[widgetVersion,setWidgetVersion]=useState(0);
-  const [pendingManual,setPendingManual]=useState<{input:TrialManualInput;settings:TrialManualSettings}|null>(null),
-    [preparingManual,setPreparingManual]=useState(false),[manualProgress,setManualProgress]=useState('');
-  const manualIntent=useRef<TrialManualIntent|null>(null);
-  const lock=useRef(false),intent=useRef<{url:string;key:string;subtitlesEnabled:boolean;voiceEnabled:boolean;durationSeconds:VideoDuration;aspectRatio:VideoAspectRatio;customization?:VideoCustomization}|null>(null);
-  const refresh=useCallback(async()=>{try{const data=await value(await fetch('/api/trial',{cache:'no-store'}));setAvailable(data.enabled);setSiteKey(data.siteKey);setUsed(data.used);setJob(data.job?GenerationView.parse(data.job):null);setLoaded(true);setFailure('');}catch{setFailure('Impossible de retrouver votre essai. Réessayez.');setLoaded(true);}},[]);
-  useEffect(()=>{if(enabled)void refresh();},[enabled,refresh]);
-  useEffect(()=>{if(enabled&&job?.ownership==='anonymous')storeJob(job,anonymousGenerationScope);},[enabled,job,storeJob]);
-  useEffect(()=>{if(!enabled||!job||!generationActive(job)||job.ownership==='owned')return;const timer=setInterval(()=>void refresh(),4000);return()=>clearInterval(timer);},[enabled,job?.id,job?.status,job?.ownership,refresh]);
-  async function start(url:string,verifiedToken?:string,subtitlesEnabled=true,customization?:VideoCustomization,voiceEnabled=true,durationSeconds:VideoDuration=20,aspectRatio:VideoAspectRatio='9:16') {
-    if(lock.current)return;setFailure('');
-    if(requestedAnimations(customization)){setFailure(publicErrors.RUNWAY_LOGIN_REQUIRED[1]);return;}
-    if(!loaded){setFailure('Votre navigateur est en cours de vérification. Réessayez dans un instant.');return;}
-    if(!available){setFailure(publicErrors.ANONYMOUS_UNAVAILABLE[1]);return;}
-    if(used){setFailure(publicErrors.TRIAL_USED[1]);return;}
-    if(job&&generationActive(job)){return;}
-    const currentToken=verifiedToken??token;
-    if(!currentToken&&!intent.current){setChallenge(true);return;}
-    if(intent.current?.url!==url||intent.current?.subtitlesEnabled!==subtitlesEnabled||intent.current?.voiceEnabled!==voiceEnabled||intent.current?.durationSeconds!==durationSeconds||intent.current?.aspectRatio!==aspectRatio||JSON.stringify(intent.current?.customization)!==JSON.stringify(customization))intent.current={url,key:crypto.randomUUID(),subtitlesEnabled,voiceEnabled,durationSeconds,aspectRatio,customization};
-    lock.current=true;
-    try{
-      const response=await fetch('/api/trial',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':intent.current.key},body:JSON.stringify({url,subtitlesEnabled,voiceEnabled,durationSeconds,aspectRatio,...(customization?{customization}:{}),turnstileToken:currentToken})});
-      const body=await response.json() as {error?:{code?:string;message?:string}};if(!response.ok){if(body.error?.code==='BOT_VERIFICATION_FAILED'){intent.current=null;setChallenge(true);}throw new Error(body.error?.message??'La création n’a pas démarré. Réessayez.');}
-      const next=GenerationView.parse(body);announceGenerationStarted(next);setJob(next);setChallenge(false);intent.current=null;
-    }catch(e){setFailure(e instanceof Error?e.message:'La connexion a été interrompue. Réessayez pour retrouver votre demande.');}
-    finally{setToken('');setWidgetVersion(n=>n+1);lock.current=false;}
-  }
-  async function startManual(input:TrialManualInput,settings:TrialManualSettings,verifiedToken?:string){
-    if(lock.current)return null;setFailure('');
-    if(requestedAnimations(settings.customization)){setFailure(publicErrors.RUNWAY_LOGIN_REQUIRED[1]);return null;}
-    if(!loaded){setFailure('Votre navigateur est en cours de vérification. Réessayez dans un instant.');return null;}
-    if(!available){setFailure(publicErrors.ANONYMOUS_UNAVAILABLE[1]);return null;}
-    if(used){setFailure(publicErrors.TRIAL_USED[1]);return null;}
-    if(job&&generationActive(job)){setFailure(publicErrors.GENERATION_BUSY[1]);return null;}
-    const fingerprint=JSON.stringify({listing:input.listing,...settings});
-    if(!manualIntent.current){try{const saved=JSON.parse(sessionStorage.getItem('bienvu:trial-manual-request')??'null') as TrialManualIntent|null;
-      if(saved&&typeof saved.fingerprint==='string'&&typeof saved.key==='string')manualIntent.current=saved;
-    }catch{/* Optional retry cache. Ownership remains in the HttpOnly cookie. */}}
-    if(manualIntent.current?.fingerprint!==fingerprint)manualIntent.current=null;
-    const currentToken=verifiedToken??token;
-    if(!currentToken&&!manualIntent.current){setPendingManual({input,settings});setChallenge(true);return null;}
-    manualIntent.current??={fingerprint,key:crypto.randomUUID()};
-    try{sessionStorage.setItem('bienvu:trial-manual-request',JSON.stringify(manualIntent.current));}catch{}
-    lock.current=true;setPreparingManual(true);setPendingManual(null);setChallenge(false);
-    try{
-      const result=await submitTrialManual(input,settings,manualIntent.current,currentToken,setManualProgress);
-      announceGenerationStarted(result);setJob(result);manualIntent.current=null;try{sessionStorage.removeItem('bienvu:trial-manual-request');}catch{}return result;
-    }catch(error){
-      if(error instanceof TrialManualFailure){
-        if(error.code==='BOT_VERIFICATION_FAILED'){setPendingManual({input,settings});setChallenge(true);}
-        if(error.code==='CONFLICT'||error.code==='NOT_FOUND'){manualIntent.current=null;try{sessionStorage.removeItem('bienvu:trial-manual-request');}catch{}}
+type TrialReply = {
+  error?: { message?: string };
+  enabled: boolean;
+  siteKey: string | null;
+  used: boolean;
+  job: unknown;
+};
+async function value(response: Response) {
+  const body = (await response.json()) as TrialReply;
+  if (!response.ok) throw new Error(body.error?.message ?? 'La demande a été interrompue. Réessayez.');
+  return body;
+}
+export function useAnonymousTrial(enabled: boolean) {
+  const { setJob: storeJob } = useGenerationStore();
+  const [job, setJob] = useState<GenerationView | null>(null),
+    [siteKey, setSiteKey] = useState<string | null>(null),
+    [available, setAvailable] = useState(false),
+    [used, setUsed] = useState(false),
+    [failure, setFailure] = useState(''),
+    [loaded, setLoaded] = useState(false);
+  const [token, setToken] = useState(''),
+    [challenge, setChallenge] = useState(false),
+    [widgetVersion, setWidgetVersion] = useState(0);
+  const [pendingManual, setPendingManual] = useState<{ input: TrialManualInput; settings: TrialManualSettings } | null>(
+      null,
+    ),
+    [preparingManual, setPreparingManual] = useState(false),
+    [manualProgress, setManualProgress] = useState('');
+  const manualIntent = useRef<TrialManualIntent | null>(null);
+  const lock = useRef(false),
+    intent = useRef<{
+      url: string;
+      key: string;
+      subtitlesEnabled: boolean;
+      voiceEnabled: boolean;
+      durationSeconds: VideoDuration;
+      aspectRatio: VideoAspectRatio;
+      customization?: VideoCustomization;
+    } | null>(null);
+  const refresh = useCallback(async () => {
+    try {
+      const data = await value(await fetch('/api/trial', { cache: 'no-store' }));
+      setAvailable(data.enabled);
+      setSiteKey(data.siteKey);
+      setUsed(data.used);
+      setJob(data.job ? GenerationView.parse(data.job) : null);
+      setLoaded(true);
+      setFailure('');
+    } catch {
+      setFailure('Impossible de retrouver votre essai. Réessayez.');
+      setLoaded(true);
+    }
+  }, []);
+  useEffect(() => {
+    if (enabled) void refresh();
+  }, [enabled, refresh]);
+  useEffect(() => {
+    if (enabled && job?.ownership === 'anonymous') storeJob(job, anonymousGenerationScope);
+  }, [enabled, job, storeJob]);
+  const polling = enabled && Boolean(job && generationActive(job) && job.ownership !== 'owned');
+  useEffect(() => {
+    if (!polling) return;
+    const timer = setInterval(() => void refresh(), 4000);
+    return () => clearInterval(timer);
+  }, [polling, job?.id, refresh]);
+  async function start(
+    url: string,
+    verifiedToken?: string,
+    subtitlesEnabled = true,
+    customization?: VideoCustomization,
+    voiceEnabled = true,
+    durationSeconds: VideoDuration = 20,
+    aspectRatio: VideoAspectRatio = '9:16',
+  ) {
+    if (lock.current) return;
+    setFailure('');
+    if (requestedAnimations(customization)) {
+      setFailure(publicErrors.RUNWAY_LOGIN_REQUIRED[1]);
+      return;
+    }
+    if (!loaded) {
+      setFailure('Votre navigateur est en cours de vérification. Réessayez dans un instant.');
+      return;
+    }
+    if (!available) {
+      setFailure(publicErrors.ANONYMOUS_UNAVAILABLE[1]);
+      return;
+    }
+    if (used) {
+      setFailure(publicErrors.TRIAL_USED[1]);
+      return;
+    }
+    if (job && generationActive(job)) {
+      return;
+    }
+    const currentToken = verifiedToken ?? token;
+    if (!currentToken && !intent.current) {
+      setChallenge(true);
+      return;
+    }
+    if (
+      intent.current?.url !== url ||
+      intent.current?.subtitlesEnabled !== subtitlesEnabled ||
+      intent.current?.voiceEnabled !== voiceEnabled ||
+      intent.current?.durationSeconds !== durationSeconds ||
+      intent.current?.aspectRatio !== aspectRatio ||
+      JSON.stringify(intent.current?.customization) !== JSON.stringify(customization)
+    )
+      intent.current = {
+        url,
+        key: crypto.randomUUID(),
+        subtitlesEnabled,
+        voiceEnabled,
+        durationSeconds,
+        aspectRatio,
+        customization,
+      };
+    lock.current = true;
+    try {
+      const response = await fetch('/api/trial', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': intent.current.key },
+        body: JSON.stringify({
+          url,
+          subtitlesEnabled,
+          voiceEnabled,
+          durationSeconds,
+          aspectRatio,
+          ...(customization ? { customization } : {}),
+          turnstileToken: currentToken,
+        }),
+      });
+      const body = (await response.json()) as { error?: { code?: string; message?: string } };
+      if (!response.ok) {
+        if (body.error?.code === 'BOT_VERIFICATION_FAILED') {
+          intent.current = null;
+          setChallenge(true);
+        }
+        throw new Error(body.error?.message ?? 'La création n’a pas démarré. Réessayez.');
       }
-      setFailure(error instanceof Error?error.message:'L’envoi a été interrompu. Réessayez pour reprendre votre annonce.');return null;
-    }finally{setPreparingManual(false);setManualProgress('');setToken('');setWidgetVersion(n=>n+1);lock.current=false;}
+      const next = GenerationView.parse(body);
+      announceGenerationStarted(next);
+      setJob(next);
+      setChallenge(false);
+      intent.current = null;
+    } catch (e) {
+      setFailure(
+        e instanceof Error ? e.message : 'La connexion a été interrompue. Réessayez pour retrouver votre demande.',
+      );
+    } finally {
+      setToken('');
+      setWidgetVersion((n) => n + 1);
+      lock.current = false;
+    }
   }
-  function cancelManual(){setPendingManual(null);setChallenge(false);setToken('');setWidgetVersion(n=>n+1);}
-  const continueManual=(verifiedToken:string)=>pendingManual?startManual(pendingManual.input,pendingManual.settings,verifiedToken):Promise.resolve(null);
-  return {job,siteKey,available,used,failure,challenge,setChallenge,widgetVersion,setWidgetVersion,loaded,token,setToken,setFailure,start,refresh,
-    startManual,continueManual,cancelManual,pendingManual,preparingManual,manualProgress};
+  async function startManual(input: TrialManualInput, settings: TrialManualSettings, verifiedToken?: string) {
+    if (lock.current) return null;
+    setFailure('');
+    if (requestedAnimations(settings.customization)) {
+      setFailure(publicErrors.RUNWAY_LOGIN_REQUIRED[1]);
+      return null;
+    }
+    if (!loaded) {
+      setFailure('Votre navigateur est en cours de vérification. Réessayez dans un instant.');
+      return null;
+    }
+    if (!available) {
+      setFailure(publicErrors.ANONYMOUS_UNAVAILABLE[1]);
+      return null;
+    }
+    if (used) {
+      setFailure(publicErrors.TRIAL_USED[1]);
+      return null;
+    }
+    if (job && generationActive(job)) {
+      setFailure(publicErrors.GENERATION_BUSY[1]);
+      return null;
+    }
+    const fingerprint = JSON.stringify({ listing: input.listing, ...settings });
+    if (!manualIntent.current) {
+      try {
+        const saved = JSON.parse(
+          sessionStorage.getItem('bienvu:trial-manual-request') ?? 'null',
+        ) as TrialManualIntent | null;
+        if (saved && typeof saved.fingerprint === 'string' && typeof saved.key === 'string')
+          manualIntent.current = saved;
+      } catch {
+        /* Optional retry cache. Ownership remains in the HttpOnly cookie. */
+      }
+    }
+    if (manualIntent.current?.fingerprint !== fingerprint) manualIntent.current = null;
+    const currentToken = verifiedToken ?? token;
+    if (!currentToken && !manualIntent.current) {
+      setPendingManual({ input, settings });
+      setChallenge(true);
+      return null;
+    }
+    manualIntent.current ??= { fingerprint, key: crypto.randomUUID() };
+    try {
+      sessionStorage.setItem('bienvu:trial-manual-request', JSON.stringify(manualIntent.current));
+    } catch {}
+    lock.current = true;
+    setPreparingManual(true);
+    setPendingManual(null);
+    setChallenge(false);
+    try {
+      const result = await submitTrialManual(input, settings, manualIntent.current, currentToken, setManualProgress);
+      announceGenerationStarted(result);
+      setJob(result);
+      manualIntent.current = null;
+      try {
+        sessionStorage.removeItem('bienvu:trial-manual-request');
+      } catch {}
+      return result;
+    } catch (error) {
+      if (error instanceof TrialManualFailure) {
+        if (error.code === 'BOT_VERIFICATION_FAILED') {
+          setPendingManual({ input, settings });
+          setChallenge(true);
+        }
+        if (error.code === 'CONFLICT' || error.code === 'NOT_FOUND') {
+          manualIntent.current = null;
+          try {
+            sessionStorage.removeItem('bienvu:trial-manual-request');
+          } catch {}
+        }
+      }
+      setFailure(
+        error instanceof Error ? error.message : 'L’envoi a été interrompu. Réessayez pour reprendre votre annonce.',
+      );
+      return null;
+    } finally {
+      setPreparingManual(false);
+      setManualProgress('');
+      setToken('');
+      setWidgetVersion((n) => n + 1);
+      lock.current = false;
+    }
+  }
+  function cancelManual() {
+    setPendingManual(null);
+    setChallenge(false);
+    setToken('');
+    setWidgetVersion((n) => n + 1);
+  }
+  const continueManual = (verifiedToken: string) =>
+    pendingManual ? startManual(pendingManual.input, pendingManual.settings, verifiedToken) : Promise.resolve(null);
+  return {
+    job,
+    siteKey,
+    available,
+    used,
+    failure,
+    challenge,
+    setChallenge,
+    widgetVersion,
+    setWidgetVersion,
+    loaded,
+    token,
+    setToken,
+    setFailure,
+    start,
+    refresh,
+    startManual,
+    continueManual,
+    cancelManual,
+    pendingManual,
+    preparingManual,
+    manualProgress,
+  };
 }
-export function TrialChallenge({siteKey,version,onToken,onError,purpose='trial'}:{siteKey:string;version:number;onToken:(token:string)=>void;
-  onError:(text:string)=>void;purpose?:'trial'|'description'}) {
-  return <div className="trial-challenge"><p>{purpose==='description'?'Vérifiez que vous êtes humain pour préparer votre annonce.':'Vérifiez que vous êtes humain pour lancer la création.'}</p>
-    <TurnstileCheck siteKey={siteKey} action="anonymous_trial" version={version} onToken={onToken} onError={onError}/></div>;
+export function TrialChallenge({
+  siteKey,
+  version,
+  onToken,
+  onError,
+  purpose = 'trial',
+}: {
+  siteKey: string;
+  version: number;
+  onToken: (token: string) => void;
+  onError: (text: string) => void;
+  purpose?: 'trial' | 'description';
+}) {
+  return (
+    <div className="trial-challenge">
+      <p>
+        {purpose === 'description'
+          ? 'Vérifiez que vous êtes humain pour préparer votre annonce.'
+          : 'Vérifiez que vous êtes humain pour lancer la création.'}
+      </p>
+      <TurnstileCheck
+        siteKey={siteKey}
+        action="anonymous_trial"
+        version={version}
+        onToken={onToken}
+        onError={onError}
+      />
+    </div>
+  );
 }
-const steps:Record<GenerationView['status'],string>={queued:'Votre vidéo attend son démarrage',importing:'Lecture de l’annonce',scripting:'Rédaction de la narration',voicing:'Création de la voix off',rendering:'Préparation de la vidéo',retry_wait:'Reprise en attente',ready:'Votre vidéo est prête',failed:'La création n’a pas abouti'};
-export function AnonymousTrialResult({job}:{job:GenerationView}) {
-  const [failure,setFailure]=useState(''),[busy,setBusy]=useState(false);
-  async function connect(){setBusy(true);setFailure('');try{await value(await fetch(`/api/trial/${job.id}/login`,{method:'POST'}));window.location.assign('/connexion?trial=1');}catch(e){setFailure(e instanceof Error?e.message:'Réessayez.');setBusy(false);}}
-  const unavailable=job.retention!=='available'||job.expiresAt!==null&&new Date(job.expiresAt).getTime()<=Date.now();
-  return <section className="trial-result" aria-label="Votre essai"><h3 aria-live="polite">{unavailable?'Cet aperçu n’est plus disponible':steps[job.status]}</h3>
-    <GenerationCelebration job={unavailable?null:job}/>
-    {!unavailable&&<GenerationQueueNotice job={job}/>}
-    {unavailable?<p>Votre aperçu n’est plus disponible. Aucun nouveau traitement n’a été lancé.</p>:job.ownership==='owned'?<p>Cette vidéo a été enregistrée dans un compte. <Link href="/essai/recuperer">Retrouver ma vidéo</Link></p>:<>
-      {generationActive(job)&&<><ol className="generation-steps" aria-label="Étapes de création">{generationSteps(job,job.sourceKind==='manual').map(({key,state,label,detail,progress})=><li key={key} className={`step-${state}`} aria-current={state==='current'?'step':undefined}>{state==='done'?'✓ ':state==='skipped'?'– ':''}{label}<GenerationAnimationCounter progress={progress}/>{detail&&<small className="generation-step-detail">{detail}</small>}{key==='map'&&job.mapConfirmation&&<GenerationMapConfirmation key={job.id} job={job}/>}</li>)}</ol><p>Vous pouvez revenir sur cette page depuis ce navigateur. Votre vidéo y sera conservée.</p><button type="button" className="text-button" disabled={busy} onClick={()=>void connect()}>Me connecter pendant la création</button></>}
-      {!generationActive(job)&&generationMapOmissionText(job)&&<p className="field-help"><strong>Carte non ajoutée.</strong> {generationMapOmissionText(job)}</p>}
-      {!generationActive(job)&&generationAnimationOmissionText(job)&&<p className="field-help" role="status">{generationAnimationOmissionText(job)}</p>}
-      {job.status==='failed'&&<p role="alert">{publicErrors[job.errorCode as PublicErrorCode]?.[1]??publicErrors.GENERATION_FAILED[1]}</p>}
-      {job.videoUrl&&<><video className={`generated-video${job.aspectRatio==='16:9'?' is-horizontal':''}`} src={job.videoUrl} controls playsInline preload="metadata" controlsList="nodownload" aria-label="Aperçu complet de votre vidéo avec filigrane"/>
-        <button className="home-primary-button" type="button" disabled={busy} onClick={()=>void connect()}>{busy?'Ouverture…':'Télécharger sans filigrane'}</button><p>Créez votre compte gratuitement pour récupérer votre vidéo.</p></>}
-    </>}{failure&&<p role="alert">{failure}</p>}
-  </section>;
+const steps: Record<GenerationView['status'], string> = {
+  queued: 'Votre vidéo attend son démarrage',
+  importing: 'Lecture de l’annonce',
+  scripting: 'Rédaction de la narration',
+  voicing: 'Création de la voix off',
+  rendering: 'Préparation de la vidéo',
+  retry_wait: 'Reprise en attente',
+  ready: 'Votre vidéo est prête',
+  failed: 'La création n’a pas abouti',
+};
+export function AnonymousTrialResult({ job }: { job: GenerationView }) {
+  const [failure, setFailure] = useState(''),
+    [busy, setBusy] = useState(false);
+  async function connect() {
+    setBusy(true);
+    setFailure('');
+    try {
+      await value(await fetch(`/api/trial/${job.id}/login`, { method: 'POST' }));
+      window.location.assign('/connexion?trial=1');
+    } catch (e) {
+      setFailure(e instanceof Error ? e.message : 'Réessayez.');
+      setBusy(false);
+    }
+  }
+  const unavailable =
+    job.retention !== 'available' || (job.expiresAt !== null && new Date(job.expiresAt).getTime() <= Date.now());
+  return (
+    <section className="trial-result" aria-label="Votre essai">
+      <h3 aria-live="polite">{unavailable ? 'Cet aperçu n’est plus disponible' : steps[job.status]}</h3>
+      <GenerationCelebration job={unavailable ? null : job} />
+      {!unavailable && <GenerationQueueNotice job={job} />}
+      {unavailable ? (
+        <p>Votre aperçu n’est plus disponible. Aucun nouveau traitement n’a été lancé.</p>
+      ) : job.ownership === 'owned' ? (
+        <p>
+          Cette vidéo a été enregistrée dans un compte. <Link href="/essai/recuperer">Retrouver ma vidéo</Link>
+        </p>
+      ) : (
+        <>
+          {generationActive(job) && (
+            <>
+              <ol className="generation-steps" aria-label="Étapes de création">
+                {generationSteps(job, job.sourceKind === 'manual').map(({ key, state, label, detail, progress }) => (
+                  <li key={key} className={`step-${state}`} aria-current={state === 'current' ? 'step' : undefined}>
+                    {state === 'done' ? '✓ ' : state === 'skipped' ? '– ' : ''}
+                    {label}
+                    <GenerationAnimationCounter progress={progress} />
+                    {detail && <small className="generation-step-detail">{detail}</small>}
+                    {key === 'map' && job.mapConfirmation && <GenerationMapConfirmation key={job.id} job={job} />}
+                  </li>
+                ))}
+              </ol>
+              <p>Vous pouvez revenir sur cette page depuis ce navigateur. Votre vidéo y sera conservée.</p>
+              <button type="button" className="text-button" disabled={busy} onClick={() => void connect()}>
+                Me connecter pendant la création
+              </button>
+            </>
+          )}
+          {!generationActive(job) && generationMapOmissionText(job) && (
+            <p className="field-help">
+              <strong>Carte non ajoutée.</strong> {generationMapOmissionText(job)}
+            </p>
+          )}
+          {!generationActive(job) && generationAnimationOmissionText(job) && (
+            <p className="field-help" role="status">
+              {generationAnimationOmissionText(job)}
+            </p>
+          )}
+          {job.status === 'failed' && (
+            <p role="alert">
+              {publicErrors[job.errorCode as PublicErrorCode]?.[1] ?? publicErrors.GENERATION_FAILED[1]}
+            </p>
+          )}
+          {job.videoUrl && (
+            <>
+              <video
+                className={`generated-video${job.aspectRatio === '16:9' ? ' is-horizontal' : ''}`}
+                src={job.videoUrl}
+                controls
+                playsInline
+                preload="metadata"
+                controlsList="nodownload"
+                aria-label="Aperçu complet de votre vidéo avec filigrane"
+              />
+              <button className="home-primary-button" type="button" disabled={busy} onClick={() => void connect()}>
+                {busy ? 'Ouverture…' : 'Télécharger sans filigrane'}
+              </button>
+              <p>Créez votre compte gratuitement pour récupérer votre vidéo.</p>
+            </>
+          )}
+        </>
+      )}
+      {failure && <p role="alert">{failure}</p>}
+    </section>
+  );
 }

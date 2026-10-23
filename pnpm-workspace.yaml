@@ -2,7 +2,7 @@ packages:
   - apps/*
   - packages/*
 onlyBuiltDependencies:
-  - '@posthog/cli'
+  - "@posthog/cli"
   - esbuild
   - sharp
   - workerd
@@ -10,20 +10,20 @@ onlyBuiltDependencies:
 # a release-age gate even when updating unrelated packages; keep future versions
 # subject to that gate rather than exempting the whole package.
 minimumReleaseAgeExclude:
-  - '@posthog/nextjs-config@1.11.2'
-  - '@posthog/plugin-utils@2.0.1'
-  - '@posthog/browser-common@0.9.4'
-  - '@posthog/core@1.58.0'
+  - "@posthog/nextjs-config@1.11.2"
+  - "@posthog/plugin-utils@2.0.1"
+  - "@posthog/browser-common@0.9.4"
+  - "@posthog/core@1.58.0"
 overrides:
   # Security patches only: leave newer upstream versions free to resolve.
   # Miniflare still pins the vulnerable Undici/Sharp patch versions.
-  'undici@7.29.0': 7.29.1
-  'sharp@0.35.4': 0.35.5
+  "undici@7.29.0": 7.29.1
+  "sharp@0.35.4": 0.35.5
   # PostCSS in Next.js and the Remotion bundler still resolves this version.
-  'source-map-js@1.2.1': 1.2.2
+  "source-map-js@1.2.1": 1.2.2
   # Remotion Studio's Cosmiconfig currently resolves the vulnerable YAML parser.
-  'js-yaml@4.2.0': 4.3.2
+  "js-yaml@4.2.0": 4.3.2
   # PostHog still resolves this DOMPurify version; preserve the upstream range.
-  'dompurify@3.4.16': 3.4.17
+  "dompurify@3.4.16": 3.4.17
   # The OpenNext minifier pins a glob version with a vulnerable CLI.
-  'glob@10.3.3': 10.5.0
+  "glob@10.3.3": 10.5.0

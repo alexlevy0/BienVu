@@ -4,10 +4,10 @@ Ce compte rendu décrit les premiers essais, avant adaptation de l’importeur. 
 
 Les deux liens fournis par Alex ont été testés une fois dans l’import réel de BienVu, via `POST /api/imports`, sous un compte technique isolé. Un premier diagnostic local avec le même importeur et son transport HTTPS épinglé donnait déjà le même résultat. Aucun résultat local n’est présenté comme une preuve de compatibilité dans le produit.
 
-| Source et annonce | Résultat dans BienVu | Photos importées |
-| --- | --- | --- |
-| [César & Brutus — maison à Limonest, 7 pièces](https://www.cesaretbrutus.com/bien/vente-dune-maison-de-famille-7-pieces-27165-m%c2%b2-a-limonest-mcl-10287-cesaretbrutus69/) | `failed`, `INCOMPLETE_LISTING` | 0 |
-| [iad — appartement à Lyon 4e, 55 m²](https://www.iadfrance.fr/annonce/appartement-vente-3-pieces-lyon-55m2/r2125326) | `failed`, `INCOMPLETE_LISTING` | 0 |
+| Source et annonce                                                                                                                                                            | Résultat dans BienVu           | Photos importées |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | ---------------- |
+| [César & Brutus — maison à Limonest, 7 pièces](https://www.cesaretbrutus.com/bien/vente-dune-maison-de-famille-7-pieces-27165-m%c2%b2-a-limonest-mcl-10287-cesaretbrutus69/) | `failed`, `INCOMPLETE_LISTING` | 0                |
+| [iad — appartement à Lyon 4e, 55 m²](https://www.iadfrance.fr/annonce/appartement-vente-3-pieces-lyon-55m2/r2125326)                                                         | `failed`, `INCOMPLETE_LISTING` | 0                |
 
 Les diagnostics indiquent une page HTML effectivement récupérée pour chacun des liens, puis un échec au stade `extraction`, avant toute récupération de photo. Il ne s’agit pas d’un refus réseau `UNSAFE_URL` ou d’une source bloquée. Le format de ces annonces ne fournit pas toutes les informations nécessaires sous une forme actuellement interprétée par l’extracteur générique. Aucun navigateur de repli ni nouvelle tentative automatique n’a été utilisé. Le HTTP 200 de la route d’import représente une réponse terminée, avec le statut métier `failed` ; il n’est pas compté comme un succès.
 

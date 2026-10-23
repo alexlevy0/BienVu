@@ -4,11 +4,11 @@
 
 Les trois liens demandés ont été importés une fois chacun via `POST https://bienvu.online/api/imports`, après publication du correctif, dans une agence technique isolée. Toutes les réponses ont le statut métier `ready`, sans avertissement, sans photo rejetée et sans recours au navigateur.
 
-| Source et référence | Faits vérifiés | Photos enregistrées | Début de l’essai UTC |
-| --- | --- | --- | --- |
-| César & Brutus · `MCL-10287-CESARETBRUTUS69` | Maison à Limonest, 1 290 000 €, 271,65 m², 7 pièces | 12 | 15:29:42 |
-| iad · `2125326` | Appartement à Lyon 4e, 278 000 €, 55 m², 3 pièces | 8 | 15:30:09 |
-| RE/MAX · `749351027-200` | Maison à Étaules, 340 000 €, 112 m², 4 pièces | 12 | 15:30:26 |
+| Source et référence                          | Faits vérifiés                                      | Photos enregistrées | Début de l’essai UTC |
+| -------------------------------------------- | --------------------------------------------------- | ------------------- | -------------------- |
+| César & Brutus · `MCL-10287-CESARETBRUTUS69` | Maison à Limonest, 1 290 000 €, 271,65 m², 7 pièces | 12                  | 15:29:42             |
+| iad · `2125326`                              | Appartement à Lyon 4e, 278 000 €, 55 m², 3 pièces   | 8                   | 15:30:09             |
+| RE/MAX · `749351027-200`                     | Maison à Étaules, 340 000 €, 112 m², 4 pièces       | 12                  | 15:30:26             |
 
 Les descriptions complètes sont conservées. Pour RE/MAX, le nombre de pièces est distinct des 3 chambres affichées dans le titre. Les galeries César & Brutus et RE/MAX contiennent respectivement 14 et 15 candidats : le plafond produit reste fixé à 12 photos. Les 8 photos iad sont récupérées dans leur ordre, sans se limiter aux trois couvertures affichées.
 

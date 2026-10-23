@@ -1,0 +1,82 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.6.2/schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": {
+    "ignoreUnknown": true,
+    "includes": [
+      "**",
+      // Wrangler/Next.js generate these declarations; typegen owns them.
+      "!!**/cloudflare-env.d.ts",
+      "!!**/next-env.d.ts",
+      "!!apps/pipeline/*-env.d.ts",
+      "!!apps/mail/mail-env.d.ts",
+      // pnpm owns the lockfile's serialization and integrity metadata.
+      "!!pnpm-lock.yaml",
+      // Deliberately incomplete third-party HTML used to exercise importers.
+      "!!fixtures/imports/**/*.html"
+    ]
+  },
+  "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 120 },
+  "javascript": { "formatter": { "quoteStyle": "single" } },
+  "linter": {
+    "rules": {
+      "preset": "recommended",
+      "style": {
+        // Keep existing string concatenation and explicit TypeScript assertions.
+        "useTemplate": "off",
+        "noNonNullAssertion": "off"
+      },
+      "correctness": {
+        // Revision/account keys intentionally trigger refetches and resets.
+        "useExhaustiveDependencies": {
+          "level": "error",
+          "options": { "reportUnnecessaryDependencies": false }
+        }
+      },
+      "a11y": {
+        "noLabelWithoutControl": { "level": "error", "options": { "inputComponents": ["EditorNumberInput"] } }
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["packages/presentation/**/*.tsx", "packages/video/**/*.tsx", "apps/marketing-video/**/*.tsx"],
+      // Node/Remotion entry points also run under the classic JSX transform.
+      "javascript": { "jsxRuntime": "reactClassic" }
+    },
+    {
+      "includes": ["**/*.css"],
+      "linter": {
+        "rules": {
+          // The authored responsive cascade uses deliberate overrides.
+          "style": { "noDescendingSpecificity": "off" },
+          "complexity": { "noImportantStyles": "off" }
+        }
+      }
+    },
+    {
+      "includes": ["apps/web/**/*.tsx"],
+      "linter": {
+        "rules": {
+          // Images use BienVu's own srcset/Cloudflare pipeline.
+          "performance": { "noImgElement": "off" },
+          "a11y": {
+            // Videos have rendered captions; audio includes instrumental previews.
+            "useMediaCaption": "off",
+            // Explicit ARIA groups/regions are used by the custom studio controls.
+            "useSemanticElements": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["scripts/**/*.mjs"],
+      "linter": {
+        "rules": {
+          // Playwright Locator.innerText() checks rendered text, not raw DOM text.
+          "performance": { "useDomNodeTextContent": "off" }
+        }
+      }
+    }
+  ]
+}

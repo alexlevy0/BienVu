@@ -60,27 +60,27 @@ Une nouvelle tentative URL provisionne 1,20 € de génération + **0,30 € de 
 
 ## Répartition historique après la hausse du 29/09
 
-| Poste | Enveloppe de travail mensuelle |
-|---|---:|
-| Workers Paid, conversion et taxes estimées | 8 € |
-| Consommation Cloudflare supplémentaire : navigateur, conteneurs, D1/R2, Workflows, logs | 7 € |
-| API texte et voix pour les tests | 5 € |
-| Marge pour écarts, opérations non anticipées ou prépaiement minimal | 30 € |
-| Total maximal visé | **50 €** |
+| Poste                                                                                   | Enveloppe de travail mensuelle |
+| --------------------------------------------------------------------------------------- | -----------------------------: |
+| Workers Paid, conversion et taxes estimées                                              |                            8 € |
+| Consommation Cloudflare supplémentaire : navigateur, conteneurs, D1/R2, Workflows, logs |                            7 € |
+| API texte et voix pour les tests                                                        |                            5 € |
+| Marge pour écarts, opérations non anticipées ou prépaiement minimal                     |                           30 € |
+| Total maximal visé                                                                      |                       **50 €** |
 
 Les adresses de développement fournies restent utilisables pour le site. Le domaine acheté par Alex pour l'expéditeur consomme désormais une partie de la marge ci-dessus ; son paiement réel doit remplacer la provision une fois le débit connu. Aucun abonnement de scraping, proxy payant, abonnement musical ou deuxième plateforme d'hébergement n'est prévu dans cette enveloppe. Un abonnement ChatGPT ne remplace pas les crédits API ; comptabiliser les crédits prépayés effectivement achetés ainsi que la consommation, sans les compter deux fois.
 
 ## Tarifs officiels consultés le 27 septembre 2026
 
-| Service | Repère tarifaire | Source |
-|---|---|---|
-| Workers Paid | Minimum de 5 USD/mois au niveau du compte, puis dépassements éventuels | S08 |
-| Browser Run gratuit | 10 minutes de navigateur/jour, 3 navigateurs simultanés | S04 |
-| Browser Run avec Workers Paid | 10 heures/mois incluses, puis 0,09 USD/heure ; facturation de concurrence au-delà de l'allocation prévue | S04 |
-| Containers | Réservé à Workers Paid ; allocations de calcul incluses et dépassements CPU, RAM, disque, réseau | S07 |
-| Remotion | Gratuit si éligible, notamment personne seule ou équipe jusqu'à 3 selon les conditions ; sinon chiffrer la licence avant de conclure sur le budget | S17 |
-| OpenAI GPT-5.4 mini | Repère du 28/09 : 0,75 USD/M tokens en entrée, 4,50 USD/M en sortie ; remise cache non déduite de la provision | [Modèle et tarifs](https://developers.openai.com/api/docs/models/gpt-5.4-mini) |
-| Google TTS Chirp 3 HD | Choisi par Alex le 28/09 : 1 million de caractères gratuits/mois, puis 30 USD/million ; facturation obligatoire | [Tarifs Google](https://cloud.google.com/text-to-speech/pricing) |
+| Service                       | Repère tarifaire                                                                                                                                   | Source                                                                         |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Workers Paid                  | Minimum de 5 USD/mois au niveau du compte, puis dépassements éventuels                                                                             | S08                                                                            |
+| Browser Run gratuit           | 10 minutes de navigateur/jour, 3 navigateurs simultanés                                                                                            | S04                                                                            |
+| Browser Run avec Workers Paid | 10 heures/mois incluses, puis 0,09 USD/heure ; facturation de concurrence au-delà de l'allocation prévue                                           | S04                                                                            |
+| Containers                    | Réservé à Workers Paid ; allocations de calcul incluses et dépassements CPU, RAM, disque, réseau                                                   | S07                                                                            |
+| Remotion                      | Gratuit si éligible, notamment personne seule ou équipe jusqu'à 3 selon les conditions ; sinon chiffrer la licence avant de conclure sur le budget | S17                                                                            |
+| OpenAI GPT-5.4 mini           | Repère du 28/09 : 0,75 USD/M tokens en entrée, 4,50 USD/M en sortie ; remise cache non déduite de la provision                                     | [Modèle et tarifs](https://developers.openai.com/api/docs/models/gpt-5.4-mini) |
+| Google TTS Chirp 3 HD         | Choisi par Alex le 28/09 : 1 million de caractères gratuits/mois, puis 30 USD/million ; facturation obligatoire                                    | [Tarifs Google](https://cloud.google.com/text-to-speech/pricing)               |
 
 Le plan gratuit Browser Run aide à tester le scraping. Le rendu sur Cloudflare Containers nécessite le plan Workers Paid : le produit complet n'est donc pas un hébergement intégralement gratuit.
 
@@ -147,11 +147,11 @@ Le troisième e-mail réel valide le domaine actuel, réception et parcours conf
 
 Alex a confirmé le 02/10/2026 le passage aux crédits BienVu. Une vidéo coûte **1 crédit**, plus **1 crédit par photo animée avec Runway**. Les mouvements classiques, la voix et les sous-titres restent inclus. Le coût maximum est affiché avant génération et réservé atomiquement. Une réussite ne consomme que 1 + les animations réellement intégrées au manifeste ; les autres suppléments sont restitués. Un échec vidéo restitue toute la réservation à sa période d’origine, sans effacer les dépenses fournisseurs.
 
-| Offre | Prix mensuel | Crédits par mois |
-| --- | --- | --- |
-| Gratuit | 0 € | 3 |
-| Plus | 19 € HT | 40 |
-| Pro | 49 € HT | 120 |
+| Offre   | Prix mensuel | Crédits par mois |
+| ------- | ------------ | ---------------- |
+| Gratuit | 0 €          | 3                |
+| Plus    | 19 € HT      | 40               |
+| Pro     | 49 € HT      | 120              |
 
 Sans report mensuel. Un compte confirmé reçoit sa période gratuite à partir de son inscription. L’essai anonyme dispose d’**1 crédit offert**, sans Runway, avec aperçu filigrané ; sa récupération après connexion ne débite pas le compte. Les anciens essais conservent leurs règles et leurs réservations initiales. Les allocations existantes ne sont pas remises à zéro.
 

@@ -18,18 +18,18 @@ Un identifiant anonyme relie les pages d’un parcours après accord. Après con
 
 ## Événements
 
-| Parcours | Événements principaux |
-| --- | --- |
-| Navigation | `$pageview`, `$pageleave`, `$autocapture` des clics avec leurs libellés, `control_interacted` avec zone et type de commande, `navigation_clicked` |
-| Compte | `signup_requested/completed/failed`, `login_requested/redirected/completed/failed`, `logout_completed` |
-| Import | `import_requested/completed/failed`, `description_requested/completed/failed`, `manual_form_opened`, `manual_listing_saved/failed` |
-| Génération | `generation_requested/accepted/request_failed`, `generation_ready/failed` |
-| Éditeur | `editor_opened`, `editor_project_selected`, `editor_action`, `editor_export_requested/accepted/failed` |
-| Agence | `agency_saved`, `agency_save_failed` |
-| Réseaux | `social_connection_requested/completed/removed`, `publication_requested/created/failed/completed` |
-| Paiement | `checkout_requested/opened/failed` |
-| Partenaires | `partner_application_started/requested/received/failed` |
-| Médias et performances | `video_played`, `video_download_clicked`, `$web_vitals` natif ; `web_vital` historique du suivi SEO |
+| Parcours               | Événements principaux                                                                                                                             |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Navigation             | `$pageview`, `$pageleave`, `$autocapture` des clics avec leurs libellés, `control_interacted` avec zone et type de commande, `navigation_clicked` |
+| Compte                 | `signup_requested/completed/failed`, `login_requested/redirected/completed/failed`, `logout_completed`                                            |
+| Import                 | `import_requested/completed/failed`, `description_requested/completed/failed`, `manual_form_opened`, `manual_listing_saved/failed`                |
+| Génération             | `generation_requested/accepted/request_failed`, `generation_ready/failed`                                                                         |
+| Éditeur                | `editor_opened`, `editor_project_selected`, `editor_action`, `editor_export_requested/accepted/failed`                                            |
+| Agence                 | `agency_saved`, `agency_save_failed`                                                                                                              |
+| Réseaux                | `social_connection_requested/completed/removed`, `publication_requested/created/failed/completed`                                                 |
+| Paiement               | `checkout_requested/opened/failed`                                                                                                                |
+| Partenaires            | `partner_application_started/requested/received/failed`                                                                                           |
+| Médias et performances | `video_played`, `video_download_clicked`, `$web_vitals` natif ; `web_vital` historique du suivi SEO                                               |
 
 `publication_created` confirme l’enregistrement dans BienVu, pas une diffusion réussie chez Meta. `publication_completed` signale la transition d’une destination vers publiée quand le calendrier est ouvert. De même, les événements de fin de génération reflètent les transitions observées par le navigateur ; fermer BienVu n’arrête pas le traitement, mais sa fin n’émet pas d’événement client. Les historiques existants ne sont pas comptés comme de nouvelles générations/publications. `checkout_opened` confirme la création du lien de paiement, pas un achat. Aucune transaction réelle n’est lancée pour tester la mesure.
 
@@ -63,15 +63,15 @@ Les anciennes sessions conservent leur masquage : les pixels et textes absents l
 
 [BienVu — Pilotage produit et croissance](https://eu.posthog.com/project/299212/dashboard/1008966) est épinglé et défini comme dashboard principal et vue d’accueil du projet. Il rassemble 21 graphiques natifs, une comparaison pour les quatre indicateurs de tête et des sections explicatives. La période par défaut est de 30 jours. Les filtres `is_test != true` et `is_internal != true` s’appliquent à chaque graphique : ces sessions restent consultables dans PostHog, mais ne gonflent pas l’audience client.
 
-| Section | Graphiques |
-| --- | --- |
-| Indicateurs | Pages consultées ; vidéos prêtes ; diffusions réussies ; checkouts ouverts |
-| Acquisition | Audience au fil des jours ; appareils ; pages consultées ; domaines référents |
-| Création | Visite → demande → admission → vidéo prête ; formats demandés |
-| Fiabilité | Imports réussis/échoués par source ; délai médian et 95e percentile ; erreurs par code |
-| Éditeur | Ouverture → personnalisation → export admis ; réglages utilisés |
-| Diffusion | Demande → enregistrement → publication observée ; immédiat/programmé |
-| Commercial | Connexion → demande d’inscription acceptée ; offres → checkout ; candidatures partenaires ; rétention hebdomadaire |
+| Section     | Graphiques                                                                                                         |
+| ----------- | ------------------------------------------------------------------------------------------------------------------ |
+| Indicateurs | Pages consultées ; vidéos prêtes ; diffusions réussies ; checkouts ouverts                                         |
+| Acquisition | Audience au fil des jours ; appareils ; pages consultées ; domaines référents                                      |
+| Création    | Visite → demande → admission → vidéo prête ; formats demandés                                                      |
+| Fiabilité   | Imports réussis/échoués par source ; délai médian et 95e percentile ; erreurs par code                             |
+| Éditeur     | Ouverture → personnalisation → export admis ; réglages utilisés                                                    |
+| Diffusion   | Demande → enregistrement → publication observée ; immédiat/programmé                                               |
+| Commercial  | Connexion → demande d’inscription acceptée ; offres → checkout ; candidatures partenaires ; rétention hebdomadaire |
 
 La collecte commence le 8 octobre 2026. Des graphiques encore vides ne constituent pas une panne : aucun historique ni événement commercial fictif n’a été ajouté pour les remplir. Les entonnoirs mesurent des personnes dans l’ordre indiqué : 24 h pour création/éditeur, 14 jours pour publication et 7 jours pour inscription/checkout/partenaires. Une diffusion sur deux destinations compte deux réussites. Un checkout ouvert n’est pas un paiement encaissé et n’alimente aucun chiffre d’affaires.
 
@@ -98,7 +98,6 @@ Le filtrage conserve type, message, fichier, ligne, colonne, identifiant de chun
 ### Builds et sourcemaps privées
 
 Ajouter `POSTHOG_PERSONAL_API_KEY` dans `.env.posthog` ou dans l’environnement de compilation. Cette clé personnelle doit autoriser « Error tracking : Write » et « Organization : Read » sur le projet 299212. Elle n’est ni une variable `NEXT_PUBLIC_` ni un binding du Worker. Ne jamais versionner `.env.posthog`, les bundles de sonde ou les journaux d’envoi.
-
 1. `pnpm build:web` compile OpenNext avec Webpack et le plugin officiel PostHog, associe la version Git (suffixée pour une arborescence modifiée), envoie les maps à PostHog EU et retire les `.map` Next après l’envoi. Sans clé, la CI reste fonctionnelle mais ne produit pas de sourcemaps de production.
 2. Pour une publication Cloudflare avec symboles serveur : `pnpm prepare:web --config apps/web/wrangler.<environment>.jsonc`. La commande compile le Worker final en dry-run, injecte ses identifiants et envoie sa map avec le CLI. Elle prépare une configuration privée `.open-next/posthog-worker/wrangler.jsonc` en conservant les bindings et ajoute `BIENVU_RELEASE` et `BIENVU_WORKER_CHUNK_ID`. Ce dernier rattache les frames du Worker à son bundle final, plutôt qu’aux identifiants des modules Next intermédiaires.
 3. Publier exactement ce bundle : `pnpm --filter @bienvu/web exec wrangler deploy --config .open-next/posthog-worker/wrangler.jsonc --keep-vars --strict`. `no_bundle=true` évite de modifier les positions des frames après l’envoi. Un simple déploiement de `worker.ts` sans cette préparation ne bénéficie pas de la map du Worker final.

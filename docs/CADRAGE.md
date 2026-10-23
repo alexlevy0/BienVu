@@ -4,22 +4,22 @@ Référence du 27 septembre 2026. Les décisions confirmées priment sur les pro
 
 ## Décisions confirmées par Alex
 
-| Sujet | Décision |
-|---|---|
-| Nom | BienVu |
-| Projet | Départ de zéro |
-| Cible | Clients payants, principalement professionnels de l'immobilier |
-| Entrée | Un lien d’annonce, une description du bien ou une saisie manuelle avec photos. Une description préremplit un brouillon à vérifier ; un import URL incomplet devient un brouillon « À compléter ». |
-| Sortie | Vidéo verticale avec une voix présentant le bien |
-| Parcours | Renseigner/importer, générer, prévisualiser, télécharger ; aucun éditeur vidéo |
-| Import | Priorité aux sites d'agences ; Le Figaro Immobilier, SeLoger, Leboncoin, Bien'ici et les autres si possible |
-| Marque | Logo, couleurs et coordonnées enregistrés pour les vidéos de l'agence |
-| Animation | Depuis le 01/10 : mouvements de caméra fluides et option Runway pour une ou deux photos, réglable avant génération. Achat API déclaré de 10 € ; recette réelle et solde requis avant activation. |
+| Sujet              | Décision                                                                                                                                                                                                                          |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Nom                | BienVu                                                                                                                                                                                                                            |
+| Projet             | Départ de zéro                                                                                                                                                                                                                    |
+| Cible              | Clients payants, principalement professionnels de l'immobilier                                                                                                                                                                    |
+| Entrée             | Un lien d’annonce, une description du bien ou une saisie manuelle avec photos. Une description préremplit un brouillon à vérifier ; un import URL incomplet devient un brouillon « À compléter ».                                 |
+| Sortie             | Vidéo verticale avec une voix présentant le bien                                                                                                                                                                                  |
+| Parcours           | Renseigner/importer, générer, prévisualiser, télécharger ; aucun éditeur vidéo                                                                                                                                                    |
+| Import             | Priorité aux sites d'agences ; Le Figaro Immobilier, SeLoger, Leboncoin, Bien'ici et les autres si possible                                                                                                                       |
+| Marque             | Logo, couleurs et coordonnées enregistrés pour les vidéos de l'agence                                                                                                                                                             |
+| Animation          | Depuis le 01/10 : mouvements de caméra fluides et option Runway pour une ou deux photos, réglable avant génération. Achat API déclaré de 10 € ; recette réelle et solde requis avant activation.                                  |
 | Rendu de référence | Le 01/10, Alex confirme une visite immersive avec les informations surtout à la fin. Cinéma devient le défaut des nouvelles créations ; Éditorial et Minimal restent proposés et les brouillons conservent leur style enregistré. |
-| Revenus | Plusieurs abonnements selon le nombre de vidéos |
-| Essai | Depuis le 29/09 : un essai anonyme abouti avec aperçu filigrané ; connexion et crédit pour récupérer le master propre, sans nouveau rendu. Compte gratuit : trois vidéos/mois, essai récupéré compris. |
-| Hébergement | Tout chez Cloudflare si techniquement possible |
-| Budget | Enveloppe actuelle 100 €/mois, coupure à 90 €, confirmées le 01/10 ; anciens relevés conservés. Achat Runway API de 10 € déclaré, compris dans cette enveloppe et à imputer une fois. Factures et coût par vidéo à rapprocher. |
+| Revenus            | Plusieurs abonnements selon le nombre de vidéos                                                                                                                                                                                   |
+| Essai              | Depuis le 29/09 : un essai anonyme abouti avec aperçu filigrané ; connexion et crédit pour récupérer le master propre, sans nouveau rendu. Compte gratuit : trois vidéos/mois, essai récupéré compris.                            |
+| Hébergement        | Tout chez Cloudflare si techniquement possible                                                                                                                                                                                    |
+| Budget             | Enveloppe actuelle 100 €/mois, coupure à 90 €, confirmées le 01/10 ; anciens relevés conservés. Achat Runway API de 10 € déclaré, compris dans cette enveloppe et à imputer une fois. Factures et coût par vidéo à rapprocher.    |
 
 La préférence de développement est Next.js et TypeScript. Remotion est le moteur vidéo envisagé. Python et Scrapling ne constituent pas une obligation.
 

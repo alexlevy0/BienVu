@@ -18,10 +18,10 @@ Compilation TypeScript des applications et des tests, contrôle des frontières,
 
 Vérification sur `bienvu.online` avec un compte technique isolé contenant 30 projets synthétiques : clic réel sur « Nouveau projet », puis sur chaque choix de la modale.
 
-| Choix | Photos | Plans animés réutilisables | Clips de voix | Musique | Crédits décomptés |
-| --- | ---: | ---: | ---: | --- | ---: |
-| Nouveau projet | 0 | 0 | 0 | Non | 0 |
-| Utiliser la démo | 4 | 4 | 4 | Oui | 0 |
+| Choix            | Photos | Plans animés réutilisables | Clips de voix | Musique | Crédits décomptés |
+| ---------------- | -----: | -------------------------: | ------------: | ------- | ----------------: |
+| Nouveau projet   |      0 |                          0 |             0 | Non     |                 0 |
+| Utiliser la démo |      4 |                          4 |             4 | Oui     |                 0 |
 
 Les 30 projets étaient encore présents après les deux créations. Les quatre photos privées ont été relues et leurs empreintes vérifiées ; les vidéos, la voix et la musique sont accessibles au propriétaire. La voix accepte les plages HTTP, la musique conserve sa durée et sa forme d’onde. Les deux brouillons restent inaccessibles sans session et leur rejeu reprend le même identifiant. La timeline de la démo affiche les quatre « Vidéo IA », la voix d’origine et la musique après chargement.
 
@@ -31,11 +31,11 @@ Solde de crédits inchangé, zéro réservation de transfert et zéro générati
 
 Migration D1 appliquée avant le code. Versions actives à 100 % :
 
-| Worker | Version | Bindings conservés |
-| --- | --- | ---: |
-| Web | `290c5c73-3d73-4b6b-b519-e9db41ca1abd` | 44 |
-| Imports | `9d4f404d-5bf2-40dd-9216-cf9be6f7a295` | 9 |
-| Génération | `b929f459-b0f5-4cfe-a697-ae76d15d5af8` | 28 |
+| Worker     | Version                                | Bindings conservés |
+| ---------- | -------------------------------------- | -----------------: |
+| Web        | `290c5c73-3d73-4b6b-b519-e9db41ca1abd` |                 44 |
+| Imports    | `9d4f404d-5bf2-40dd-9216-cf9be6f7a295` |                  9 |
+| Génération | `b929f459-b0f5-4cfe-a697-ae76d15d5af8` |                 28 |
 
 Les empreintes des bindings avant et après déploiement sont identiques. Les conteneurs existants ont été conservés sans reconstruction.
 

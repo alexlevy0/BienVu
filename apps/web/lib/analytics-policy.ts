@@ -1,115 +1,316 @@
-import {publicSeoPaths} from './seo-paths';
+import { publicSeoPaths } from './seo-paths';
 
-export const ANALYTICS_CONSENT_KEY='bienvu:privacy:v2';
-export const CONSENT_DURATION_MS=180*24*60*60*1000;
-export type AnalyticsConsent={version:2;analytics:boolean;replay:boolean;at:number};
-export type AnalyticsConfig={enabled:boolean;token:string;host:string;errorTracking?:boolean};
-export type AnalyticsProperties=Record<string,string|number|boolean|undefined>;
-const privateParameters=new Set(['token','code','state','grant','socialError','socialConnected','session_id','checkout','homePreview','facebookPage']);
-const studioPaths=new Set(['/beta','/connexion','/agence','/biens','/historique','/editeur','/projets','/publications','/equipe','/ma-vitrine']);
+export const ANALYTICS_CONSENT_KEY = 'bienvu:privacy:v2';
+export const CONSENT_DURATION_MS = 180 * 24 * 60 * 60 * 1000;
+export type AnalyticsConsent = { version: 2; analytics: boolean; replay: boolean; at: number };
+export type AnalyticsConfig = { enabled: boolean; token: string; host: string; errorTracking?: boolean };
+export type AnalyticsProperties = Record<string, string | number | boolean | undefined>;
+const privateParameters = new Set([
+  'token',
+  'code',
+  'state',
+  'grant',
+  'socialError',
+  'socialConnected',
+  'session_id',
+  'checkout',
+  'homePreview',
+  'facebookPage',
+]);
+const studioPaths = new Set([
+  '/beta',
+  '/connexion',
+  '/agence',
+  '/biens',
+  '/historique',
+  '/editeur',
+  '/projets',
+  '/publications',
+  '/equipe',
+  '/ma-vitrine',
+]);
 
 // Public article slugs are retained; private property/project IDs never leave the browser.
-export function analyticsPath(value:string):string|null {
-  try {const url=new URL(value,'https://bienvu.online');
-    if([...url.searchParams.keys()].some(key=>privateParameters.has(key))||/token=|code=/i.test(url.hash))return null;
-    const path=url.pathname.replace(/\/$/,'')||'/';
-    if(publicSeoPaths.includes(path)||studioPaths.has(path))return path;
-    if(/^\/agences\/[^/]+$/.test(path))return '/agences/[slug]';
-    if(/^\/agences\/[^/]+\/biens\/[^/]+$/.test(path))return '/agences/[slug]/biens/[id]';
-    if(/^\/(biens|historique|explorer)\/[^/]+$/.test(path))return '/'+path.split('/')[1]+'/[id]';
+export function analyticsPath(value: string): string | null {
+  try {
+    const url = new URL(value, 'https://bienvu.online');
+    if ([...url.searchParams.keys()].some((key) => privateParameters.has(key)) || /token=|code=/i.test(url.hash))
+      return null;
+    const path = url.pathname.replace(/\/$/, '') || '/';
+    if (publicSeoPaths.includes(path) || studioPaths.has(path)) return path;
+    if (/^\/agences\/[^/]+$/.test(path)) return '/agences/[slug]';
+    if (/^\/agences\/[^/]+\/biens\/[^/]+$/.test(path)) return '/agences/[slug]/biens/[id]';
+    if (/^\/(biens|historique|explorer)\/[^/]+$/.test(path)) return '/' + path.split('/')[1] + '/[id]';
     return null;
-  }catch{return null;}
+  } catch {
+    return null;
+  }
 }
-export function replayAllowed(value:string):boolean {
-  const path=analyticsPath(value);
-  return path!==null&&path!=='/ma-vitrine'&&!path.startsWith('/agences/');
+export function replayAllowed(value: string): boolean {
+  const path = analyticsPath(value);
+  return path !== null && path !== '/ma-vitrine' && !path.startsWith('/agences/');
 }
-export function readAnalyticsConsent(raw:string|null,now=Date.now()):AnalyticsConsent|null {
-  try {const c=JSON.parse(raw??'null') as AnalyticsConsent|null;
-    if(!c||c.version!==2||typeof c.analytics!=='boolean'||typeof c.replay!=='boolean'||!Number.isFinite(c.at)||c.at>now||now-c.at>=CONSENT_DURATION_MS||c.replay&&!c.analytics)return null;
-    return {version:2,analytics:c.analytics,replay:c.replay,at:c.at};
-  }catch{return null;}
+export function readAnalyticsConsent(raw: string | null, now = Date.now()): AnalyticsConsent | null {
+  try {
+    const c = JSON.parse(raw ?? 'null') as AnalyticsConsent | null;
+    if (
+      c?.version !== 2 ||
+      typeof c.analytics !== 'boolean' ||
+      typeof c.replay !== 'boolean' ||
+      !Number.isFinite(c.at) ||
+      c.at > now ||
+      now - c.at >= CONSENT_DURATION_MS ||
+      (c.replay && !c.analytics)
+    )
+      return null;
+    return { version: 2, analytics: c.analytics, replay: c.replay, at: c.at };
+  } catch {
+    return null;
+  }
 }
-export function analyticsConfiguration(env:{POSTHOG_ENABLED?:string;POSTHOG_PROJECT_TOKEN?:string;POSTHOG_HOST?:string;POSTHOG_ERROR_TRACKING_ENABLED?:string}):AnalyticsConfig {
-  const token=env.POSTHOG_PROJECT_TOKEN??'',host=env.POSTHOG_HOST??'https://eu.i.posthog.com';
-  return {enabled:env.POSTHOG_ENABLED==='true'&&/^phc_[A-Za-z0-9_-]{20,150}$/.test(token)&&host==='https://eu.i.posthog.com',token,host,errorTracking:env.POSTHOG_ERROR_TRACKING_ENABLED!=='false'};
+export function analyticsConfiguration(env: {
+  POSTHOG_ENABLED?: string;
+  POSTHOG_PROJECT_TOKEN?: string;
+  POSTHOG_HOST?: string;
+  POSTHOG_ERROR_TRACKING_ENABLED?: string;
+}): AnalyticsConfig {
+  const token = env.POSTHOG_PROJECT_TOKEN ?? '',
+    host = env.POSTHOG_HOST ?? 'https://eu.i.posthog.com';
+  return {
+    enabled:
+      env.POSTHOG_ENABLED === 'true' &&
+      /^phc_[A-Za-z0-9_-]{20,150}$/.test(token) &&
+      host === 'https://eu.i.posthog.com',
+    token,
+    host,
+    errorTracking: env.POSTHOG_ERROR_TRACKING_ENABLED !== 'false',
+  };
 }
 
-const enums:Record<string,readonly string[]>={
-  source_kind:['url','manual','description','editor','demo','empty'],
-  mode:['now','later'],method:['email','google'],account_type:['anonymous','authenticated'],
-  aspect_ratio:['9:16','16:9'],platform:['instagram','facebook','both'],
-  tab:['photos','style','voice','map','text','audio'],status:['ready','needs_input','failed','queued','scheduled','processing','published','partial','cancelled'],
-  action:['photo_added','photo_removed','photo_reordered','animation_toggled','text_changed','music_added','music_removed','music_trimmed','clip_duration_changed','undo','redo','preview','new_project','format_changed','voice_changed','subtitles_changed','map_changed'],
-  metric:['CLS','INP','LCP'],quality:['good','needs-improvement','poor'],
-  control_area:['navigation','composer','customizer','editor_media','editor_timeline','editor_preview','agency','properties','publications','partners','offers','page'],
-  control_type:['link','button','input','select','textarea'],
-  render_preset:['standard','avatar','avatar-ai'],
+const enums: Record<string, readonly string[]> = {
+  source_kind: ['url', 'manual', 'description', 'editor', 'demo', 'empty'],
+  mode: ['now', 'later'],
+  method: ['email', 'google'],
+  account_type: ['anonymous', 'authenticated'],
+  aspect_ratio: ['9:16', '16:9'],
+  platform: ['instagram', 'facebook', 'both'],
+  tab: ['photos', 'style', 'voice', 'map', 'text', 'audio'],
+  status: ['ready', 'needs_input', 'failed', 'queued', 'scheduled', 'processing', 'published', 'partial', 'cancelled'],
+  action: [
+    'photo_added',
+    'photo_removed',
+    'photo_reordered',
+    'animation_toggled',
+    'text_changed',
+    'music_added',
+    'music_removed',
+    'music_trimmed',
+    'clip_duration_changed',
+    'undo',
+    'redo',
+    'preview',
+    'new_project',
+    'format_changed',
+    'voice_changed',
+    'subtitles_changed',
+    'map_changed',
+  ],
+  metric: ['CLS', 'INP', 'LCP'],
+  quality: ['good', 'needs-improvement', 'poor'],
+  control_area: [
+    'navigation',
+    'composer',
+    'customizer',
+    'editor_media',
+    'editor_timeline',
+    'editor_preview',
+    'agency',
+    'properties',
+    'publications',
+    'partners',
+    'offers',
+    'page',
+  ],
+  control_type: ['link', 'button', 'input', 'select', 'textarea'],
+  render_preset: ['standard', 'avatar', 'avatar-ai'],
 };
-const counts=new Set(['photo_count','animation_count','duration_seconds','credit_cost','destination_count','elapsed_ms','metric_value']);
-const flags=new Set(['voice_enabled','subtitles_enabled','map_enabled','verification_required','is_test','is_internal']);
-export const analyticsEvents=new Set(['import_requested','import_completed','import_failed','description_requested','description_completed','description_failed',
-  'manual_form_opened','manual_listing_saved','manual_listing_failed','generation_requested','generation_accepted','generation_request_failed','generation_ready','generation_failed',
-  'editor_project_selected','editor_opened','editor_action','editor_export_requested','editor_export_accepted','editor_export_failed',
-  'signup_requested','signup_completed','signup_failed','login_requested','login_redirected','login_completed','login_failed','logout_completed',
-  'agency_saved','agency_save_failed','social_connection_requested','social_connection_completed','social_connection_removed',
-  'publication_requested','publication_created','publication_failed','publication_completed',
-  'checkout_requested','checkout_opened','checkout_failed','partner_application_started','partner_application_requested','partner_application_received','partner_application_failed',
-  'video_played','video_download_clicked','share_clicked','navigation_clicked','control_interacted','preferences_updated','web_vital',
-  'beta_demo_opened','beta_render_selected','beta_demo_applied','beta_voice_applied']);
-export function safeAnalyticsProperties(input:Record<string,unknown>):AnalyticsProperties {
-  const result:AnalyticsProperties={};
-  for(const [key,value] of Object.entries(input)){
-    if(enums[key]?.includes(value as string))result[key]=value as string;
-    else if(counts.has(key)&&typeof value==='number'&&Number.isFinite(value)&&value>=0&&value<=3_600_000)result[key]=Math.round(value*1000)/1000;
-    else if(flags.has(key)&&typeof value==='boolean')result[key]=value;
-    else if(key==='page'||key==='destination'){const path=typeof value==='string'?analyticsPath(value):null;if(path)result[key]=path;}
-    else if(key==='error_code'&&typeof value==='string'&&/^[A-Z][A-Z0-9_]{1,60}$/.test(value))result[key]=value;
-    else if(key==='source_domain'&&typeof value==='string'&&/^[a-z0-9-]+(?:\.[a-z0-9-]+){1,6}$/.test(value)&&value.length<=200)result[key]=value;
-  }return result;
+const counts = new Set([
+  'photo_count',
+  'animation_count',
+  'duration_seconds',
+  'credit_cost',
+  'destination_count',
+  'elapsed_ms',
+  'metric_value',
+]);
+const flags = new Set([
+  'voice_enabled',
+  'subtitles_enabled',
+  'map_enabled',
+  'verification_required',
+  'is_test',
+  'is_internal',
+]);
+export const analyticsEvents = new Set([
+  'import_requested',
+  'import_completed',
+  'import_failed',
+  'description_requested',
+  'description_completed',
+  'description_failed',
+  'manual_form_opened',
+  'manual_listing_saved',
+  'manual_listing_failed',
+  'generation_requested',
+  'generation_accepted',
+  'generation_request_failed',
+  'generation_ready',
+  'generation_failed',
+  'editor_project_selected',
+  'editor_opened',
+  'editor_action',
+  'editor_export_requested',
+  'editor_export_accepted',
+  'editor_export_failed',
+  'signup_requested',
+  'signup_completed',
+  'signup_failed',
+  'login_requested',
+  'login_redirected',
+  'login_completed',
+  'login_failed',
+  'logout_completed',
+  'agency_saved',
+  'agency_save_failed',
+  'social_connection_requested',
+  'social_connection_completed',
+  'social_connection_removed',
+  'publication_requested',
+  'publication_created',
+  'publication_failed',
+  'publication_completed',
+  'checkout_requested',
+  'checkout_opened',
+  'checkout_failed',
+  'partner_application_started',
+  'partner_application_requested',
+  'partner_application_received',
+  'partner_application_failed',
+  'video_played',
+  'video_download_clicked',
+  'share_clicked',
+  'navigation_clicked',
+  'control_interacted',
+  'preferences_updated',
+  'web_vital',
+  'beta_demo_opened',
+  'beta_render_selected',
+  'beta_demo_applied',
+  'beta_voice_applied',
+]);
+export function safeAnalyticsProperties(input: Record<string, unknown>): AnalyticsProperties {
+  const result: AnalyticsProperties = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (enums[key]?.includes(value as string)) result[key] = value as string;
+    else if (counts.has(key) && typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 3_600_000)
+      result[key] = Math.round(value * 1000) / 1000;
+    else if (flags.has(key) && typeof value === 'boolean') result[key] = value;
+    else if (key === 'page' || key === 'destination') {
+      const path = typeof value === 'string' ? analyticsPath(value) : null;
+      if (path) result[key] = path;
+    } else if (key === 'error_code' && typeof value === 'string' && /^[A-Z][A-Z0-9_]{1,60}$/.test(value))
+      result[key] = value;
+    else if (
+      key === 'source_domain' &&
+      typeof value === 'string' &&
+      /^[a-z0-9-]+(?:\.[a-z0-9-]+){1,6}$/.test(value) &&
+      value.length <= 200
+    )
+      result[key] = value;
+  }
+  return result;
 }
-export function analyticsUrl(value:string):string {
-  const path=analyticsPath(value);return path?'https://bienvu.online'+path:'';
+export function analyticsUrl(value: string): string {
+  const path = analyticsPath(value);
+  return path ? 'https://bienvu.online' + path : '';
 }
 // Native Web Analytics properties. Retain measurements and their correlation,
 // without DOM targets, asset URLs, query strings or arbitrary metric metadata.
-export function safeWebVitalsProperties(input:Record<string,unknown>,documentUrl:string):Record<string,unknown> {
-  const result:Record<string,unknown>={},url=analyticsUrl(documentUrl);if(!url)return result;
-  for(const metric of ['LCP','INP','CLS','FCP']){
-    const value=input[`$web_vitals_${metric}_value`];
-    if(typeof value!=='number'||!Number.isFinite(value)||value<0||value>3_600_000)continue;
-    result[`$web_vitals_${metric}_value`]=value;
-    const raw=input[`$web_vitals_${metric}_event`];if(!raw||typeof raw!=='object'||Array.isArray(raw))continue;
-    const event=raw as Record<string,unknown>,clean:Record<string,unknown>={name:metric,value,$current_url:url};
-    for(const key of ['delta','timestamp'])if(typeof event[key]==='number'&&Number.isFinite(event[key]))clean[key]=event[key];
-    if(typeof event.id==='string'&&/^[\w-]{1,100}$/.test(event.id))clean.id=event.id;
-    if(['good','needs-improvement','poor'].includes(event.rating as string))clean.rating=event.rating;
-    if(['navigate','reload','back-forward','back-forward-cache','prerender','restore'].includes(event.navigationType as string))clean.navigationType=event.navigationType;
-    for(const key of ['$session_id','$window_id'])if(typeof event[key]==='string'&&/^[a-f\d-]{36}$/i.test(event[key]))clean[key]=event[key];
-    if(event.attribution&&typeof event.attribution==='object'){
-      const attribution:Record<string,number>={};
-      for(const key of ['inputDelay','processingDuration','presentationDelay','interactionTime','nextPaintTime','timeToFirstByte','resourceLoadDelay','resourceLoadDuration','elementRenderDelay','firstByteToFCP']){
-        const value=(event.attribution as Record<string,unknown>)[key];if(typeof value==='number'&&Number.isFinite(value)&&value>=0&&value<=3_600_000)attribution[key]=value;
-      }if(Object.keys(attribution).length)clean.attribution=attribution;
+export function safeWebVitalsProperties(input: Record<string, unknown>, documentUrl: string): Record<string, unknown> {
+  const result: Record<string, unknown> = {},
+    url = analyticsUrl(documentUrl);
+  if (!url) return result;
+  for (const metric of ['LCP', 'INP', 'CLS', 'FCP']) {
+    const value = input[`$web_vitals_${metric}_value`];
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 3_600_000) continue;
+    result[`$web_vitals_${metric}_value`] = value;
+    const raw = input[`$web_vitals_${metric}_event`];
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
+    const event = raw as Record<string, unknown>,
+      clean: Record<string, unknown> = { name: metric, value, $current_url: url };
+    for (const key of ['delta', 'timestamp'])
+      if (typeof event[key] === 'number' && Number.isFinite(event[key])) clean[key] = event[key];
+    if (typeof event.id === 'string' && /^[\w-]{1,100}$/.test(event.id)) clean.id = event.id;
+    if (['good', 'needs-improvement', 'poor'].includes(event.rating as string)) clean.rating = event.rating;
+    if (
+      ['navigate', 'reload', 'back-forward', 'back-forward-cache', 'prerender', 'restore'].includes(
+        event.navigationType as string,
+      )
+    )
+      clean.navigationType = event.navigationType;
+    for (const key of ['$session_id', '$window_id'])
+      if (typeof event[key] === 'string' && /^[a-f\d-]{36}$/i.test(event[key])) clean[key] = event[key];
+    if (event.attribution && typeof event.attribution === 'object') {
+      const attribution: Record<string, number> = {};
+      for (const key of [
+        'inputDelay',
+        'processingDuration',
+        'presentationDelay',
+        'interactionTime',
+        'nextPaintTime',
+        'timeToFirstByte',
+        'resourceLoadDelay',
+        'resourceLoadDuration',
+        'elementRenderDelay',
+        'firstByteToFCP',
+      ]) {
+        const value = (event.attribution as Record<string, unknown>)[key];
+        if (typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 3_600_000)
+          attribution[key] = value;
+      }
+      if (Object.keys(attribution).length) clean.attribution = attribution;
     }
-    result[`$web_vitals_${metric}_event`]=clean;
-  }return result;
+    result[`$web_vitals_${metric}_event`] = clean;
+  }
+  return result;
 }
 // Replay keeps the real interface. Only credentials are removed from resource/link URLs.
-export function replayUrl(value:string):string {
-  if(/^data:image\/(?:png|jpeg|webp|gif|svg\+xml)[;,]/i.test(value)||value.startsWith('blob:'))return value;
-  try{const origin=typeof window==='undefined'?'https://bienvu.online':window.location.origin,url=new URL(value,origin);
-    if(['mailto:','tel:'].includes(url.protocol))return value;
-    if(!['http:','https:'].includes(url.protocol))return value.startsWith('#')?value:'';
-    url.username='';url.password='';
-    for(const key of [...url.searchParams.keys()])if(/^(?:access_token|refresh_token|id_token|token|code|state|grant|password|secret|authorization|turnstileToken|signature)$/i.test(key))url.searchParams.delete(key);
-    if(/token=|code=|secret=/i.test(url.hash))url.hash='';
+export function replayUrl(value: string): string {
+  if (/^data:image\/(?:png|jpeg|webp|gif|svg\+xml)[;,]/i.test(value) || value.startsWith('blob:')) return value;
+  try {
+    const origin = typeof window === 'undefined' ? 'https://bienvu.online' : window.location.origin,
+      url = new URL(value, origin);
+    if (['mailto:', 'tel:'].includes(url.protocol)) return value;
+    if (!['http:', 'https:'].includes(url.protocol)) return value.startsWith('#') ? value : '';
+    url.username = '';
+    url.password = '';
+    for (const key of [...url.searchParams.keys()])
+      if (
+        /^(?:access_token|refresh_token|id_token|token|code|state|grant|password|secret|authorization|turnstileToken|signature)$/i.test(
+          key,
+        )
+      )
+        url.searchParams.delete(key);
+    if (/token=|code=|secret=/i.test(url.hash)) url.hash = '';
     return url.href;
-  }catch{return '';}
+  } catch {
+    return '';
+  }
 }
-export function replayAttribute(name:string,value:string,element?:Element):string {
-  if(/password|secret|csrf|authorization|access.token|refresh.token/i.test(name))return '';
-  if(name==='value'&&element?.matches('input[type="password"],input[autocomplete="one-time-code"],.ph-mask'))return '[masqué]';
-  if(['href','src','poster','xlink:href'].includes(name))return replayUrl(value);
+export function replayAttribute(name: string, value: string, element?: Element): string {
+  if (/password|secret|csrf|authorization|access.token|refresh.token/i.test(name)) return '';
+  if (name === 'value' && element?.matches('input[type="password"],input[autocomplete="one-time-code"],.ph-mask'))
+    return '[masqué]';
+  if (['href', 'src', 'poster', 'xlink:href'].includes(name)) return replayUrl(value);
   return value;
 }

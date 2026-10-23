@@ -42,21 +42,21 @@ Les représentations distinguent `status/stage`, `ownership`, `masterAccess` et 
 
 Une seule ligne `trial_policy`, valeurs initiales :
 
-| Champ | Défaut | Portée |
-|---|---:|---|
-| `enabled`, `free_enabled` | 0 / 0 | Nouveaux essais / nouvelles générations gratuites |
-| `free_monthly` | 3 | Allocation gratuite lors de la création de sa période |
-| `session_days` | 30 | Durée de la preuve de session |
-| `successes` | 1 | Succès cumulés par session, conservés après récupération |
-| `session_concurrency` | 1 | Jobs en cours par session |
-| `session_daily` | 3 | Démarrages par session sur 24 h glissantes |
-| `ip_daily` | 5 | Démarrages par empreinte IP sur 24 h glissantes |
-| `global_daily`, `global_monthly` | 5 / 30 | Démarrages anonymes par jour/mois UTC |
-| `render_concurrency` | 1 | Un seul slot de rendu ; cette V1 refuse une autre valeur |
-| `retention_hours` | 24 | Nettoyage des tentatives échouées non récupérées ; les vidéos réussies sont conservées sans expiration |
-| `active_minutes` | 15 | Deadline séparée du job en cours |
-| `budget_ceiling_cents` | Réglage mensuel ; 9000 pour octobre | Coupure du pilote, au plus le plafond global déjà configuré |
-| `preview_provision_cents` | 30 | Surprovision conservatrice de la dérivée, figée par job |
+| Champ                            |                              Défaut | Portée                                                                                                 |
+| -------------------------------- | ----------------------------------: | ------------------------------------------------------------------------------------------------------ |
+| `enabled`, `free_enabled`        |                               0 / 0 | Nouveaux essais / nouvelles générations gratuites                                                      |
+| `free_monthly`                   |                                   3 | Allocation gratuite lors de la création de sa période                                                  |
+| `session_days`                   |                                  30 | Durée de la preuve de session                                                                          |
+| `successes`                      |                                   1 | Succès cumulés par session, conservés après récupération                                               |
+| `session_concurrency`            |                                   1 | Jobs en cours par session                                                                              |
+| `session_daily`                  |                                   3 | Démarrages par session sur 24 h glissantes                                                             |
+| `ip_daily`                       |                                   5 | Démarrages par empreinte IP sur 24 h glissantes                                                        |
+| `global_daily`, `global_monthly` |                              5 / 30 | Démarrages anonymes par jour/mois UTC                                                                  |
+| `render_concurrency`             |                                   1 | Un seul slot de rendu ; cette V1 refuse une autre valeur                                               |
+| `retention_hours`                |                                  24 | Nettoyage des tentatives échouées non récupérées ; les vidéos réussies sont conservées sans expiration |
+| `active_minutes`                 |                                  15 | Deadline séparée du job en cours                                                                       |
+| `budget_ceiling_cents`           | Réglage mensuel ; 9000 pour octobre | Coupure du pilote, au plus le plafond global déjà configuré                                            |
+| `preview_provision_cents`        |                                  30 | Surprovision conservatrice de la dérivée, figée par job                                                |
 
 Les garde-fous globaux déjà présents restent applicables : toutes générations confondues 5/jour et 30/mois, un job actif, imports 10/jour et 30/mois, budget D1 et plafonds privés voix/rendu. Modifier un plafond anonyme ne relève pas ces limites partagées. Une IP partagée n’est pas une personne et un cookie ne garantit pas « un essai par personne ». Les refus proposent la connexion, qui reste soumise à son quota et au budget.
 

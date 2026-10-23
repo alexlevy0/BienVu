@@ -8,15 +8,15 @@ Les scénarios restent indépendants du catalogue commercial et des droits clien
 
 ## Recette locale
 
-| Vérification | Résultat |
-|---|---|
-| `pnpm check` | **437 tests réussis**, typage monorepo/tests et frontières |
+| Vérification                                                                    | Résultat                                                                                                                                                                                                       |
+| ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm check`                                                                    | **437 tests réussis**, typage monorepo/tests et frontières                                                                                                                                                     |
 | Tests `pricing-calculator` / `pricing-simulator` après les derniers ajustements | **24/24** : montants connus, calcul HT/TTC, prix arrondi et remises, bonus, crédits reportés, provision, paliers voix, quotas et arrondis R2, rétention longue, données inconnues, accès privés et concurrence |
-| `pnpm typecheck` final | Tous les packages et tests réussis |
-| `pnpm check:boundaries` final | **424 fichiers**, composition et renderer isolés des Workers |
-| `pnpm probe:pricing:ui` | Chromium **1536/390 px**, six onglets, aucune exception JS ni débordement global |
-| `pnpm build:web` | Next.js/OpenNext réussis, nouvelle route privée incluse |
-| Wrangler dry-run avec configuration publiée | Empaquetage réussi |
+| `pnpm typecheck` final                                                          | Tous les packages et tests réussis                                                                                                                                                                             |
+| `pnpm check:boundaries` final                                                   | **424 fichiers**, composition et renderer isolés des Workers                                                                                                                                                   |
+| `pnpm probe:pricing:ui`                                                         | Chromium **1536/390 px**, six onglets, aucune exception JS ni débordement global                                                                                                                               |
+| `pnpm build:web`                                                                | Next.js/OpenNext réussis, nouvelle route privée incluse                                                                                                                                                        |
+| Wrangler dry-run avec configuration publiée                                     | Empaquetage réussi                                                                                                                                                                                             |
 
 La sonde UI utilise le composant réel dans une page HTTP locale avec réponses contrôlées. Elle vérifie sauvegarde avec modifications de saisie en cours, version suivante, copie, conflit 409 et récupération par copie, application des observations, distinction de coûts absents, JSON/CSV, restauration du brouillon et suppression. Les deux réponses 409 présentes dans la console sont intentionnelles. Cette sonde ne prouve pas une connexion d’utilisateur au site publié.
 

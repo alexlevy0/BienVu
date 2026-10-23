@@ -37,7 +37,6 @@ Ces images et fixtures ne constituent pas une nouvelle vidéo MP4 produite sur C
 ## Publication et preuves Cloudflare réelles
 
 Déploiement du pipeline avec `--keep-vars --strict --containers-rollout immediate`, puis du web avec `--keep-vars --strict` :
-
 - **bienvu-generation-development** : version **698f5039-5fc0-4acd-b2f1-4b2aa829b3bc**, **100 %**.
 - **bienvu-web-probe-staging**, domaine **bienvu.online** : version **7659f76f-3564-4bf1-9828-54dcb78d7fec**, **100 %**.
 - Image poussée au registre Cloudflare, digest **354290e83528a0598ec9e665c95ba38bacb4b02c2971c0c97c9805650686edce** ; application **a0302315-6859-4e3c-9254-891604aee659**, instance `standard-2`, maximum **1**, ressources inchangées.

@@ -1,7 +1,15 @@
-import {staffEmails} from './admin-audience';
-export async function adminCustomerHealth(db:D1Database,env:{SUPER_ADMIN_EMAIL?:string;ADMIN_EMAIL?:string},now=Date.now()){
- const at=new Date(now).toISOString(),days14=new Date(now-14*86400000).toISOString(),days3=new Date(now-3*86400000).toISOString();
- const rows=(await db.prepare(`WITH activity AS (
+import { staffEmails } from './admin-audience';
+export async function adminCustomerHealth(
+  db: D1Database,
+  env: { SUPER_ADMIN_EMAIL?: string; ADMIN_EMAIL?: string },
+  now = Date.now(),
+) {
+  const at = new Date(now).toISOString(),
+    days14 = new Date(now - 14 * 86400000).toISOString(),
+    days3 = new Date(now - 3 * 86400000).toISOString();
+  const rows = (
+    await db
+      .prepare(`WITH activity AS (
   SELECT coalesce(g.owner_agency_id,j.agency_id) AS agencyId,count(*) AS total,sum(j.status='ready') AS ready,
   sum(j.status='failed' AND j.created_at>=?) AS failures,sum(j.status NOT IN ('ready','failed')) AS active,
   max(CASE WHEN j.status='ready' THEN e.created_at END) AS lastReady
@@ -15,6 +23,18 @@ export async function adminCustomerHealth(db:D1Database,env:{SUPER_ADMIN_EMAIL?:
  WHERE lower(u.email) NOT IN (SELECT value FROM json_each(?))
  AND coalesce(json_extract((SELECT body_json FROM admin_workspace_documents d WHERE d.key='agency:'||a.id),'$.audience'),'client')='client'
  AND a.created_at<=? AND signal IS NOT NULL ORDER BY CASE signal WHEN 'failures' THEN 0 WHEN 'first_video' THEN 1 ELSE 2 END,failures DESC,a.created_at LIMIT 100`)
- .bind(days14,at,days3,days14,JSON.stringify(staffEmails(env)),at).all<{id:string;agency:string;email:string;joinedAt:string;total:number;ready:number;failures:number;lastReady:string|null;signal:'failures'|'first_video'|'inactive'}>()).results;
- return {at,items:rows};
+      .bind(days14, at, days3, days14, JSON.stringify(staffEmails(env)), at)
+      .all<{
+        id: string;
+        agency: string;
+        email: string;
+        joinedAt: string;
+        total: number;
+        ready: number;
+        failures: number;
+        lastReady: string | null;
+        signal: 'failures' | 'first_video' | 'inactive';
+      }>()
+  ).results;
+  return { at, items: rows };
 }

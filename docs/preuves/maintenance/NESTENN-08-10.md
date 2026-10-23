@@ -11,7 +11,6 @@ Les 7 JPEG sont relus par l’API privée, avec vérification des dimensions, ta
 ## Blocages et correction
 
 Le premier blocage est `CONFLICTING_FACTS` : le canonique est sur `immobilier-lyon-8.nestenn.com`, alors que le lien initial est sur `nestenn.com`. Sans source enregistrée, l’import générique refuse cette différence de domaine. La page contient aussi deux objets JSON-LD séparés par une virgule sans tableau englobant, ainsi que des quantités écrites avec quatre décimales (`65.0000`, `3.0000`). La galerie utilise un CDN distinct.
-
 - Source explicite **Nestenn** : `nestenn.com`, `www.nestenn.com`, `immobilier-lyon-8.nestenn.com`, routes se terminant par `-ref-ID`.
 - CDN d’images **`media-nestenn.immo-facile.com`** ; aucun joker pour les sous-domaines Nestenn ou immo-facile.
 - Adaptateur **`nestenn-dom/1.0`** : JSON seul, avec un tableau ajouté autour des objets séparés par une virgule ; aucun code exécuté, aucune requête ou API devinée.
@@ -34,11 +33,11 @@ pnpm build:web
 
 Typage complet, frontières sur **426 fichiers**, build Next/OpenNext, dry-runs des trois Workers et `git diff --check` réussis. Le build web est renouvelé pour publier le résultat daté sur `/sources`. L’échec du 05/10 est conservé ; le succès du 08/10 ne constitue pas une garantie pour tous les formats ou sous-domaines Nestenn.
 
-| Worker | Version initiale du correctif à 100 % | Bindings conservés |
-| --- | --- | --- |
-| Web, `bienvu.online` | `d0aade07-9a1e-4915-afb5-b74cdaec9f7d` | 50 |
-| Service d’import | `398fb6a9-45d8-49fa-8828-54e8e797c80d` | 9 |
-| Service de génération | `8cc78d63-d2a2-493d-a874-842422dff234` | 30 |
+| Worker                | Version initiale du correctif à 100 %  | Bindings conservés |
+| --------------------- | -------------------------------------- | ------------------ |
+| Web, `bienvu.online`  | `d0aade07-9a1e-4915-afb5-b74cdaec9f7d` | 50                 |
+| Service d’import      | `398fb6a9-45d8-49fa-8828-54e8e797c80d` | 9                  |
+| Service de génération | `8cc78d63-d2a2-493d-a874-842422dff234` | 30                 |
 
 Comparaison des bindings complets et du runtime avant/après : identiques. Conteneurs existants conservés avec `--containers-rollout none`. Le web contient également l’extracteur ; le registre est publié dans le service de génération pour les mêmes liens en essai sans compte. Aucun rendu vidéo n’est déclenché pour cette recette.
 

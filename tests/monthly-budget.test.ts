@@ -1,126 +1,368 @@
-import {test} from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {readFile,readdir} from 'node:fs/promises';
-import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
-import {AdminAction,VideoManifest,videoManifestHash,MAX_MONTHLY_BUDGET_CENTS,MIN_BUDGET_SAFETY_MARGIN_CENTS} from '../packages/contracts/src/index';
-import {adminAction,adminOverview,admitGeneration,failGeneration,admitAnonymous,createAnonymousSession} from '../packages/db/src/index';
-import {seedNarrationFixture} from '../scripts/narration-fixtures';
-import {productRenderBudget} from '../apps/pipeline/src/product-render-budget';
-import {videoFixture} from '../fixtures/video';
+import { readFile, readdir } from 'node:fs/promises';
+import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
+import {
+  AdminAction,
+  VideoManifest,
+  videoManifestHash,
+  MAX_MONTHLY_BUDGET_CENTS,
+  MIN_BUDGET_SAFETY_MARGIN_CENTS,
+} from '../packages/contracts/src/index';
+import {
+  adminAction,
+  adminOverview,
+  admitGeneration,
+  failGeneration,
+  admitAnonymous,
+  createAnonymousSession,
+} from '../packages/db/src/index';
+import { seedNarrationFixture } from '../scripts/narration-fixtures';
+import { productRenderBudget } from '../apps/pipeline/src/product-render-budget';
+import { videoFixture } from '../fixtures/video';
 
-test('budget mensuel D1 : migration sans effacement, ouverture explicite, audit et conflits atomiques',async t=>{
-  const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:'export default {fetch(){return new Response("fixture")}}',compatibilityDate:'2026-10-01',d1Databases:['DB']}));t.after(()=>mf.dispose());
-  const {DB:db}=await mf.getBindings<{DB:D1Database}>(),at=new Date().toISOString(),month=at.slice(0,7),older='2026-08';
-  const migrate=async(file:string)=>db.exec((await readFile('packages/db/migrations/'+file,'utf8')).replace(/^--.*$/gm,'').replace(/\n/g,' '));
-  for(const file of (await readdir('packages/db/migrations')).filter(f=>f.endsWith('.sql')&&f<'0025').sort())await migrate(file);
-  await db.prepare('INSERT INTO auth_user(id,name,email,emailVerified,createdAt,updatedAt) VALUES(?,?,?,?,?,?)').bind('budget-admin','Fixture','admin@example.com',1,Date.now(),Date.now()).run();
-  await db.exec(`INSERT INTO hosted_import_budget VALUES('${older}',3080,4500,0); INSERT INTO hosted_import_costs(import_id,agency_id,month,created_at) VALUES('history','fixture','${older}','2026-08-01'); UPDATE generation_control SET enabled=1`);
-  await adminAction(db,'budget-admin',{action:'generation_gate',enabled:false,expected:true,reason:'Fixture historique'});
-  const before=await db.prepare('SELECT * FROM admin_audit').all();
+test('budget mensuel D1 : migration sans effacement, ouverture explicite, audit et conflits atomiques', async (t) => {
+  const mf = new Miniflare(
+    convertV4MiniflareOptions({
+      modules: true,
+      script: 'export default {fetch(){return new Response("fixture")}}',
+      compatibilityDate: '2026-10-01',
+      d1Databases: ['DB'],
+    }),
+  );
+  t.after(() => mf.dispose());
+  const { DB: db } = await mf.getBindings<{ DB: D1Database }>(),
+    at = new Date().toISOString(),
+    month = at.slice(0, 7),
+    older = '2026-08';
+  const migrate = async (file: string) =>
+    db.exec((await readFile('packages/db/migrations/' + file, 'utf8')).replace(/^--.*$/gm, '').replace(/\n/g, ' '));
+  for (const file of (await readdir('packages/db/migrations')).filter((f) => f.endsWith('.sql') && f < '0025').sort())
+    await migrate(file);
+  await db
+    .prepare('INSERT INTO auth_user(id,name,email,emailVerified,createdAt,updatedAt) VALUES(?,?,?,?,?,?)')
+    .bind('budget-admin', 'Fixture', 'admin@example.com', 1, Date.now(), Date.now())
+    .run();
+  await db.exec(
+    `INSERT INTO hosted_import_budget VALUES('${older}',3080,4500,0); INSERT INTO hosted_import_costs(import_id,agency_id,month,created_at) VALUES('history','fixture','${older}','2026-08-01'); UPDATE generation_control SET enabled=1`,
+  );
+  await adminAction(db, 'budget-admin', {
+    action: 'generation_gate',
+    enabled: false,
+    expected: true,
+    reason: 'Fixture historique',
+  });
+  const before = await db.prepare('SELECT * FROM admin_audit').all();
   await migrate('0025_monthly_budget.sql');
-  assert.deepEqual((await db.prepare('SELECT * FROM admin_audit').all()).results,before.results);
-  assert.equal((await db.prepare("SELECT enabled FROM generation_control WHERE id='generations'").first<{enabled:number}>())!.enabled,0,'Le journal copié ne réexécute aucune ancienne action');
-  assert.deepEqual(await db.prepare('SELECT * FROM hosted_import_budget').first(),{month:older,baseline_cents:3080,ceiling_cents:4500,paused:0});
-  assert.equal(await db.prepare('SELECT * FROM narration_budget').first(),null);
+  assert.deepEqual((await db.prepare('SELECT * FROM admin_audit').all()).results, before.results);
+  assert.equal(
+    (await db.prepare("SELECT enabled FROM generation_control WHERE id='generations'").first<{ enabled: number }>())!
+      .enabled,
+    0,
+    'Le journal copié ne réexécute aucune ancienne action',
+  );
+  assert.deepEqual(await db.prepare('SELECT * FROM hosted_import_budget').first(), {
+    month: older,
+    baseline_cents: 3080,
+    ceiling_cents: 4500,
+    paused: 0,
+  });
+  assert.equal(await db.prepare('SELECT * FROM narration_budget').first(), null);
   // Application queries require the current schema. Defer only the two budget
   // upgrades whose historical ceilings are explicitly checked below.
-  const deferred=new Set(['0059_monthly_budget_200.sql','0060_admin_budget_amounts.sql']);
-  for(const file of (await readdir('packages/db/migrations')).filter(f=>f.endsWith('.sql')&&f>'0025_monthly_budget.sql'&&!deferred.has(f)).sort())await migrate(file);
-  const open={action:'monthly_budget' as const,month,envelopeCents:10000,ceilingCents:9000,openingCents:800,paused:false,expected:null,reason:'Ouverture du mois pour la recette'};
-  assert.equal(AdminAction.safeParse({...open,envelopeCents:MAX_MONTHLY_BUDGET_CENTS+1}).success,false);
-  assert.equal(AdminAction.safeParse({...open,ceilingCents:9600}).success,false);
-  assert.equal(AdminAction.safeParse({...open,unexpected:true}).success,false);
-  await adminAction(db,'budget-admin',open);
-  assert.deepEqual(await db.prepare('SELECT * FROM monthly_budget_settings').first(),{month,envelope_cents:10000,revision:1});
-  assert.deepEqual(await db.prepare('SELECT * FROM narration_budget').first(),{month,envelope_cents:2500,paused:0});
-  assert.equal((await db.prepare('SELECT budget_ceiling_cents AS n FROM trial_policy').first<{n:number}>())!.n,9000);
+  const deferred = new Set(['0059_monthly_budget_200.sql', '0060_admin_budget_amounts.sql']);
+  for (const file of (await readdir('packages/db/migrations'))
+    .filter((f) => f.endsWith('.sql') && f > '0025_monthly_budget.sql' && !deferred.has(f))
+    .sort())
+    await migrate(file);
+  const open = {
+    action: 'monthly_budget' as const,
+    month,
+    envelopeCents: 10000,
+    ceilingCents: 9000,
+    openingCents: 800,
+    paused: false,
+    expected: null,
+    reason: 'Ouverture du mois pour la recette',
+  };
+  assert.equal(AdminAction.safeParse({ ...open, envelopeCents: MAX_MONTHLY_BUDGET_CENTS + 1 }).success, false);
+  assert.equal(AdminAction.safeParse({ ...open, ceilingCents: 9600 }).success, false);
+  assert.equal(AdminAction.safeParse({ ...open, unexpected: true }).success, false);
+  await adminAction(db, 'budget-admin', open);
+  assert.deepEqual(await db.prepare('SELECT * FROM monthly_budget_settings').first(), {
+    month,
+    envelope_cents: 10000,
+    revision: 1,
+  });
+  assert.deepEqual(await db.prepare('SELECT * FROM narration_budget').first(), {
+    month,
+    envelope_cents: 2500,
+    paused: 0,
+  });
+  assert.equal(
+    (await db.prepare('SELECT budget_ceiling_cents AS n FROM trial_policy').first<{ n: number }>())!.n,
+    9000,
+  );
   await db.prepare('UPDATE hosted_import_budget SET baseline_cents=baseline_cents+150 WHERE month=?').bind(month).run();
-  await db.prepare('INSERT INTO hosted_import_costs(import_id,agency_id,month,created_at) VALUES(?,?,?,?)').bind('current-import','fixture',month,at).run();
-  const change={...open,expected:1,openingCents:0};
-  const auditCount=async()=>(await db.prepare('SELECT count(*) AS n FROM admin_audit').first<{n:number}>())!.n;
-  const count=await auditCount();
-  for(const action of [{...change,expected:0},{...change,expected:null},{...change,ceilingCents:999},{...change,month:older}])await assert.rejects(adminAction(db,'budget-admin',action),/ADMIN_CONFLICT/);
-  assert.equal(await auditCount(),count);
-  const [first,second]=await Promise.allSettled([1,2].map(()=>adminAction(db,'budget-admin',{...change,paused:true})));
-  assert.equal([first,second].filter(r=>r.status==='fulfilled').length,1,'Une seule modification concurrente réussit');
-  assert.equal((await db.prepare('SELECT paused FROM narration_budget WHERE month=?').bind(month).first<{paused:number}>())!.paused,1);
-  await adminAction(db,'budget-admin',{...change,expected:2,paused:false});
-  const config={generations:true,anonymousTrials:true,imports:'cloudflare',email:'cloudflare',google:true,origin:'https://fixture.test'};
-  const overview=await adminOverview(db,config);
-  assert.equal(overview.budget?.envelopeCents,10000);assert.equal(overview.budget?.ceilingCents,9000);assert.equal(overview.budget?.revision,3);
-  assert.equal(overview.budget?.baselineCents,950);assert.equal(overview.budget?.importsCents,50);
-  const audit=await db.prepare("SELECT before_value,after_value FROM admin_audit WHERE action='monthly_budget' ORDER BY rowid DESC LIMIT 1").first<{before_value:string;after_value:string}>();
-  assert.equal(JSON.parse(audit!.before_value).envelopeCents,10000);assert.equal(JSON.parse(audit!.after_value).paused,0);
-  await assert.rejects(db.exec("DELETE FROM admin_audit"),/ADMIN_AUDIT_IMMUTABLE/);
-  assert.deepEqual((await db.prepare('PRAGMA foreign_key_check').all()).results,[]);
+  await db
+    .prepare('INSERT INTO hosted_import_costs(import_id,agency_id,month,created_at) VALUES(?,?,?,?)')
+    .bind('current-import', 'fixture', month, at)
+    .run();
+  const change = { ...open, expected: 1, openingCents: 0 };
+  const auditCount = async () => (await db.prepare('SELECT count(*) AS n FROM admin_audit').first<{ n: number }>())!.n;
+  const count = await auditCount();
+  for (const action of [
+    { ...change, expected: 0 },
+    { ...change, expected: null },
+    { ...change, ceilingCents: 999 },
+    { ...change, month: older },
+  ])
+    await assert.rejects(adminAction(db, 'budget-admin', action), /ADMIN_CONFLICT/);
+  assert.equal(await auditCount(), count);
+  const [first, second] = await Promise.allSettled(
+    [1, 2].map(() => adminAction(db, 'budget-admin', { ...change, paused: true })),
+  );
+  assert.equal(
+    [first, second].filter((r) => r.status === 'fulfilled').length,
+    1,
+    'Une seule modification concurrente réussit',
+  );
+  assert.equal(
+    (await db.prepare('SELECT paused FROM narration_budget WHERE month=?').bind(month).first<{ paused: number }>())!
+      .paused,
+    1,
+  );
+  await adminAction(db, 'budget-admin', { ...change, expected: 2, paused: false });
+  const config = {
+    generations: true,
+    anonymousTrials: true,
+    imports: 'cloudflare',
+    email: 'cloudflare',
+    google: true,
+    origin: 'https://fixture.test',
+  };
+  const overview = await adminOverview(db, config);
+  assert.equal(overview.budget?.envelopeCents, 10000);
+  assert.equal(overview.budget?.ceilingCents, 9000);
+  assert.equal(overview.budget?.revision, 3);
+  assert.equal(overview.budget?.baselineCents, 950);
+  assert.equal(overview.budget?.importsCents, 50);
+  const audit = await db
+    .prepare(
+      "SELECT before_value,after_value FROM admin_audit WHERE action='monthly_budget' ORDER BY rowid DESC LIMIT 1",
+    )
+    .first<{ before_value: string; after_value: string }>();
+  assert.equal(JSON.parse(audit!.before_value).envelopeCents, 10000);
+  assert.equal(JSON.parse(audit!.after_value).paused, 0);
+  await assert.rejects(db.exec('DELETE FROM admin_audit'), /ADMIN_AUDIT_IMMUTABLE/);
+  assert.deepEqual((await db.prepare('PRAGMA foreign_key_check').all()).results, []);
 
   // Admission réelle D1, mais rendu simulé : le montant global comprend déjà les 50 c du rendu.
-  const {agencyId,jobId}=await seedNarrationFixture(db,'monthly-budget',true);
+  const { agencyId, jobId } = await seedNarrationFixture(db, 'monthly-budget', true);
   await db.prepare("UPDATE jobs SET status='failed',error_code='FIXTURE' WHERE id=?").bind(jobId).run();
   await db.exec('UPDATE generation_control SET enabled=1');
-  await db.prepare('INSERT INTO generation_access VALUES(?,?,1)').bind(agencyId,'allocation-monthly-budget').run();
-  const job=await admitGeneration(db,agencyId,'monthly-budget-job',{listingId:'listing-monthly-budget'},'true');
+  await db.prepare('INSERT INTO generation_access VALUES(?,?,1)').bind(agencyId, 'allocation-monthly-budget').run();
+  const job = await admitGeneration(
+    db,
+    agencyId,
+    'monthly-budget-job',
+    { listingId: 'listing-monthly-budget' },
+    'true',
+  );
   await db.prepare("UPDATE jobs SET status='rendering',stage='rendering' WHERE id=?").bind(job.jobId).run();
-  const f=await videoFixture(),prefix=`agencies/${agencyId}/jobs/${job.jobId}/`,old=`agencies/${f.manifest.agencyId}/jobs/${f.manifest.jobId}/`;
-  const manifest=VideoManifest.parse({...f.manifest,agencyId,jobId:job.jobId,listingId:'listing-monthly-budget',brand:{...f.manifest.brand,id:agencyId},rights:{kind:'trial',allocationId:'allocation-monthly-budget',watermarked:true},
-    photos:f.manifest.photos.map(p=>({...p,objectKey:p.objectKey.replace(old,prefix)})),audio:f.manifest.audio.map(a=>({...a,objectKey:a.objectKey.replace(old,prefix)}))});
-  const hash=await videoManifestHash(manifest);
-  await db.prepare("INSERT INTO video_manifests VALUES(?,?,?,?,?,?,'prepared',?,?)").bind(job.jobId,agencyId,1,hash,JSON.stringify(manifest),'[]',at,new Date(Date.now()+86400000).toISOString()).run();
-  const snapshot=await productRenderBudget(db,manifest,Date.now());assert.equal(snapshot.fixedAndOtherCents,1120);assert.equal(snapshot.ceilingCents,9000);assert.equal(snapshot.month,month);
-  await assert.rejects(productRenderBudget(db,{...manifest,subtitlesEnabled:false},Date.now()),/RESERVATION_REQUIRED/);
-  await adminAction(db,'budget-admin',{...change,expected:3,paused:true});
-  await assert.rejects(productRenderBudget(db,manifest,Date.now()),/VIDEO_BUDGET_LIMIT/);
-  await adminAction(db,'budget-admin',{...change,expected:4,paused:false});
-  await failGeneration(db,job,'GENERATION_FAILED');await assert.rejects(productRenderBudget(db,manifest,Date.now()),/RESERVATION_REQUIRED/);
+  const f = await videoFixture(),
+    prefix = `agencies/${agencyId}/jobs/${job.jobId}/`,
+    old = `agencies/${f.manifest.agencyId}/jobs/${f.manifest.jobId}/`;
+  const manifest = VideoManifest.parse({
+    ...f.manifest,
+    agencyId,
+    jobId: job.jobId,
+    listingId: 'listing-monthly-budget',
+    brand: { ...f.manifest.brand, id: agencyId },
+    rights: { kind: 'trial', allocationId: 'allocation-monthly-budget', watermarked: true },
+    photos: f.manifest.photos.map((p) => ({ ...p, objectKey: p.objectKey.replace(old, prefix) })),
+    audio: f.manifest.audio.map((a) => ({ ...a, objectKey: a.objectKey.replace(old, prefix) })),
+  });
+  const hash = await videoManifestHash(manifest);
+  await db
+    .prepare("INSERT INTO video_manifests VALUES(?,?,?,?,?,?,'prepared',?,?)")
+    .bind(
+      job.jobId,
+      agencyId,
+      1,
+      hash,
+      JSON.stringify(manifest),
+      '[]',
+      at,
+      new Date(Date.now() + 86400000).toISOString(),
+    )
+    .run();
+  const snapshot = await productRenderBudget(db, manifest, Date.now());
+  assert.equal(snapshot.fixedAndOtherCents, 1120);
+  assert.equal(snapshot.ceilingCents, 9000);
+  assert.equal(snapshot.month, month);
+  await assert.rejects(
+    productRenderBudget(db, { ...manifest, subtitlesEnabled: false }, Date.now()),
+    /RESERVATION_REQUIRED/,
+  );
+  await adminAction(db, 'budget-admin', { ...change, expected: 3, paused: true });
+  await assert.rejects(productRenderBudget(db, manifest, Date.now()), /VIDEO_BUDGET_LIMIT/);
+  await adminAction(db, 'budget-admin', { ...change, expected: 4, paused: false });
+  await failGeneration(db, job, 'GENERATION_FAILED');
+  await assert.rejects(productRenderBudget(db, manifest, Date.now()), /RESERVATION_REQUIRED/);
   await db.exec('UPDATE trial_policy SET enabled=1');
-  const {session}=await createAnonymousSession(db);
-  const anon=await admitAnonymous(db,session,'budget-anonymous-fixture',{url:'https://www.century21.fr/trouver_logement/detail/123456/'},{ipHmac:'a'.repeat(64),turnstileHash:'b'.repeat(64)},'true');
+  const { session } = await createAnonymousSession(db);
+  const anon = await admitAnonymous(
+    db,
+    session,
+    'budget-anonymous-fixture',
+    { url: 'https://www.century21.fr/trouver_logement/detail/123456/' },
+    { ipHmac: 'a'.repeat(64), turnstileHash: 'b'.repeat(64) },
+    'true',
+  );
   await db.prepare("UPDATE jobs SET status='rendering',stage='rendering' WHERE id=?").bind(anon.jobId).run();
-  const af=await videoFixture('anonymous'),ap=`agencies/${session.scopeId}/jobs/${anon.jobId}/`,ao=`agencies/${af.manifest.agencyId}/jobs/${af.manifest.jobId}/`;
-  const am=VideoManifest.parse({...af.manifest,agencyId:session.scopeId,jobId:anon.jobId,brand:{...af.manifest.brand,id:session.scopeId},
-    photos:af.manifest.photos.map(p=>({...p,objectKey:p.objectKey.replace(ao,ap)})),audio:af.manifest.audio.map(a=>({...a,objectKey:a.objectKey.replace(ao,ap)}))});
-  const ah=await videoManifestHash(am);
-  await db.prepare("INSERT INTO video_manifests VALUES(?,?,?,?,?,?,'prepared',?,?)").bind(anon.jobId,session.scopeId,1,ah,JSON.stringify(am),'[]',at,new Date(Date.now()+86400000).toISOString()).run();
-  assert.equal((await db.prepare('SELECT status FROM reservations WHERE job_id=?').bind(anon.jobId).first<{status:string}>())!.status,'unfunded');
-  assert.equal((await productRenderBudget(db,am,Date.now())).fixedAndOtherCents,1270,'Le rendu anonyme est autorisé avant tout débit de crédit utilisateur');
-  assert.equal((await db.prepare('SELECT baseline_cents FROM hosted_import_budget WHERE month=?').bind(older).first<{baseline_cents:number}>())!.baseline_cents,3080);
+  const af = await videoFixture('anonymous'),
+    ap = `agencies/${session.scopeId}/jobs/${anon.jobId}/`,
+    ao = `agencies/${af.manifest.agencyId}/jobs/${af.manifest.jobId}/`;
+  const am = VideoManifest.parse({
+    ...af.manifest,
+    agencyId: session.scopeId,
+    jobId: anon.jobId,
+    brand: { ...af.manifest.brand, id: session.scopeId },
+    photos: af.manifest.photos.map((p) => ({ ...p, objectKey: p.objectKey.replace(ao, ap) })),
+    audio: af.manifest.audio.map((a) => ({ ...a, objectKey: a.objectKey.replace(ao, ap) })),
+  });
+  const ah = await videoManifestHash(am);
+  await db
+    .prepare("INSERT INTO video_manifests VALUES(?,?,?,?,?,?,'prepared',?,?)")
+    .bind(
+      anon.jobId,
+      session.scopeId,
+      1,
+      ah,
+      JSON.stringify(am),
+      '[]',
+      at,
+      new Date(Date.now() + 86400000).toISOString(),
+    )
+    .run();
+  assert.equal(
+    (await db.prepare('SELECT status FROM reservations WHERE job_id=?').bind(anon.jobId).first<{ status: string }>())!
+      .status,
+    'unfunded',
+  );
+  assert.equal(
+    (await productRenderBudget(db, am, Date.now())).fixedAndOtherCents,
+    1270,
+    'Le rendu anonyme est autorisé avant tout débit de crédit utilisateur',
+  );
+  assert.equal(
+    (await db
+      .prepare('SELECT baseline_cents FROM hosted_import_budget WHERE month=?')
+      .bind(older)
+      .first<{ baseline_cents: number }>())!.baseline_cents,
+    3080,
+  );
 
-  const tables=['hosted_import_budget','monthly_budget_settings','hosted_import_costs','admin_audit','generation_runs','reservations'];
-  const dataSnapshot=async()=>Promise.all(tables.map(async table=>(await db.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()).results));
-  const historical=await dataSnapshot();
+  const tables = [
+    'hosted_import_budget',
+    'monthly_budget_settings',
+    'hosted_import_costs',
+    'admin_audit',
+    'generation_runs',
+    'reservations',
+  ];
+  const dataSnapshot = async () =>
+    Promise.all(tables.map(async (table) => (await db.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()).results));
+  const historical = await dataSnapshot();
   await migrate('0059_monthly_budget_200.sql');
-  assert.deepEqual(await dataSnapshot(),historical,'L’extension du plafond conserve chaque budget, dépense, réservation et action');
-  assert.deepEqual((await db.prepare('PRAGMA foreign_key_check').all()).results,[]);
-  const current=overview.budget!;
-  const baseline=(await db.prepare('SELECT baseline_cents AS n FROM hosted_import_budget WHERE month=?').bind(month).first<{n:number}>())!.n;
-  await adminAction(db,'budget-admin',{...change,expected:5,envelopeCents:20000,ceilingCents:18000});
-  const doubled=(await adminOverview(db,config)).budget!;
-  assert.equal(doubled.envelopeCents,20000);assert.equal(doubled.ceilingCents,18000);assert.equal(doubled.revision,6);
-  assert.equal(doubled.baselineCents,baseline);assert.equal(doubled.importsCents,current.importsCents);
-  assert.equal((await db.prepare('SELECT budget_ceiling_cents AS n FROM trial_policy').first<{n:number}>())!.n,18000);
-  assert.equal((await db.prepare('SELECT envelope_cents AS n FROM narration_budget WHERE month=?').bind(month).first<{n:number}>())!.n,2500);
-  const renderAt200=await productRenderBudget(db,am,Date.now());
-  assert.equal(renderAt200.envelopeCents,20000);assert.equal(renderAt200.ceilingCents,18000);
-  assert.equal(renderAt200.fixedAndOtherCents,1270,'La hausse autorise le rendu sans nouvelle provision D1');
+  assert.deepEqual(
+    await dataSnapshot(),
+    historical,
+    'L’extension du plafond conserve chaque budget, dépense, réservation et action',
+  );
+  assert.deepEqual((await db.prepare('PRAGMA foreign_key_check').all()).results, []);
+  const current = overview.budget!;
+  const baseline = (await db
+    .prepare('SELECT baseline_cents AS n FROM hosted_import_budget WHERE month=?')
+    .bind(month)
+    .first<{ n: number }>())!.n;
+  await adminAction(db, 'budget-admin', { ...change, expected: 5, envelopeCents: 20000, ceilingCents: 18000 });
+  const doubled = (await adminOverview(db, config)).budget!;
+  assert.equal(doubled.envelopeCents, 20000);
+  assert.equal(doubled.ceilingCents, 18000);
+  assert.equal(doubled.revision, 6);
+  assert.equal(doubled.baselineCents, baseline);
+  assert.equal(doubled.importsCents, current.importsCents);
+  assert.equal(
+    (await db.prepare('SELECT budget_ceiling_cents AS n FROM trial_policy').first<{ n: number }>())!.n,
+    18000,
+  );
+  assert.equal(
+    (await db
+      .prepare('SELECT envelope_cents AS n FROM narration_budget WHERE month=?')
+      .bind(month)
+      .first<{ n: number }>())!.n,
+    2500,
+  );
+  const renderAt200 = await productRenderBudget(db, am, Date.now());
+  assert.equal(renderAt200.envelopeCents, 20000);
+  assert.equal(renderAt200.ceilingCents, 18000);
+  assert.equal(renderAt200.fixedAndOtherCents, 1270, 'La hausse autorise le rendu sans nouvelle provision D1');
   // Even a direct database write cannot exceed the authorized envelope.
-  await assert.rejects(db.prepare('UPDATE monthly_budget_settings SET envelope_cents=20001 WHERE month=?').bind(month).run());
-  await assert.rejects(db.prepare('UPDATE hosted_import_budget SET ceiling_cents=19501 WHERE month=?').bind(month).run());
+  await assert.rejects(
+    db.prepare('UPDATE monthly_budget_settings SET envelope_cents=20001 WHERE month=?').bind(month).run(),
+  );
+  await assert.rejects(
+    db.prepare('UPDATE hosted_import_budget SET ceiling_cents=19501 WHERE month=?').bind(month).run(),
+  );
 
-  const beforeConfigurable=await dataSnapshot();
+  const beforeConfigurable = await dataSnapshot();
   await migrate('0060_admin_budget_amounts.sql');
-  assert.deepEqual(await dataSnapshot(),beforeConfigurable,'Retirer la limite du pilote ne change aucun montant ou historique actif');
-  assert.deepEqual((await db.prepare('PRAGMA foreign_key_check').all()).results,[]);
-  const selected={...change,expected:6,envelopeCents:30000,ceilingCents:18000,reason:'Montant choisi et confirmé dans le superadmin'};
-  await adminAction(db,'budget-admin',selected);
-  const configured=(await adminOverview(db,config)).budget!;
-  assert.equal(configured.envelopeCents,30000);assert.equal(configured.ceilingCents,18000);assert.equal(configured.revision,7);
-  assert.equal(configured.baselineCents,baseline);assert.equal(configured.importsCents,current.importsCents);
-  const renderAt300=await productRenderBudget(db,am,Date.now());assert.equal(renderAt300.envelopeCents,30000);assert.equal(renderAt300.ceilingCents,18000);
-  const auditAfter=await auditCount();
-  await assert.rejects(adminAction(db,'budget-admin',selected),/ADMIN_CONFLICT/);
-  await assert.rejects(adminAction(db,'budget-admin',{...selected,expected:7,ceilingCents:29900}),/INVALID_MONTHLY_BUDGET/);
-  await assert.rejects(adminAction(db,'budget-admin',{...selected,expected:7,ceilingCents:baseline-1}),/ADMIN_CONFLICT/);
-  assert.equal(await auditCount(),auditAfter);
-  await assert.rejects(db.prepare('UPDATE monthly_budget_settings SET envelope_cents=? WHERE month=?').bind(MAX_MONTHLY_BUDGET_CENTS+1,month).run());
-  await assert.rejects(db.prepare('UPDATE hosted_import_budget SET ceiling_cents=? WHERE month=?').bind(MAX_MONTHLY_BUDGET_CENTS-MIN_BUDGET_SAFETY_MARGIN_CENTS+1,month).run());
+  assert.deepEqual(
+    await dataSnapshot(),
+    beforeConfigurable,
+    'Retirer la limite du pilote ne change aucun montant ou historique actif',
+  );
+  assert.deepEqual((await db.prepare('PRAGMA foreign_key_check').all()).results, []);
+  const selected = {
+    ...change,
+    expected: 6,
+    envelopeCents: 30000,
+    ceilingCents: 18000,
+    reason: 'Montant choisi et confirmé dans le superadmin',
+  };
+  await adminAction(db, 'budget-admin', selected);
+  const configured = (await adminOverview(db, config)).budget!;
+  assert.equal(configured.envelopeCents, 30000);
+  assert.equal(configured.ceilingCents, 18000);
+  assert.equal(configured.revision, 7);
+  assert.equal(configured.baselineCents, baseline);
+  assert.equal(configured.importsCents, current.importsCents);
+  const renderAt300 = await productRenderBudget(db, am, Date.now());
+  assert.equal(renderAt300.envelopeCents, 30000);
+  assert.equal(renderAt300.ceilingCents, 18000);
+  const auditAfter = await auditCount();
+  await assert.rejects(adminAction(db, 'budget-admin', selected), /ADMIN_CONFLICT/);
+  await assert.rejects(
+    adminAction(db, 'budget-admin', { ...selected, expected: 7, ceilingCents: 29900 }),
+    /INVALID_MONTHLY_BUDGET/,
+  );
+  await assert.rejects(
+    adminAction(db, 'budget-admin', { ...selected, expected: 7, ceilingCents: baseline - 1 }),
+    /ADMIN_CONFLICT/,
+  );
+  assert.equal(await auditCount(), auditAfter);
+  await assert.rejects(
+    db
+      .prepare('UPDATE monthly_budget_settings SET envelope_cents=? WHERE month=?')
+      .bind(MAX_MONTHLY_BUDGET_CENTS + 1, month)
+      .run(),
+  );
+  await assert.rejects(
+    db
+      .prepare('UPDATE hosted_import_budget SET ceiling_cents=? WHERE month=?')
+      .bind(MAX_MONTHLY_BUDGET_CENTS - MIN_BUDGET_SAFETY_MARGIN_CENTS + 1, month)
+      .run(),
+  );
 });

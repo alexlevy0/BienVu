@@ -2,20 +2,20 @@
 
 L’administration conserve les outils existants et les regroupe dans six catégories. Les favoris et filtres sont synchronisés par compte ; les vues peuvent être privées ou partagées avec le staff. Les liens de listes contiennent leurs critères ; les dossiers vidéo et agence ont une URL dédiée.
 
-| Fonction | Accès / comportement |
-| --- | --- |
-| Navigation | Six catégories, recherche de rubrique, favoris synchronisés. |
-| Points d’attention | Générations sans changement depuis 15 minutes, signalements ouverts et incidents avec agence, date et diagnostic. |
-| Diagnostic vidéo | Source, transitions d’étapes, appels script/voix, préparation, avatar, chaque animation, ressources en file, crédits, coûts et notifications. |
-| Agence à 360° | Abonnement, crédits, dernières vidéos, signalements, correspondance par adresse du propriétaire et notes internes. |
-| Fournisseurs | Activité réelle enregistrée, capacité et occupation des files, dernier solde Runway, vérification gratuite du solde HeyGen. Un solde inconnu n’est pas zéro. |
-| Filtres et vues | Critères conservés par rubrique, URL partageable, vues nommées synchronisées ou partagées, raccourci des échecs de la semaine. |
-| Performance | Moyenne, médiane et P95, filtres origine/durée/avatar/animations, attentes cumulées, séries quotidiennes sans faux zéros. |
-| Incidents | Une occurrence par vidéo/étape/code, deux fenêtres de 7 jours, suivi optimiste à traiter/en cours/résolu, réouverture si nouveau cas. |
-| Rétention | Première puis deuxième vidéo prête, retour à 7/30 jours avec exclusion des cohortes trop récentes, jours et semaines d’usage. |
-| Rentabilité par rendu | Standard, avatar, avatar avec animations, animations seules. Modes Stripe séparés ; marge inconnue si les frais/coûts ne sont pas couverts. |
-| Changements | Réglages et changements documentés sur la courbe de durée ou de taux d’échec ; historique de déploiement vérifié. |
-| Tables et dossiers | En-têtes fixes dans les tables, unités et badges communs, dossiers longs en page dédiée. |
+| Fonction              | Accès / comportement                                                                                                                                         |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Navigation            | Six catégories, recherche de rubrique, favoris synchronisés.                                                                                                 |
+| Points d’attention    | Générations sans changement depuis 15 minutes, signalements ouverts et incidents avec agence, date et diagnostic.                                            |
+| Diagnostic vidéo      | Source, transitions d’étapes, appels script/voix, préparation, avatar, chaque animation, ressources en file, crédits, coûts et notifications.                |
+| Agence à 360°         | Abonnement, crédits, dernières vidéos, signalements, correspondance par adresse du propriétaire et notes internes.                                           |
+| Fournisseurs          | Activité réelle enregistrée, capacité et occupation des files, dernier solde Runway, vérification gratuite du solde HeyGen. Un solde inconnu n’est pas zéro. |
+| Filtres et vues       | Critères conservés par rubrique, URL partageable, vues nommées synchronisées ou partagées, raccourci des échecs de la semaine.                               |
+| Performance           | Moyenne, médiane et P95, filtres origine/durée/avatar/animations, attentes cumulées, séries quotidiennes sans faux zéros.                                    |
+| Incidents             | Une occurrence par vidéo/étape/code, deux fenêtres de 7 jours, suivi optimiste à traiter/en cours/résolu, réouverture si nouveau cas.                        |
+| Rétention             | Première puis deuxième vidéo prête, retour à 7/30 jours avec exclusion des cohortes trop récentes, jours et semaines d’usage.                                |
+| Rentabilité par rendu | Standard, avatar, avatar avec animations, animations seules. Modes Stripe séparés ; marge inconnue si les frais/coûts ne sont pas couverts.                  |
+| Changements           | Réglages et changements documentés sur la courbe de durée ou de taux d’échec ; historique de déploiement vérifié.                                            |
+| Tables et dossiers    | En-têtes fixes dans les tables, unités et badges communs, dossiers longs en page dédiée.                                                                     |
 
 ## Droits
 
@@ -39,18 +39,18 @@ Appliquer `0081_admin_operations.sql` puis `0082_admin_workspace.sql` avant de d
 
 La migration `0082_admin_workspace.sql` ajoute les dix évolutions suivantes sans modifier les droits client ni les contrats des générations existantes :
 
-| Fonction | Accès |
-| --- | --- |
-| Récupération guidée | Diagnostic vidéo, section « Récupération guidée » |
-| Alertes automatiques et opt-in navigateur | Vue d’ensemble / Incidents ; seuils dans Incidents / Fournisseurs |
-| Classification client, interne et démonstration | Dossier agence ; filtre Clients dans Performance, Rétention et Rentabilité |
-| Recherche globale | Bouton de recherche et raccourci ⌘K / Ctrl+K |
-| Dossiers attribués, priorité, échéance et report | Vue d’ensemble, Incidents, dossiers vidéo/agence ; suivi simplifié pour le compte support |
-| Agences à accompagner | Agences et Rétention |
-| Comparaison avec une fenêtre précédente de durée égale | Performance, Rétention et Rentabilité |
-| Différences et restauration d’une configuration | Changements & résultats |
-| Miniatures, sommaire et navigation entre diagnostics | Dossier vidéo ; contexte de la liste filtrée conservé pendant cinq minutes dans l’onglet |
-| Favoris, filtres et vues synchronisés ou partagés | Navigation et barre « Enregistrer la vue » |
+| Fonction                                               | Accès                                                                                     |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| Récupération guidée                                    | Diagnostic vidéo, section « Récupération guidée »                                         |
+| Alertes automatiques et opt-in navigateur              | Vue d’ensemble / Incidents ; seuils dans Incidents / Fournisseurs                         |
+| Classification client, interne et démonstration        | Dossier agence ; filtre Clients dans Performance, Rétention et Rentabilité                |
+| Recherche globale                                      | Bouton de recherche et raccourci ⌘K / Ctrl+K                                              |
+| Dossiers attribués, priorité, échéance et report       | Vue d’ensemble, Incidents, dossiers vidéo/agence ; suivi simplifié pour le compte support |
+| Agences à accompagner                                  | Agences et Rétention                                                                      |
+| Comparaison avec une fenêtre précédente de durée égale | Performance, Rétention et Rentabilité                                                     |
+| Différences et restauration d’une configuration        | Changements & résultats                                                                   |
+| Miniatures, sommaire et navigation entre diagnostics   | Dossier vidéo ; contexte de la liste filtrée conservé pendant cinq minutes dans l’onglet  |
+| Favoris, filtres et vues synchronisés ou partagés      | Navigation et barre « Enregistrer la vue »                                                |
 
 ## Persistance et accès
 

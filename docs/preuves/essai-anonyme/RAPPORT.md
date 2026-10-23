@@ -19,19 +19,19 @@ Fichiers principaux : migrations `0017_anonymous_trials.sql` et `0018_anonymous_
 
 Les tests ordinaires utilisent de vrais runtimes **workerd, D1, R2, Durable Objects et Workflows locaux** selon le scénario. Les réponses de portails, Google, OpenAI, Turnstile et du moteur vidéo sont simulées dans ces tests ; leurs octets MP4 de fixture ne prouvent pas un rendu.
 
-| Risque | Vérification |
-|---|---|
-| Doubles soumissions et callbacks | Admission concurrente, unicité du job/coût, deux claims simultanés, un seul crédit, un seul propriétaire |
-| Connexion pendant le rendu | Allocation réservée au claim et consommée à la fin ; échec libérant la réservation, coût/tentative conservés |
-| Période mensuelle | 31 janvier, février bissextile/non bissextile, retour au 31 mars ; règlement sur la période originale |
-| Quota épuisé et abonnements | Vidéo privée verrouillée, affectation ultérieure idempotente, aucun repli gratuit autour d’un abonnement existant |
-| Reprise du traitement | Outbox avant lancement, publication R2 interrompue puis récupérée, mêmes appels et fichiers, pas de seconde génération |
-| Autorisation média | Anonyme/autre session/autre agence refusés, variante forcée inefficace, requêtes partielles, cache privé, contrôle du crédit |
-| Coût et anti-abus | Session/IP/jour/mois/concurrence, jeton Turnstile invalide/expiré/autre hostname/action/rejoué, source interdite et garde-fous SSRF existants |
-| Budget du pilote | Ancien plafond à 35 € sans effet sur la coupure anonyme à 25 € ; les 0,50 € du futur import entrent dans le contrôle ; refus sans provision supplémentaire |
-| Expiration et purge | Claim contre transition d’expiration, effacement R2 et charges utiles non référencées, fichier récupéré conservé, empreinte/proof expirées inutilisables |
-| Migration | Base peuplée avant 0017, ancien MP4 et crédit consommé, job ancien actif, propriétaires/périodes/compteurs conservés, clés étrangères cohérentes |
-| Confidentialité | Aucun partage Explorer au claim ; événements idempotents sans token, URL complète, adresse ou IP brute |
+| Risque                           | Vérification                                                                                                                                               |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Doubles soumissions et callbacks | Admission concurrente, unicité du job/coût, deux claims simultanés, un seul crédit, un seul propriétaire                                                   |
+| Connexion pendant le rendu       | Allocation réservée au claim et consommée à la fin ; échec libérant la réservation, coût/tentative conservés                                               |
+| Période mensuelle                | 31 janvier, février bissextile/non bissextile, retour au 31 mars ; règlement sur la période originale                                                      |
+| Quota épuisé et abonnements      | Vidéo privée verrouillée, affectation ultérieure idempotente, aucun repli gratuit autour d’un abonnement existant                                          |
+| Reprise du traitement            | Outbox avant lancement, publication R2 interrompue puis récupérée, mêmes appels et fichiers, pas de seconde génération                                     |
+| Autorisation média               | Anonyme/autre session/autre agence refusés, variante forcée inefficace, requêtes partielles, cache privé, contrôle du crédit                               |
+| Coût et anti-abus                | Session/IP/jour/mois/concurrence, jeton Turnstile invalide/expiré/autre hostname/action/rejoué, source interdite et garde-fous SSRF existants              |
+| Budget du pilote                 | Ancien plafond à 35 € sans effet sur la coupure anonyme à 25 € ; les 0,50 € du futur import entrent dans le contrôle ; refus sans provision supplémentaire |
+| Expiration et purge              | Claim contre transition d’expiration, effacement R2 et charges utiles non référencées, fichier récupéré conservé, empreinte/proof expirées inutilisables   |
+| Migration                        | Base peuplée avant 0017, ancien MP4 et crédit consommé, job ancien actif, propriétaires/périodes/compteurs conservés, clés étrangères cohérentes           |
+| Confidentialité                  | Aucun partage Explorer au claim ; événements idempotents sans token, URL complète, adresse ou IP brute                                                     |
 
 Commande complète retenue : `pnpm check:boundaries`, puis `pnpm exec tsx --test --test-concurrency=1 tests/*.test.ts`, puis `pnpm typecheck`. **173 tests réussis, zéro échec**, en 85,4 s ; frontières sur 143 fichiers et TypeScript complet réussis. Exécution en série pour ne pas saturer workerd avec le navigateur et Docker. Les premiers essais parallèles avaient subi des resets/timeouts de runtimes locaux ; aucun succès de `pnpm check` en parallèle n’est revendiqué. Les erreurs initiales des nouvelles fixtures ont été corrigées avant la recette finale.
 
@@ -45,15 +45,15 @@ L’annonce, les trois images de couleur et le signal audio sont des **fixtures 
 
 Mesure finale du 29/09 à 12:27 UTC, Node 24.17.0 / Remotion 4.0.529 :
 
-| Mesure | Master | Aperçu |
-|---|---:|---:|
-| Dimensions / cadence | 1080 × 1920 / 30 fps | 1080 × 1920 / 30 fps |
-| Images / durée conteneur | 603 / 20,16 s | 603 / 20,16 s |
-| Codecs / faststart | H.264, AAC / oui | H.264, AAC / oui |
-| Taille | 916 863 octets | 900 461 octets |
-| Rendu/post-traitement et vérification | 120,19 s | 45,68 s |
-| Volume audio mesuré | −22,845 dB | −22,845 dB |
-| Filigrane incrusté | absent | présent |
+| Mesure                                |               Master |               Aperçu |
+| ------------------------------------- | -------------------: | -------------------: |
+| Dimensions / cadence                  | 1080 × 1920 / 30 fps | 1080 × 1920 / 30 fps |
+| Images / durée conteneur              |        603 / 20,16 s |        603 / 20,16 s |
+| Codecs / faststart                    |     H.264, AAC / oui |     H.264, AAC / oui |
+| Taille                                |       916 863 octets |       900 461 octets |
+| Rendu/post-traitement et vérification |             120,19 s |              45,68 s |
+| Volume audio mesuré                   |           −22,845 dB |           −22,845 dB |
+| Filigrane incrusté                    |               absent |              présent |
 
 Le flux AAC extrait est strictement identique par SHA-256. Les images 0, 301 et 602 ont été extraites et inspectées : filigrane visible sur toute la séquence échantillonnée, absent du master, texte/captions conservés. L’overlay n’a pas de condition temporelle : il s’applique à toutes les frames. Les différences moyennes de pixels dans sa zone sont respectivement 61,43 / 88,08 / 61,51. La carte finale neutre n’invente pas de coordonnées d’agence.
 
@@ -66,7 +66,6 @@ Une première exécution locale avait mesuré 86,43 s et 46,26 s. Le second pass
 ## Les vrais fichiers à travers les routes privées
 
 `pnpm probe:trial:media` réussi à 12:29 UTC : ces deux fichiers exacts sont chargés dans **R2 local** avec D1/workerd et servis par les véritables fonctions de streaming. Identité, propriété initiale et état du job sont semés comme fixtures ; aucun OAuth ni vrai Turnstile dans cette sonde.
-
 - Cookie anonyme : réponse égale au SHA-256 de l’aperçu, même avec `variant=master&download=1`, disposition inline et cache privé.
 - Master refusé avant récupération ; autre session sans preuve et autre propriétaire refusés.
 - Deux claims simultanés puis deux téléchargements : SHA-256 du master conservé, **deux crédits restants, une entrée d’historique et zéro partage public**.
@@ -93,7 +92,6 @@ Cette tâche : **0 achat, 0 appel OpenAI/Google/Browser Run/Containers distant**
 ## Vérification externe restant à réaliser
 
 Après choix d’un environnement, capacité budgétaire rapprochée et instruction de déploiement :
-
 1. Configurer un widget Turnstile Managed pour le hostname exact, sitekey/secret et un secret HMAC serveur ; conserver la vérification d’adresse et les retours Google existants.
 2. Sauvegarder D1 distante, appliquer 0017/0018, livrer ensemble web, pipeline et image renderer. Ouvrir explicitement les portes de lancement et sous-enveloppes uniquement dans cet environnement.
 3. Limiter la recette à un lien de connecteur autorisé : vrai Turnstile, import, script/voix français, master et dérivée sur Containers/R2 ; écouter et inspecter les deux fichiers.

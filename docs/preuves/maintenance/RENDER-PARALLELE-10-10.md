@@ -16,10 +16,10 @@ Les estimations de fin de session prennent désormais 8 GiB de mémoire et 16 GB
 - **Deux vrais rendus Cloudflare avec l’entrée de production normale**, sur les médias du benchmark : vidéo anonyme de 20 s avec carte et douze photos, puis vidéo de 20 s avec avatar pendant toute la durée. Aucun nouvel appel OpenAI, Cartesia, Runway ou HeyGen, aucun nouvel import ou job client, aucune consommation de crédits produit. Conteneur temporaire privé, sorties réseau désactivées, sources R2 lues sans écriture.
 - Masters et aperçu filigrané **identiques octet pour octet aux sorties à deux cœurs du benchmark**, déjà contrôlées visuellement et par SSIM/audio. Dimensions 1080 × 1920, 600 frames, H.264/AAC, fast-start, SHA-256 au téléchargement et contrôles audio du moteur validés.
 
-| Cas | Master + vérification | Aperçu filigrané | Total moteur |
-|---|---:|---:|---:|
-| Classique anonyme | 71,31 s | 26,12 s | 97,43 s |
-| Avatar continu | 108,12 s | — | 108,12 s |
+| Cas               | Master + vérification | Aperçu filigrané | Total moteur |
+| ----------------- | --------------------: | ---------------: | -----------: |
+| Classique anonyme |               71,31 s |          26,12 s |      97,43 s |
+| Avatar continu    |              108,12 s |                — |     108,12 s |
 
 Ces contrôles confirment le fonctionnement de l’image livrée. Ils ne mesurent pas le délai total du Workflow, l’import ou la génération chez les fournisseurs. Les durées varient selon le contenu et les ressources disponibles ; la comparaison précédente reste la référence pour le gain observé.
 
@@ -28,7 +28,6 @@ Plafond estimé de calcul des deux sessions de contrôle, démarrage et récupé
 ## Déploiement et protection
 
 La production était au repos avant la bascule : aucun job actif dans D1, instance `generation-single-slot-v1` inactive. Déploiement avec les variables distantes préservées et `--strict`, sans migration ni modification des secrets.
-
 - Worker : `bienvu-generation-development`, version **`fd07598c-865d-4020-b7a3-38c43aa1486b`**, trafic **100 %**.
 - Application Containers : `a0302315-6859-4e3c-9254-891604aee659`, version **27**, ressources **2 / 8192 MiB / 16000 MB**, maximum **1** instance. Bascule terminée et santé confirmée via API.
 - Image : `bienvu-renderer@sha256:9d4fd549b023fdb754ee04ee52e5ddb85a9aaebb32c7d6cfe21c30f5c94e3055`.

@@ -1,125 +1,558 @@
-import type {Metadata} from 'next';
+import type { Metadata } from 'next';
 import Link from 'next/link';
-import {LegalDocument, LegalSection} from '../../../components/legal-document';
-import {seoMetadata} from '../../../lib/seo';
-import {CookiePreferencesButton} from '../../../components/product-analytics';
+import { LegalDocument, LegalSection } from '../../../components/legal-document';
+import { seoMetadata } from '../../../lib/seo';
+import { CookiePreferencesButton } from '../../../components/product-analytics';
 
-export const metadata: Metadata = seoMetadata({title:'Politique de confidentialité — BienVu',description:'Comment BienVu utilise les données du compte, la connexion Google, les annonces, les photos et les vidéos, et comment exercer vos droits.',path:'/confidentialite'});
+export const metadata: Metadata = seoMetadata({
+  title: 'Politique de confidentialité — BienVu',
+  description:
+    'Comment BienVu utilise les données du compte, la connexion Google, les annonces, les photos et les vidéos, et comment exercer vos droits.',
+  path: '/confidentialite',
+});
 
 const contents = [
-  {id: 'responsable', title: 'BienVu et vos données'},
-  {id: 'donnees', title: 'Les données utilisées'},
-  {id: 'google', title: 'La connexion Google'},
-  {id: 'finalites', title: 'Pourquoi les utiliser'},
-  {id: 'prestataires', title: 'Accès et prestataires'},
-  {id: 'conservation', title: 'Durées de conservation'},
-  {id: 'cookies', title: 'Cookies et fréquentation'},
-  {id: 'droits', title: 'Vos droits et contact'},
-  {id: 'vitrines', title: 'Les vitrines des agences'},
+  { id: 'responsable', title: 'BienVu et vos données' },
+  { id: 'donnees', title: 'Les données utilisées' },
+  { id: 'google', title: 'La connexion Google' },
+  { id: 'finalites', title: 'Pourquoi les utiliser' },
+  { id: 'prestataires', title: 'Accès et prestataires' },
+  { id: 'conservation', title: 'Durées de conservation' },
+  { id: 'cookies', title: 'Cookies et fréquentation' },
+  { id: 'droits', title: 'Vos droits et contact' },
+  { id: 'vitrines', title: 'Les vitrines des agences' },
 ] as const;
 
 export default function Page() {
-  return <LegalDocument kind="confidentialite" title="Politique de confidentialité" introduction="Les données nécessaires à votre studio, les services qui les traitent et les choix qui restent entre vos mains." contents={contents} updatedAt="2026-10-11">
-    <LegalSection {...contents[0]}>
-      <p>Cette politique concerne <a href="https://bienvu.online">bienvu.online</a>. BienVu est le nom du projet en accès anticipé, sans société constituée à ce jour. Pour toute question sur le traitement de vos données par BienVu, contactez <a href="mailto:contact@bienvu.online">contact@bienvu.online</a>.</p>
-      <div className="legal-callout">Vos créations restent privées par défaut. Leur publication dans Explorer ou sur vos réseaux sociaux est un choix explicite. La connexion Google est facultative : vous pouvez aussi utiliser votre adresse e-mail et un mot de passe.</div>
-    </LegalSection>
-    <LegalSection {...contents[1]}>
-      <ul>
-        <li><strong>Compte :</strong> adresse e-mail, nom de profil, état de vérification de l’adresse et identifiants nécessaires à la connexion. Pour la connexion par mot de passe, une empreinte cryptographique est stockée, pas le mot de passe en clair.</li>
-        <li><strong>Agence :</strong> nom, logo, couleurs, ville et coordonnées que vous renseignez. Les champs facultatifs peuvent rester vides.</li>
-        <li><strong>Créations :</strong> liens d’annonces, informations du bien, descriptions, photos, brouillons, textes de narration, pistes audio et vidéos. Les informations importées proviennent du lien demandé ; les informations manuelles sont celles que vous transmettez.</li>
-        <li><strong>Collaboration :</strong> appartenance à une agence, rôles, adresses d’invitation, dossiers, modèles et noms ou commentaires ajoutés lors d’une validation client.</li>
-        <li><strong>Réseaux sociaux facultatifs :</strong> identifiants et noms des Pages Facebook ou comptes Instagram que vous choisissez, autorisations de publication chiffrées côté serveur, légendes, dates programmées et résultats des envois. La connexion Meta sert à publier sur les comptes associés à l’agence ; elle ne remplace pas votre connexion BienVu.</li>
-        <li><strong>Abonnement :</strong> identifiants Stripe, formule, périodes, état du paiement, montants et consommation de crédits. BienVu ne stocke pas les numéros de carte bancaire.</li>
-        <li><strong>Fonctionnement :</strong> quotas, dates, états et erreurs des générations, consommation estimée des prestataires et traces des traitements nécessaires au suivi des créations.</li>
-        <li><strong>Candidature partenaire :</strong> nom, e-mail professionnel et activité renseignés dans le formulaire public. La candidature est enregistrée dans la messagerie privée de BienVu pour être étudiée par notre équipe. Elle n’inscrit pas à une newsletter et ne crée pas de compte. Des empreintes protégées de l’adresse IP et de l’e-mail servent à limiter les envois répétés.</li>
-        <li><strong>Assistance par chat :</strong> messages et fichiers que vous choisissez de transmettre, coordonnées éventuellement renseignées dans le chat et informations techniques de navigation nécessaires au widget Tawk.to. BienVu ne lui transmet pas automatiquement le nom, l’e-mail ou les informations de votre compte.</li>
-        <li><strong>Sécurité :</strong> informations de session, adresse IP et navigateur associés à la connexion, limites de requêtes et résultats des contrôles anti-abus. Pour l’essai anonyme, une empreinte IP protégée sert à limiter les tentatives.</li>
-        <li><strong>Mesure facultative de l’utilisation :</strong> avec votre accord, pages consultées, clics et résultats des parcours (import, création, éditeur, connexion, publication, candidature), sources de visite, caractéristiques techniques du navigateur et identifiants pseudonymes. Un compte connecté est associé à son identifiant technique. Si vous autorisez aussi les enregistrements de sessions, les pages, textes, champs renseignés, photos et aperçus sont visibles par l’équipe BienVu. Les noms, coordonnées et informations d’annonce affichés ou saisis peuvent donc apparaître dans ces enregistrements. Les mots de passe et jetons de connexion restent protégés.</li>
-      </ul>
-      <p>Pour créer un compte ou une vidéo, certaines informations sont nécessaires au fonctionnement de la demande. Les autres champs sont signalés comme facultatifs. Évitez d’ajouter des données personnelles de tiers dans les photos ou les descriptions si elles ne sont pas nécessaires et autorisées.</p>
-    </LegalSection>
-    <LegalSection {...contents[2]}>
-      <p>Si vous choisissez « Continuer avec Google », BienVu demande uniquement les autorisations de connexion <code>openid</code>, <code>email</code> et <code>profile</code>. Google transmet l’identifiant de votre compte, votre adresse e-mail et son état de vérification, votre nom et, lorsqu’elle est disponible, votre image de profil.</p>
-      <p>Ces informations servent à vous identifier, créer ou retrouver votre compte BienVu et lui associer votre agence. Elles sont conservées avec les données du compte sur l’infrastructure Cloudflare. Les jetons Google sont utilisés pendant l’authentification puis ne sont pas conservés dans les enregistrements de compte BienVu.</p>
-      <p>BienVu ne reçoit pas votre mot de passe Google et ne demande aucun accès à votre messagerie Gmail, vos fichiers Drive, vos contacts ou votre calendrier. Votre identifiant Google, votre image de profil et vos jetons de connexion ne sont pas envoyés aux services de rédaction ou de voix. Les données de connexion ne sont ni vendues ni utilisées pour du ciblage publicitaire.</p>
-      <p>L’adresse e-mail du compte initialise aussi le champ de contact de votre agence. Vous pouvez le modifier dans Mon agence. Si vous utilisez cette adresse ou d’autres coordonnées dans votre charte ou vos textes, elles peuvent figurer dans la vidéo et être traitées avec les informations de création, comme décrit ci-dessous.</p>
-      <p>Vous pouvez retirer l’autorisation BienVu depuis les paramètres de votre compte Google. Ce retrait empêche une nouvelle connexion Google autorisée mais ne supprime pas automatiquement votre compte BienVu ; contactez-nous pour sa suppression ou utilisez la connexion par e-mail si vous avez défini un mot de passe.</p>
-      <p>L’utilisation de ces données respecte la <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, y compris les exigences de « Limited Use » lorsqu’elles s’appliquent.</p>
-    </LegalSection>
-    <LegalSection {...contents[3]}>
-      <div className="legal-table-scroll"><table><thead><tr><th scope="col">Usage</th><th scope="col">Fondement du traitement</th></tr></thead><tbody>
-        <tr><th scope="row">Compte, agence et vidéos</th><td>Exécution du service demandé : vous authentifier, préparer une annonce, créer une vidéo, gérer les crédits et fournir vos fichiers.</td></tr>
-        <tr><th scope="row">Publication dans Explorer</th><td>Exécution de la fonction de partage que vous demandez volontairement. Vous pouvez retirer la publication.</td></tr>
-        <tr><th scope="row">Protection et assistance</th><td>Intérêt légitime de BienVu à protéger le service, limiter les abus, comprendre les incidents et répondre aux demandes d’aide.</td></tr>
-        <tr><th scope="row">Candidatures partenaires</th><td>Répondre à votre demande de participation et étudier votre candidature avant un éventuel partenariat. L’acceptation et l’attribution des recommandations sont validées par notre équipe.</td></tr>
-        <tr><th scope="row">Obligations applicables</th><td>Respect d’une obligation légale lorsqu’une conservation ou une communication est requise.</td></tr>
-      </tbody></table></div>
-      <p>Les e-mails envoyés servent à confirmer votre adresse et à gérer votre mot de passe. BienVu ne propose actuellement ni newsletter ni ciblage publicitaire. Aucune décision automatisée produisant un effet juridique sur vous n’est proposée.</p>
-    </LegalSection>
-    <LegalSection {...contents[4]}>
-      <p>L’administration autorisée de BienVu peut accéder aux informations utiles au support, à la sécurité et au suivi des coûts. Les collaborateurs invités dans votre agence ont accès à son espace selon leur rôle. Un lien privé de validation donne accès à la version concernée à toute personne qui possède ce lien, jusqu’à son expiration ou sa révocation. Si vous publiez une vidéo dans Explorer, sa vidéo, sa page et les informations d’agence qui y figurent deviennent publiques.</p>
-      <ul>
-        <li><strong>Tawk.to</strong> fournit le chat d’assistance et reçoit les échanges que vous lui confiez ainsi que les informations techniques du widget. Les conversations sont consultables par l’équipe BienVu dans Tawk.to. Le widget n’est pas proposé dans le superadmin ou sur les pages de validation privée. <a href="https://www.tawk.to/privacy-policy/">Politique de Tawk.to</a>.</li>
-        <li><strong>PostHog</strong> fournit les statistiques d’utilisation et les enregistrements de sessions facultatifs, dans un projet hébergé en Europe. Après votre accord à l’enregistrement, les contenus visibles des pages et des formulaires sont transmis, dont les informations et photos d’annonces. Des copies réduites des photos déjà affichées peuvent être intégrées aux replays pour conserver leur lisibilité sans rendre les médias publics. Les mots de passe, champs cachés et jetons de connexion sont protégés dans le navigateur. Les contenus et en-têtes des requêtes ainsi que les journaux de console ne sont pas enregistrés. Le panneau superadmin et les liens privés de validation sont exclus. Les visites internes sur les pages du produit sont identifiées pour pouvoir les exclure des indicateurs. L’adresse IP n’est pas conservée par ce projet. <a href="https://posthog.com/privacy">Politique de PostHog</a>.</li>
-        <li><strong>Diagnostic des erreurs</strong> : PostHog reçoit également des messages d’erreur et des traces techniques pour corriger les dysfonctionnements. Les erreurs du navigateur sont transmises après votre accord à la mesure d’utilisation. Les erreurs serveur sont collectées sans cookie analytique ; une session consentie peut être associée lorsqu’elle est disponible. Les mots de passe, clés API, cookies, corps de requêtes et paramètres privés des liens sont exclus de ces diagnostics.</li>
-        <li><strong>Cloudflare</strong> fournit l’hébergement, la base de données, le stockage des médias, les e-mails transactionnels, certains imports et les contrôles Turnstile. Ces services traitent les données nécessaires à ces fonctions. <a href="https://www.cloudflare.com/privacypolicy/">Politique de Cloudflare</a>.</li>
-        <li><strong>Google</strong> fournit la connexion facultative décrite ci-dessus. <a href="https://policies.google.com/privacy?hl=fr">Politique de Google</a>.</li>
-        <li><strong>OpenAI</strong> reçoit les textes et informations du bien nécessaires à leur structuration ou à la rédaction de la narration, y compris les données personnelles que vous auriez incluses dans ces textes. Les requêtes API de BienVu désactivent le stockage des réponses. Selon OpenAI, les données API ne servent pas à l’entraînement par défaut ; des journaux de prévention des abus peuvent toutefois subsister jusqu’à trente jours, avec des exceptions légales ou de sécurité. <a href="https://developers.openai.com/api/docs/guides/your-data">Traitement des données API OpenAI</a>.</li>
-        <li><strong>Google Cloud Text-to-Speech</strong> reçoit le texte de narration pour produire la voix française. Selon sa documentation, ce service ne journalise pas les textes ni les fichiers audio des clients. L’audio produit est ensuite conservé par BienVu avec les médias de la création. <a href="https://docs.cloud.google.com/text-to-speech/docs/data-logging?hl=en">Traitement des données Text-to-Speech</a>.</li>
-        <li><strong>Fish Audio</strong> reçoit le texte de narration si vous choisissez une voix Fish Audio. Son offre gratuite S2.1 Pro peut conserver les requêtes et les utiliser pour améliorer ses modèles. BienVu lui transmet le texte à prononcer, sans votre compte ni vos identifiants de connexion. L’audio produit est conservé avec votre création. <a href="https://fish.audio/privacy/">Politique de Fish Audio</a> et <a href="https://fish.audio/fr/blog/s2-1-pro-free-api/">Conditions de l’offre gratuite</a>.</li>
-        <li><strong>HeyGen</strong> reçoit les passages audio d’ouverture ou de conclusion si vous activez l’option Avatar IA. La voix off déjà générée est utilisée pour animer le présentateur choisi. BienVu transmet cet audio et les réglages nécessaires, sans votre compte ni vos identifiants de connexion. Les clips retournés sont copiés dans le stockage privé de BienVu et peuvent être réutilisés avec le même audio dans votre agence. Les conditions du fournisseur régissent aussi son traitement des fichiers transmis. <a href="https://www.heygen.com/privacy">Politique de HeyGen</a>.</li>
-        <li><strong>Prestataire spécialisé dans l’animation IA</strong> : ce service reçoit les photos sélectionnées si vous activez l’animation IA avant génération. Une instruction de mouvement de caméra accompagne ces images, sans identifiants de connexion. Les clips produits sont copiés dans le stockage privé de BienVu. Une bibliothèque conserve les animations réussies pendant 90 jours pour permettre leur réutilisation ; les copies intégrées aux exports suivent la conservation de ces exports.</li>
-      <li><strong>Stripe</strong> traite les informations nécessaires à la souscription et au paiement, notamment les données de facturation et de moyen de paiement saisies sur ses pages. BienVu reçoit les identifiants et états nécessaires à l’abonnement, aux factures et aux crédits. Le parcours est actuellement en mode test. <a href="https://stripe.com/fr/privacy">Politique de Stripe</a>.</li>
-        <li><strong>Meta</strong> traite la connexion facultative aux comptes Instagram et Pages Facebook sélectionnés. Si vous demandez une publication, BienVu transmet la vidéo, sa légende et les identifiants nécessaires, à la date choisie. Les administrateurs peuvent déconnecter ces comptes dans Mon agence ; cela retire l’autorisation conservée par BienVu et annule les envois qui n’ont pas démarré leur publication finale. Une publication déjà transmise peut encore se terminer et les contenus déjà publiés restent sur le réseau. Vous pouvez les supprimer sur celui-ci. Meta peut aussi transmettre une demande de désautorisation ou de suppression des données liées à cette connexion. <a href="https://www.facebook.com/privacy/policy/">Politique de Meta</a>.</li>
-      </ul>
-      <p>Ces prestataires peuvent traiter des données hors de l’Union européenne, notamment aux États-Unis. Leurs conditions de protection des données décrivent les garanties de transfert applicables, dont les clauses contractuelles types lorsqu’elles sont utilisées. BienVu ne garantit pas un traitement exclusivement en France ou dans l’Union européenne. Contactez-nous si vous souhaitez des précisions sur un prestataire ou un transfert.</p>
-      <p>BienVu ne vend pas vos données. Une communication peut aussi être nécessaire à une autorité compétente lorsque la loi l’exige.</p>
-    </LegalSection>
-    <LegalSection {...contents[5]}>
-      <div className="legal-table-scroll"><table><thead><tr><th scope="col">Données</th><th scope="col">Durée ou règle actuelle</th></tr></thead><tbody>
-        <tr><th scope="row">Compte et identité d’agence</th><td>Tant que votre compte est utilisé pour le service, puis traitement de votre demande de fermeture et de suppression, sous réserve des obligations applicables.</td></tr>
-        <tr><th scope="row">Session de connexion</th><td>Validité de sept jours ; elle peut être renouvelée lors de l’utilisation du compte. La déconnexion ferme la session concernée.</td></tr>
-        <tr><th scope="row">Brouillons et imports enregistrés</th><td>Échéance de trente jours ; les médias sont ensuite soumis au nettoyage des imports. Vous pouvez supprimer un brouillon avant cette échéance.</td></tr>
-        <tr><th scope="row">Médias d’une vidéo de compte</th><td>Les vidéos réussies et leurs ressources de montage sont conservées sans expiration automatique. Leur suppression peut être demandée. Les fichiers déjà purgés ne sont pas restaurés.</td></tr>
-        <tr><th scope="row">Bibliothèque d’animations IA</th><td>Les animations liées à une vidéo conservée restent disponibles et réutilisables sans expiration automatique. Les copies issues de tentatives échouées peuvent être nettoyées après leur échéance.</td></tr>
-        <tr><th scope="row">Invitations et validations privées</th><td>Liens utilisables sept jours au maximum, ou jusqu’à la révocation ; une validation ne dépasse pas la disponibilité de sa vidéo. Les rôles, états et commentaires restent dans l’historique de l’agence.</td></tr>
-        <tr><th scope="row">Connexion et publications sur les réseaux</th><td>Autorisations conservées chiffrées jusqu’à leur échéance ou à la déconnexion, puis effacées. L’état temporaire de connexion est valable quinze minutes et le choix des comptes dix minutes. Une copie privée de la vidéo programmée est disponible jusqu’à trente jours après la date prévue, puis nettoyée. Les légendes, destinations, dates et résultats restent dans l’historique de l’agence tant qu’une suppression n’est pas demandée.</td></tr>
-        <tr><th scope="row">Essai anonyme non récupéré</th><td>Les vidéos réussies sont conservées sans expiration automatique. Les fichiers de tentatives échouées peuvent être nettoyés après vingt-quatre heures. La preuve de session du navigateur reste valable trente jours.</td></tr>
-        <tr><th scope="row">Empreinte IP d’une génération anonyme</th><td>Effacée au nettoyage des générations datant de plus de quarante-huit heures.</td></tr>
-        <tr><th scope="row">Candidature partenaire</th><td>La candidature et les échanges restent dans la messagerie privée jusqu’à une demande de suppression. Les empreintes anti-abus de l’IP et de l’e-mail ainsi que la preuve de vérification anti-robot sont effacées lors du nettoyage quotidien des candidatures datant de plus de quarante-huit heures.</td></tr>
-        <tr><th scope="row">Fréquentation agrégée</th><td>Environ trente et un jours, avec une purge quotidienne.</td></tr>
-        <tr><th scope="row">Choix de mesure et d’enregistrement</th><td>Six mois au maximum dans ce navigateur, puis un nouveau choix est demandé. Le retrait de l’accord arrête les nouvelles collectes et supprime les identifiants analytiques locaux.</td></tr>
-        <tr><th scope="row">Enregistrements de sessions PostHog</th><td>Trente jours, selon le réglage actuel du projet.</td></tr>
-        <tr><th scope="row">Événements de mesure produit PostHog</th><td>Conservés dans le projet pour analyser l’évolution du service ; aucune purge générale automatique n’est actuellement configurée par BienVu. Leur suppression peut être demandée.</td></tr>
-        <tr><th scope="row">Historique et traces de traitement</th><td>Les états, informations du bien, narrations, traces de coûts et extractions de texte peuvent subsister après les fichiers. Les traces d’extraction peuvent aussi contenir une empreinte IP protégée. Aucune purge automatique générale de ces métadonnées n’est encore appliquée pendant l’accès anticipé. Leur suppression peut être demandée.</td></tr>
-      </tbody></table></div>
-      <p>Le nettoyage d’un brouillon ou d’une tentative échouée n’équivaut pas à l’effacement de toutes les informations de la création. Les durées propres aux prestataires sont distinctes et décrites dans leurs politiques. Vous pouvez demander la suppression de vos données à contact@bienvu.online.</p>
-    </LegalSection>
-    <LegalSection {...contents[6]}>
-      <p>Des cookies nécessaires permettent de maintenir la connexion, sécuriser l’authentification et retrouver un essai anonyme dans le même navigateur. Les contrôles Turnstile de Cloudflare traitent des signaux techniques de sécurité. BienVu n’installe pas de cookie publicitaire.</p>
-      <p>Le chat Tawk.to utilise ses propres cookies et stockages pour maintenir une conversation entre les pages. Son éventuel formulaire de consentement est distinct des préférences PostHog et dépend des réglages du widget. Vous pouvez contacter BienVu par e-mail si vous préférez ne pas utiliser le chat. <a href="https://help.tawk.to/article/what-are-tawkto-cookies-and-what-do-they-do">Cookies du widget Tawk.to</a>.</p>
-      <p>Les notifications de fin de génération sont facultatives et nécessitent votre autorisation dans le navigateur. Leur activation enregistre un abonnement technique chiffré associé à votre compte ou à votre essai anonyme. Le service de notifications de votre navigateur transporte un message générique, sans adresse de bien ni contenu d’annonce ; le résultat reste protégé par vos droits d’accès. Vous pouvez désactiver les notifications depuis le menu du compte, le pied de page ou les réglages du navigateur. Un abonnement serveur expire après quatre-vingt-dix jours sans renouvellement ; le suivi d’une notification est conservé au maximum vingt-quatre heures et les identifiants locaux de dédoublonnage sept jours.</p>
-      <p>La mesure d’utilisation PostHog et l’enregistrement des sessions sont deux choix facultatifs. Ils restent désactivés avant votre accord. Vous pouvez tout accepter, tout refuser ou autoriser uniquement la mesure d’utilisation. Les identifiants analytiques sont conservés dans le stockage local du navigateur après accord. Les contenus des pages et les champs renseignés sont visibles dans les enregistrements, à l’exception des mots de passe et autres secrets de connexion. Un nouveau choix est demandé aux visiteurs qui avaient accepté une version limitée aux contenus masqués. Refuser ces fonctions n’empêche pas d’utiliser BienVu. Le retrait de votre accord arrête les nouvelles collectes ; il n’efface pas automatiquement les événements déjà reçus, dont vous pouvez demander la suppression.</p>
-      <p><CookiePreferencesButton/></p>
-      <p>Le lien d’une annonce peut être gardé dans l’onglet pendant une heure. Pour reprendre une annonce manuelle, les champs et photos peuvent être conservés localement dans ce navigateur pendant une heure, lorsque son stockage est autorisé. Ils sont effacés après enregistrement ou lors d’une visite suivant leur expiration. Les photos simplement déposées dans l’input restent en mémoire avant leur ajout au brouillon.</p>
-      <p>Les statistiques du site comptent les chargements de pages publiques par jour et pays d’origine réseau communiqué par Cloudflare. Une catégorie de source (moteur de recherche, réseau social, accès direct ou autre site) peut être calculée à partir du référent transmis par le navigateur. Pour les autres sites, seul le domaine d’origine est compté par jour ; le chemin, les paramètres et l’URL complète ne sont pas conservés. Les performances de chargement et d’interaction sont regroupées par page et classe de qualité. Ces agrégats n’enregistrent ni adresse IP, ni identifiant de visiteur, ni adresse de bien, ni paramètres d’URL. Ils sont conservés environ trente et un jours, ne comptent pas des visiteurs uniques et ne permettent pas d’attribuer une inscription ou un paiement à une personne ayant visité une page. Les données techniques utilisées pour la sécurité des connexions restent un traitement distinct.</p>
-      <p>Vous pouvez effacer les cookies et le stockage du site depuis votre navigateur. Cela peut fermer votre session, supprimer un brouillon local ou empêcher de retrouver un essai anonyme.</p>
-    </LegalSection>
-    <LegalSection {...contents[7]}>
-      <p>Selon votre situation et le traitement concerné, vous pouvez demander l’accès, la rectification, l’effacement ou la portabilité de vos données, la limitation d’un traitement ou vous y opposer. Certains droits ont des conditions et peuvent être limités par une obligation légale.</p>
-      <p>Écrivez à <a href="mailto:contact@bienvu.online">contact@bienvu.online</a> en indiquant l’adresse de votre compte et votre demande. Ne transmettez pas votre mot de passe. Nous pouvons demander une vérification proportionnée de votre identité si nécessaire. Une réponse est apportée dans le délai applicable, en principe un mois ; si une prolongation autorisée est nécessaire, vous en êtes informé.</p>
-      <p>Vous pouvez également saisir la <a href="https://www.cnil.fr/fr/plaintes">CNIL</a>. Les <a href="https://www.cnil.fr/fr/mes-demarches/les-droits-pour-maitriser-vos-donnees-personnelles">informations de la CNIL sur vos droits</a> précisent leurs modalités.</p>
-      <p>Cette politique sera mise à jour si les pratiques de BienVu évoluent. Sa date est affichée en haut de la page ; toute évolution importante de l’utilisation de vos données fera l’objet d’une information appropriée. Consultez aussi les <Link href="/conditions">conditions d’utilisation</Link>.</p>
-    </LegalSection>
-    <LegalSection {...contents[8]}>
-      <p>Une agence choisit explicitement les biens, médias, coordonnées et éventuelles adresses précises qu’elle publie sur sa vitrine. Ses adaptations de présentation restent privées jusqu’à publication. Une vitrine mise hors ligne, un bien retiré ou archivé et ses liens de médias publics deviennent inaccessibles. Les copies de médias sélectionnées restent protégées dans le stockage et ne sont servies publiquement que pour une publication active.</p>
-      <p>Si vous contactez une agence depuis sa vitrine, votre nom, e-mail, téléphone facultatif, message et le bien concerné sont enregistrés dans son espace privé pour traiter votre demande. Seuls les membres autorisés de cette agence peuvent les consulter. Une notification peut être envoyée à l’agence ; son échec n’efface pas la demande. Ce formulaire ne vous inscrit pas à une newsletter et ne confirme pas un rendez-vous.</p>
-      <p>Les demandes et leurs coordonnées sont supprimées automatiquement après six mois, ou plus tôt par un administrateur de l’agence. Un reçu technique sans coordonnées ni message évite de recréer une demande lors d’un nouvel envoi réseau ; il est lui aussi supprimé après six mois. Les empreintes de contrôle anti-spam et les clés de dédoublonnage sont purgées à leur expiration.</p>
-      <p>Avec votre consentement à la mesure, les vues, fiches consultées et clics de contact alimentent des compteurs agrégés conservés quatre-vingt-dix jours. Les demandes reçues sont comptées à partir des formulaires effectivement enregistrés. Les prévisualisations, visites des membres de l’agence et robots reconnus sont exclus. Ni vos coordonnées ni le contenu des messages ne sont transmis dans ces événements. L’enregistrement de sessions est désactivé dans les vitrines et leur espace de gestion, même si vous l’avez autorisé sur le reste de BienVu.</p>
-      <p>Si vous ajoutez un bien aux favoris, son identifiant public est conservé dans le navigateur de cet appareil pour retrouver votre choix. Les favoris sont propres à chaque vitrine, ne sont pas envoyés à l’agence et ne constituent pas un compte visiteur. Vous pouvez les retirer avec le bouton cœur, ou les effacer en supprimant les données du site dans votre navigateur.</p>
-      <p>Pour modifier ou supprimer une demande, contactez l’agence à laquelle vous l’avez adressée, ou <a href="mailto:contact@bienvu.online">contact@bienvu.online</a> pour l’assistance technique relative au stockage dans BienVu.</p>
-    </LegalSection>
-  </LegalDocument>;
+  return (
+    <LegalDocument
+      kind="confidentialite"
+      title="Politique de confidentialité"
+      introduction="Les données nécessaires à votre studio, les services qui les traitent et les choix qui restent entre vos mains."
+      contents={contents}
+      updatedAt="2026-10-11"
+    >
+      <LegalSection {...contents[0]}>
+        <p>
+          Cette politique concerne <a href="https://bienvu.online">bienvu.online</a>. BienVu est le nom du projet en
+          accès anticipé, sans société constituée à ce jour. Pour toute question sur le traitement de vos données par
+          BienVu, contactez <a href="mailto:contact@bienvu.online">contact@bienvu.online</a>.
+        </p>
+        <div className="legal-callout">
+          Vos créations restent privées par défaut. Leur publication dans Explorer ou sur vos réseaux sociaux est un
+          choix explicite. La connexion Google est facultative : vous pouvez aussi utiliser votre adresse e-mail et un
+          mot de passe.
+        </div>
+      </LegalSection>
+      <LegalSection {...contents[1]}>
+        <ul>
+          <li>
+            <strong>Compte :</strong> adresse e-mail, nom de profil, état de vérification de l’adresse et identifiants
+            nécessaires à la connexion. Pour la connexion par mot de passe, une empreinte cryptographique est stockée,
+            pas le mot de passe en clair.
+          </li>
+          <li>
+            <strong>Agence :</strong> nom, logo, couleurs, ville et coordonnées que vous renseignez. Les champs
+            facultatifs peuvent rester vides.
+          </li>
+          <li>
+            <strong>Créations :</strong> liens d’annonces, informations du bien, descriptions, photos, brouillons,
+            textes de narration, pistes audio et vidéos. Les informations importées proviennent du lien demandé ; les
+            informations manuelles sont celles que vous transmettez.
+          </li>
+          <li>
+            <strong>Collaboration :</strong> appartenance à une agence, rôles, adresses d’invitation, dossiers, modèles
+            et noms ou commentaires ajoutés lors d’une validation client.
+          </li>
+          <li>
+            <strong>Réseaux sociaux facultatifs :</strong> identifiants et noms des Pages Facebook ou comptes Instagram
+            que vous choisissez, autorisations de publication chiffrées côté serveur, légendes, dates programmées et
+            résultats des envois. La connexion Meta sert à publier sur les comptes associés à l’agence ; elle ne
+            remplace pas votre connexion BienVu.
+          </li>
+          <li>
+            <strong>Abonnement :</strong> identifiants Stripe, formule, périodes, état du paiement, montants et
+            consommation de crédits. BienVu ne stocke pas les numéros de carte bancaire.
+          </li>
+          <li>
+            <strong>Fonctionnement :</strong> quotas, dates, états et erreurs des générations, consommation estimée des
+            prestataires et traces des traitements nécessaires au suivi des créations.
+          </li>
+          <li>
+            <strong>Candidature partenaire :</strong> nom, e-mail professionnel et activité renseignés dans le
+            formulaire public. La candidature est enregistrée dans la messagerie privée de BienVu pour être étudiée par
+            notre équipe. Elle n’inscrit pas à une newsletter et ne crée pas de compte. Des empreintes protégées de
+            l’adresse IP et de l’e-mail servent à limiter les envois répétés.
+          </li>
+          <li>
+            <strong>Assistance par chat :</strong> messages et fichiers que vous choisissez de transmettre, coordonnées
+            éventuellement renseignées dans le chat et informations techniques de navigation nécessaires au widget
+            Tawk.to. BienVu ne lui transmet pas automatiquement le nom, l’e-mail ou les informations de votre compte.
+          </li>
+          <li>
+            <strong>Sécurité :</strong> informations de session, adresse IP et navigateur associés à la connexion,
+            limites de requêtes et résultats des contrôles anti-abus. Pour l’essai anonyme, une empreinte IP protégée
+            sert à limiter les tentatives.
+          </li>
+          <li>
+            <strong>Mesure facultative de l’utilisation :</strong> avec votre accord, pages consultées, clics et
+            résultats des parcours (import, création, éditeur, connexion, publication, candidature), sources de visite,
+            caractéristiques techniques du navigateur et identifiants pseudonymes. Un compte connecté est associé à son
+            identifiant technique. Si vous autorisez aussi les enregistrements de sessions, les pages, textes, champs
+            renseignés, photos et aperçus sont visibles par l’équipe BienVu. Les noms, coordonnées et informations
+            d’annonce affichés ou saisis peuvent donc apparaître dans ces enregistrements. Les mots de passe et jetons
+            de connexion restent protégés.
+          </li>
+        </ul>
+        <p>
+          Pour créer un compte ou une vidéo, certaines informations sont nécessaires au fonctionnement de la demande.
+          Les autres champs sont signalés comme facultatifs. Évitez d’ajouter des données personnelles de tiers dans les
+          photos ou les descriptions si elles ne sont pas nécessaires et autorisées.
+        </p>
+      </LegalSection>
+      <LegalSection {...contents[2]}>
+        <p>
+          Si vous choisissez « Continuer avec Google », BienVu demande uniquement les autorisations de connexion{' '}
+          <code>openid</code>, <code>email</code> et <code>profile</code>. Google transmet l’identifiant de votre
+          compte, votre adresse e-mail et son état de vérification, votre nom et, lorsqu’elle est disponible, votre
+          image de profil.
+        </p>
+        <p>
+          Ces informations servent à vous identifier, créer ou retrouver votre compte BienVu et lui associer votre
+          agence. Elles sont conservées avec les données du compte sur l’infrastructure Cloudflare. Les jetons Google
+          sont utilisés pendant l’authentification puis ne sont pas conservés dans les enregistrements de compte BienVu.
+        </p>
+        <p>
+          BienVu ne reçoit pas votre mot de passe Google et ne demande aucun accès à votre messagerie Gmail, vos
+          fichiers Drive, vos contacts ou votre calendrier. Votre identifiant Google, votre image de profil et vos
+          jetons de connexion ne sont pas envoyés aux services de rédaction ou de voix. Les données de connexion ne sont
+          ni vendues ni utilisées pour du ciblage publicitaire.
+        </p>
+        <p>
+          L’adresse e-mail du compte initialise aussi le champ de contact de votre agence. Vous pouvez le modifier dans
+          Mon agence. Si vous utilisez cette adresse ou d’autres coordonnées dans votre charte ou vos textes, elles
+          peuvent figurer dans la vidéo et être traitées avec les informations de création, comme décrit ci-dessous.
+        </p>
+        <p>
+          Vous pouvez retirer l’autorisation BienVu depuis les paramètres de votre compte Google. Ce retrait empêche une
+          nouvelle connexion Google autorisée mais ne supprime pas automatiquement votre compte BienVu ; contactez-nous
+          pour sa suppression ou utilisez la connexion par e-mail si vous avez défini un mot de passe.
+        </p>
+        <p>
+          L’utilisation de ces données respecte la{' '}
+          <a href="https://developers.google.com/terms/api-services-user-data-policy">
+            Google API Services User Data Policy
+          </a>
+          , y compris les exigences de « Limited Use » lorsqu’elles s’appliquent.
+        </p>
+      </LegalSection>
+      <LegalSection {...contents[3]}>
+        <div className="legal-table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Usage</th>
+                <th scope="col">Fondement du traitement</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Compte, agence et vidéos</th>
+                <td>
+                  Exécution du service demandé : vous authentifier, préparer une annonce, créer une vidéo, gérer les
+                  crédits et fournir vos fichiers.
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Publication dans Explorer</th>
+                <td>
+                  Exécution de la fonction de partage que vous demandez volontairement. Vous pouvez retirer la
+                  publication.
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Protection et assistance</th>
+                <td>
+                  Intérêt légitime de BienVu à protéger le service, limiter les abus, comprendre les incidents et
+                  répondre aux demandes d’aide.
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Candidatures partenaires</th>
+                <td>
+                  Répondre à votre demande de participation et étudier votre candidature avant un éventuel partenariat.
+                  L’acceptation et l’attribution des recommandations sont validées par notre équipe.
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Obligations applicables</th>
+                <td>Respect d’une obligation légale lorsqu’une conservation ou une communication est requise.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          Les e-mails envoyés servent à confirmer votre adresse et à gérer votre mot de passe. BienVu ne propose
+          actuellement ni newsletter ni ciblage publicitaire. Aucune décision automatisée produisant un effet juridique
+          sur vous n’est proposée.
+        </p>
+      </LegalSection>
+      <LegalSection {...contents[4]}>
+        <p>
+          L’administration autorisée de BienVu peut accéder aux informations utiles au support, à la sécurité et au
+          suivi des coûts. Les collaborateurs invités dans votre agence ont accès à son espace selon leur rôle. Un lien
+          privé de validation donne accès à la version concernée à toute personne qui possède ce lien, jusqu’à son
+          expiration ou sa révocation. Si vous publiez une vidéo dans Explorer, sa vidéo, sa page et les informations
+          d’agence qui y figurent deviennent publiques.
+        </p>
+        <ul>
+          <li>
+            <strong>Tawk.to</strong> fournit le chat d’assistance et reçoit les échanges que vous lui confiez ainsi que
+            les informations techniques du widget. Les conversations sont consultables par l’équipe BienVu dans Tawk.to.
+            Le widget n’est pas proposé dans le superadmin ou sur les pages de validation privée.{' '}
+            <a href="https://www.tawk.to/privacy-policy/">Politique de Tawk.to</a>.
+          </li>
+          <li>
+            <strong>PostHog</strong> fournit les statistiques d’utilisation et les enregistrements de sessions
+            facultatifs, dans un projet hébergé en Europe. Après votre accord à l’enregistrement, les contenus visibles
+            des pages et des formulaires sont transmis, dont les informations et photos d’annonces. Des copies réduites
+            des photos déjà affichées peuvent être intégrées aux replays pour conserver leur lisibilité sans rendre les
+            médias publics. Les mots de passe, champs cachés et jetons de connexion sont protégés dans le navigateur.
+            Les contenus et en-têtes des requêtes ainsi que les journaux de console ne sont pas enregistrés. Le panneau
+            superadmin et les liens privés de validation sont exclus. Les visites internes sur les pages du produit sont
+            identifiées pour pouvoir les exclure des indicateurs. L’adresse IP n’est pas conservée par ce projet.{' '}
+            <a href="https://posthog.com/privacy">Politique de PostHog</a>.
+          </li>
+          <li>
+            <strong>Diagnostic des erreurs</strong> : PostHog reçoit également des messages d’erreur et des traces
+            techniques pour corriger les dysfonctionnements. Les erreurs du navigateur sont transmises après votre
+            accord à la mesure d’utilisation. Les erreurs serveur sont collectées sans cookie analytique ; une session
+            consentie peut être associée lorsqu’elle est disponible. Les mots de passe, clés API, cookies, corps de
+            requêtes et paramètres privés des liens sont exclus de ces diagnostics.
+          </li>
+          <li>
+            <strong>Cloudflare</strong> fournit l’hébergement, la base de données, le stockage des médias, les e-mails
+            transactionnels, certains imports et les contrôles Turnstile. Ces services traitent les données nécessaires
+            à ces fonctions. <a href="https://www.cloudflare.com/privacypolicy/">Politique de Cloudflare</a>.
+          </li>
+          <li>
+            <strong>Google</strong> fournit la connexion facultative décrite ci-dessus.{' '}
+            <a href="https://policies.google.com/privacy?hl=fr">Politique de Google</a>.
+          </li>
+          <li>
+            <strong>OpenAI</strong> reçoit les textes et informations du bien nécessaires à leur structuration ou à la
+            rédaction de la narration, y compris les données personnelles que vous auriez incluses dans ces textes. Les
+            requêtes API de BienVu désactivent le stockage des réponses. Selon OpenAI, les données API ne servent pas à
+            l’entraînement par défaut ; des journaux de prévention des abus peuvent toutefois subsister jusqu’à trente
+            jours, avec des exceptions légales ou de sécurité.{' '}
+            <a href="https://developers.openai.com/api/docs/guides/your-data">Traitement des données API OpenAI</a>.
+          </li>
+          <li>
+            <strong>Google Cloud Text-to-Speech</strong> reçoit le texte de narration pour produire la voix française.
+            Selon sa documentation, ce service ne journalise pas les textes ni les fichiers audio des clients. L’audio
+            produit est ensuite conservé par BienVu avec les médias de la création.{' '}
+            <a href="https://docs.cloud.google.com/text-to-speech/docs/data-logging?hl=en">
+              Traitement des données Text-to-Speech
+            </a>
+            .
+          </li>
+          <li>
+            <strong>Fish Audio</strong> reçoit le texte de narration si vous choisissez une voix Fish Audio. Son offre
+            gratuite S2.1 Pro peut conserver les requêtes et les utiliser pour améliorer ses modèles. BienVu lui
+            transmet le texte à prononcer, sans votre compte ni vos identifiants de connexion. L’audio produit est
+            conservé avec votre création. <a href="https://fish.audio/privacy/">Politique de Fish Audio</a> et{' '}
+            <a href="https://fish.audio/fr/blog/s2-1-pro-free-api/">Conditions de l’offre gratuite</a>.
+          </li>
+          <li>
+            <strong>HeyGen</strong> reçoit les passages audio d’ouverture ou de conclusion si vous activez l’option
+            Avatar IA. La voix off déjà générée est utilisée pour animer le présentateur choisi. BienVu transmet cet
+            audio et les réglages nécessaires, sans votre compte ni vos identifiants de connexion. Les clips retournés
+            sont copiés dans le stockage privé de BienVu et peuvent être réutilisés avec le même audio dans votre
+            agence. Les conditions du fournisseur régissent aussi son traitement des fichiers transmis.{' '}
+            <a href="https://www.heygen.com/privacy">Politique de HeyGen</a>.
+          </li>
+          <li>
+            <strong>Prestataire spécialisé dans l’animation IA</strong> : ce service reçoit les photos sélectionnées si
+            vous activez l’animation IA avant génération. Une instruction de mouvement de caméra accompagne ces images,
+            sans identifiants de connexion. Les clips produits sont copiés dans le stockage privé de BienVu. Une
+            bibliothèque conserve les animations réussies pendant 90 jours pour permettre leur réutilisation ; les
+            copies intégrées aux exports suivent la conservation de ces exports.
+          </li>
+          <li>
+            <strong>Stripe</strong> traite les informations nécessaires à la souscription et au paiement, notamment les
+            données de facturation et de moyen de paiement saisies sur ses pages. BienVu reçoit les identifiants et
+            états nécessaires à l’abonnement, aux factures et aux crédits. Le parcours est actuellement en mode test.{' '}
+            <a href="https://stripe.com/fr/privacy">Politique de Stripe</a>.
+          </li>
+          <li>
+            <strong>Meta</strong> traite la connexion facultative aux comptes Instagram et Pages Facebook sélectionnés.
+            Si vous demandez une publication, BienVu transmet la vidéo, sa légende et les identifiants nécessaires, à la
+            date choisie. Les administrateurs peuvent déconnecter ces comptes dans Mon agence ; cela retire
+            l’autorisation conservée par BienVu et annule les envois qui n’ont pas démarré leur publication finale. Une
+            publication déjà transmise peut encore se terminer et les contenus déjà publiés restent sur le réseau. Vous
+            pouvez les supprimer sur celui-ci. Meta peut aussi transmettre une demande de désautorisation ou de
+            suppression des données liées à cette connexion.{' '}
+            <a href="https://www.facebook.com/privacy/policy/">Politique de Meta</a>.
+          </li>
+        </ul>
+        <p>
+          Ces prestataires peuvent traiter des données hors de l’Union européenne, notamment aux États-Unis. Leurs
+          conditions de protection des données décrivent les garanties de transfert applicables, dont les clauses
+          contractuelles types lorsqu’elles sont utilisées. BienVu ne garantit pas un traitement exclusivement en France
+          ou dans l’Union européenne. Contactez-nous si vous souhaitez des précisions sur un prestataire ou un
+          transfert.
+        </p>
+        <p>
+          BienVu ne vend pas vos données. Une communication peut aussi être nécessaire à une autorité compétente lorsque
+          la loi l’exige.
+        </p>
+      </LegalSection>
+      <LegalSection {...contents[5]}>
+        <div className="legal-table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Données</th>
+                <th scope="col">Durée ou règle actuelle</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Compte et identité d’agence</th>
+                <td>
+                  Tant que votre compte est utilisé pour le service, puis traitement de votre demande de fermeture et de
+                  suppression, sous réserve des obligations applicables.
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Session de connexion</th>
+                <td>
+                  Validité de sept jours ; elle peut être renouvelée lors de l’utilisation du compte. La déconnexion
+                  ferme la session concernée.
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Brouillons et imports enregistrés</th>
+                <td>
+                  Échéance de trente jours ; les médias sont ensuite soumis au nettoyage des imports. Vous pouvez
+                  supprimer un brouillon avant cette échéance.
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Médias d’une vidéo de compte</th>
+                <td>
+                  Les vidéos réussies et leurs ressources de montage sont conservées sans expiration automatique. Leur
+                  suppression peut être demandée. Les fichiers déjà purgés ne sont pas restaurés.
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Bibliothèque d’animations IA</th>
+                <td>
+                  Les animations liées à une vidéo conservée restent disponibles et réutilisables sans expiration
+                  automatique. Les copies issues de tentatives échouées peuvent être nettoyées après leur échéance.
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Invitations et validations privées</th>
+                <td>
+                  Liens utilisables sept jours au maximum, ou jusqu’à la révocation ; une validation ne dépasse pas la
+                  disponibilité de sa vidéo. Les rôles, états et commentaires restent dans l’historique de l’agence.
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Connexion et publications sur les réseaux</th>
+                <td>
+                  Autorisations conservées chiffrées jusqu’à leur échéance ou à la déconnexion, puis effacées. L’état
+                  temporaire de connexion est valable quinze minutes et le choix des comptes dix minutes. Une copie
+                  privée de la vidéo programmée est disponible jusqu’à trente jours après la date prévue, puis nettoyée.
+                  Les légendes, destinations, dates et résultats restent dans l’historique de l’agence tant qu’une
+                  suppression n’est pas demandée.
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Essai anonyme non récupéré</th>
+                <td>
+                  Les vidéos réussies sont conservées sans expiration automatique. Les fichiers de tentatives échouées
+                  peuvent être nettoyés après vingt-quatre heures. La preuve de session du navigateur reste valable
+                  trente jours.
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Empreinte IP d’une génération anonyme</th>
+                <td>Effacée au nettoyage des générations datant de plus de quarante-huit heures.</td>
+              </tr>
+              <tr>
+                <th scope="row">Candidature partenaire</th>
+                <td>
+                  La candidature et les échanges restent dans la messagerie privée jusqu’à une demande de suppression.
+                  Les empreintes anti-abus de l’IP et de l’e-mail ainsi que la preuve de vérification anti-robot sont
+                  effacées lors du nettoyage quotidien des candidatures datant de plus de quarante-huit heures.
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Fréquentation agrégée</th>
+                <td>Environ trente et un jours, avec une purge quotidienne.</td>
+              </tr>
+              <tr>
+                <th scope="row">Choix de mesure et d’enregistrement</th>
+                <td>
+                  Six mois au maximum dans ce navigateur, puis un nouveau choix est demandé. Le retrait de l’accord
+                  arrête les nouvelles collectes et supprime les identifiants analytiques locaux.
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Enregistrements de sessions PostHog</th>
+                <td>Trente jours, selon le réglage actuel du projet.</td>
+              </tr>
+              <tr>
+                <th scope="row">Événements de mesure produit PostHog</th>
+                <td>
+                  Conservés dans le projet pour analyser l’évolution du service ; aucune purge générale automatique
+                  n’est actuellement configurée par BienVu. Leur suppression peut être demandée.
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Historique et traces de traitement</th>
+                <td>
+                  Les états, informations du bien, narrations, traces de coûts et extractions de texte peuvent subsister
+                  après les fichiers. Les traces d’extraction peuvent aussi contenir une empreinte IP protégée. Aucune
+                  purge automatique générale de ces métadonnées n’est encore appliquée pendant l’accès anticipé. Leur
+                  suppression peut être demandée.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          Le nettoyage d’un brouillon ou d’une tentative échouée n’équivaut pas à l’effacement de toutes les
+          informations de la création. Les durées propres aux prestataires sont distinctes et décrites dans leurs
+          politiques. Vous pouvez demander la suppression de vos données à contact@bienvu.online.
+        </p>
+      </LegalSection>
+      <LegalSection {...contents[6]}>
+        <p>
+          Des cookies nécessaires permettent de maintenir la connexion, sécuriser l’authentification et retrouver un
+          essai anonyme dans le même navigateur. Les contrôles Turnstile de Cloudflare traitent des signaux techniques
+          de sécurité. BienVu n’installe pas de cookie publicitaire.
+        </p>
+        <p>
+          Le chat Tawk.to utilise ses propres cookies et stockages pour maintenir une conversation entre les pages. Son
+          éventuel formulaire de consentement est distinct des préférences PostHog et dépend des réglages du widget.
+          Vous pouvez contacter BienVu par e-mail si vous préférez ne pas utiliser le chat.{' '}
+          <a href="https://help.tawk.to/article/what-are-tawkto-cookies-and-what-do-they-do">
+            Cookies du widget Tawk.to
+          </a>
+          .
+        </p>
+        <p>
+          Les notifications de fin de génération sont facultatives et nécessitent votre autorisation dans le navigateur.
+          Leur activation enregistre un abonnement technique chiffré associé à votre compte ou à votre essai anonyme. Le
+          service de notifications de votre navigateur transporte un message générique, sans adresse de bien ni contenu
+          d’annonce ; le résultat reste protégé par vos droits d’accès. Vous pouvez désactiver les notifications depuis
+          le menu du compte, le pied de page ou les réglages du navigateur. Un abonnement serveur expire après
+          quatre-vingt-dix jours sans renouvellement ; le suivi d’une notification est conservé au maximum vingt-quatre
+          heures et les identifiants locaux de dédoublonnage sept jours.
+        </p>
+        <p>
+          La mesure d’utilisation PostHog et l’enregistrement des sessions sont deux choix facultatifs. Ils restent
+          désactivés avant votre accord. Vous pouvez tout accepter, tout refuser ou autoriser uniquement la mesure
+          d’utilisation. Les identifiants analytiques sont conservés dans le stockage local du navigateur après accord.
+          Les contenus des pages et les champs renseignés sont visibles dans les enregistrements, à l’exception des mots
+          de passe et autres secrets de connexion. Un nouveau choix est demandé aux visiteurs qui avaient accepté une
+          version limitée aux contenus masqués. Refuser ces fonctions n’empêche pas d’utiliser BienVu. Le retrait de
+          votre accord arrête les nouvelles collectes ; il n’efface pas automatiquement les événements déjà reçus, dont
+          vous pouvez demander la suppression.
+        </p>
+        <p>
+          <CookiePreferencesButton />
+        </p>
+        <p>
+          Le lien d’une annonce peut être gardé dans l’onglet pendant une heure. Pour reprendre une annonce manuelle,
+          les champs et photos peuvent être conservés localement dans ce navigateur pendant une heure, lorsque son
+          stockage est autorisé. Ils sont effacés après enregistrement ou lors d’une visite suivant leur expiration. Les
+          photos simplement déposées dans l’input restent en mémoire avant leur ajout au brouillon.
+        </p>
+        <p>
+          Les statistiques du site comptent les chargements de pages publiques par jour et pays d’origine réseau
+          communiqué par Cloudflare. Une catégorie de source (moteur de recherche, réseau social, accès direct ou autre
+          site) peut être calculée à partir du référent transmis par le navigateur. Pour les autres sites, seul le
+          domaine d’origine est compté par jour ; le chemin, les paramètres et l’URL complète ne sont pas conservés. Les
+          performances de chargement et d’interaction sont regroupées par page et classe de qualité. Ces agrégats
+          n’enregistrent ni adresse IP, ni identifiant de visiteur, ni adresse de bien, ni paramètres d’URL. Ils sont
+          conservés environ trente et un jours, ne comptent pas des visiteurs uniques et ne permettent pas d’attribuer
+          une inscription ou un paiement à une personne ayant visité une page. Les données techniques utilisées pour la
+          sécurité des connexions restent un traitement distinct.
+        </p>
+        <p>
+          Vous pouvez effacer les cookies et le stockage du site depuis votre navigateur. Cela peut fermer votre
+          session, supprimer un brouillon local ou empêcher de retrouver un essai anonyme.
+        </p>
+      </LegalSection>
+      <LegalSection {...contents[7]}>
+        <p>
+          Selon votre situation et le traitement concerné, vous pouvez demander l’accès, la rectification, l’effacement
+          ou la portabilité de vos données, la limitation d’un traitement ou vous y opposer. Certains droits ont des
+          conditions et peuvent être limités par une obligation légale.
+        </p>
+        <p>
+          Écrivez à <a href="mailto:contact@bienvu.online">contact@bienvu.online</a> en indiquant l’adresse de votre
+          compte et votre demande. Ne transmettez pas votre mot de passe. Nous pouvons demander une vérification
+          proportionnée de votre identité si nécessaire. Une réponse est apportée dans le délai applicable, en principe
+          un mois ; si une prolongation autorisée est nécessaire, vous en êtes informé.
+        </p>
+        <p>
+          Vous pouvez également saisir la <a href="https://www.cnil.fr/fr/plaintes">CNIL</a>. Les{' '}
+          <a href="https://www.cnil.fr/fr/mes-demarches/les-droits-pour-maitriser-vos-donnees-personnelles">
+            informations de la CNIL sur vos droits
+          </a>{' '}
+          précisent leurs modalités.
+        </p>
+        <p>
+          Cette politique sera mise à jour si les pratiques de BienVu évoluent. Sa date est affichée en haut de la page
+          ; toute évolution importante de l’utilisation de vos données fera l’objet d’une information appropriée.
+          Consultez aussi les <Link href="/conditions">conditions d’utilisation</Link>.
+        </p>
+      </LegalSection>
+      <LegalSection {...contents[8]}>
+        <p>
+          Une agence choisit explicitement les biens, médias, coordonnées et éventuelles adresses précises qu’elle
+          publie sur sa vitrine. Ses adaptations de présentation restent privées jusqu’à publication. Une vitrine mise
+          hors ligne, un bien retiré ou archivé et ses liens de médias publics deviennent inaccessibles. Les copies de
+          médias sélectionnées restent protégées dans le stockage et ne sont servies publiquement que pour une
+          publication active.
+        </p>
+        <p>
+          Si vous contactez une agence depuis sa vitrine, votre nom, e-mail, téléphone facultatif, message et le bien
+          concerné sont enregistrés dans son espace privé pour traiter votre demande. Seuls les membres autorisés de
+          cette agence peuvent les consulter. Une notification peut être envoyée à l’agence ; son échec n’efface pas la
+          demande. Ce formulaire ne vous inscrit pas à une newsletter et ne confirme pas un rendez-vous.
+        </p>
+        <p>
+          Les demandes et leurs coordonnées sont supprimées automatiquement après six mois, ou plus tôt par un
+          administrateur de l’agence. Un reçu technique sans coordonnées ni message évite de recréer une demande lors
+          d’un nouvel envoi réseau ; il est lui aussi supprimé après six mois. Les empreintes de contrôle anti-spam et
+          les clés de dédoublonnage sont purgées à leur expiration.
+        </p>
+        <p>
+          Avec votre consentement à la mesure, les vues, fiches consultées et clics de contact alimentent des compteurs
+          agrégés conservés quatre-vingt-dix jours. Les demandes reçues sont comptées à partir des formulaires
+          effectivement enregistrés. Les prévisualisations, visites des membres de l’agence et robots reconnus sont
+          exclus. Ni vos coordonnées ni le contenu des messages ne sont transmis dans ces événements. L’enregistrement
+          de sessions est désactivé dans les vitrines et leur espace de gestion, même si vous l’avez autorisé sur le
+          reste de BienVu.
+        </p>
+        <p>
+          Si vous ajoutez un bien aux favoris, son identifiant public est conservé dans le navigateur de cet appareil
+          pour retrouver votre choix. Les favoris sont propres à chaque vitrine, ne sont pas envoyés à l’agence et ne
+          constituent pas un compte visiteur. Vous pouvez les retirer avec le bouton cœur, ou les effacer en supprimant
+          les données du site dans votre navigateur.
+        </p>
+        <p>
+          Pour modifier ou supprimer une demande, contactez l’agence à laquelle vous l’avez adressée, ou{' '}
+          <a href="mailto:contact@bienvu.online">contact@bienvu.online</a> pour l’assistance technique relative au
+          stockage dans BienVu.
+        </p>
+      </LegalSection>
+    </LegalDocument>
+  );
 }

@@ -4,17 +4,17 @@
 
 ## Vérifications réellement effectuées
 
-| Étape | Résultat |
-|---|---|
-| Domaine et expéditeur | `bienvu.online` actif ; `connexion@bienvu.online` configuré dans Email Sending |
-| DNS | Trois MX, SPF, DKIM et DMARC conformes sur les deux serveurs Cloudflare faisant autorité |
-| Inscription | HTTP 200, hash salé en D1, aucune session ni agence avant vérification |
-| Connexion avant confirmation | HTTP 403, `EMAIL_NOT_VERIFIED` |
-| Confirmation | Lien réellement reçu et ouvert par Alex ; adresse vérifiée, sans connexion automatique |
-| Connexion de recette | HTTP 200, cookie `Secure; HttpOnly; SameSite=Lax`, agence accessible |
-| Récupération | Second message reçu ; Alex choisit son mot de passe et se connecte avec succès |
-| Révocation | Ancienne session HTTP 401, ancien mot de passe HTTP 400 ; agence conservée |
-| Livraison fournisseur | Deux événements `delivered`, compteur d'envoi 0 → 2 ; réceptions Gmail confirmées séparément |
+| Étape                        | Résultat                                                                                     |
+| ---------------------------- | -------------------------------------------------------------------------------------------- |
+| Domaine et expéditeur        | `bienvu.online` actif ; `connexion@bienvu.online` configuré dans Email Sending               |
+| DNS                          | Trois MX, SPF, DKIM et DMARC conformes sur les deux serveurs Cloudflare faisant autorité     |
+| Inscription                  | HTTP 200, hash salé en D1, aucune session ni agence avant vérification                       |
+| Connexion avant confirmation | HTTP 403, `EMAIL_NOT_VERIFIED`                                                               |
+| Confirmation                 | Lien réellement reçu et ouvert par Alex ; adresse vérifiée, sans connexion automatique       |
+| Connexion de recette         | HTTP 200, cookie `Secure; HttpOnly; SameSite=Lax`, agence accessible                         |
+| Récupération                 | Second message reçu ; Alex choisit son mot de passe et se connecte avec succès               |
+| Révocation                   | Ancienne session HTTP 401, ancien mot de passe HTTP 400 ; agence conservée                   |
+| Livraison fournisseur        | Deux événements `delivered`, compteur d'envoi 0 → 2 ; réceptions Gmail confirmées séparément |
 
 Preuves expurgées : parcours et retour humain (`docs/preuves/sprint-02/email-cloudflare.json`), livraison Cloudflare (`docs/preuves/sprint-02/email-cloudflare-delivery.json`), événements et mesures (`docs/preuves/sprint-02/email-cloudflare-events.json`), configuration et budget (`docs/preuves/sprint-02/email-domain-setup.json`).
 

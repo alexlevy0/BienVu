@@ -9,7 +9,6 @@ Les informations sous l’URL de création utilisent le même catalogue. Ce cata
 Recherche effectuée le 5 octobre sur les sites officiels des réseaux nationaux. Le panel couvre les agences franchisées, les réseaux intégrés et les mandataires ; ce n’est pas un classement exhaustif. Les implantations et les nombres de conseillers ne sont pas des unités comparables.
 
 Références consultées pour leur présence en France :
-
 - [Orpi — le réseau](https://www.orpi.com/le-reseau-orpi/) et [Century 21 — en France](https://www.century21.fr/fiches/a_propos/century21/france/).
 - [Laforêt — qui sommes-nous](https://www.laforet.com/qui-sommes-nous), [HUMAN — le réseau](https://www.human-immobilier.fr/human-news/human-premiere-agence-paris/1538), [Guy Hoquet — qui sommes-nous](https://business.guy-hoquet.com/qui-sommes-nous/).
 - [Nestenn — liste des agences](https://nestenn.com/liste-agences), [ERA — agences](https://www.eraimmobilier.com/agences/), [l’Adresse — activité du réseau](https://www.ladresse.com/blog/un-premier-semestre-2026-en-dents-de-scie-qui-rebat-les-cartes-en-faveur-des-acheteurs/1262).
@@ -20,24 +19,24 @@ Références consultées pour leur présence en France :
 
 **16 annonces**, une tentative par URL, via `POST https://bienvu.online/api/imports`, avec une identité technique isolée et le transport produit Cloudflare Worker/Container/D1/R2. Le premier lien Orpi étant indisponible, une seconde annonce Orpi connue a été ajoutée au panel. Les URL exactes sont dans `scripts/source-coverage-samples.json` et dans le catalogue public.
 
-| Réseau et annonce | Résultat du 5 octobre | Photos vérifiées |
-|---|---|---:|
-| Orpi — Ambillou | Lien indisponible (`SOURCE_UNAVAILABLE`, `not_found`) | 0 |
-| Orpi — Sanary-sur-Mer | Import complet (`ready`) | 12 |
-| Century 21 — Saint-Martin-Boulogne | Informations insuffisantes (`INCOMPLETE_LISTING`) | 0 |
-| Laforêt — Lyon 3e | Destination non prise en charge (`UNSAFE_URL`) | 0 |
-| HUMAN — Tulle | Accès refusé par la source (`SOURCE_BLOCKED`, `access_denied`) | 0 |
-| Guy Hoquet — Courbevoie | Destination non prise en charge (`UNSAFE_URL`) | 0 |
-| Nestenn — Lyon 8e | Informations contradictoires (`CONFLICTING_FACTS`) | 0 |
-| ERA — Saint-Nazaire | Destination non prise en charge (`UNSAFE_URL`) | 0 |
-| l’Adresse — Bègles | Destination non prise en charge (`UNSAFE_URL`) | 0 |
-| Foncia — Toulouse | Lien indisponible (`SOURCE_UNAVAILABLE`, `not_found`) | 0 |
-| Citya — Toulouse | Informations insuffisantes (`INCOMPLETE_LISTING`) | 0 |
-| Square Habitat — Angers | Informations contradictoires (`CONFLICTING_FACTS`) | 0 |
-| Arthurimmo.com — Nantes | Source indisponible (`SOURCE_UNAVAILABLE`) | 0 |
-| iad — Lyon | Informations insuffisantes (`INCOMPLETE_LISTING`) | 0 |
-| SAFTI — Cergy | Destination non prise en charge (`UNSAFE_URL`) | 0 |
-| Espaces Atypiques — Sathonay-Village | Import complet (`ready`) | 12 |
+| Réseau et annonce                    | Résultat du 5 octobre                                          | Photos vérifiées |
+| ------------------------------------ | -------------------------------------------------------------- | ---------------: |
+| Orpi — Ambillou                      | Lien indisponible (`SOURCE_UNAVAILABLE`, `not_found`)          |                0 |
+| Orpi — Sanary-sur-Mer                | Import complet (`ready`)                                       |               12 |
+| Century 21 — Saint-Martin-Boulogne   | Informations insuffisantes (`INCOMPLETE_LISTING`)              |                0 |
+| Laforêt — Lyon 3e                    | Destination non prise en charge (`UNSAFE_URL`)                 |                0 |
+| HUMAN — Tulle                        | Accès refusé par la source (`SOURCE_BLOCKED`, `access_denied`) |                0 |
+| Guy Hoquet — Courbevoie              | Destination non prise en charge (`UNSAFE_URL`)                 |                0 |
+| Nestenn — Lyon 8e                    | Informations contradictoires (`CONFLICTING_FACTS`)             |                0 |
+| ERA — Saint-Nazaire                  | Destination non prise en charge (`UNSAFE_URL`)                 |                0 |
+| l’Adresse — Bègles                   | Destination non prise en charge (`UNSAFE_URL`)                 |                0 |
+| Foncia — Toulouse                    | Lien indisponible (`SOURCE_UNAVAILABLE`, `not_found`)          |                0 |
+| Citya — Toulouse                     | Informations insuffisantes (`INCOMPLETE_LISTING`)              |                0 |
+| Square Habitat — Angers              | Informations contradictoires (`CONFLICTING_FACTS`)             |                0 |
+| Arthurimmo.com — Nantes              | Source indisponible (`SOURCE_UNAVAILABLE`)                     |                0 |
+| iad — Lyon                           | Informations insuffisantes (`INCOMPLETE_LISTING`)              |                0 |
+| SAFTI — Cergy                        | Destination non prise en charge (`UNSAFE_URL`)                 |                0 |
+| Espaces Atypiques — Sathonay-Village | Import complet (`ready`)                                       |               12 |
 
 Deux imports complets, 14 échecs, aucun brouillon partiel : **24 photos effectivement téléchargées, décodées et persistées**, avec contrôle des empreintes SHA-256, du format JPEG, des dimensions et de l’absence de métadonnées EXIF. Chaque réponse d’import a été relue par sa route privée ; un accès sans session reste refusé avec HTTP 401. Un HTTP 200 de la route d’import ne transforme pas un résultat `failed` en réussite.
 

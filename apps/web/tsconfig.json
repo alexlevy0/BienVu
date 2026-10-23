@@ -1,1 +1,6 @@
-{"extends":"../../tsconfig.base.json","compilerOptions":{"plugins":[{"name":"next"}],"incremental":true},"include":["**/*.ts","**/*.tsx",".next/types/**/*.ts",".next/dev/types/**/*.ts"],"exclude":["node_modules",".open-next"]}
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "plugins": [{ "name": "next" }], "incremental": true },
+  "include": ["**/*.ts", "**/*.tsx", ".next/types/**/*.ts", ".next/dev/types/**/*.ts"],
+  "exclude": ["node_modules", ".open-next"]
+}

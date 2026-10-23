@@ -22,7 +22,6 @@ Le formulaire URL appelle le parcours de génération existant pour les comptes 
 ## Recette locale
 
 Les fixtures sont limitées à localhost/127.0.0.1. Le compte, l’historique et les réponses de génération sont simulés dans le navigateur, sans créer de compte ou de job en D1. Le mode distant de la sonde ne soumet aucune génération.
-
 - Chromium en 1536, 390 et 320 px : quatre visuels chargés, aucun débordement horizontal ; captures inspectées.
 - Quatre vrais fichiers MP4 lus : 28/32/27/30 s, 600 × 800, pas de piste audio. Ce sont des animations de photos synthétiques, pas une nouvelle validation du moteur vidéo produit.
 - Aide, filtres de galerie, lecteur, navigation mobile, fermeture Échap ; formulaire manuel avec description et upload présent.

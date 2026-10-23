@@ -1,32 +1,78 @@
 // Native master + genuine watermark/FFprobe/stills inside the deployed Linux
 // image. Synthetic listing, previously paid Runway clip; no provider requests.
 import assert from 'node:assert/strict';
-import {spawn} from 'node:child_process';
-import {readFile,writeFile,mkdir,chmod} from 'node:fs/promises';
-import {resolve} from 'node:path';
-import {VideoManifest,videoAssets,videoAssetFile} from '../packages/contracts/src/index.ts';
-const image=process.argv[2]??'bienvu-renderer:voice-toggle-20261001';
-assert.match(image,/^[a-zA-Z0-9][a-zA-Z0-9./:_@-]+$/);
-const source=resolve('evidence/local/voice-toggle/render'),folder=resolve('evidence/local/voice-toggle/linux');
-await mkdir(folder,{recursive:true,mode:0o700});
-async function docker(args,input,timeout=60_000){
-  const child=spawn('docker',args,{stdio:['pipe','pipe','pipe']}),out=[],errors=[];
-  child.stdout.on('data',c=>out.push(c));child.stderr.on('data',c=>errors.push(c));child.stdin.end(input);
-  let expired=false;const timer=setTimeout(()=>{expired=true;child.kill('SIGKILL');},timeout);
-  try{const code=await new Promise((r,j)=>{child.once('error',j);child.once('close',r);});
-    if(code!==0)throw Error(expired?'DOCKER_PROBE_TIMEOUT':Buffer.concat(errors).toString().slice(-1500)||'DOCKER_PROBE_FAILED');
+import { spawn } from 'node:child_process';
+import { readFile, writeFile, mkdir, chmod } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { VideoManifest, videoAssets, videoAssetFile } from '../packages/contracts/src/index.ts';
+const image = process.argv[2] ?? 'bienvu-renderer:voice-toggle-20261001';
+assert.match(image, /^[a-zA-Z0-9][a-zA-Z0-9./:_@-]+$/);
+const source = resolve('evidence/local/voice-toggle/render'),
+  folder = resolve('evidence/local/voice-toggle/linux');
+await mkdir(folder, { recursive: true, mode: 0o700 });
+async function docker(args, input, timeout = 60_000) {
+  const child = spawn('docker', args, { stdio: ['pipe', 'pipe', 'pipe'] }),
+    out = [],
+    errors = [];
+  child.stdout.on('data', (c) => out.push(c));
+  child.stderr.on('data', (c) => errors.push(c));
+  child.stdin.end(input);
+  let expired = false;
+  const timer = setTimeout(() => {
+    expired = true;
+    child.kill('SIGKILL');
+  }, timeout);
+  try {
+    const code = await new Promise((r, j) => {
+      child.once('error', j);
+      child.once('close', r);
+    });
+    if (code !== 0)
+      throw Error(
+        expired ? 'DOCKER_PROBE_TIMEOUT' : Buffer.concat(errors).toString().slice(-1500) || 'DOCKER_PROBE_FAILED',
+      );
     return Buffer.concat(out).toString();
-  }finally{clearTimeout(timer);}
+  } finally {
+    clearTimeout(timer);
+  }
 }
-const [info]=JSON.parse(await docker(['image','inspect',image]));
-assert.equal(info.Os,'linux');assert.equal(info.Architecture,'amd64');
-const manifest=VideoManifest.parse(JSON.parse(await readFile(source+'/manifest.json','utf8')));
-assert.equal(manifest.voiceEnabled,false);assert.equal(manifest.subtitlesEnabled,false);
-const assets=await Promise.all(videoAssets(manifest).map(async asset=>({file:videoAssetFile(asset),bytes:(await readFile(source+'/'+videoAssetFile(asset))).toString('base64')})));
-const master=(await readFile(source+'/video.mp4')).toString('base64'),container=`bienvu-voice-linux-probe-${Date.now()}`;
-try{
-  await docker(['run','-d','--rm','--name',container,'--label','bienvu.probe=voice-disabled','--network','none','--cpus=2','--memory=3g','--entrypoint','sleep',image,'600'],undefined,120_000);
-  const program=`
+const [info] = JSON.parse(await docker(['image', 'inspect', image]));
+assert.equal(info.Os, 'linux');
+assert.equal(info.Architecture, 'amd64');
+const manifest = VideoManifest.parse(JSON.parse(await readFile(source + '/manifest.json', 'utf8')));
+assert.equal(manifest.voiceEnabled, false);
+assert.equal(manifest.subtitlesEnabled, false);
+const assets = await Promise.all(
+  videoAssets(manifest).map(async (asset) => ({
+    file: videoAssetFile(asset),
+    bytes: (await readFile(source + '/' + videoAssetFile(asset))).toString('base64'),
+  })),
+);
+const master = (await readFile(source + '/video.mp4')).toString('base64'),
+  container = `bienvu-voice-linux-probe-${Date.now()}`;
+try {
+  await docker(
+    [
+      'run',
+      '-d',
+      '--rm',
+      '--name',
+      container,
+      '--label',
+      'bienvu.probe=voice-disabled',
+      '--network',
+      'none',
+      '--cpus=2',
+      '--memory=3g',
+      '--entrypoint',
+      'sleep',
+      image,
+      '600',
+    ],
+    undefined,
+    120_000,
+  );
+  const program = `
     import assert from 'node:assert/strict';
     import {mkdir,writeFile} from 'node:fs/promises';
     import {withVideoAssets,renderListingStills,verifyVideoArtifact,createWatermarkedPreview} from './apps/renderer/src/listing-render.ts';
@@ -48,9 +94,23 @@ try{
     console.log(JSON.stringify({at:new Date().toISOString(),linux:true,syntheticListing:true,realRunwayClipReused:true,newProviderCalls:0,
       network:'none',user:process.getuid(),fullVideoRendered:false,nativeMasterVerified:true,linuxWatermarkProduced:true,
       assetsValidated:true,rangeValidated:true,stills,report,preview}));`;
-  const stdout=await docker(['exec','-i',container,'node','--import','tsx','--input-type=module','-e',program],JSON.stringify({manifest,assets,master}),320_000);
-  const report={...JSON.parse(stdout.trim()),image:{reference:image,id:info.Id,architecture:info.Architecture}};
-  for(const frame of report.stills){await docker(['cp',`${container}:/tmp/silent-stills/frame-${frame}.png`,`${folder}/frame-${frame}.png`]);await chmod(`${folder}/frame-${frame}.png`,0o600);}
-  await docker(['cp',`${container}:/tmp/silent-input/preview.mp4`,`${folder}/preview.mp4`]);await chmod(`${folder}/preview.mp4`,0o600);
-  await writeFile(folder+'/report.json',JSON.stringify(report,null,2),{mode:0o600});console.log(JSON.stringify(report));
-}finally{await docker(['rm','-f',container],undefined,60_000).catch(()=>{});}
+  const stdout = await docker(
+    ['exec', '-i', container, 'node', '--import', 'tsx', '--input-type=module', '-e', program],
+    JSON.stringify({ manifest, assets, master }),
+    320_000,
+  );
+  const report = {
+    ...JSON.parse(stdout.trim()),
+    image: { reference: image, id: info.Id, architecture: info.Architecture },
+  };
+  for (const frame of report.stills) {
+    await docker(['cp', `${container}:/tmp/silent-stills/frame-${frame}.png`, `${folder}/frame-${frame}.png`]);
+    await chmod(`${folder}/frame-${frame}.png`, 0o600);
+  }
+  await docker(['cp', `${container}:/tmp/silent-input/preview.mp4`, `${folder}/preview.mp4`]);
+  await chmod(`${folder}/preview.mp4`, 0o600);
+  await writeFile(folder + '/report.json', JSON.stringify(report, null, 2), { mode: 0o600 });
+  console.log(JSON.stringify(report));
+} finally {
+  await docker(['rm', '-f', container], undefined, 60_000).catch(() => {});
+}

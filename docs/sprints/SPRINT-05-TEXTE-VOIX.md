@@ -29,13 +29,13 @@ Références : [CONTRATS.md](../CONTRATS.md), [CADRAGE.md](../CADRAGE.md), [BUDG
 
 ## Résultats d'acceptation
 
-| Critère | État et preuve |
-|---|---|
-| 1 — Variété des cas | Vente/location, champ absent, gros montant, décimale et injection couverts par les tests déterministes |
-| 2 — Faits et provenance | Compilation/validation canonique, mocks URL et manuel ; scénarios synthétiques avec vrais fournisseurs : URL depuis le Mac, manuel depuis Cloudflare ; aucune promotion de `user_provided` |
-| 3 — Écoute | Premier échantillon validé par Alex ; nouvelle narration Cloudflare avec phrasé oral et transitions courtes : Alex confirme « Oui, c’est plus naturel et le rythme convient ». [Comparaison](../preuves/sprint-05/NATUREL.md) |
-| 4 — Échecs bornés | Erreurs et journal privé par job vérifiés ; traduction vers le statut global et réservation client par le futur Workflow (sprint 07) |
-| 5 — Privé et reprise | D1/R2 locaux et Cloudflare privés ; isolation, corruption/concurrence sur fixtures ; reprise distante après redéploiement sans nouvel appel ni récupération de données |
+| Critère                 | État et preuve                                                                                                                                                                                                                |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 — Variété des cas     | Vente/location, champ absent, gros montant, décimale et injection couverts par les tests déterministes                                                                                                                        |
+| 2 — Faits et provenance | Compilation/validation canonique, mocks URL et manuel ; scénarios synthétiques avec vrais fournisseurs : URL depuis le Mac, manuel depuis Cloudflare ; aucune promotion de `user_provided`                                    |
+| 3 — Écoute              | Premier échantillon validé par Alex ; nouvelle narration Cloudflare avec phrasé oral et transitions courtes : Alex confirme « Oui, c’est plus naturel et le rythme convient ». [Comparaison](../preuves/sprint-05/NATUREL.md) |
+| 4 — Échecs bornés       | Erreurs et journal privé par job vérifiés ; traduction vers le statut global et réservation client par le futur Workflow (sprint 07)                                                                                          |
+| 5 — Privé et reprise    | D1/R2 locaux et Cloudflare privés ; isolation, corruption/concurrence sur fixtures ; reprise distante après redéploiement sans nouvel appel ni récupération de données                                                        |
 
 Les travaux du sprint sont implémentés et vérifiés localement puis sur Cloudflare. La migration 0011, les secrets, les appels réels, le stockage privé et la reprise sont éprouvés. Restent aux sprints suivants : manifeste/rendu (06), Workflow/budget produit/purge (07/09). Aucun accès client aux voix ni pipeline public ouvert ; Worker opérateur remis en pause après recette. L’écoute d’un MP4 complet, avec contrôle du rythme sur images, appartient au sprint 06.
 

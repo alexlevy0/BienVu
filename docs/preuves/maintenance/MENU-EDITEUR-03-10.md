@@ -5,7 +5,6 @@ L’Éditeur remplaçait les styles communs du menu : largeur de 224 px, textes 
 `apps/web/app/landing.css` définit les dimensions communes : menu de 256 px, 225 px entre 901 et 1250 px, panneau mobile de 270 px jusqu’à 900 px. L’Éditeur utilise la même largeur pour son décalage et la même hauteur d’en-tête mobile pour remplir l’espace restant (78 px, puis 72 px jusqu’à 540 px). L’entrée « Dossiers & modèles » réserve deux lignes afin que son passage en gras ne déplace pas les activités récentes.
 
 Validation réalisée :
-
 - `pnpm build:web`, dry-run Wrangler avec `apps/web/wrangler.staging.jsonc` et `git diff --check` réussis.
 - Chromium local puis publié à **1536, 1280, 1200, 901, 900, 870, 840 et 390 px** : navigation réelle par liens entre accueil, dossiers et Éditeur, puis ouverture d’un projet. Dimensions et styles du menu, logo, textes, récents, crédits et compte identiques à chaque largeur ; espace de montage correctement aligné.
 - Anciennes règles réintroduites temporairement dans le navigateur local : le menu revient à 224 px et les liens à 14 px. Leur retrait rétablit les dimensions communes.

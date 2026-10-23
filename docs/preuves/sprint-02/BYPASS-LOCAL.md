@@ -6,12 +6,12 @@ Demande d’Alex : une variable pour marquer l’adresse vérifiée et connecter
 
 L’option exige mode local, origine HTTP localhost/127.0.0.1 et requête sur l’origine configurée. Une requête publique reste refusée même si les variables locales y étaient copiées. La préparation staging force `false`. Le contrôle d’identité Google reste inchangé. Avec `false`/variable absente, la confirmation normale demeure obligatoire pour les nouvelles inscriptions. Une désactivation ne modifie pas rétroactivement les comptes de test déjà vérifiés.
 
-| Vérification | Preuve |
-|---|---|
-| 56 tests, frontières et TypeScript | Journal (`docs/preuves/sprint-02/bypass-check.log`) |
-| Build Next/OpenNext | Journal (`docs/preuves/sprint-02/bypass-build.log`) |
+| Vérification                                                                | Preuve                                                                                                      |
+| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| 56 tests, frontières et TypeScript                                          | Journal (`docs/preuves/sprint-02/bypass-check.log`)                                                         |
+| Build Next/OpenNext                                                         | Journal (`docs/preuves/sprint-02/bypass-build.log`)                                                         |
 | HTTP réel sous workerd local, inscription synthétique sans compte préinséré | Rapport (`docs/preuves/sprint-02/bypass-workerd.json`), journal (`docs/preuves/sprint-02/bypass-probe.log`) |
-| Inscription navigateur et redirection automatique | Inspection (`docs/preuves/sprint-02/bypass-inspection-ui.json`) |
+| Inscription navigateur et redirection automatique                           | Inspection (`docs/preuves/sprint-02/bypass-inspection-ui.json`)                                             |
 
 La sonde contrôle le champ D1, le hachage, le cookie, l’agence unique, aucun mail, la persistance, le mauvais mot de passe, la réinscription, zéro allocation et la déconnexion. Le compte de sonde est supprimé ensuite. La recette normale avec confirmation reste couverte par les tests ; les preuves HTTP précédentes sont distinctes.
 

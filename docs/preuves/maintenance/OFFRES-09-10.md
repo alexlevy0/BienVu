@@ -35,7 +35,6 @@ Sauvegarde SQL privée avant intervention, puis répétition de **0063** sur sa 
 Migration **0063 appliquée** sur la D1 `bienvu-s00-staging` utilisée par le domaine. Les quatre journaux de facturation ont été comparés à la sauvegarde : contenu identique ; commande et recharge historiques conservées. `PRAGMA foreign_key_check` vide avant et après. Aucun journal de report créé dans les données existantes lors de cette recette.
 
 Versions publiées à **100 %** :
-
 - Web `bienvu-web-probe-staging` : **628024ed-0080-49ce-9e59-06055a70059a**.
 - Génération `bienvu-generation-development` : **795c9aa5-8cc1-4a82-b8b9-722f888a5db2**.
 

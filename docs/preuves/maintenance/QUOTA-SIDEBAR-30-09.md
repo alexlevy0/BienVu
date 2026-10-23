@@ -18,7 +18,6 @@ Ce correctif ponctuel n'est pas une migration globale ni un mécanisme de rechar
 ## Vérifications locales et fixtures
 
 Commandes exécutées avec Node 24 et pnpm 10.33.2 du projet :
-
 - `pnpm --filter @bienvu/web typecheck` : réussi.
 - `pnpm exec tsx --test --test-concurrency=1 tests/generation-storage.test.ts tests/accounts.test.ts` : **12 tests réussis**, dont admission atomique, réservation unique, libération idempotente après échec, consommation unique après disponibilité et isolation entre agences. D1/R2/workerd locaux ; identités et fournisseurs simulés.
 - `pnpm check:boundaries` : réussi, 163 fichiers.

@@ -32,7 +32,6 @@ Rapports et captures ignorés par Git sous `evidence/local/workflow-ui` ; logs e
 ## Publication et contrôles Cloudflare réels
 
 Dry-run puis déploiement avec `--config apps/web/wrangler.staging.jsonc --keep-vars --strict`. Worker **bienvu-web-probe-staging**, version **1f6a44b1-868c-4a8b-9980-cb40e3fdcc63**, active à **100 %** sur **bienvu.online** ; planification existante conservée.
-
 - `/historique` : **200**, ses **14 fichiers CSS/JS** : **200**, empreintes SHA-256 identiques au build local, menu présent dans le bundle publié.
 - DELETE sans session sur un identifiant fictif : **401**. Cette requête n'a supprimé aucune donnée.
 - Bindings, variables, secrets, date et flags de compatibilité, modèle d'usage : identiques avant/après.

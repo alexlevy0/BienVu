@@ -1,151 +1,403 @@
-import {test} from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {createRequire} from 'node:module';
-import {mkdtemp,rm,readFile} from 'node:fs/promises';
-import {tmpdir} from 'node:os';
+import { createRequire } from 'node:module';
+import { mkdtemp, rm, readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
-import {pathToFileURL} from 'node:url';
-import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
-import {videoFixture,videoReport} from '../fixtures/video';
-import {videoManifestHash,videoAssets,videoPreviewKey,VideoManifest} from '../packages/contracts/src/index';
-import type {VideoJob} from '../apps/pipeline/src/video-coordinator';
-type Snapshot={starts:number;cleaned:boolean;stopped:boolean;job:VideoJob;state:{active:string|null;budget:{attempts:number;committedCents:number;fixedAndOtherCents:number}}};
-test('contrôleur durable workerd : budget, concurrence, R2, timeout et coupures',async t=>{
-  const directory=await mkdtemp(path.join(tmpdir(),'bienvu-video-do-'));t.after(()=>rm(directory,{recursive:true,force:true}));
-  const require=createRequire(import.meta.url),wrangler=createRequire(require.resolve('wrangler/package.json'));
-  const esbuild=await import(pathToFileURL(wrangler.resolve('esbuild')).href) as {build:(o:unknown)=>Promise<unknown>};
-  const scriptPath=path.join(directory,'worker.mjs');
-  await esbuild.build({entryPoints:['fixtures/video-worker.ts'],outfile:scriptPath,bundle:true,platform:'neutral',format:'esm',target:'es2022',external:['cloudflare:*','node:*'],conditions:['workerd','worker','browser']});
-  const options={...convertV4MiniflareOptions({modules:true,script:await readFile(scriptPath,'utf8'),compatibilityDate:'2026-09-27',compatibilityFlags:['nodejs_compat'],
-    durableObjects:{COORDINATOR:{className:'FixtureVideo',useSQLite:true}},r2Buckets:['MEDIA']}),resourcePersistencePath:path.join(directory,'storage')};
-  let mf=new Miniflare(options);t.after(()=>mf.dispose());
-  const fixture=await videoFixture(),manifest=fixture.manifest,id=await videoManifestHash(manifest),report=videoReport(id,manifest);
-  let bucket=(await mf.getBindings<{MEDIA:R2Bucket}>()).MEDIA;for(const asset of videoAssets(manifest))await bucket.put(asset.objectKey,new Uint8Array(fixture.files.get(asset.id)!));
-  const call=(name:string,route:string,body?:unknown)=>mf.dispatchFetch(`https://test${route}?name=${name}`,{method:body===undefined?'GET':'POST',body:body===undefined?undefined:JSON.stringify(body)});
-  const snapshot=async(name:string)=>(await (await call(name,'/state')).json()) as Snapshot;
-  const accept=(name:string)=>call(name,'/accept',{manifest,report});
-  await call('cancelled-before-start','/cancel',{id});assert.equal((await accept('cancelled-before-start')).status,409);
-  assert.equal((await snapshot('cancelled-before-start')).state.budget,null);
-  await Promise.all([accept('success'),accept('success')]);
-  assert.equal((await snapshot('success')).state.budget.committedCents,50);
-  await Promise.all([call('success','/advance'),call('success','/advance')]);
-  let state=await snapshot('success');assert.equal(state.job.status,'ready');assert.equal(state.starts,1);assert.equal(state.cleaned,true);assert.equal(state.stopped,true);
-  const stored=await bucket.get(state.job.objectKey!);assert.equal(stored!.customMetadata?.watermarked,'true');assert.equal(stored!.size,3);
+import { pathToFileURL } from 'node:url';
+import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
+import { videoFixture, videoReport } from '../fixtures/video';
+import { videoManifestHash, videoAssets, videoPreviewKey, VideoManifest } from '../packages/contracts/src/index';
+import type { VideoJob } from '../apps/pipeline/src/video-coordinator';
+type Snapshot = {
+  starts: number;
+  cleaned: boolean;
+  stopped: boolean;
+  job: VideoJob;
+  state: { active: string | null; budget: { attempts: number; committedCents: number; fixedAndOtherCents: number } };
+};
+test('contrôleur durable workerd : budget, concurrence, R2, timeout et coupures', async (t) => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'bienvu-video-do-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const require = createRequire(import.meta.url),
+    wrangler = createRequire(require.resolve('wrangler/package.json'));
+  const esbuild = (await import(pathToFileURL(wrangler.resolve('esbuild')).href)) as {
+    build: (o: unknown) => Promise<unknown>;
+  };
+  const scriptPath = path.join(directory, 'worker.mjs');
+  await esbuild.build({
+    entryPoints: ['fixtures/video-worker.ts'],
+    outfile: scriptPath,
+    bundle: true,
+    platform: 'neutral',
+    format: 'esm',
+    target: 'es2022',
+    external: ['cloudflare:*', 'node:*'],
+    conditions: ['workerd', 'worker', 'browser'],
+  });
+  const options = {
+    ...convertV4MiniflareOptions({
+      modules: true,
+      script: await readFile(scriptPath, 'utf8'),
+      compatibilityDate: '2026-09-27',
+      compatibilityFlags: ['nodejs_compat'],
+      durableObjects: { COORDINATOR: { className: 'FixtureVideo', useSQLite: true } },
+      r2Buckets: ['MEDIA'],
+    }),
+    resourcePersistencePath: path.join(directory, 'storage'),
+  };
+  let mf = new Miniflare(options);
+  t.after(() => mf.dispose());
+  const fixture = await videoFixture(),
+    manifest = fixture.manifest,
+    id = await videoManifestHash(manifest),
+    report = videoReport(id, manifest);
+  let bucket = (await mf.getBindings<{ MEDIA: R2Bucket }>()).MEDIA;
+  for (const asset of videoAssets(manifest))
+    await bucket.put(asset.objectKey, new Uint8Array(fixture.files.get(asset.id)!));
+  const call = (name: string, route: string, body?: unknown) =>
+    mf.dispatchFetch(`https://test${route}?name=${name}`, {
+      method: body === undefined ? 'GET' : 'POST',
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  const snapshot = async (name: string) => (await (await call(name, '/state')).json()) as Snapshot;
+  const accept = (name: string) => call(name, '/accept', { manifest, report });
+  await call('cancelled-before-start', '/cancel', { id });
+  assert.equal((await accept('cancelled-before-start')).status, 409);
+  assert.equal((await snapshot('cancelled-before-start')).state.budget, null);
+  await Promise.all([accept('success'), accept('success')]);
+  assert.equal((await snapshot('success')).state.budget.committedCents, 50);
+  await Promise.all([call('success', '/advance'), call('success', '/advance')]);
+  let state = await snapshot('success');
+  assert.equal(state.job.status, 'ready');
+  assert.equal(state.starts, 1);
+  assert.equal(state.cleaned, true);
+  assert.equal(state.stopped, true);
+  const stored = await bucket.get(state.job.objectKey!);
+  assert.equal(stored!.customMetadata?.watermarked, 'true');
+  assert.equal(stored!.size, 3);
   // Publication sauvée dans R2 mais état ready perdu : aucune seconde exécution.
-  await call('success','/publishing',{});await mf.dispose();mf=new Miniflare(options);bucket=(await mf.getBindings<{MEDIA:R2Bucket}>()).MEDIA;
-  await call('success','/advance');await accept('success');state=await snapshot('success');assert.equal(state.job.status,'ready');assert.equal(state.starts,1);
-  await call('success','/cancel',{id});assert.equal((await accept('success')).status,200);
-  await call('success','/pause',{});await accept('success');assert.equal((await snapshot('success')).state.budget.attempts,1);
-  await accept('cold-start');await call('cold-start','/control',{unavailable:1});await call('cold-start','/advance');
-  state=await snapshot('cold-start');assert.equal(state.job.status,'staging');assert.equal(state.starts,0);
-  assert.equal(state.job.diagnostic?.httpStatus,503);assert.equal(state.state.budget.committedCents,50);
-  await call('cold-start','/advance');state=await snapshot('cold-start');assert.equal(state.job.status,'ready');assert.equal(state.starts,1);
-  await accept('unavailable');await call('unavailable','/control',{unavailable:4});
-  for(let i=0;i<3;i++)await call('unavailable','/advance');
-  state=await snapshot('unavailable');assert.equal(state.job.status,'failed');assert.equal(state.job.error,'VIDEO_CONTAINER_UNAVAILABLE');
-  assert.equal(state.starts,0);assert.equal(state.job.failures,2);assert.equal(state.stopped,true);
-  const failedAt=state.job.updatedAt;await call('unavailable','/pause',{});
-  assert.equal((await call('unavailable','/retry',{failedAt:failedAt-1})).status,409);
-  await Promise.all([1,2].map(()=>call('unavailable','/retry',{failedAt})));
-  state=await snapshot('unavailable');assert.equal(state.job.status,'accepted');assert.equal(state.job.attempt,2);
-  assert.equal(state.state.budget.committedCents,100);assert.equal(state.state.budget.attempts,2);
-  const history=await (await call('unavailable','/history')).json() as VideoJob[];
-  assert.equal(history.length,2);assert.equal(history[0].error,'VIDEO_CONTAINER_UNAVAILABLE');
-  await call('unavailable','/control',{unavailable:0});await call('unavailable','/advance');
-  state=await snapshot('unavailable');assert.equal(state.job.status,'ready');assert.equal(state.starts,1);
-  await call('unavailable','/retry',{failedAt});assert.equal((await snapshot('unavailable')).state.budget.attempts,2);
-  assert.equal((await call('unavailable','/retry',{failedAt:failedAt+1})).status,409);
-  await accept('crash');await call('crash','/control',{hold:true});await call('crash','/advance');
-  assert.equal((await snapshot('crash')).job.status,'rendering');await call('crash','/control',{stopped:true});await call('crash','/advance');
-  state=await snapshot('crash');assert.equal(state.job.error,'VIDEO_RENDER_INTERRUPTED');assert.equal(state.starts,1);assert.equal(state.state.budget.committedCents,50);
-  await accept('progress');await call('progress','/control',{hold:true,progressPercent:42});await call('progress','/advance');
-  assert.equal((await snapshot('progress')).job.progressPercent,42);
-  await call('progress','/control',{progressPercent:17});await call('progress','/advance');
-  assert.equal((await snapshot('progress')).job.progressPercent,42,'Une mesure tardive ne fait pas reculer la barre');
-  await call('progress','/control',{progressPercent:101});await call('progress','/advance');
-  assert.equal((await snapshot('progress')).job.progressPercent,42,'Une valeur invalide est ignorée');
-  await call('progress','/control',{hold:false,progressPercent:95});await call('progress','/advance');
-  assert.equal((await snapshot('progress')).job.progressPercent,100);
-  await accept('timeout');await call('timeout','/control',{clock:Date.now()+700_000});await call('timeout','/advance');
-  state=await snapshot('timeout');assert.equal(state.job.error,'VIDEO_TIMEOUT');assert.equal(state.starts,0);assert.equal(state.stopped,true);
-  await accept('stale-cancel');await call('stale-cancel','/control',{hold:true});await call('stale-cancel','/advance');
-  await call('stale-cancel','/cancel',{id});
-  const next=structuredClone(manifest);next.jobId='job-next';
-  for(const asset of videoAssets(next)){asset.objectKey=asset.objectKey.replace(`/jobs/${manifest.jobId}/`,'/jobs/job-next/');await bucket.put(asset.objectKey,new Uint8Array(fixture.files.get(asset.id)!));}
-  const nextId=await videoManifestHash(next);await call('stale-cancel','/accept',{manifest:next,report:videoReport(nextId,next)});await call('stale-cancel','/advance');
-  await call('stale-cancel','/cancel',{id});state=await snapshot('stale-cancel');
-  assert.equal(state.job.id,nextId);assert.equal(state.job.status,'rendering');assert.equal(state.stopped,false);
-  await call('stale-cancel','/cancel',{id:nextId});
-  await accept('stop-uncertain');await call('stop-uncertain','/control',{stopBlocked:true});await call('stop-uncertain','/advance');
-  state=await snapshot('stop-uncertain');assert.equal(state.job.status,'publishing');assert.equal(state.state.active,id);
-  assert.equal((await call('stop-uncertain','/accept',{manifest:next,report:videoReport(nextId,next)})).status,409,'Le serveur reste réservé jusqu’à confirmation de son arrêt');
-  await call('stop-uncertain','/control',{stopBlocked:false});await call('stop-uncertain','/advance');
-  state=await snapshot('stop-uncertain');assert.equal(state.job.status,'ready');assert.equal(state.state.active,null);assert.equal(state.stopped,true);
-  await call('stop-uncertain','/accept',{manifest:next,report:videoReport(nextId,next)});await call('stop-uncertain','/advance');
-  state=await snapshot('stop-uncertain');assert.equal(state.job.status,'ready');assert.equal(state.starts,2);
+  await call('success', '/publishing', {});
+  await mf.dispose();
+  mf = new Miniflare(options);
+  bucket = (await mf.getBindings<{ MEDIA: R2Bucket }>()).MEDIA;
+  await call('success', '/advance');
+  await accept('success');
+  state = await snapshot('success');
+  assert.equal(state.job.status, 'ready');
+  assert.equal(state.starts, 1);
+  await call('success', '/cancel', { id });
+  assert.equal((await accept('success')).status, 200);
+  await call('success', '/pause', {});
+  await accept('success');
+  assert.equal((await snapshot('success')).state.budget.attempts, 1);
+  await accept('cold-start');
+  await call('cold-start', '/control', { unavailable: 1 });
+  await call('cold-start', '/advance');
+  state = await snapshot('cold-start');
+  assert.equal(state.job.status, 'staging');
+  assert.equal(state.starts, 0);
+  assert.equal(state.job.diagnostic?.httpStatus, 503);
+  assert.equal(state.state.budget.committedCents, 50);
+  await call('cold-start', '/advance');
+  state = await snapshot('cold-start');
+  assert.equal(state.job.status, 'ready');
+  assert.equal(state.starts, 1);
+  await accept('unavailable');
+  await call('unavailable', '/control', { unavailable: 4 });
+  for (let i = 0; i < 3; i++) await call('unavailable', '/advance');
+  state = await snapshot('unavailable');
+  assert.equal(state.job.status, 'failed');
+  assert.equal(state.job.error, 'VIDEO_CONTAINER_UNAVAILABLE');
+  assert.equal(state.starts, 0);
+  assert.equal(state.job.failures, 2);
+  assert.equal(state.stopped, true);
+  const failedAt = state.job.updatedAt;
+  await call('unavailable', '/pause', {});
+  assert.equal((await call('unavailable', '/retry', { failedAt: failedAt - 1 })).status, 409);
+  await Promise.all([1, 2].map(() => call('unavailable', '/retry', { failedAt })));
+  state = await snapshot('unavailable');
+  assert.equal(state.job.status, 'accepted');
+  assert.equal(state.job.attempt, 2);
+  assert.equal(state.state.budget.committedCents, 100);
+  assert.equal(state.state.budget.attempts, 2);
+  const history = (await (await call('unavailable', '/history')).json()) as VideoJob[];
+  assert.equal(history.length, 2);
+  assert.equal(history[0].error, 'VIDEO_CONTAINER_UNAVAILABLE');
+  await call('unavailable', '/control', { unavailable: 0 });
+  await call('unavailable', '/advance');
+  state = await snapshot('unavailable');
+  assert.equal(state.job.status, 'ready');
+  assert.equal(state.starts, 1);
+  await call('unavailable', '/retry', { failedAt });
+  assert.equal((await snapshot('unavailable')).state.budget.attempts, 2);
+  assert.equal((await call('unavailable', '/retry', { failedAt: failedAt + 1 })).status, 409);
+  await accept('crash');
+  await call('crash', '/control', { hold: true });
+  await call('crash', '/advance');
+  assert.equal((await snapshot('crash')).job.status, 'rendering');
+  await call('crash', '/control', { stopped: true });
+  await call('crash', '/advance');
+  state = await snapshot('crash');
+  assert.equal(state.job.error, 'VIDEO_RENDER_INTERRUPTED');
+  assert.equal(state.starts, 1);
+  assert.equal(state.state.budget.committedCents, 50);
+  await accept('progress');
+  await call('progress', '/control', { hold: true, progressPercent: 42 });
+  await call('progress', '/advance');
+  assert.equal((await snapshot('progress')).job.progressPercent, 42);
+  await call('progress', '/control', { progressPercent: 17 });
+  await call('progress', '/advance');
+  assert.equal((await snapshot('progress')).job.progressPercent, 42, 'Une mesure tardive ne fait pas reculer la barre');
+  await call('progress', '/control', { progressPercent: 101 });
+  await call('progress', '/advance');
+  assert.equal((await snapshot('progress')).job.progressPercent, 42, 'Une valeur invalide est ignorée');
+  await call('progress', '/control', { hold: false, progressPercent: 95 });
+  await call('progress', '/advance');
+  assert.equal((await snapshot('progress')).job.progressPercent, 100);
+  await accept('timeout');
+  await call('timeout', '/control', { clock: Date.now() + 700_000 });
+  await call('timeout', '/advance');
+  state = await snapshot('timeout');
+  assert.equal(state.job.error, 'VIDEO_TIMEOUT');
+  assert.equal(state.starts, 0);
+  assert.equal(state.stopped, true);
+  await accept('stale-cancel');
+  await call('stale-cancel', '/control', { hold: true });
+  await call('stale-cancel', '/advance');
+  await call('stale-cancel', '/cancel', { id });
+  const next = structuredClone(manifest);
+  next.jobId = 'job-next';
+  for (const asset of videoAssets(next)) {
+    asset.objectKey = asset.objectKey.replace(`/jobs/${manifest.jobId}/`, '/jobs/job-next/');
+    await bucket.put(asset.objectKey, new Uint8Array(fixture.files.get(asset.id)!));
+  }
+  const nextId = await videoManifestHash(next);
+  await call('stale-cancel', '/accept', { manifest: next, report: videoReport(nextId, next) });
+  await call('stale-cancel', '/advance');
+  await call('stale-cancel', '/cancel', { id });
+  state = await snapshot('stale-cancel');
+  assert.equal(state.job.id, nextId);
+  assert.equal(state.job.status, 'rendering');
+  assert.equal(state.stopped, false);
+  await call('stale-cancel', '/cancel', { id: nextId });
+  await accept('stop-uncertain');
+  await call('stop-uncertain', '/control', { stopBlocked: true });
+  await call('stop-uncertain', '/advance');
+  state = await snapshot('stop-uncertain');
+  assert.equal(state.job.status, 'publishing');
+  assert.equal(state.state.active, id);
+  assert.equal(
+    (await call('stop-uncertain', '/accept', { manifest: next, report: videoReport(nextId, next) })).status,
+    409,
+    'Le serveur reste réservé jusqu’à confirmation de son arrêt',
+  );
+  await call('stop-uncertain', '/control', { stopBlocked: false });
+  await call('stop-uncertain', '/advance');
+  state = await snapshot('stop-uncertain');
+  assert.equal(state.job.status, 'ready');
+  assert.equal(state.state.active, null);
+  assert.equal(state.stopped, true);
+  await call('stop-uncertain', '/accept', { manifest: next, report: videoReport(nextId, next) });
+  await call('stop-uncertain', '/advance');
+  state = await snapshot('stop-uncertain');
+  assert.equal(state.job.status, 'ready');
+  assert.equal(state.starts, 2);
   // Paired outputs use the same rendered job. Both objects are required before ready.
-  const anonymous=await videoFixture('anonymous'),anonymousId=await videoManifestHash(anonymous.manifest);
-  const paired={...videoReport(anonymousId,anonymous.manifest),preview:{...videoReport(anonymousId,anonymous.manifest,new Uint8Array([3,2,1])),watermarked:true}};
-  for(const asset of videoAssets(anonymous.manifest))await bucket.put(asset.objectKey,new Uint8Array(anonymous.files.get(asset.id)!));
-  await call('anonymous','/accept',{manifest:anonymous.manifest,report:paired});await call('anonymous','/advance');
-  state=await snapshot('anonymous');assert.equal(state.job.status,'ready');assert.equal(state.starts,1);assert.equal(state.state.budget.committedCents,80);
-  assert.equal((await bucket.head(state.job.objectKey!))!.customMetadata!.watermarked,'false');
-  assert.equal((await bucket.head(videoPreviewKey(anonymous.manifest,anonymousId)))!.customMetadata!.watermarked,'true');
-  await call('anonymous','/publishing',{});await call('anonymous','/advance');assert.equal((await snapshot('anonymous')).starts,1);
-  assert.equal((await snapshot('anonymous')).job.status,'ready');
-  await call('missing-preview','/accept',{manifest:anonymous.manifest,report:videoReport(anonymousId,anonymous.manifest)});await call('missing-preview','/advance');
-  assert.equal((await snapshot('missing-preview')).job.error,'VIDEO_PREVIEW_INVALID');
-  assert.equal((await snapshot('missing-preview')).state.budget.committedCents,80);
-  const landscape=await videoFixture('anonymous',8);
-  const horizontal=VideoManifest.parse({...landscape.manifest,templateVersion:'bienvu-horizontal/1',width:1920,height:1080});
-  const horizontalId=await videoManifestHash(horizontal),horizontalReport=videoReport(horizontalId,horizontal);
-  for(const asset of videoAssets(horizontal))await bucket.put(asset.objectKey,new Uint8Array(landscape.files.get(asset.id)!));
-  await call('horizontal','/accept',{manifest:horizontal,report:{...horizontalReport,preview:{...videoReport(horizontalId,horizontal,new Uint8Array([3,2,1])),watermarked:true}}});
-  await call('horizontal','/advance');assert.equal((await snapshot('horizontal')).job.status,'ready');
-  await call('wrong-orientation','/accept',{manifest:horizontal,report:{...horizontalReport,width:1080,height:1920}});
-  await call('wrong-orientation','/advance');assert.equal((await snapshot('wrong-orientation')).job.error,'VIDEO_REPORT_INVALID');
-  await bucket.delete(manifest.photos[0].objectKey);await accept('missing');await call('missing','/advance');
-  state=await snapshot('missing');assert.equal(state.job.error,'VIDEO_ASSET_MISSING');assert.equal(state.starts,0);assert.equal(state.state.active,null);
+  const anonymous = await videoFixture('anonymous'),
+    anonymousId = await videoManifestHash(anonymous.manifest);
+  const paired = {
+    ...videoReport(anonymousId, anonymous.manifest),
+    preview: { ...videoReport(anonymousId, anonymous.manifest, new Uint8Array([3, 2, 1])), watermarked: true },
+  };
+  for (const asset of videoAssets(anonymous.manifest))
+    await bucket.put(asset.objectKey, new Uint8Array(anonymous.files.get(asset.id)!));
+  await call('anonymous', '/accept', { manifest: anonymous.manifest, report: paired });
+  await call('anonymous', '/advance');
+  state = await snapshot('anonymous');
+  assert.equal(state.job.status, 'ready');
+  assert.equal(state.starts, 1);
+  assert.equal(state.state.budget.committedCents, 80);
+  assert.equal((await bucket.head(state.job.objectKey!))!.customMetadata!.watermarked, 'false');
+  assert.equal(
+    (await bucket.head(videoPreviewKey(anonymous.manifest, anonymousId)))!.customMetadata!.watermarked,
+    'true',
+  );
+  await call('anonymous', '/publishing', {});
+  await call('anonymous', '/advance');
+  assert.equal((await snapshot('anonymous')).starts, 1);
+  assert.equal((await snapshot('anonymous')).job.status, 'ready');
+  await call('missing-preview', '/accept', {
+    manifest: anonymous.manifest,
+    report: videoReport(anonymousId, anonymous.manifest),
+  });
+  await call('missing-preview', '/advance');
+  assert.equal((await snapshot('missing-preview')).job.error, 'VIDEO_PREVIEW_INVALID');
+  assert.equal((await snapshot('missing-preview')).state.budget.committedCents, 80);
+  const landscape = await videoFixture('anonymous', 8);
+  const horizontal = VideoManifest.parse({
+    ...landscape.manifest,
+    templateVersion: 'bienvu-horizontal/1',
+    width: 1920,
+    height: 1080,
+  });
+  const horizontalId = await videoManifestHash(horizontal),
+    horizontalReport = videoReport(horizontalId, horizontal);
+  for (const asset of videoAssets(horizontal))
+    await bucket.put(asset.objectKey, new Uint8Array(landscape.files.get(asset.id)!));
+  await call('horizontal', '/accept', {
+    manifest: horizontal,
+    report: {
+      ...horizontalReport,
+      preview: { ...videoReport(horizontalId, horizontal, new Uint8Array([3, 2, 1])), watermarked: true },
+    },
+  });
+  await call('horizontal', '/advance');
+  assert.equal((await snapshot('horizontal')).job.status, 'ready');
+  await call('wrong-orientation', '/accept', {
+    manifest: horizontal,
+    report: { ...horizontalReport, width: 1080, height: 1920 },
+  });
+  await call('wrong-orientation', '/advance');
+  assert.equal((await snapshot('wrong-orientation')).job.error, 'VIDEO_REPORT_INVALID');
+  await bucket.delete(manifest.photos[0].objectKey);
+  await accept('missing');
+  await call('missing', '/advance');
+  state = await snapshot('missing');
+  assert.equal(state.job.error, 'VIDEO_ASSET_MISSING');
+  assert.equal(state.starts, 0);
+  assert.equal(state.state.active, null);
 });
 
-test('rendu produit : plafond D1 actualisé, mois archivés, plus de cinq rendus et rejeux sans nouvelle provision',async t=>{
-  const directory=await mkdtemp(path.join(tmpdir(),'bienvu-product-budget-'));t.after(()=>rm(directory,{recursive:true,force:true}));
-  const require=createRequire(import.meta.url),wrangler=createRequire(require.resolve('wrangler/package.json'));
-  const esbuild=await import(pathToFileURL(wrangler.resolve('esbuild')).href) as {build:(o:unknown)=>Promise<unknown>};
-  const scriptPath=path.join(directory,'worker.mjs');await esbuild.build({entryPoints:['fixtures/video-worker.ts'],outfile:scriptPath,bundle:true,platform:'neutral',format:'esm',target:'es2022',external:['cloudflare:*','node:*'],conditions:['workerd','worker','browser']});
-  const options={...convertV4MiniflareOptions({modules:true,script:await readFile(scriptPath,'utf8'),compatibilityDate:'2026-10-01',compatibilityFlags:['nodejs_compat'],bindings:{PRODUCT_BUDGET:'true'},durableObjects:{COORDINATOR:{className:'FixtureVideo',useSQLite:true}},r2Buckets:['MEDIA']}),resourcePersistencePath:path.join(directory,'storage')};
-  let mf=new Miniflare(options);t.after(()=>mf.dispose());
-  const call=(route:string,body?:unknown)=>mf.dispatchFetch(`https://fixture${route}?name=product`,{method:body===undefined?'GET':'POST',body:body===undefined?undefined:JSON.stringify(body)});
-  const f=await videoFixture('anonymous');let bucket=(await mf.getBindings<{MEDIA:R2Bucket}>()).MEDIA;
-  let latest=f.manifest,latestReport=videoReport(await videoManifestHash(latest),latest);
-  const prepare=async(index:number)=>{latest=structuredClone(f.manifest);latest.jobId='product-job-'+index;
-    for(const asset of videoAssets(latest)){asset.objectKey=asset.objectKey.replace('/jobs/job-fixture/','/jobs/'+latest.jobId+'/');await bucket.put(asset.objectKey,new Uint8Array(f.files.get(asset.id)!));}
-    const id=await videoManifestHash(latest);latestReport={...videoReport(id,latest),preview:{...videoReport(id,latest,new Uint8Array([3,2,1])),watermarked:true}};return id;};
-  const control=async(month:string,engaged:number,ceiling=9000,paused=false,envelope=10000)=>call('/control',{clock:Date.parse(month+'-02T12:00:00Z'),productBudget:{month,paused,fixedAndOtherCents:engaged,committedCents:0,attempts:0,days:{},ceilingCents:ceiling,envelopeCents:envelope}});
-  await prepare(0);assert.equal((await call('/accept',{manifest:latest,report:latestReport})).status,409,'Mois absent fermé');
-  await control('2026-09',1000);assert.equal((await call('/accept',{manifest:latest,report:latestReport})).status,200);await call('/advance');
-  let state=await (await call('/state')).json() as Snapshot;assert.equal(state.state.budget.committedCents,80);
-  await prepare(1);await control('2026-10',950);assert.equal((await call('/accept',{manifest:latest,report:latestReport})).status,200);await call('/advance');
-  const history=await (await call('/budget-history')).json() as [string,{month:string;committedCents:number;attempts:number}][];
-  assert.equal(history.length,1);assert.equal(history[0]![1].month,'2026-09');assert.equal(history[0]![1].committedCents,80);
-  for(let i=2;i<=7;i++){await prepare(i);await control('2026-10',800+i*200);assert.equal((await call('/accept',{manifest:latest,report:latestReport})).status,200);await call('/advance');}
-  state=await (await call('/state')).json() as Snapshot;assert.equal(state.state.budget.attempts,7);assert.equal(state.state.budget.committedCents,560);
-  assert.equal(state.state.budget.fixedAndOtherCents+560,2200,'Le rendu est déjà compris dans D1');
-  await mf.dispose();mf=new Miniflare(options);bucket=(await mf.getBindings<{MEDIA:R2Bucket}>()).MEDIA;
-  assert.equal((await call('/accept',{manifest:latest,report:latestReport})).status,200);assert.equal(((await (await call('/state')).json()) as Snapshot).state.budget.attempts,7);
+test('rendu produit : plafond D1 actualisé, mois archivés, plus de cinq rendus et rejeux sans nouvelle provision', async (t) => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'bienvu-product-budget-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const require = createRequire(import.meta.url),
+    wrangler = createRequire(require.resolve('wrangler/package.json'));
+  const esbuild = (await import(pathToFileURL(wrangler.resolve('esbuild')).href)) as {
+    build: (o: unknown) => Promise<unknown>;
+  };
+  const scriptPath = path.join(directory, 'worker.mjs');
+  await esbuild.build({
+    entryPoints: ['fixtures/video-worker.ts'],
+    outfile: scriptPath,
+    bundle: true,
+    platform: 'neutral',
+    format: 'esm',
+    target: 'es2022',
+    external: ['cloudflare:*', 'node:*'],
+    conditions: ['workerd', 'worker', 'browser'],
+  });
+  const options = {
+    ...convertV4MiniflareOptions({
+      modules: true,
+      script: await readFile(scriptPath, 'utf8'),
+      compatibilityDate: '2026-10-01',
+      compatibilityFlags: ['nodejs_compat'],
+      bindings: { PRODUCT_BUDGET: 'true' },
+      durableObjects: { COORDINATOR: { className: 'FixtureVideo', useSQLite: true } },
+      r2Buckets: ['MEDIA'],
+    }),
+    resourcePersistencePath: path.join(directory, 'storage'),
+  };
+  let mf = new Miniflare(options);
+  t.after(() => mf.dispose());
+  const call = (route: string, body?: unknown) =>
+    mf.dispatchFetch(`https://fixture${route}?name=product`, {
+      method: body === undefined ? 'GET' : 'POST',
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  const f = await videoFixture('anonymous');
+  let bucket = (await mf.getBindings<{ MEDIA: R2Bucket }>()).MEDIA;
+  let latest = f.manifest,
+    latestReport = videoReport(await videoManifestHash(latest), latest);
+  const prepare = async (index: number) => {
+    latest = structuredClone(f.manifest);
+    latest.jobId = 'product-job-' + index;
+    for (const asset of videoAssets(latest)) {
+      asset.objectKey = asset.objectKey.replace('/jobs/job-fixture/', '/jobs/' + latest.jobId + '/');
+      await bucket.put(asset.objectKey, new Uint8Array(f.files.get(asset.id)!));
+    }
+    const id = await videoManifestHash(latest);
+    latestReport = {
+      ...videoReport(id, latest),
+      preview: { ...videoReport(id, latest, new Uint8Array([3, 2, 1])), watermarked: true },
+    };
+    return id;
+  };
+  const control = async (month: string, engaged: number, ceiling = 9000, paused = false, envelope = 10000) =>
+    call('/control', {
+      clock: Date.parse(month + '-02T12:00:00Z'),
+      productBudget: {
+        month,
+        paused,
+        fixedAndOtherCents: engaged,
+        committedCents: 0,
+        attempts: 0,
+        days: {},
+        ceilingCents: ceiling,
+        envelopeCents: envelope,
+      },
+    });
+  await prepare(0);
+  assert.equal((await call('/accept', { manifest: latest, report: latestReport })).status, 409, 'Mois absent fermé');
+  await control('2026-09', 1000);
+  assert.equal((await call('/accept', { manifest: latest, report: latestReport })).status, 200);
+  await call('/advance');
+  let state = (await (await call('/state')).json()) as Snapshot;
+  assert.equal(state.state.budget.committedCents, 80);
+  await prepare(1);
+  await control('2026-10', 950);
+  assert.equal((await call('/accept', { manifest: latest, report: latestReport })).status, 200);
+  await call('/advance');
+  const history = (await (await call('/budget-history')).json()) as [
+    string,
+    { month: string; committedCents: number; attempts: number },
+  ][];
+  assert.equal(history.length, 1);
+  assert.equal(history[0]![1].month, '2026-09');
+  assert.equal(history[0]![1].committedCents, 80);
+  for (let i = 2; i <= 7; i++) {
+    await prepare(i);
+    await control('2026-10', 800 + i * 200);
+    assert.equal((await call('/accept', { manifest: latest, report: latestReport })).status, 200);
+    await call('/advance');
+  }
+  state = (await (await call('/state')).json()) as Snapshot;
+  assert.equal(state.state.budget.attempts, 7);
+  assert.equal(state.state.budget.committedCents, 560);
+  assert.equal(state.state.budget.fixedAndOtherCents + 560, 2200, 'Le rendu est déjà compris dans D1');
+  await mf.dispose();
+  mf = new Miniflare(options);
+  bucket = (await mf.getBindings<{ MEDIA: R2Bucket }>()).MEDIA;
+  assert.equal((await call('/accept', { manifest: latest, report: latestReport })).status, 200);
+  assert.equal(((await (await call('/state')).json()) as Snapshot).state.budget.attempts, 7);
   // Changement de configuration immédiatement relu ; aucun démarrage en cas de coupure.
-  latest={...latest,subtitlesEnabled:false};const id=await videoManifestHash(latest);latestReport={...latestReport,id,manifestHash:id,preview:{...latestReport.preview!,id,manifestHash:id}};
-  await control('2026-10',9001);assert.equal((await call('/accept',{manifest:latest,report:latestReport})).status,409);
-  await control('2026-10',2200,9000,true);assert.equal((await call('/accept',{manifest:latest,report:latestReport})).status,409);
-  await control('2026-10',2200,2100);assert.equal((await call('/accept',{manifest:latest,report:latestReport})).status,409);
-  assert.equal(((await (await call('/state')).json()) as Snapshot).state.budget.attempts,7);
-  await control('2026-10',9200,18000,false,20000);
-  await Promise.all([1,2].map(()=>call('/accept',{manifest:latest,report:latestReport})));
-  state=await (await call('/state')).json() as Snapshot;
-  assert.equal(state.state.budget.attempts,8);assert.equal(state.state.budget.committedCents,640);
-  assert.equal(state.state.budget.fixedAndOtherCents+640,9200,'La hausse ne compte pas le rendu deux fois');
-  await call('/advance');state=await (await call('/state')).json() as Snapshot;assert.equal(state.job.status,'ready');
-  await prepare(9);await control('2026-10',18001,18000,false,20000);
-  assert.equal((await call('/accept',{manifest:latest,report:latestReport})).status,409,'La coupure à 180 € reste effective');
-  assert.equal(((await (await call('/state')).json()) as Snapshot).state.budget.attempts,8);
+  latest = { ...latest, subtitlesEnabled: false };
+  const id = await videoManifestHash(latest);
+  latestReport = { ...latestReport, id, manifestHash: id, preview: { ...latestReport.preview!, id, manifestHash: id } };
+  await control('2026-10', 9001);
+  assert.equal((await call('/accept', { manifest: latest, report: latestReport })).status, 409);
+  await control('2026-10', 2200, 9000, true);
+  assert.equal((await call('/accept', { manifest: latest, report: latestReport })).status, 409);
+  await control('2026-10', 2200, 2100);
+  assert.equal((await call('/accept', { manifest: latest, report: latestReport })).status, 409);
+  assert.equal(((await (await call('/state')).json()) as Snapshot).state.budget.attempts, 7);
+  await control('2026-10', 9200, 18000, false, 20000);
+  await Promise.all([1, 2].map(() => call('/accept', { manifest: latest, report: latestReport })));
+  state = (await (await call('/state')).json()) as Snapshot;
+  assert.equal(state.state.budget.attempts, 8);
+  assert.equal(state.state.budget.committedCents, 640);
+  assert.equal(state.state.budget.fixedAndOtherCents + 640, 9200, 'La hausse ne compte pas le rendu deux fois');
+  await call('/advance');
+  state = (await (await call('/state')).json()) as Snapshot;
+  assert.equal(state.job.status, 'ready');
+  await prepare(9);
+  await control('2026-10', 18001, 18000, false, 20000);
+  assert.equal(
+    (await call('/accept', { manifest: latest, report: latestReport })).status,
+    409,
+    'La coupure à 180 € reste effective',
+  );
+  assert.equal(((await (await call('/state')).json()) as Snapshot).state.budget.attempts, 8);
 });

@@ -1,30 +1,75 @@
-import {EntityId, GeneratableListing, NormalizedListing, ImportFailure, importResourceDiagnostic,
-  type ImportFailureReason, type ImportResourceDiagnostic} from '@bienvu/contracts';
-import {extractListingHtml} from './listing';
-import {IMPORT_LIMITS, publicUrl, scopedUrl, sourcePolicy, type ImportTransport} from './network';
-import {assertListingDestination, selectAdapter} from './registry';
+import {
+  EntityId,
+  GeneratableListing,
+  NormalizedListing,
+  ImportFailure,
+  importResourceDiagnostic,
+  type ImportFailureReason,
+  type ImportResourceDiagnostic,
+} from '@bienvu/contracts';
+import { extractListingHtml } from './listing';
+import { IMPORT_LIMITS, publicUrl, scopedUrl, sourcePolicy, type ImportTransport } from './network';
+import { assertListingDestination, selectAdapter } from './registry';
 
-export type ImportDiagnostics = {durationMs: number; resources: number; sourceBytes: number; storedBytes: number;
-  rejected: Array<{order: number; reason: string}>; duplicatePhotos: number; mode: 'local' | 'cloudflare'; browserUsed: boolean;
-  failureReason?: ImportFailureReason; stage?: 'page' | 'extraction' | 'browser' | 'photo' | 'storage';
-  failureResource?: ImportResourceDiagnostic};
+export type ImportDiagnostics = {
+  durationMs: number;
+  resources: number;
+  sourceBytes: number;
+  storedBytes: number;
+  rejected: Array<{ order: number; reason: string }>;
+  duplicatePhotos: number;
+  mode: 'local' | 'cloudflare';
+  browserUsed: boolean;
+  failureReason?: ImportFailureReason;
+  stage?: 'page' | 'extraction' | 'browser' | 'photo' | 'storage';
+  failureResource?: ImportResourceDiagnostic;
+};
 export async function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
   signal.throwIfAborted();
   let onAbort: () => void = () => {};
-  try {return await Promise.race([promise, new Promise<never>((_, reject) => {
-    onAbort = () => reject(signal.reason); signal.addEventListener('abort', onAbort, {once: true});
-  })]);} finally {signal.removeEventListener('abort', onAbort);}
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        onAbort = () => reject(signal.reason);
+        signal.addEventListener('abort', onAbort, { once: true });
+      }),
+    ]);
+  } finally {
+    signal.removeEventListener('abort', onAbort);
+  }
 }
-export async function importListing(url: string, context: {agencyId: string; importId: string}, ports: {
-  transport: ImportTransport;
-  store(photo: NormalizedListing['photos'][number], bytes: Uint8Array<ArrayBuffer>, signal: AbortSignal): Promise<void>;
-  browserHtml?: (url: string, signal: AbortSignal) => Promise<string>;
-}, options: {signal?: AbortSignal; maxPhotos?: number; mode?: 'local' | 'cloudflare'; allowPartial?: boolean} = {}) {
-  const start = Date.now(), timeout = AbortSignal.timeout(IMPORT_LIMITS.durationMs);
+export async function importListing(
+  url: string,
+  context: { agencyId: string; importId: string },
+  ports: {
+    transport: ImportTransport;
+    store(
+      photo: NormalizedListing['photos'][number],
+      bytes: Uint8Array<ArrayBuffer>,
+      signal: AbortSignal,
+    ): Promise<void>;
+    browserHtml?: (url: string, signal: AbortSignal) => Promise<string>;
+  },
+  options: { signal?: AbortSignal; maxPhotos?: number; mode?: 'local' | 'cloudflare'; allowPartial?: boolean } = {},
+) {
+  const start = Date.now(),
+    timeout = AbortSignal.timeout(IMPORT_LIMITS.durationMs);
   const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
-  const agencyId = EntityId.parse(context.agencyId), id = EntityId.parse(context.importId), source = publicUrl(url).href;
+  const agencyId = EntityId.parse(context.agencyId),
+    id = EntityId.parse(context.importId),
+    source = publicUrl(url).href;
   const policy = sourcePolicy(source);
-  const diagnostics: ImportDiagnostics = {durationMs: 0, resources: 0, sourceBytes: 0, storedBytes: 0, rejected: [], duplicatePhotos: 0, mode: options.mode ?? 'local', browserUsed: false};
+  const diagnostics: ImportDiagnostics = {
+    durationMs: 0,
+    resources: 0,
+    sourceBytes: 0,
+    storedBytes: 0,
+    rejected: [],
+    duplicatePhotos: 0,
+    mode: options.mode ?? 'local',
+    browserUsed: false,
+  };
   let stage: NonNullable<ImportDiagnostics['stage']> = 'page';
   // Une récupération échouée garde sa réservation : ses octets ne sont pas
   // toujours mesurables (flux interrompu ou image indécodable).
@@ -32,26 +77,34 @@ export async function importListing(url: string, context: {agencyId: string; imp
   const maxPhotos = Math.min(IMPORT_LIMITS.photos, Math.max(3, options.maxPhotos ?? IMPORT_LIMITS.photos));
   const load = async (value: string, kind: 'page' | 'image', resourceSignal = signal) => {
     stage = kind === 'image' ? 'photo' : 'page';
-    const resourceContext = {stage, resourceType: kind} as const;
+    const resourceContext = { stage, resourceType: kind } as const;
     resourceSignal.throwIfAborted();
-    if (++diagnostics.resources > IMPORT_LIMITS.requests) throw new ImportFailure('IMPORT_TIMEOUT', 'Plafond de requêtes atteint.');
+    if (++diagnostics.resources > IMPORT_LIMITS.requests)
+      throw new ImportFailure('IMPORT_TIMEOUT', 'Plafond de requêtes atteint.');
     const hosts = kind === 'page' ? policy.pageHosts : policy.imageHosts;
     scopedUrl(value, hosts, resourceContext);
-    const limit = Math.min(kind === 'page' ? IMPORT_LIMITS.htmlBytes : IMPORT_LIMITS.imageBytes, IMPORT_LIMITS.totalBytes - byteBudgetUsed);
+    const limit = Math.min(
+      kind === 'page' ? IMPORT_LIMITS.htmlBytes : IMPORT_LIMITS.imageBytes,
+      IMPORT_LIMITS.totalBytes - byteBudgetUsed,
+    );
     if (limit <= 0) throw new ImportFailure('SOURCE_UNAVAILABLE', 'Plafond total de médias atteint.');
     byteBudgetUsed += limit;
-    let resource;
-    try {resource = await abortable(ports.transport.load(value, kind, hosts, resourceSignal, limit), resourceSignal);} catch (error) {
+    let resource: Awaited<ReturnType<ImportTransport['load']>>;
+    try {
+      resource = await abortable(ports.transport.load(value, kind, hosts, resourceSignal, limit), resourceSignal);
+    } catch (error) {
       if (error instanceof ImportFailure && error.code === 'UNSAFE_URL' && !error.resource)
         error.resource = importResourceDiagnostic(value, resourceContext.stage, 'transport_refused', kind);
       throw error;
     }
-    scopedUrl(resource.url, hosts, resourceContext); resourceSignal.throwIfAborted();
+    scopedUrl(resource.url, hosts, resourceContext);
+    resourceSignal.throwIfAborted();
     if (!Number.isInteger(resource.sourceBytes) || resource.sourceBytes < 0 || resource.sourceBytes > limit)
       throw new ImportFailure('SOURCE_UNAVAILABLE', 'Réponse hors limites.');
     byteBudgetUsed -= limit - resource.sourceBytes;
     diagnostics.sourceBytes += resource.sourceBytes;
-    if (diagnostics.sourceBytes > IMPORT_LIMITS.totalBytes) throw new ImportFailure('SOURCE_UNAVAILABLE', 'Plafond total de médias atteint.');
+    if (diagnostics.sourceBytes > IMPORT_LIMITS.totalBytes)
+      throw new ImportFailure('SOURCE_UNAVAILABLE', 'Plafond total de médias atteint.');
     return resource;
   };
   try {
@@ -60,100 +113,180 @@ export async function importListing(url: string, context: {agencyId: string; imp
     diagnostics.browserUsed = page.browserUsed === true;
     assertListingDestination(source, page.url);
     stage = 'extraction';
-    let extracted;
-    try {extracted = extractListingHtml(new TextDecoder('utf-8', {fatal: true}).decode(page.bytes), page.url,
-      {allowPartial: options.allowPartial});} catch (error) {
-      if (!(error instanceof ImportFailure) || error.code !== 'NOT_A_LISTING' || error.reason === 'not_listing' || page.browserUsed || !ports.browserHtml) throw error;
+    let extracted: ReturnType<typeof extractListingHtml>;
+    try {
+      extracted = extractListingHtml(new TextDecoder('utf-8', { fatal: true }).decode(page.bytes), page.url, {
+        allowPartial: options.allowPartial,
+      });
+    } catch (error) {
+      if (
+        !(error instanceof ImportFailure) ||
+        error.code !== 'NOT_A_LISTING' ||
+        error.reason === 'not_listing' ||
+        page.browserUsed ||
+        !ports.browserHtml
+      )
+        throw error;
       diagnostics.browserUsed = true;
       stage = 'browser';
       const browserHtml = await abortable(ports.browserHtml(page.url, signal), signal);
       stage = 'extraction';
-      extracted = extractListingHtml(browserHtml, page.url, {allowPartial: options.allowPartial});
+      extracted = extractListingHtml(browserHtml, page.url, { allowPartial: options.allowPartial });
     }
     // Validation de TOUTE la galerie avant récupération. Une URL privée ou
     // malformée reste fatale. Un CDN public non autorisé n'est jamais contacté,
     // mais ne doit pas effacer les faits d'un brouillon partiel.
     stage = 'photo';
     const candidates = extracted.photoUrls.flatMap((value, order) => {
-      const photoUrl = publicUrl(value, {stage: 'photo', resourceType: 'image'});
+      const photoUrl = publicUrl(value, { stage: 'photo', resourceType: 'image' });
       if (!policy.imageHosts.includes(photoUrl.hostname) && options.allowPartial) {
-        diagnostics.rejected.push({order, reason: 'MEDIA_HOST_UNSUPPORTED'}); return [];
+        diagnostics.rejected.push({ order, reason: 'MEDIA_HOST_UNSUPPORTED' });
+        return [];
       }
-      scopedUrl(value, policy.imageHosts, {stage: 'photo', resourceType: 'image'}); return [{value, order}];
+      scopedUrl(value, policy.imageHosts, { stage: 'photo', resourceType: 'image' });
+      return [{ value, order }];
     });
-    if (diagnostics.rejected.length) extracted.warnings.push('Certaines photos ne sont pas disponibles à l’import. Vous pouvez les ajouter manuellement.');
-    const photos: NormalizedListing['photos'] = [], hashes = new Set<string>();
+    if (diagnostics.rejected.length)
+      extracted.warnings.push(
+        'Certaines photos ne sont pas disponibles à l’import. Vous pouvez les ajouter manuellement.',
+      );
+    const photos: NormalizedListing['photos'] = [],
+      hashes = new Set<string>();
     // Garder une marge pour enregistrer les faits déjà lus. Le budget photo
     // peut expirer ; l'annulation de l'appelant et la deadline globale restent fatales.
-    const photoTimeout = AbortSignal.timeout(Math.max(1, Math.min(IMPORT_LIMITS.photoDurationMs,
-      IMPORT_LIMITS.durationMs - (Date.now() - start) - 2_000)));
+    const photoTimeout = AbortSignal.timeout(
+      Math.max(1, Math.min(IMPORT_LIMITS.photoDurationMs, IMPORT_LIMITS.durationMs - (Date.now() - start) - 2_000)),
+    );
     const photoSignal = AbortSignal.any([signal, photoTimeout]);
-    for (let offset=0;offset<candidates.length;) {
+    for (let offset = 0; offset < candidates.length; ) {
       // The transport admits two resources at a time. Download a bounded pair,
       // await both outcomes, then validate/store in source order. Slow images
       // cannot reorder the gallery or leave untracked background writes.
-      const batch=candidates.slice(offset,offset+Math.min(2,maxPhotos-photos.length,IMPORT_LIMITS.requests-diagnostics.resources));
-      if(!batch.length)break;
-      offset+=batch.length;
+      const batch = candidates.slice(
+        offset,
+        offset + Math.min(2, maxPhotos - photos.length, IMPORT_LIMITS.requests - diagnostics.resources),
+      );
+      if (!batch.length) break;
+      offset += batch.length;
       if (photos.length >= maxPhotos) break;
       if (diagnostics.resources >= IMPORT_LIMITS.requests) break;
-      if (byteBudgetUsed >= IMPORT_LIMITS.totalBytes) {extracted.warnings.push('Galerie limitée au plafond de téléchargement de cet import.'); break;}
+      if (byteBudgetUsed >= IMPORT_LIMITS.totalBytes) {
+        extracted.warnings.push('Galerie limitée au plafond de téléchargement de cet import.');
+        break;
+      }
       signal.throwIfAborted();
-      if (photoTimeout.aborted) {extracted.warnings.push('Téléchargement des photos interrompu : les informations déjà récupérées sont conservées.'); break;}
-      const results=await Promise.allSettled(batch.map(async({value})=>{
-        const imageSignal=AbortSignal.any([photoSignal,AbortSignal.timeout(IMPORT_LIMITS.imageDurationMs)]);
-        try{return await load(value,'image',imageSignal);}catch(error){
-          if(imageSignal.aborted&&!(error instanceof ImportFailure))throw new ImportFailure('IMPORT_TIMEOUT','Délai photo dépassé.');
-          throw error;
-        }
-      }));
+      if (photoTimeout.aborted) {
+        extracted.warnings.push(
+          'Téléchargement des photos interrompu : les informations déjà récupérées sont conservées.',
+        );
+        break;
+      }
+      const results = await Promise.allSettled(
+        batch.map(async ({ value }) => {
+          const imageSignal = AbortSignal.any([photoSignal, AbortSignal.timeout(IMPORT_LIMITS.imageDurationMs)]);
+          try {
+            return await load(value, 'image', imageSignal);
+          } catch (error) {
+            if (imageSignal.aborted && !(error instanceof ImportFailure))
+              throw new ImportFailure('IMPORT_TIMEOUT', 'Délai photo dépassé.');
+            throw error;
+          }
+        }),
+      );
       signal.throwIfAborted();
-      for(const [position,result] of results.entries()){
-        const {order,value:candidate}=batch[position];
-        if(result.status==='rejected'){
-          const error=result.reason;
-          if(error instanceof ImportFailure&&error.code==='UNSAFE_URL')throw error;
-          if(!(error instanceof ImportFailure))throw error;
-          diagnostics.rejected.push({order,reason:error.code});continue;
+      for (const [position, result] of results.entries()) {
+        const { order, value: candidate } = batch[position];
+        if (result.status === 'rejected') {
+          const error = result.reason;
+          if (error instanceof ImportFailure && error.code === 'UNSAFE_URL') throw error;
+          if (!(error instanceof ImportFailure)) throw error;
+          diagnostics.rejected.push({ order, reason: error.code });
+          continue;
         }
-        const resource=result.value;
-        if (resource.mime !== 'image/jpeg' || !resource.width || !resource.height || resource.width < 640 || resource.height < 360
-          || resource.width > 2048 || resource.height > 2048 || resource.bytes.length > IMPORT_LIMITS.imageBytes || resource.bytes.length < 4
-          || resource.bytes[0] !== 255 || resource.bytes[1] !== 216 || resource.bytes.at(-2) !== 255 || resource.bytes.at(-1) !== 217) {
-          diagnostics.rejected.push({order, reason: 'INVALID_PHOTO'}); continue;
+        const resource = result.value;
+        if (
+          resource.mime !== 'image/jpeg' ||
+          !resource.width ||
+          !resource.height ||
+          resource.width < 640 ||
+          resource.height < 360 ||
+          resource.width > 2048 ||
+          resource.height > 2048 ||
+          resource.bytes.length > IMPORT_LIMITS.imageBytes ||
+          resource.bytes.length < 4 ||
+          resource.bytes[0] !== 255 ||
+          resource.bytes[1] !== 216 ||
+          resource.bytes.at(-2) !== 255 ||
+          resource.bytes.at(-1) !== 217
+        ) {
+          diagnostics.rejected.push({ order, reason: 'INVALID_PHOTO' });
+          continue;
         }
         const digest = await crypto.subtle.digest('SHA-256', resource.bytes);
-        const hash = Array.from(new Uint8Array(digest), n => n.toString(16).padStart(2, '0')).join('');
-        if (hashes.has(hash)) {diagnostics.duplicatePhotos++; continue;}
+        const hash = Array.from(new Uint8Array(digest), (n) => n.toString(16).padStart(2, '0')).join('');
+        if (hashes.has(hash)) {
+          diagnostics.duplicatePhotos++;
+          continue;
+        }
         hashes.add(hash);
-        const photo = {id: crypto.randomUUID(), agencyId, listingId: id, sourceUrl: candidate,
-          objectKey: `agencies/${agencyId}/imports/${id}/${hash}.jpg`, contentHash: hash,
-          width: resource.width, height: resource.height, mime: 'image/jpeg' as const, sizeBytes: resource.bytes.length, sourceOrder: photos.length};
+        const photo = {
+          id: crypto.randomUUID(),
+          agencyId,
+          listingId: id,
+          sourceUrl: candidate,
+          objectKey: `agencies/${agencyId}/imports/${id}/${hash}.jpg`,
+          contentHash: hash,
+          width: resource.width,
+          height: resource.height,
+          mime: 'image/jpeg' as const,
+          sizeBytes: resource.bytes.length,
+          sourceOrder: photos.length,
+        };
         stage = 'storage';
         await abortable(ports.store(photo, resource.bytes, signal), signal);
-        signal.throwIfAborted(); photos.push(photo); diagnostics.storedBytes += resource.bytes.length;
+        signal.throwIfAborted();
+        photos.push(photo);
+        diagnostics.storedBytes += resource.bytes.length;
         stage = 'photo';
       }
     }
-    if(photos.length>=maxPhotos&&candidates.length>photos.length)extracted.warnings.push(`La galerie est limitée à ${maxPhotos} photos pour cet import.`);
+    if (photos.length >= maxPhotos && candidates.length > photos.length)
+      extracted.warnings.push(`La galerie est limitée à ${maxPhotos} photos pour cet import.`);
     signal.throwIfAborted();
-    const unavailable=diagnostics.rejected.filter(p=>p.reason!=='MEDIA_HOST_UNSUPPORTED').length;
-    if(unavailable)extracted.warnings.push(`${unavailable} photo(s) n’ont pas pu être récupérées. Les autres photos et les informations du bien sont conservées.`);
-    if (photos.length < 3 && !options.allowPartial) throw new ImportFailure('INSUFFICIENT_PHOTOS', 'Moins de trois photos distinctes et décodées.');
-    if (photos.length < 3) extracted.warnings.push('Les informations du bien ont été récupérées. Ajoutez au moins trois photos pour créer la vidéo.');
-    const {photoUrls: _sourceCandidates, ...data} = extracted;
-    const listing = (options.allowPartial ? NormalizedListing : GeneratableListing).parse({...data, id, agencyId, sourceUrl: source,
-      sourceHost: new URL(source).hostname, fetchedAt: new Date().toISOString(), photos});
+    const unavailable = diagnostics.rejected.filter((p) => p.reason !== 'MEDIA_HOST_UNSUPPORTED').length;
+    if (unavailable)
+      extracted.warnings.push(
+        `${unavailable} photo(s) n’ont pas pu être récupérées. Les autres photos et les informations du bien sont conservées.`,
+      );
+    if (photos.length < 3 && !options.allowPartial)
+      throw new ImportFailure('INSUFFICIENT_PHOTOS', 'Moins de trois photos distinctes et décodées.');
+    if (photos.length < 3)
+      extracted.warnings.push(
+        'Les informations du bien ont été récupérées. Ajoutez au moins trois photos pour créer la vidéo.',
+      );
+    const { photoUrls: _sourceCandidates, ...data } = extracted;
+    const listing = (options.allowPartial ? NormalizedListing : GeneratableListing).parse({
+      ...data,
+      id,
+      agencyId,
+      sourceUrl: source,
+      sourceHost: new URL(source).hostname,
+      fetchedAt: new Date().toISOString(),
+      photos,
+    });
     diagnostics.durationMs = Date.now() - start;
-    return {listing, diagnostics};
+    return { listing, diagnostics };
   } catch (error) {
     diagnostics.durationMs = Date.now() - start;
     diagnostics.stage = stage;
-    const failure = signal.aborted ? new ImportFailure('IMPORT_TIMEOUT', 'Temps maximal d’import dépassé.')
-      : error instanceof ImportFailure ? error : new ImportFailure('INCOMPLETE_LISTING', 'Les données ne respectent pas le contrat d’import.');
+    const failure = signal.aborted
+      ? new ImportFailure('IMPORT_TIMEOUT', 'Temps maximal d’import dépassé.')
+      : error instanceof ImportFailure
+        ? error
+        : new ImportFailure('INCOMPLETE_LISTING', 'Les données ne respectent pas le contrat d’import.');
     if (error instanceof ImportFailure && error.browserUsed) diagnostics.browserUsed = true;
     if (failure.reason) diagnostics.failureReason = failure.reason;
     if (failure.resource) diagnostics.failureResource = failure.resource;
-    throw Object.assign(failure, {diagnostics});
+    throw Object.assign(failure, { diagnostics });
   }
 }

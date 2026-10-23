@@ -10,13 +10,13 @@ Images et signal sonore synthétiques ; aucun TTS, appel OpenAI, e-mail réel ou
 
 ## Résultats constatés
 
-| Tentative | Fixture | Résultat |
-|---|---|---|
-| `remote-short-20260928-01` | 6 s | Acceptée après 2,277 s ; lecture de statut en timeout. Après ajout du délai interne, `RENDER_STATE_LOST`. Aucun MP4 validé. |
-| `remote-short-20260928-02` | 6 s | Accusé consommé et délai interne borné ; même perte de réponse. |
-| `remote-short-20260928-03` | 6 s | Transport Worker → Durable Object passé en HTTP ; même échec. RPC n’est donc pas la cause démontrée. |
-| `remote-short-20260928-04` | 6 s | Diagnostic exécuté dans le conteneur : même `/health` sur `127.0.0.1` ne répond pas, aucun fichier de rendu ni processus Chromium observé. |
-| `remote-target-20260928-05` | 30 s | Nouvelle image avec calcul isolé : rendu vérifié en 105,940 s. Premier transfert R2 refusé ; récupération du même MP4 après correction du flux, empreinte vérifiée, aucun nouveau calcul. |
+| Tentative                   | Fixture | Résultat                                                                                                                                                                                  |
+| --------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `remote-short-20260928-01`  | 6 s     | Acceptée après 2,277 s ; lecture de statut en timeout. Après ajout du délai interne, `RENDER_STATE_LOST`. Aucun MP4 validé.                                                               |
+| `remote-short-20260928-02`  | 6 s     | Accusé consommé et délai interne borné ; même perte de réponse.                                                                                                                           |
+| `remote-short-20260928-03`  | 6 s     | Transport Worker → Durable Object passé en HTTP ; même échec. RPC n’est donc pas la cause démontrée.                                                                                      |
+| `remote-short-20260928-04`  | 6 s     | Diagnostic exécuté dans le conteneur : même `/health` sur `127.0.0.1` ne répond pas, aucun fichier de rendu ni processus Chromium observé.                                                |
+| `remote-target-20260928-05` | 30 s    | Nouvelle image avec calcul isolé : rendu vérifié en 105,940 s. Premier transfert R2 refusé ; récupération du même MP4 après correction du flux, empreinte vérifiée, aucun nouveau calcul. |
 
 Tentatives conservées (`docs/preuves/sprint-00/paid-resume/attempts-before-final.json`), événements sans en-têtes ni données de connexion (`docs/preuves/sprint-00/paid-resume/diagnostic-events-sanitized.json`), diagnostic interne (`docs/preuves/sprint-00/paid-resume/exec-diagnostic.json`). Le SSH Wrangler et l’API de consultation des journaux n’ont pas permis une inspection : connexion SSH refusée, API observabilité 403. L’API des métriques reste accessible.
 
@@ -25,7 +25,6 @@ Les quatre premiers cycles se sont arrêtés : intervalles des hooks de 267,551 
 ## MP4 distant et arrêt vérifiés
 
 Image réellement déployée : `sha256:c29ff3a2f658360229f362d21f3c9910bd1cb552ef6049ebf3e744fd04c9d8d1`, application version 2. Configuration fournisseur (`docs/preuves/sprint-00/paid-resume/application-process.json`). L’acceptation initiale prend 2,350 s ; le renderer mesure 105,940 s de calcul/vérification. Le premier état durable `ready` arrive après environ 272 s, **corrections de transfert comprises** : ce délai n’est pas une mesure de performance normale du pipeline.
-
 - H.264/AAC, 1080×1920, 30 fps, 900 images ; durée du conteneur MP4 30,059 s ; 2 505 065 octets.
 - SHA-256 : `048cf189ddd53dcce09e924358c082648d3a3a12848e7edcdf4cbc861a3fff45`, vérifié au dépôt R2 et après téléchargement.
 - AAC décodé en PCM : −32,76 dBFS ; il s’agit d’un signal de recette, aucune voix off générée.

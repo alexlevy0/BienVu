@@ -1,1 +1,19 @@
-.generation-queue-notice{display:grid;gap:6px;padding:14px 18px;margin:0 0 20px;border:1px solid #d1ddc8;border-radius:14px;background:#edf2e8;color:#30432e;text-align:left;font-size:14px;line-height:1.5}.generation-queue-notice strong{font-weight:600}.generation-queue-notice span{color:#63725b}
+.generation-queue-notice {
+  display: grid;
+  gap: 6px;
+  padding: 14px 18px;
+  margin: 0 0 20px;
+  border: 1px solid #d1ddc8;
+  border-radius: 14px;
+  background: #edf2e8;
+  color: #30432e;
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.generation-queue-notice strong {
+  font-weight: 600;
+}
+.generation-queue-notice span {
+  color: #63725b;
+}

@@ -23,10 +23,10 @@ Deux tests progressifs avec workerd, D1 et R2 : intégrité, publication atomiqu
 
 Deux rendus réels de l’image finale sur Cloudflare standard-4, utilisateur Linux non privilégié, quatre frames parallèles. Médias déjà stockés réutilisés : aucun nouvel appel d’import, Cartesia, Runway ou HeyGen, ni génération cliente créée. La source chargée dans le conteneur est comparée au dépôt par SHA-256.
 
-| Cas réel de 20 s | Premier segment observé | MP4 vérifié | Flux |
-|---|---:|---:|---|
-| 12 photos et carte satellite, aperçu anonyme | 22,36 s | 53,18 s | 10 × 2 s, son et filigrane |
-| 12 photos, carte et avatar continu | 41,11 s | 77,19 s | 10 × 2 s, son |
+| Cas réel de 20 s                             | Premier segment observé | MP4 vérifié | Flux                       |
+| -------------------------------------------- | ----------------------: | ----------: | -------------------------- |
+| 12 photos et carte satellite, aperçu anonyme |                 22,36 s |     53,18 s | 10 × 2 s, son et filigrane |
+| 12 photos, carte et avatar continu           |                 41,11 s |     77,19 s | 10 × 2 s, son              |
 
 Temps depuis le lancement de l’assemblage, hors préparation des fournisseurs, démarrage du conteneur et transfert de ses sources. Observation par sondes, donc précision limitée à leur intervalle et au réseau. Ces mesures ne constituent pas une promesse de délai pour toutes les annonces.
 

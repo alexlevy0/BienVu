@@ -23,16 +23,16 @@ Le mix initial est un **exemple** : 60 % de montages classiques, 30 % de vidéos
 
 Tarifs unitaires revérifiés le 7 octobre 2026 :
 
-| Poste | Paramétrage initial | Source |
-|---|---|---|
-| Runway Gen-4 Turbo | 5 crédits API/s ; 5 s/clip ; 0,01 USD/crédit API | [Runway](https://docs.dev.runwayml.com/guides/pricing/) |
-| Cartesia | Free 0 USD, ~27 min ; Pro 5 USD, ~133 min ; Startup 49 USD, ~1 667 min ; Scale 299 USD, ~10 667 min/mois | [Cartesia](https://www.cartesia.ai/pricing) |
-| Containers | 0,000020 USD/s CPU ; 0,0000025 USD/GiB-s RAM ; 0,00000007 USD/Go-s disque | [Containers](https://developers.cloudflare.com/containers/platform/pricing/) |
-| Rendu standard-2 | 1 vCPU, 6 GiB RAM, 12 Go disque ; 30 s d’inactivité après rendu | [Types d’instances](https://developers.cloudflare.com/containers/platform/instance-types/) |
-| Quotas Containers | 22 500 s CPU, 90 000 GiB-s RAM, 720 000 Go-s disque/mois | [Containers](https://developers.cloudflare.com/containers/platform/pricing/) |
-| R2 Standard | 10 Go inclus ; 0,015 USD/Go-mois ; classe A 1 M incluse puis 4,50 USD/M ; classe B 10 M incluses puis 0,36 USD/M | [R2](https://developers.cloudflare.com/r2/pricing/) |
-| Workers Paid | 5 USD/mois ; 10 M requêtes et 30 M ms CPU incluses ; dépassements 0,30 USD/M requêtes et 0,02 USD/M ms CPU | [Workers](https://developers.cloudflare.com/workers/platform/pricing/) |
-| Paiement | Carte standard EEE : 1,5 % + 0,25 EUR ; Billing : 0,7 % supplémentaire pour les abonnements | [Stripe France](https://stripe.com/fr/pricing) |
+| Poste              | Paramétrage initial                                                                                              | Source                                                                                     |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Runway Gen-4 Turbo | 5 crédits API/s ; 5 s/clip ; 0,01 USD/crédit API                                                                 | [Runway](https://docs.dev.runwayml.com/guides/pricing/)                                    |
+| Cartesia           | Free 0 USD, ~27 min ; Pro 5 USD, ~133 min ; Startup 49 USD, ~1 667 min ; Scale 299 USD, ~10 667 min/mois         | [Cartesia](https://www.cartesia.ai/pricing)                                                |
+| Containers         | 0,000020 USD/s CPU ; 0,0000025 USD/GiB-s RAM ; 0,00000007 USD/Go-s disque                                        | [Containers](https://developers.cloudflare.com/containers/platform/pricing/)               |
+| Rendu standard-2   | 1 vCPU, 6 GiB RAM, 12 Go disque ; 30 s d’inactivité après rendu                                                  | [Types d’instances](https://developers.cloudflare.com/containers/platform/instance-types/) |
+| Quotas Containers  | 22 500 s CPU, 90 000 GiB-s RAM, 720 000 Go-s disque/mois                                                         | [Containers](https://developers.cloudflare.com/containers/platform/pricing/)               |
+| R2 Standard        | 10 Go inclus ; 0,015 USD/Go-mois ; classe A 1 M incluse puis 4,50 USD/M ; classe B 10 M incluses puis 0,36 USD/M | [R2](https://developers.cloudflare.com/r2/pricing/)                                        |
+| Workers Paid       | 5 USD/mois ; 10 M requêtes et 30 M ms CPU incluses ; dépassements 0,30 USD/M requêtes et 0,02 USD/M ms CPU       | [Workers](https://developers.cloudflare.com/workers/platform/pricing/)                     |
+| Paiement           | Carte standard EEE : 1,5 % + 0,25 EUR ; Billing : 0,7 % supplémentaire pour les abonnements                      | [Stripe France](https://stripe.com/fr/pricing)                                             |
 
 Les minutes Cartesia sont approximatives : la facturation dépend notamment des crédits/caractères. Le choix automatique simule un palier disposant d’une licence commerciale. Le Free reste sélectionnable, avec ses limites de capacité et de licence visibles ; le coût prudent utilise une référence commerciale plutôt qu’un coût nul. Un contrat personnalisé permet de remplacer ces allocations. Cette sélection ne souscrit aucun forfait et ne change pas le fournisseur ou la voix du produit.
 

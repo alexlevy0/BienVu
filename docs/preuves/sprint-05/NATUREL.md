@@ -20,13 +20,13 @@ Déploiement `fc9c2de6-6694-4f0d-9488-443d95581cdd`, Worker privé `bienvu-narra
 
 Essai lancé à **19:29 UTC**, réponse 200, 83 682 ms de temps mural. Un appel OpenAI, cinq appels Google réels, aucune correction ni réduction du texte. OpenAI : 972 tokens d'entrée, 86 de sortie, zéro token en cache. Google : **284 caractères**, cinq WAV PCM 24 kHz mono, empreintes et mesures relues depuis R2.
 
-| Scène | Narration réellement synthétisée | Durée WAV | Frames de scène |
-|---|---|---:|---:|
-| Introduction | Direction Lyon, pour découvrir cet appartement à vendre. | 3,68 s | 120 |
-| Surface | Vous disposez ici de quarante-deux virgule zéro six mètres carrés. | 4,08 s | 132 |
-| Prix | Son prix : trois cent soixante-dix-neuf mille euros. | 2,52 s | 85 |
-| Photos | Prenons un instant pour découvrir les lieux en images. | 2,80 s | 93 |
-| Contact | Envie d'en savoir plus ? Contactez BienVu Démonstration. | 3,84 s | 170 |
+| Scène        | Narration réellement synthétisée                                   | Durée WAV | Frames de scène |
+| ------------ | ------------------------------------------------------------------ | --------: | --------------: |
+| Introduction | Direction Lyon, pour découvrir cet appartement à vendre.           |    3,68 s |             120 |
+| Surface      | Vous disposez ici de quarante-deux virgule zéro six mètres carrés. |    4,08 s |             132 |
+| Prix         | Son prix : trois cent soixante-dix-neuf mille euros.               |    2,52 s |              85 |
+| Photos       | Prenons un instant pour découvrir les lieux en images.             |    2,80 s |              93 |
+| Contact      | Envie d'en savoir plus ? Contactez BienVu Démonstration.           |    3,84 s |             170 |
 
 Résultat : **600 frames / 20 s**, dont 16,92 s dans les WAV et 3,08 s ajoutées au montage. Transitions de 0,30–0,32 s après arrondi ; 1,83 s après la conclusion. La version précédente durait 20,37 s, dont 15,28 s dans les WAV et 5,09 s ajoutées. Le fichier écoutable est `evidence/remote/sprint-05/naturalness/narration-cloudflare.wav` ; script, rapport et pistes restent hors Git, permissions privées. Photos/annonce synthétiques : ce n'est pas une vidéo ni un import de portail.
 
