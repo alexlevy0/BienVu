@@ -22,6 +22,8 @@ La demande d’Alex du 25/10/2026 porte sur la maquette fournie et un mode **Aut
 
 La compatibilité d’un domaine n’est pas une garantie pour toutes ses annonces. Le catalogue public `/sources` distingue ces essais locaux des essais Cloudflare. Les hôtes de médias sont explicites ; références, URL canonique, redirections, DNS, tailles et durées restent contrôlés par le transport existant.
 
+**Recette réelle en production le 25/10/2026** : le lien AutoScout24 fourni par Alex a aussi été importé depuis la session Chrome connectée, par le transport Cloudflare publié. La revue affiche Peugeot 207, 2007, 198 500 km, Diesel, boîte manuelle, 110 ch, 1 500 €, Sin-le-Noble et cinq photos réelles. Le risque de colmatage du FAP figure dans la description. Le brouillon `fef65d52-391c-4586-86ca-9c5c3897fc6b` est conservé dans le compte d’Alex ; aucune génération n’a été lancée. Aramisauto et La Centrale restent des vérifications HTTPS locales, sans promesse supplémentaire de disponibilité distante.
+
 ## Contrats et conservation des données
 
 `NormalizedListing` accepte une extension optionnelle `category: vehicle` et des caractéristiques avec provenance : marque, modèle, année, kilomètres, énergie, transmission, puissance. Elle n’ajoute aucun champ par défaut aux annonces historiques. Les faits immobiliers restent absents pour un véhicule. Aucune migration SQL n’est nécessaire : ces données restent dans les JSON d’import et de brouillon existants.
@@ -34,10 +36,12 @@ Le pipeline conserve admission, crédits, plafonds fournisseurs, journaux, cache
 - Workflow workerd réel, fournisseurs simulés : Auto avec voix, manifeste automobile, arrêt et reprise du runtime, une seule admission et un seul crédit consommé.
 - Navigateur Chrome 1536 et 390 px : import simulé, modification des caractéristiques, ordre `[1,0,2]`, supplément d’animation, trois durées, format horizontal et reprise avec la même clé après une réponse perdue. Aucun débordement ni erreur JavaScript.
 - Import HTTPS réel sur les trois exemples ci-dessus. MP4 local de 40 s avec les cinq photos de la Peugeot et une voix **Thomas macOS hors ligne**, distincte de Cartesia. 1200 frames, H.264/AAC, lecture progressive, volume moyen −18,51 dB, durée conteneur 40,043 s.
-- Premier `pnpm check` : 915/922 tests réussis. Deux attentes de catalogue nécessitaient les nouvelles sources ; cinq échecs liés aux ports locaux `EADDRNOTAVAIL` ou à leurs conséquences. Les deux attentes sont corrigées ; reprise ciblée en série **50/50 réussie**. La CI complète du commit exact reste à consigner avant publication.
+- Premier `pnpm check` local : 915/922 tests réussis. Deux attentes de catalogue nécessitaient les nouvelles sources ; cinq échecs liés aux ports locaux `EADDRNOTAVAIL` ou à leurs conséquences. Les deux attentes sont corrigées ; reprise ciblée en série **50/50 réussie**. La [CI fonctionnelle du commit `39c1f0025d74`](https://github.com/alexlevy0/BienVu/actions/runs/40192228707) est ensuite entièrement verte : **922/922 tests**, lint, formatage, frontières, types, build, 51 pages SEO et sondes du Worker local. La [CI sécurité](https://github.com/alexlevy0/BienVu/actions/runs/40192228874) est également verte, avec construction des deux images et véritable rendu natif Linux.
 - Typage complet réussi. Audit corrigé : aucune vulnérabilité connue. Node 24.22.1, Undici 7.30.1, postal-mime 4.0.8 et fast-uri 3.1.9 corrigent les alertes qui bloquaient la CI. Images Linux reconstruites avec un digest Node exact, sans modification de facturation.
 
-Les fixtures et rapports bruts sont ignorés dans `evidence/local/beta-auto/`. Aucun appel de génération GPT/Cartesia/HeyGen/Runway ni crédit BienVu n’est utilisé par ces vérifications. Le coût du visuel imagegen n’est pas mesuré ici. La qualité de la voix Cartesia et les sorties payantes HeyGen/Runway ne sont pas revalidées par ce rendu hors ligne.
+Les fixtures et rapports bruts sont ignorés dans `evidence/local/beta-auto/`. Aucun appel de génération GPT/Cartesia/HeyGen/Runway ni crédit BienVu n’est utilisé par ces vérifications. L’import réel de production réserve **50 centimes** dans le plafond interne existant : six requêtes, 1 068 485 octets source, aucun navigateur hébergé. Cette réservation prudente n’est pas une facture fournisseur ; le solde client reste à **27 crédits**. Le coût du visuel imagegen n’est pas mesuré ici. La qualité de la voix Cartesia et les sorties payantes HeyGen/Runway ne sont pas revalidées par ce rendu hors ligne.
+
+Commandes réellement exécutées : `pnpm check` (résultat local détaillé ci-dessus), reprises `pnpm exec tsx --test` ciblées, `pnpm typecheck`, `pnpm audit:dependencies`, `pnpm build:web`, `pnpm prepare:web --config apps/web/wrangler.staging.auto.jsonc`, `pnpm preview`, `pnpm probe:foundations`, `pnpm probe:web`, `pnpm probe:seo` et les quatre `wrangler deploy --dry-run`. Publication via `wrangler deploy --keep-vars --strict` ; images Docker construites en `linux/amd64` avec `--provenance=false` puis poussées au registre Cloudflare. Vérifications distantes avec les scripts privés `deploy/verify.mjs` et `deploy/invariants.mjs`, puis `BIENVU_SEO_URL=https://bienvu.online pnpm probe:seo` : **51 pages de production validées**. `node scripts/record-admin-deployment.mjs` a enregistré la publication active dans le superadmin. Les trois importeurs HTTPS et le rendu local utilisent les scripts de recette ignorés de ce dossier de preuves.
 
 ## Visuel de démonstration
 
@@ -45,10 +49,21 @@ Outil intégré **imagegen**, skill `imagegen`, photographie illustrative géné
 
 ## Publication et retour arrière
 
-La publication doit attendre la CI du commit exact, puis utiliser les configurations opérateur issues de l’inventaire distant. Conserver les noms, bindings, ressources, crons, limites et secrets. Préparer le web avec ses sourcemaps privées puis publier le bundle `no_bundle`, avec `--keep-vars --strict`. Déployer les nouvelles images import/rendu et le correctif du Worker mail. Enregistrer le déploiement web après vérification.
+**Publié le 25/10/2026**, après succès des deux CI du commit exact **`39c1f0025d740f5827cbce8802010ccf7682946a`**. Release **`39c1f0025d74`**, via les configurations opérateur issues de l’inventaire distant. Les noms, bindings, secrets, domaines, crons, limites et ressources sont conservés. Les sourcemaps privées PostHog ont été envoyées avant publication du web préparé `no_bundle`, avec `--keep-vars --strict`, sans recompilation.
+
+| Worker                          | Version active à 100 %                 |
+| ------------------------------- | -------------------------------------- |
+| `bienvu-web-probe-staging`      | `6e83155e-ab32-4847-9531-025518949207` |
+| `bienvu-generation-development` | `a569467a-5943-4de0-aebe-be37706a7468` |
+| `bienvu-import-staging`         | `10538ba5-1008-4a22-a65b-a9ce3aced0b9` |
+| `bienvu-mail-staging`           | `01e4e86f-6409-48a5-9e6f-dee04cac1ca7` |
+
+Les quatre modules distants sont identiques par SHA-256 aux bundles préparés. Module web : `6e6aa3e5cc8a31e23c3000acec0e11fdd4572a74834de71399d24a650b272dbd`. Images Linux déployées par digest, renouvellement terminé à 100 % : renderer **v38** (`56a3e7b0230b7cc1c33038d41d3359881d50eb6227aa2692e7ae0655155fee95`), import **v9** (`3c93b456f5a7027a1ea573be614c05048247e8cf2a5c2e2215cf4a2e3ade3238`). Le Worker historique `bienvu-narration-staging` reste inchangé ; la narration automobile est exécutée dans le workflow de génération actuel.
+
+Contrôles distants réussis : pages publiques 200, accès privés 401, redirection Beta 302, release HTML/RSC cohérente, assets identiques, maps publiques 404, analytics actif, huit offres mensuelles/annuelles et commission partenaire conservées. Avant l’import de recette : **163 schémas de tables existants et 16 tables / 424 lignes critiques identiques** avant/après déploiement. Après cet import, ces 16 tables restent identiques ; le parcours d’import ajoute son brouillon, ses médias et sa réservation internes. Migration 0085 conservée, aucune nouvelle migration, aucune erreur de clé étrangère et aucun job actif au contrôle. Stripe reste en mode test.
 
 En cas de problème d’interface, revenir à la version web précédente `bd1d3357-8b79-414a-881b-b9dda7cdcae5`, en conservant les lecteurs génération/import compatibles avec les jobs Auto déjà admis. Avant tout retour arrière de ces lecteurs, inventorier les jobs en cours ; ne pas supprimer leurs JSON, médias ou réservations. Il n’existe aucune migration Auto à annuler.
 
-Versions publiées, CI et contrôles distants : **à compléter après publication réelle**.
+Preuves locales ignorées : `deploy/verification.json`, `deploy/invariants-before.json`, `deploy/invariants-after.json`, `deploy/rollouts-completed.json`, `deploy/live-import-deltas.json`, `beta-production.png` et `import-production.png` sous `evidence/local/beta-auto/`. Les documents de compte rendu sont mis à jour après publication ; cela ne change pas la release applicative déployée.
 
 Sources des correctifs : [Node 24.22.1](https://nodejs.org/en/blog/release/v24.22.1), [Undici 7.30.1](https://github.com/nodejs/undici/releases/tag/v7.30.1), [postal-mime 4.0.8](https://github.com/postalsys/postal-mime/releases/tag/v4.0.8), [fast-uri 3.1.9](https://github.com/fastify/fast-uri/releases/tag/v3.1.9).
