@@ -1,35 +1,38 @@
 import {
-  IMPORT_PHOTO_MAXIMUM,
-  VIDEO_PHOTO_MAXIMUM,
-  VideoCustomization,
-  ManualDraftInput,
   CreationDraftData,
+  type CreationDraftView,
+  type CreationFieldName,
   CreationFields,
+  emptyVehicleValues,
   GeneratableListing,
+  IMPORT_PHOTO_MAXIMUM,
+  type NormalizedListing as Listing,
+  ManualDraftInput,
   ManualListingInput,
   NormalizedListing,
   PhotoAsset,
-  type CreationFieldName,
-  type CreationDraftView,
-  type NormalizedListing as Listing,
+  userVehicleFacts,
+  VehicleValues,
+  VIDEO_PHOTO_MAXIMUM,
+  VideoCustomization,
 } from '@bienvu/contracts';
 import {
   beginManualImport,
-  completeImport,
-  findImport,
-  startCreationDraft,
   blankCreationDraft,
-  markCreationDraftDeleting,
-  importObjectKeys,
-  draftFromListing,
-  updateCreationDraft,
-  ImportStateFailure,
-  type ImportRow,
+  completeImport,
   type Database,
+  draftFromListing,
+  findImport,
+  type ImportRow,
+  ImportStateFailure,
+  importObjectKeys,
+  markCreationDraftDeleting,
+  startCreationDraft,
+  updateCreationDraft,
 } from '@bienvu/db';
-import { contentHash, type PhotoNormalizer } from './manual-listings';
-import { RequestFailure } from './http';
 import { logDiagnostic, requestContext } from '@bienvu/observability';
+import { RequestFailure } from './http';
+import { contentHash, type PhotoNormalizer } from './manual-listings';
 
 type Env = { DB: Database; MEDIA: Pick<R2Bucket, 'put' | 'head' | 'delete'> };
 function required(row: ImportRow | null): CreationDraftView {
@@ -52,9 +55,10 @@ export async function startManualCreationDraft(
   agencyId: string,
   key: string,
   originalText: string | null = null,
+  category?: 'vehicle',
 ) {
   const sourceHash = originalText ? await contentHash(new TextEncoder().encode(originalText)) : null;
-  const input = JSON.stringify({ draft: 1, sourceHash });
+  const input = JSON.stringify({ draft: 1, sourceHash, ...(category ? { category } : {}) });
   try {
     const started = await beginManualImport(
       db,
@@ -64,7 +68,10 @@ export async function startManualCreationDraft(
       await contentHash(new TextEncoder().encode(input)),
     );
     if (started.row.status === 'ready') throw new RequestFailure('CONFLICT');
-    await startCreationDraft(db, agencyId, started.row.id, blankCreationDraft(originalText));
+    await startCreationDraft(db, agencyId, started.row.id, {
+      ...blankCreationDraft(originalText),
+      ...(category ? { category, vehicle: userVehicleFacts(emptyVehicleValues()) } : {}),
+    });
     return required(await findImport(db, agencyId, started.row.id));
   } catch (error) {
     if (error instanceof ImportStateFailure) throw new RequestFailure(error.code);
@@ -79,6 +86,7 @@ export async function patchCreationDraft(db: Database, agencyId: string, id: str
     confirm?: unknown;
     videoCustomization?: unknown;
     manualInput?: unknown;
+    vehicle?: unknown;
   };
   if (
     !Number.isSafeInteger(input.version) ||
@@ -89,6 +97,8 @@ export async function patchCreationDraft(db: Database, agencyId: string, id: str
   )
     throw new RequestFailure('VALIDATION_ERROR');
   const before = required(await findImport(db, agencyId, id));
+  const vehicle = input.vehicle === undefined ? undefined : VehicleValues.safeParse(input.vehicle);
+  if (vehicle && (!vehicle.success || before.data.category !== 'vehicle')) throw new RequestFailure('VALIDATION_ERROR');
   if (before.version !== input.version) throw new RequestFailure('CONFLICT');
   const changes = input.changes as Record<string, unknown>;
   if (
@@ -124,6 +134,7 @@ export async function patchCreationDraft(db: Database, agencyId: string, id: str
     ...before.data,
     fields: fields.data,
     provenance,
+    ...(vehicle?.success ? { vehicle: userVehicleFacts(vehicle.data, before.data.vehicle) } : {}),
     manualInput: manualInput?.success
       ? manualInput.data
       : Object.keys(changes).length
@@ -377,7 +388,23 @@ export async function finishCreationDraft(env: Env, agencyId: string, id: string
     chosen = order.map((slot) => photos.find((photo) => photo.sourceOrder === slot));
   if (chosen.some((photo) => !photo)) throw new RequestFailure('VALIDATION_ERROR');
   const manifest = chosen.map((p) => ({ hash: p!.contentHash, size: p!.sizeBytes, mime: p!.mime }));
-  const input = ManualListingInput.safeParse({ ...fields, description: fields.description ?? '', photos: manifest });
+  // The same photo ownership, journal and completion transaction serve both modes.
+  // Property-only inputs are ignored for Auto and never become vehicle facts.
+  const input = ManualListingInput.safeParse({
+    ...fields,
+    ...(data.category === 'vehicle'
+      ? {
+          propertyType: 'other',
+          transaction: 'sale',
+          locality: fields.locality || 'Automobile',
+          area: null,
+          rooms: null,
+          charges: null,
+        }
+      : {}),
+    description: fields.description ?? '',
+    photos: manifest,
+  });
   if (!input.success)
     throw new RequestFailure(
       'VALIDATION_ERROR',
@@ -408,6 +435,19 @@ export async function finishCreationDraft(env: Env, agencyId: string, id: string
     sourceListingId: null,
     fetchedAt: row!.createdAt,
     adapterVersion: 'creation-draft/1',
+    ...(data.category === 'vehicle'
+      ? {
+          category: 'vehicle',
+          vehicle:
+            row!.sourceKind === 'manual'
+              ? userVehicleFacts(
+                  VehicleValues.parse(
+                    Object.fromEntries(Object.entries(data.vehicle!).map(([key, fact]) => [key, fact.value])),
+                  ),
+                )
+              : data.vehicle,
+        }
+      : {}),
     transaction: input.data.transaction,
     description: input.data.description
       ? {
@@ -418,13 +458,21 @@ export async function finishCreationDraft(env: Env, agencyId: string, id: string
       : null,
     facts: {
       title: fact(input.data.title, 'text', source('title')?.source, source('title')?.evidence ?? null),
-      propertyType: fact(
-        input.data.propertyType,
-        'category',
-        source('propertyType')?.source,
-        source('propertyType')?.evidence ?? null,
+      propertyType:
+        data.category === 'vehicle'
+          ? fact(null, 'category', undefined, null)
+          : fact(
+              input.data.propertyType,
+              'category',
+              source('propertyType')?.source,
+              source('propertyType')?.evidence ?? null,
+            ),
+      locality: fact(
+        data.category === 'vehicle' ? fields.locality : input.data.locality,
+        'text',
+        source('locality')?.source,
+        source('locality')?.evidence ?? null,
       ),
-      locality: fact(input.data.locality, 'text', source('locality')?.source, source('locality')?.evidence ?? null),
       price: fact(
         input.data.priceCents === null
           ? null

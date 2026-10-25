@@ -30,7 +30,7 @@
     "maplibre-gl": "6.12.0",
     "motion": "14.3.0",
     "next": "16.4.1",
-    "postal-mime": "4.0.4",
+    "postal-mime": "4.0.8",
     "posthog-js": "1.438.5",
     "posthog-node": "5.55.1",
     "react": "19.3.0",

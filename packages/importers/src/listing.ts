@@ -1,40 +1,42 @@
 import {
   ImportFailure,
+  type NormalizedListing,
   sameSourceHost,
   sourceForHost,
   sourceListingId,
-  type NormalizedListing,
 } from '@bienvu/contracts';
+import { extractCesarBrutus } from './agencies/cesar-brutus';
+import { extractCitya } from './agencies/citya';
+import { extractHuman } from './agencies/human';
+import { extractIad } from './agencies/iad';
+import { extractLadresse } from './agencies/ladresse';
+import { extractLaforet } from './agencies/laforet';
+import { extractNestenn } from './agencies/nestenn';
+import { extractRemax } from './agencies/remax';
+import { extractSafti } from './agencies/safti';
+import { descriptionFromNodes, descriptionFromString } from './description';
+import { clean, missing, numeric, unique, verified } from './facts';
 import {
   absolute,
   attr,
   children,
   descendants,
+  type HtmlNode,
   hasClass,
   htmlDocument,
   imageCandidate,
   rawText,
   tag,
   text,
-  type HtmlNode,
 } from './html';
-import { descriptionFromNodes, descriptionFromString } from './description';
 import { IMPORT_LIMITS, publicUrl } from './network';
-import { selectAdapter } from './registry';
-import { clean, missing, numeric, unique, verified } from './facts';
+import { extractAirbnb } from './portals/airbnb';
 import { extractBienici } from './portals/bienici';
 import { extractFigaro } from './portals/figaro';
-import { extractLadresse } from './agencies/ladresse';
-import { extractCesarBrutus } from './agencies/cesar-brutus';
-import { extractIad } from './agencies/iad';
-import { extractRemax } from './agencies/remax';
-import { extractSafti } from './agencies/safti';
-import { extractNestenn } from './agencies/nestenn';
-import { extractHuman } from './agencies/human';
-import { extractCitya } from './agencies/citya';
-import { extractLaforet } from './agencies/laforet';
-import { extractAirbnb } from './portals/airbnb';
-export { verified, missing } from './facts';
+import { selectAdapter } from './registry';
+import { extractVehicle, isVehicleSource } from './vehicle';
+
+export { missing, verified } from './facts';
 
 type Obj = Record<string, unknown>;
 const obj = (v: unknown): Obj => (v !== null && typeof v === 'object' && !Array.isArray(v) ? (v as Obj) : {});
@@ -568,6 +570,8 @@ export function extractListingHtml(
                     : adapter.id === 'citya'
                       ? extractCitya(nodes, documents, url, canonicalUrl, adapter.listingId!)
                       : undefined;
+  if (isVehicleSource(url))
+    return checkedGallery(extractVehicle(nodes, documents, url, canonicalUrl), options.allowPartial);
   if (specific) return checkedGallery(specific, options.allowPartial);
   const figaro =
     adapter.id === 'figaro' ? extractFigaro(nodes, documents, url, canonicalUrl, adapter.listingId!) : undefined;

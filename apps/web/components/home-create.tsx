@@ -1,56 +1,55 @@
 'use client';
 import '../app/home-create-panel.css';
 import '../app/home-import-feedback.css';
-import { analyticsFetch as fetch, trackProductEvent } from '../lib/product-analytics';
-
-import Link from 'next/link';
-import dynamic from 'next/dynamic';
-import { useEffect, useLayoutEffect, useRef, useState, type DragEvent, type FormEvent } from 'react';
 import {
-  VideoDuration,
-  ImportUrl,
-  GenerationView,
   AvatarCatalog,
-  defaultAvatarCustomization,
   avatarVoiceWarning,
-  requestedAnimations,
-  defaultVideoCustomization,
-  GenerationCustomization,
-  generationCreditCost,
-  hasCreationDraftContent,
-  type VideoCustomization,
   type CreationDraftData,
   type CreationDraftView,
+  defaultAvatarCustomization,
+  defaultVideoCustomization,
+  GenerationCustomization,
   type GenerationRequest,
+  GenerationView,
+  generationCreditCost,
+  hasCreationDraftContent,
+  ImportUrl,
+  requestedAnimations,
+  type VideoCustomization,
+  VideoDuration,
 } from '@bienvu/contracts';
-import { useAnonymousTrial, TrialChallenge } from './anonymous-trial';
-import { useAccount } from './account';
-import { HomeIcon } from './home-icons';
-import { CreationMotion, CreationReveal, m, creationSpring, AnimatePresence } from './creation-motion';
-import { CreationCreditAmount } from './creation-credit-amount';
-import { CreationPhotoHandoff, useCreationPhotoHandoff } from './creation-photo-handoff';
-import { HomeCreateButton } from './home-create-button';
-import { BetaSettingsSummary } from './beta-settings-summary';
-import { PhotoDurationAdvice } from './photo-duration-advice';
-import { PhotoAnimationToggle } from './photo-animation-toggle';
-import { HomeComposerSettings } from './home-composer-settings';
-import { withPhotoAnimationChoice, type PhotoAnimationSelection } from '../lib/photo-animation-choice';
-import type { ManualListingFormHandle, PreparedManualListing } from './manual-listing-form';
-import { generationActive, useGenerationProgress } from './generation-progress-state';
+import dynamic from 'next/dynamic';
+import Link from 'next/link';
+import { type DragEvent, type FormEvent, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { avatarIntentKey, parseAvatarIntent } from '../lib/avatar-intent';
+import { type BetaVoiceChoice, withBetaVoice } from '../lib/beta-preferences';
 import { requestGeneration } from '../lib/generation-client';
-import { clearListingDraft, readListingDraft, readManualListingDraft, saveListingDraft } from '../lib/listing-draft';
-import { inspectManualPhotos } from '../lib/manual-photos';
-import { useSubtitlePreference } from './video-settings';
-import { useUrlImportEstimate, urlImportPhotoSlots, type PreparedUrlImport } from './url-import-estimate';
-import { useStickyHomeComposer } from './use-sticky-home-composer';
 import {
   applyHomeRenderPreset,
-  presetAvatar,
-  homeRenderPresets,
   type HomeRenderChoice,
+  homeRenderPresets,
+  presetAvatar,
 } from '../lib/home-render-presets';
-import { withBetaVoice, type BetaVoiceChoice } from '../lib/beta-preferences';
-import { avatarIntentKey, parseAvatarIntent } from '../lib/avatar-intent';
+import { clearListingDraft, readListingDraft, readManualListingDraft, saveListingDraft } from '../lib/listing-draft';
+import { inspectManualPhotos } from '../lib/manual-photos';
+import { type PhotoAnimationSelection, withPhotoAnimationChoice } from '../lib/photo-animation-choice';
+import { analyticsFetch as fetch, trackProductEvent } from '../lib/product-analytics';
+import { useAccount } from './account';
+import { TrialChallenge, useAnonymousTrial } from './anonymous-trial';
+import { BetaSettingsSummary } from './beta-settings-summary';
+import { CreationCreditAmount } from './creation-credit-amount';
+import { AnimatePresence, CreationMotion, CreationReveal, creationSpring, m } from './creation-motion';
+import { CreationPhotoHandoff, useCreationPhotoHandoff } from './creation-photo-handoff';
+import { generationActive, useGenerationProgress } from './generation-progress-state';
+import { HomeComposerSettings } from './home-composer-settings';
+import { HomeCreateButton } from './home-create-button';
+import { HomeIcon } from './home-icons';
+import type { ManualListingFormHandle, PreparedManualListing } from './manual-listing-form';
+import { PhotoAnimationToggle } from './photo-animation-toggle';
+import { PhotoDurationAdvice } from './photo-duration-advice';
+import { type PreparedUrlImport, urlImportPhotoSlots, useUrlImportEstimate } from './url-import-estimate';
+import { useStickyHomeComposer } from './use-sticky-home-composer';
+import { useSubtitlePreference } from './video-settings';
 
 const loadingTool = () => (
   <p className="home-tool-loading" role="status">
@@ -592,6 +591,10 @@ function HomeCreateContent({
           !value.draft
         )
           return;
+        if (value.draft.data.category === 'vehicle') {
+          window.location.replace(`/beta?mode=auto&draft=${encodeURIComponent(value.draft.id)}`);
+          return;
+        }
         if (!hasCreationDraftContent(value.draft.data, value.draft.photos.length)) {
           const local = await readManualListingDraft(me.agency.id);
           if (controller.signal.aborted || interactionVersion.current !== version) return;

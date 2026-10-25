@@ -1,13 +1,13 @@
 import {
   CreationDraftData,
   CreationDraftView,
+  type CreationFieldName,
+  emptyCreationFields,
   type NormalizedListing,
   PhotoAsset,
-  emptyCreationFields,
-  type CreationFieldName,
 } from '@bienvu/contracts';
-import type { Database } from './index';
 import { findImport, type ImportRow } from './imports';
+import type { Database } from './index';
 
 export function draftFromListing(listing: NormalizedListing): CreationDraftData {
   const fields = emptyCreationFields(),
@@ -42,6 +42,7 @@ export function draftFromListing(listing: NormalizedListing): CreationDraftData 
     originalText: null,
     canonicalUrl: listing.canonicalUrl,
     warnings: listing.warnings,
+    ...(listing.vehicle ? { category: 'vehicle', vehicle: listing.vehicle } : {}),
   });
 }
 export function blankCreationDraft(originalText: string | null = null): CreationDraftData {

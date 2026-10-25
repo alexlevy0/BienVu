@@ -4,7 +4,7 @@ Les sprints 01–03 avancent en local à la demande d'Alex sans attendre la rece
 
 ## Installation et commandes
 
-Node 24.21.0, pnpm 10.33.2 ; versions exactes dans les manifests et le lockfile. Aucun Docker, compte Cloudflare ou crédit API requis pour les fondations.
+Node 24.22.1, pnpm 10.33.2 ; versions exactes dans les manifests et le lockfile. Aucun Docker, compte Cloudflare ou crédit API requis pour les fondations.
 
 ```sh
 pnpm install --frozen-lockfile

@@ -1,5 +1,9 @@
 # BienVu — suivi des sprints
 
+### 25/10/2026 — Préparation du studio Beta Auto
+
+Branche `codex/beta-auto-studio` : accueil Beta d’après la référence d’Alex, import automobile, vérification et saisie manuelle, photos privées, paramètres et génération via le pipeline existant. Extension JSON optionnelle sans migration ; anciennes empreintes immobilières conservées. AutoScout24 : cinq photos réelles récupérées en local ; Aramisauto : caractéristiques à compléter avec des photos réelles ; La Centrale : refus d’accès et repli manuel. Tests Auto et workflow workerd réussis, recette Chrome desktop/mobile sans débordement ni erreur JavaScript, MP4 local de 40 s avec voix macOS. Correctifs de dépendances nécessaires à la CI : Node 24.22.1, Undici 7.30.1, postal-mime 4.0.8 et fast-uri 3.1.9 ; audit sans alerte connue. Première suite complète : 915/922, attentes de catalogue corrigées et reprise ciblée en série **50/50 réussie** après les erreurs de ports locaux. Publication et CI finale à consigner. [Périmètre, preuves et limites](BETA-AUTO.md).
+
 ### 24/10/2026 — Correctif body-parser publié, CI vérifiées
 
 Alerte **GHSA-27r3-jxmh-p828 / #33** corrigée : override borné vers **body-parser 2.4.0** dans la chaîne OpenNext/Express, avec **qs 6.16.1** requis. Crash reproduit localement en 2.3.0 ; trois contrôles de parsing réussis après correction. GitHub classe automatiquement l’alerte **fixed**. Commit **`d0a5599`** poussé, release **`d0a5599c5ef6`**, Worker web **`bd1d3357-8b79-414a-881b-b9dda7cdcae5`** actif à **100 %**, bundle distant identique au module préparé et sourcemaps privées envoyées. Configuration, secrets, domaines et crons conservés. Narration, génération, import, mail et conteneurs inchangés ; aucune nouvelle migration distante.

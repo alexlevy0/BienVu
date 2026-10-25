@@ -1,6 +1,6 @@
-import { NarrationFailure, type ListingScript } from '@bienvu/contracts';
-import { compileScript, descriptionPlan, filledNarrationPlan, scriptPromptVersion, type ScriptContext } from './script';
-import { narrationWordLimit, narrationWordTarget, DESCRIPTION_SEGMENTATION_VERSION } from './suggestion';
+import { type ListingScript, NarrationFailure } from '@bienvu/contracts';
+import { compileScript, descriptionPlan, filledNarrationPlan, type ScriptContext, scriptPromptVersion } from './script';
+import { DESCRIPTION_SEGMENTATION_VERSION, narrationWordLimit, narrationWordTarget } from './suggestion';
 
 export const DEFAULT_SCRIPT_MODEL = 'gpt-5.4-mini-2026-03-17';
 export const SCRIPT_MODELS = [DEFAULT_SCRIPT_MODEL, 'gpt-5.4-mini'] as const;
@@ -71,7 +71,7 @@ export function scriptRequest(context: ScriptContext, model: string, correction:
     input: [
       {
         role: 'developer',
-        content: `Tu prépares une courte présentation immobilière française. Sélectionne quatre à six formulations fournies, une par scène. Commence par intro, termine par contact, sans répéter un type de scène. ${
+        content: `Tu prépares ${context.listing.category === 'vehicle' ? 'une courte présentation automobile française. Ne parle pas de bien immobilier, surface ou pièces. Conserve les réserves et défauts indiqués par le vendeur. Le catalogue automobile est fermé : sélectionne ses quatre paragraphes avec le même suffixe, sans réécrire le texte.' : 'une courte présentation immobilière française.'} Sélectionne quatre à six formulations fournies, une par scène. Commence par intro, termine par contact, sans répéter un type de scène. ${
           context.copyVersion === 'description-copy/1'
             ? `La narration résume d'abord la description du bien : choisis un extrait descriptif sur les espaces ou atouts du bien, sans répéter le même extrait. ${conditions.length ? 'Le champ conditionScene est OBLIGATOIRE et sera ajouté à scenes avant le contact : sélectionne l’un des extraits condition:true. scenes doit alors comporter 3 à 5 scènes et ne doit pas contenir gallery. Compte également TOUS les mots de conditionScene dans maximumWords.' : ''} Les extraits gardent leur sens exact, notamment garage en supplément, négations et aménagement seulement possible. Respecte impérativement maximumWords pour TOUS les mots prononcés, intro et contact compris. Pour 20 secondes vise 25 à 38 mots au total, avec quatre scènes brèves et les variantes short ; 30 secondes vise 40 à 55 mots, 40 secondes vise 55 à 70 mots lorsque le catalogue est assez riche. Les chiffres structurés sont prioritaires ; surface, pièces et prix peuvent rester sur l'image lorsque la voix doit être courte. Ne lis aucune mention d'agent, référence, immatriculation ni avertissement administratif.`
             : context.copyVersion === 'description-copy/2'

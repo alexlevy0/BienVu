@@ -8,9 +8,9 @@ import '../landing.css';
 import './sources.css';
 
 export const metadata = seoMetadata({
-  title: 'Importer une annonce immobilière — Sources testées par BienVu',
+  title: 'Importer une annonce immobilière ou auto — Sources testées par BienVu',
   description:
-    'Consultez les tests datés d’import d’annonces immobilières par réseau : informations, photos, limites constatées et saisie manuelle avec BienVu.',
+    'Consultez les tests datés d’import d’annonces immobilières et automobiles : informations, photos, limites constatées et saisie manuelle avec BienVu.',
   path: '/sources',
 });
 export default function SourcesPage() {
@@ -40,7 +40,7 @@ export default function SourcesPage() {
           <p className="page-intro">
             De votre annonce à votre vidéo, tout commence par un lien.
             <br />
-            Découvrez les résultats de nos essais sur les principaux réseaux immobiliers.
+            Découvrez les résultats de nos essais sur les réseaux immobiliers et les portails automobiles.
           </p>
           <span className="source-updated">
             <HomeIcon name="check" size={16} /> Dernière campagne : <time dateTime={latest}>{checkedDate}</time>

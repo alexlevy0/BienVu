@@ -1,5 +1,5 @@
-import RunwayML, { TaskFailedError, TaskTimedOutError, toFile } from '@runwayml/sdk';
 import { VideoAspectRatio } from '@bienvu/contracts';
+import RunwayML, { TaskFailedError, TaskTimedOutError, toFile } from '@runwayml/sdk';
 
 export const RUNWAY_MODEL = 'gen4_turbo',
   RUNWAY_SECONDS = 5,
@@ -24,13 +24,15 @@ export function runwayMotionForSlot(slot: number): RunwayMotion {
   if (!Number.isInteger(slot) || slot < 0 || slot >= 12) throw Error('RUNWAY_MOTION_INVALID');
   return RUNWAY_MOTION_SEQUENCE[slot % RUNWAY_MOTION_SEQUENCE.length];
 }
-export function runwayPrompt(motion: RunwayMotion, durationSeconds: number) {
+export function runwayPrompt(motion: RunwayMotion, durationSeconds: number, category?: 'vehicle') {
   runwayClipCost(durationSeconds);
   if (!Object.hasOwn(RUNWAY_PROMPTS, motion)) throw Error('RUNWAY_MOTION_INVALID');
   const amplitude =
     durationSeconds <= 3
       ? 'A very small movement, staying close to the original viewpoint.'
       : 'A subtle movement, staying close to the original viewpoint.';
+  if (category === 'vehicle')
+    return `${RUNWAY_PROMPTS[motion]} ${amplitude} A single continuous, steady automotive product shot. The car stays parked and unchanged: preserve its exact bodywork, wheels, badges, windows, paint, interior and proportions. No driving, no wheel rotation, no new objects or people. Original lighting and surroundings remain consistent. Photorealistic.`;
   return `${RUNWAY_PROMPTS[motion]} ${amplitude} A single continuous, steady real estate shot. The original architecture, furniture, materials and lighting remain consistent. Photorealistic.`;
 }
 export const RUNWAY_PROMPT = runwayPrompt('dolly', RUNWAY_SECONDS);
@@ -49,6 +51,7 @@ export type AnimationProvider = {
     motion?: RunwayMotion,
     aspectRatio?: VideoAspectRatio,
     durationSeconds?: number,
+    category?: 'vehicle',
   ) => Promise<Uint8Array>;
   resume: (taskId: string, signal: AbortSignal) => Promise<Uint8Array>;
 };
@@ -151,9 +154,10 @@ export function runwayProvider(secret: string, fetcher: typeof fetch = fetch): A
       motion = 'dolly',
       aspectRatio = '9:16',
       durationSeconds = RUNWAY_SECONDS,
+      category,
     ) => {
       VideoAspectRatio.parse(aspectRatio);
-      const promptText = runwayPrompt(motion, durationSeconds);
+      const promptText = runwayPrompt(motion, durationSeconds, category);
       if (
         image.length < 512 ||
         image.length > 10 * 1024 * 1024 ||

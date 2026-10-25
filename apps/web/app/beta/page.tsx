@@ -1,7 +1,7 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare';
-import { HomepageMediaProvider } from '../../components/homepage-media';
 import { BetaLandingPage } from '../../components/beta-landing-page';
-import { readHomepageConfig, homepageEdgeCache } from '../../lib/homepage-media';
+import { HomepageMediaProvider } from '../../components/homepage-media';
+import { homepageEdgeCache, readHomepageConfig } from '../../lib/homepage-media';
 import { seoMetadata } from '../../lib/seo';
 import '../landing.css';
 import '../home-hero-depth.css';
@@ -14,11 +14,13 @@ import '../home-composer.css';
 import '../home-noise.css';
 import '../home-typography.css';
 import './beta.css';
+import './auto.css';
 
 export const dynamic = 'force-dynamic';
 export const metadata = seoMetadata({
-  title: 'BienVu — Votre annonce, sa prochaine vidéo',
-  description: 'Essayez une nouvelle façon de découvrir BienVu : une annonce, trois rendus et une vidéo à votre image.',
+  title: 'BienVu — Vos annonces immobilières et auto en vidéo',
+  description:
+    'Le studio marketing IA de vos annonces immobilières et automobiles : import par lien, voix off, avatars et animations.',
   path: '/beta',
   noindex: true,
 });

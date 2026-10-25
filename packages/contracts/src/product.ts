@@ -106,6 +106,88 @@ function fact<T extends z.ZodType, U extends string>(value: T, unit: U) {
 }
 
 export const TextFact = fact(boundedText(200), 'text');
+// Optional vehicle facts leave historical real-estate payloads and hashes intact.
+export const VehicleValues = z
+  .object({
+    make: boundedText(100).nullable(),
+    model: boundedText(100).nullable(),
+    year: z.number().int().min(1886).max(2100).nullable(),
+    mileageKm: z.number().int().min(0).max(5_000_000).nullable(),
+    fuel: boundedText(100).nullable(),
+    transmission: boundedText(100).nullable(),
+    powerHp: z.number().int().positive().max(3000).nullable(),
+  })
+  .strict();
+export type VehicleValues = z.infer<typeof VehicleValues>;
+export const VehicleFacts = z
+  .object({
+    make: TextFact,
+    model: TextFact,
+    year: fact(z.number().int().min(1886).max(2100), 'year'),
+    mileageKm: fact(z.number().int().min(0).max(5_000_000), 'km'),
+    fuel: TextFact,
+    transmission: TextFact,
+    powerHp: fact(z.number().int().positive().max(3000), 'hp'),
+  })
+  .strict();
+export type VehicleFacts = z.infer<typeof VehicleFacts>;
+export const emptyVehicleValues = (): VehicleValues => ({
+  make: null,
+  model: null,
+  year: null,
+  mileageKm: null,
+  fuel: null,
+  transmission: null,
+  powerHp: null,
+});
+export function vehicleValues(facts: VehicleFacts): VehicleValues {
+  return VehicleValues.parse(
+    Object.fromEntries(
+      Object.entries(facts).map(([key, value]) => [
+        key,
+        value.status === 'verified' || value.status === 'user_provided' ? value.value : null,
+      ]),
+    ),
+  );
+}
+export function userVehicleFacts(values: VehicleValues, original?: VehicleFacts): VehicleFacts {
+  const units = {
+    make: 'text',
+    model: 'text',
+    year: 'year',
+    mileageKm: 'km',
+    fuel: 'text',
+    transmission: 'text',
+    powerHp: 'hp',
+  };
+  return VehicleFacts.parse(
+    Object.fromEntries(
+      Object.entries(VehicleValues.parse(values)).map(([key, value]) => {
+        const previous = original?.[key as keyof VehicleFacts];
+        return [
+          key,
+          previous && previous.value === value
+            ? previous
+            : value === null
+              ? {
+                  status: 'missing',
+                  value: null,
+                  unit: units[key as keyof typeof units],
+                  sourcePath: null,
+                  rawEvidence: null,
+                }
+              : {
+                  status: 'user_provided',
+                  value,
+                  unit: units[key as keyof typeof units],
+                  sourcePath: `manual.vehicle.${key}`,
+                  rawEvidence: String(value),
+                },
+        ];
+      }),
+    ),
+  );
+}
 export const DESCRIPTION_MAX_CHARACTERS = 20_000;
 // Texte de l'annonce, pas une preuve que chaque affirmation commerciale est vraie.
 export const ListingDescription = z
@@ -196,6 +278,8 @@ export const NormalizedListing = z
     sourceListingId: boundedText(100).nullable(),
     fetchedAt: Timestamp,
     adapterVersion: boundedText(64),
+    category: z.literal('vehicle').optional(),
+    vehicle: VehicleFacts.optional(),
     transaction: z.enum(['sale', 'rent']),
     description: ListingDescription.nullable().default(null),
     facts: z
@@ -213,6 +297,24 @@ export const NormalizedListing = z
   })
   .strict()
   .superRefine((listing, context) => {
+    if ((listing.category === 'vehicle') !== Boolean(listing.vehicle))
+      context.addIssue({
+        code: 'custom',
+        path: ['vehicle'],
+        message: 'Les caractéristiques doivent correspondre au mode Auto.',
+      });
+    if (
+      listing.category === 'vehicle' &&
+      (listing.transaction !== 'sale' ||
+        listing.facts.propertyType.status !== 'missing' ||
+        listing.facts.area.status !== 'missing' ||
+        (listing.facts.rooms && listing.facts.rooms.status !== 'missing'))
+    )
+      context.addIssue({
+        code: 'custom',
+        path: ['facts'],
+        message: 'Une annonce automobile ne possède pas de caractéristiques immobilières.',
+      });
     try {
       if (
         listing.sourceKind === 'url' &&
@@ -238,7 +340,7 @@ export const NormalizedListing = z
         listing.sourceListingId !== null)
     )
       context.addIssue({ code: 'custom', message: 'Une saisie manuelle ne possède pas de source web.' });
-    for (const value of Object.values(listing.facts)) {
+    for (const value of [...Object.values(listing.facts), ...Object.values(listing.vehicle ?? {})]) {
       if (listing.sourceKind === 'manual' && (value.status === 'verified' || value.status === 'conflicting'))
         context.addIssue({
           code: 'custom',
@@ -286,7 +388,7 @@ export type NormalizedListing = z.infer<typeof NormalizedListing>;
 
 export const GeneratableListing = NormalizedListing.superRefine((listing, context) => {
   if (
-    ['title', 'propertyType', 'locality'].some(
+    (listing.category === 'vehicle' ? ['title'] : ['title', 'propertyType', 'locality']).some(
       (key) =>
         !['verified', 'user_provided'].includes(listing.facts[key as 'title' | 'propertyType' | 'locality'].status),
     )
@@ -296,7 +398,11 @@ export const GeneratableListing = NormalizedListing.superRefine((listing, contex
       path: ['facts'],
       message: 'Le titre, le type et la localisation doivent être vérifiés.',
     });
-  if (Object.values(listing.facts).some((item) => item.status === 'conflicting'))
+  if (
+    [...Object.values(listing.facts), ...Object.values(listing.vehicle ?? {})].some(
+      (item) => item.status === 'conflicting',
+    )
+  )
     context.addIssue({
       code: 'custom',
       path: ['facts'],

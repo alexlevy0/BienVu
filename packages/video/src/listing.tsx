@@ -1,38 +1,37 @@
-import React from 'react';
+import { type AvatarContentBounds, VideoManifest } from '@bienvu/contracts';
 import {
-  DesignedPhotoScene as SharedDesignedPhotoScene,
-  isDesignedStyle,
-  photoStage,
   canvasColor,
   galleryMotion,
-  VerticalBrand,
+  isDesignedStyle,
+  photoStage,
+  CinematicPhotoScene as SharedCinematicPhotoScene,
+  DesignedPhotoScene as SharedDesignedPhotoScene,
   EditorialPhotoScene as SharedEditorialPhotoScene,
   StyledPhotoScene as SharedStyledPhotoScene,
-  CinematicPhotoScene as SharedCinematicPhotoScene,
+  VerticalBrand,
 } from '@bienvu/presentation';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   AbsoluteFill,
   Audio,
-  Img,
-  OffthreadVideo,
-  Freeze,
-  Sequence,
   cancelRender,
   continueRender,
   delayRender,
+  Freeze,
+  Img,
   interpolate,
+  OffthreadVideo,
+  Sequence,
   useCurrentFrame,
 } from 'remotion';
-import { VideoManifest, type AvatarContentBounds } from '@bienvu/contracts';
-import { fitFont, subtitleGroups, VIDEO_SAFE as safe } from './layout';
-import { HorizontalPhotoScene } from './horizontal';
-import { EditorFilm } from './editor';
-import { BackgroundMusic } from './background-music';
 import { AvatarOverlay } from './avatar';
+import { BackgroundMusic } from './background-music';
+import { EditorFilm } from './editor';
+import { HorizontalPhotoScene } from './horizontal';
+import { fitFont, VIDEO_SAFE as safe, subtitleGroups } from './layout';
 import { MapOverlay } from './map';
-import { SceneLayers } from './scene-layers';
 import { MarketingLayerContext } from './marketing-layer';
+import { SceneLayers } from './scene-layers';
 import { TrialWatermark } from './watermark';
 
 // Ces URL sont résolues uniquement par le renderer Node vers son serveur
@@ -152,7 +151,11 @@ function PhotoScene({
       {last && (
         <div style={{ position: 'absolute', top: 865, left: safe.left, right: safe.right, color: dark }}>
           <div style={{ fontSize: 25, letterSpacing: 3, textTransform: 'uppercase' }}>
-            {m.contact === 'none' ? 'Découvrez le bien.' : 'Parlons de votre projet.'}
+            {m.contact === 'none'
+              ? m.presentation?.vehicle
+                ? 'Découvrez le véhicule.'
+                : 'Découvrez le bien.'
+              : 'Parlons de votre projet.'}
           </div>
           <div
             style={{
@@ -260,13 +263,14 @@ function GalleryPhoto({
     position: 'absolute' as const,
     width: '100%',
     height: '100%',
-    objectFit: 'cover' as const,
+    objectFit: m.presentation?.vehicle ? ('contain' as const) : ('cover' as const),
+    backgroundColor: m.presentation?.vehicle ? '#14251d' : undefined,
     objectPosition: 'center',
   };
   // The generated clip plays at normal speed for short slots and gently slows
   // for longer slots. Its last frame is held through the next crossfade.
   return (
-    <AbsoluteFill style={{ opacity, overflow: 'hidden' }}>
+    <AbsoluteFill style={{ opacity, overflow: 'hidden', background: m.presentation?.vehicle ? '#14251d' : undefined }}>
       {animation ? (
         <Freeze frame={duration - 1} active={frame >= duration}>
           <OffthreadVideo
@@ -277,7 +281,14 @@ function GalleryPhoto({
           />
         </Freeze>
       ) : (
-        <Img src={media[photoId]} style={{ ...style, scale: motion.scale, translate: `${motion.x}px ${motion.y}px` }} />
+        <Img
+          src={media[photoId]}
+          style={{
+            ...style,
+            scale: m.presentation?.vehicle ? Math.min(motion.scale * 0.94, 1) : motion.scale,
+            translate: m.presentation?.vehicle ? '0px 0px' : `${motion.x}px ${motion.y}px`,
+          }}
+        />
       )}
     </AbsoluteFill>
   );

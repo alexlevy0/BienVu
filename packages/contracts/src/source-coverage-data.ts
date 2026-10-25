@@ -6,6 +6,51 @@
 import type { CoverageSourceId, SourceCoverageEntry } from './source-coverage';
 
 export const sourceCoverageData = {
+  lacentrale: {
+    summary:
+      'Annonces automobiles. Le portail peut refuser la lecture automatique ; utilisez alors la saisie manuelle.',
+    samples: [
+      {
+        url: 'https://www.lacentrale.fr/auto-occasion-annonce-87103059281.html',
+        label: 'Audi Q4 e-tron · exemple fourni',
+        checkedAt: '2026-10-25',
+        environment: 'local_https',
+        outcome: 'failed',
+        photos: 0,
+        note: 'Le transport HTTPS sécurisé reçoit un refus d’accès. Aucun contournement. Import Cloudflare non validé.',
+      },
+    ],
+  },
+  autoscout24: {
+    summary:
+      'Import des caractéristiques et des photos du véhicule identifié. Les réserves du vendeur sont conservées.',
+    samples: [
+      {
+        url: 'https://www.autoscout24.fr/offres/peugeot-207-1-6-hdi-diesel-gris-cat_ma55mo18797-6571066c-6882-4f91-a7f8-8bad0771c9d8',
+        label: 'Peugeot 207 · Sin-le-Noble',
+        checkedAt: '2026-10-25',
+        environment: 'local_https',
+        outcome: 'complete',
+        photos: 5,
+        note: 'Titre, année, kilométrage, énergie, transmission, prix et cinq photos normalisées. Import Cloudflare à confirmer.',
+      },
+    ],
+  },
+  aramisauto: {
+    summary:
+      'Caractéristiques automobiles récupérables ; les illustrations de catalogue sont exclues de la galerie du véhicule.',
+    samples: [
+      {
+        url: 'https://www.aramisauto.com/voitures/jaecoo/7/exclusive/v352925?vehicleId=1023164',
+        label: 'Jaecoo 7 · exemple fourni',
+        checkedAt: '2026-10-25',
+        environment: 'local_https',
+        outcome: 'partial',
+        photos: 0,
+        note: 'Caractéristiques et prix récupérés. L’image betamodel est une illustration de catalogue ; ajoutez trois photos réelles. Import Cloudflare à confirmer.',
+      },
+    ],
+  },
   airbnb: {
     summary:
       'Lecture du logement et de sa galerie publique. Les tarifs par nuit ou séjour ne sont pas assimilés à un loyer mensuel ; les surfaces non publiées restent absentes.',

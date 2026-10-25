@@ -1,5 +1,6 @@
-import React from 'react';
 import type { VideoManifest, VideoStyle } from '@bienvu/contracts';
+import React from 'react';
+import { cameraMotion } from './camera-motion';
 import type { PresentationProps } from './index';
 import {
   contrastInk,
@@ -10,7 +11,6 @@ import {
   fitFont,
   subtitleGroups,
 } from './layout';
-import { cameraMotion } from './camera-motion';
 
 export const designedStyles = ['signature', 'mosaic', 'dynamic'] as const;
 export function isDesignedStyle(style: VideoStyle | undefined) {
@@ -95,9 +95,16 @@ export function DesignedPhotoScene({
     count = m.photos.length;
   const heading = displayLocation(p.locality),
     price = p.priceCents === null ? '' : displayPrice(p.priceCents, p.transaction === 'rent');
-  const facts = [p.areaM2 === null ? '' : displayArea(p.areaM2), p.rooms === null ? '' : displayRooms(p.rooms)].filter(
-    Boolean,
-  );
+  const facts = (
+    p.vehicle
+      ? [
+          p.vehicle.year === null ? '' : String(p.vehicle.year),
+          p.vehicle.mileageKm === null ? '' : `${new Intl.NumberFormat('fr-FR').format(p.vehicle.mileageKm)} km`,
+          p.vehicle.fuel ?? '',
+          p.vehicle.transmission ?? '',
+        ]
+      : [p.areaM2 === null ? '' : displayArea(p.areaM2), p.rooms === null ? '' : displayRooms(p.rooms)]
+  ).filter(Boolean);
   const label = contact
     ? m.contact === 'none'
       ? 'Pour en savoir plus'
@@ -165,7 +172,15 @@ export function DesignedPhotoScene({
         <>
           {!m.photoTimeline && mainPhoto && (
             <div style={{ position: 'absolute', ...(stage ?? { inset: 0 }), overflow: 'hidden' }}>
-              <Img src={media[mainPhoto.id]} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <Img
+                src={media[mainPhoto.id]}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: m.presentation?.vehicle ? 'contain' : 'cover',
+                  backgroundColor: m.presentation?.vehicle ? '#14251d' : undefined,
+                }}
+              />
             </div>
           )}
           {!signature && !mosaic && (
@@ -196,7 +211,8 @@ export function DesignedPhotoScene({
                     style={{
                       width: '100%',
                       height: '100%',
-                      objectFit: 'cover',
+                      objectFit: m.presentation?.vehicle ? 'contain' : 'cover',
+                      backgroundColor: m.presentation?.vehicle ? '#14251d' : undefined,
                       scale: m.photoMotion === false ? 1 : 1.025,
                     }}
                   />

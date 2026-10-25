@@ -17,7 +17,10 @@ export type SourceId =
   | 'human'
   | 'citya'
   | 'laforet'
-  | 'airbnb';
+  | 'airbnb'
+  | 'lacentrale'
+  | 'autoscout24'
+  | 'aramisauto';
 export type ImportSource = {
   id: SourceId;
   name: string;
@@ -27,6 +30,27 @@ export type ImportSource = {
   documentTransport?: 'browser';
 };
 export const importSources: readonly ImportSource[] = [
+  {
+    id: 'lacentrale',
+    name: 'La Centrale',
+    hosts: ['www.lacentrale.fr', 'lacentrale.fr'],
+    paths: [/^\/auto-occasion-annonce-(\d+)\.html$/],
+    mediaHosts: ['image-annonce.lacentrale.fr'],
+  },
+  {
+    id: 'autoscout24',
+    name: 'AutoScout24',
+    hosts: ['www.autoscout24.fr', 'autoscout24.fr'],
+    paths: [/^\/offres\/[^/]+-([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})\/?$/i],
+    mediaHosts: ['prod.pictures.autoscout24.net'],
+  },
+  {
+    id: 'aramisauto',
+    name: 'Aramisauto',
+    hosts: ['www.aramisauto.com', 'aramisauto.com'],
+    paths: [/^\/voitures\/[^/]+\/[^/]+\/[^/]+\/(v\d+)\/?$/],
+    mediaHosts: ['storage.googleapis.com', 'webstatic.aramisauto.com'],
+  },
   {
     id: 'espaces-atypiques',
     name: 'Espaces Atypiques',
@@ -69,8 +93,11 @@ export const importSources: readonly ImportSource[] = [
     id: 'leboncoin',
     name: 'Leboncoin',
     hosts: ['www.leboncoin.fr', 'leboncoin.fr'],
-    paths: [/^\/ad\/(?:ventes_immobilieres|locations)\/(\d+)\/?$/, /^\/(?:ventes_immobilieres|locations)\/(\d+)\.htm$/],
-    mediaHosts: ['www.leboncoin.fr'],
+    paths: [
+      /^\/ad\/(?:ventes_immobilieres|locations|voitures)\/(\d+)\/?$/,
+      /^\/(?:ventes_immobilieres|locations|voitures)\/(\d+)\.htm$/,
+    ],
+    mediaHosts: ['www.leboncoin.fr', 'img.leboncoin.fr'],
   },
   {
     id: 'bienici',

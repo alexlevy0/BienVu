@@ -92,8 +92,8 @@ export function SourceDirectory() {
             </div>
             {kind === 'portal' && (
               <p className="source-group-intro">
-                Les portails peuvent limiter la récupération automatique. Le lien du bien sur le site de son agence est
-                une bonne alternative.
+                Les portails peuvent limiter la récupération automatique. Le site de l’agence ou du vendeur est une
+                autre source à essayer. La saisie manuelle reste disponible.
               </p>
             )}
             <div className="source-coverage-grid">

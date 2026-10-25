@@ -1,27 +1,29 @@
 'use client';
-import Link from 'next/link';
-import dynamic from 'next/dynamic';
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { cartesiaParisianVoices } from '@bienvu/contracts';
-import { StudioSidebar } from './studio-sidebar';
-import { HomeCreate } from './home-create';
-import { BetaDestinations } from './beta-destinations';
-import { betaVoiceKey, parseBetaVoice, type BetaVoiceChoice } from '../lib/beta-preferences';
-import { trackProductEvent } from '../lib/product-analytics';
-import { HomeHeroVideo } from './home-hero-video';
-import { HomeRenderComparison } from './home-render-comparison';
-import { HomeVitrineShowcase } from './home-vitrine-showcase';
-import { HomeFooter } from './home-footer';
-import { HomeIcon } from './home-icons';
-import { useAccount } from './account';
-import { useGenerationStore } from './generation-store';
-import { voicePreviews } from '../lib/voice-previews';
+import dynamic from 'next/dynamic';
+import Link from 'next/link';
+import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
+import { type BetaVoiceChoice, betaVoiceKey, parseBetaVoice } from '../lib/beta-preferences';
 import {
+  type HomeRenderChoice,
+  type HomeRenderPreset,
   homeRenderPresetKey,
   parseHomeRenderPreset,
-  type HomeRenderPreset,
-  type HomeRenderChoice,
 } from '../lib/home-render-presets';
+import { trackProductEvent } from '../lib/product-analytics';
+import { voicePreviews } from '../lib/voice-previews';
+import { useAccount } from './account';
+import { AutoCreate } from './auto-create';
+import { AutoContentKit, AutoStudioPreview } from './auto-studio-preview';
+import { BetaDestinations } from './beta-destinations';
+import { useGenerationStore } from './generation-store';
+import { HomeCreate } from './home-create';
+import { HomeFooter } from './home-footer';
+import { HomeHeroVideo } from './home-hero-video';
+import { HomeIcon } from './home-icons';
+import { HomeRenderComparison } from './home-render-comparison';
+import { HomeVitrineShowcase } from './home-vitrine-showcase';
+import { StudioSidebar } from './studio-sidebar';
 
 const loadingDemo = () => (
   <p className="beta-loading" role="status">
@@ -203,6 +205,10 @@ function Workspace() {
 
 export function BetaLandingPage() {
   const { me } = useAccount();
+  const [category, setCategory] = useState<'real-estate' | 'vehicle'>('vehicle');
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('mode') === 'immo') setCategory('real-estate');
+  }, []);
   const [creating, setCreating] = useState(false),
     [example, setExample] = useState(false),
     [heroPlaying, setHeroPlaying] = useState(false),
@@ -270,9 +276,9 @@ export function BetaLandingPage() {
       <StudioSidebar active="create" />
       <div className="home-workspace">
         <header className="home-topbar">
-          <span>Le studio marketing de votre agence.</span>
+          <span>Le studio marketing IA de vos annonces.</span>
           <div className="beta-topbar-links">
-            <span className="beta-version">Nouvelle expérience</span>
+            <Link href="/aide">Aide</Link>
             <Link href="/">
               Version actuelle <HomeIcon name="external" size={13} />
             </Link>
@@ -283,7 +289,7 @@ export function BetaLandingPage() {
           id="home-content"
           tabIndex={-1}
         >
-          {!creating && <Workspace />}
+          {!creating && category === 'real-estate' && <Workspace />}
           <section
             className={`beta-hero${creating ? ' is-creating' : ''}`}
             aria-labelledby={creating ? undefined : 'beta-title'}
@@ -292,31 +298,79 @@ export function BetaLandingPage() {
             <div className="beta-hero-main">
               {!creating && (
                 <div className="beta-hero-intro">
-                  <p className="beta-eyebrow">
-                    <span />
-                    DE L’ANNONCE À LA VIDÉO
-                  </p>
+                  <div className="beta-vertical-switch" role="group" aria-label="Type d’annonce">
+                    <button
+                      type="button"
+                      aria-pressed={category === 'real-estate'}
+                      onClick={() => {
+                        setCategory('real-estate');
+                        const u = new URL(window.location.href);
+                        u.searchParams.set('mode', 'immo');
+                        u.searchParams.delete('draft');
+                        u.searchParams.delete('job');
+                        window.history.replaceState(null, '', u.pathname + u.search);
+                      }}
+                    >
+                      <HomeIcon name="house" size={22} /> Immobilier
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={category === 'vehicle'}
+                      onClick={() => {
+                        setCategory('vehicle');
+                        const u = new URL(window.location.href);
+                        u.searchParams.set('mode', 'auto');
+                        u.searchParams.delete('draft');
+                        u.searchParams.delete('job');
+                        window.history.replaceState(null, '', u.pathname + u.search);
+                      }}
+                    >
+                      <HomeIcon name="car" size={24} /> Auto <span>Nouveau</span>
+                    </button>
+                  </div>
                   <h1 id="beta-title">
-                    Votre annonce immobilière.
+                    Vos annonces,
                     <br />
-                    <em>
-                      Sa vidéo, prête
-                      <br />à partager.
-                    </em>
+                    en version
+                    <br />
+                    <em>vidéo !</em>
                   </h1>
                   <p className="beta-hero-description">
-                    Collez votre lien. BienVu transforme vos photos en une vidéo qui donne envie de visiter.
+                    {category === 'vehicle'
+                      ? 'Voitures aussi ! Transformez vos annonces auto en vidéos percutantes, avec voix off, avatar et animations IA.'
+                      : 'Transformez vos annonces immobilières en vidéos qui donnent envie de visiter, avec voix off, avatar et animations IA.'}
                   </p>
                 </div>
               )}
-              <HomeCreate
-                variant="beta"
-                onLayoutChange={setCreating}
-                renderChoice={choice}
-                voiceChoice={voiceChoice}
-                onClearRenderChoice={() => choose(null)}
-              />
-              {!creating && (
+              {category === 'vehicle' ? (
+                <AutoCreate key={me?.agency.id ?? 'guest'} onLayoutChange={setCreating} voiceChoice={voiceChoice} />
+              ) : (
+                <HomeCreate
+                  variant="beta"
+                  onLayoutChange={setCreating}
+                  renderChoice={choice}
+                  voiceChoice={voiceChoice}
+                  onClearRenderChoice={() => choose(null)}
+                />
+              )}
+              {!creating && category === 'vehicle' && (
+                <div className="auto-sources">
+                  <p>Exemples de sources auto</p>
+                  <div>
+                    <span className="auto-source-leboncoin">leboncoin</span>
+                    <span className="auto-source-lacentrale">LaCentrale</span>
+                    <span className="auto-source-autoscout">
+                      <mark>Auto</mark>Scout24
+                    </span>
+                    <span className="auto-source-aramis">Aramisauto</span>
+                    <button type="button" onClick={() => document.getElementById('home-listing-url')?.focus()}>
+                      <HomeIcon name="plus" size={17} /> Autres sites
+                    </button>
+                  </div>
+                  <small>Selon l’accès autorisé par le site. Saisie manuelle disponible.</small>
+                </div>
+              )}
+              {!creating && category === 'real-estate' && (
                 <div className="beta-hero-actions">
                   <button type="button" className="beta-demo-link" onClick={openExample}>
                     <span>
@@ -328,7 +382,13 @@ export function BetaLandingPage() {
                 </div>
               )}
             </div>
-            {!creating && (
+            {!creating && category === 'vehicle' && (
+              <AutoStudioPreview
+                paused={example || destinationPreview || worldPreview}
+                onPlayingChange={setHeroPlaying}
+              />
+            )}
+            {!creating && category === 'real-estate' && (
               <aside className="beta-hero-preview" aria-label="Un résultat créé avec BienVu">
                 <div className="beta-preview-tag">
                   <HomeIcon name={heroRender === 'standard' ? 'video' : 'sparkle'} size={14} />
@@ -378,8 +438,9 @@ export function BetaLandingPage() {
                 </div>
               </aside>
             )}
+            {!creating && category === 'vehicle' && <AutoContentKit />}
           </section>
-          {!creating && (
+          {!creating && category === 'real-estate' && (
             <>
               <div role="group" className="beta-reassurance" aria-label="Votre premier essai">
                 <span>

@@ -1,18 +1,18 @@
 import {
   GenerationRequest,
-  PreparedNarration,
+  type NormalizedListing,
   PhotoAnimation,
+  PreparedNarration,
   requestedAnimations,
   selectedAnimationIndices,
-  type NormalizedListing,
 } from '@bienvu/contracts';
-import { findNarration, findGeneration, findDefaultGenerationMap } from '@bienvu/db';
-import { scriptContext, LEGACY_DESCRIPTION_SEGMENTATION_VERSION } from '@bienvu/narration';
+import { findDefaultGenerationMap, findGeneration, findNarration } from '@bienvu/db';
+import { LEGACY_DESCRIPTION_SEGMENTATION_VERSION, scriptContext } from '@bienvu/narration';
+import { plannedAnimationSeconds, prepareAnimationTiming } from './animation-timing';
 import type { NarrationBucket } from './narration';
-import { runwayProvider, runwayError, runwayClipCost, runwayMotionForSlot, type AnimationProvider } from './runway';
-import { videoBytesHash } from './video-manifest';
-import { prepareAnimationTiming, plannedAnimationSeconds } from './animation-timing';
+import { type AnimationProvider, runwayClipCost, runwayError, runwayMotionForSlot, runwayProvider } from './runway';
 import { syncRunwayAccount } from './runway-account';
+import { videoBytesHash } from './video-manifest';
 
 type AnimationRow = {
   id: string;
@@ -239,6 +239,7 @@ export async function prepareJobAnimations(
             runwayMotionForSlot(slot),
             input.aspectRatio,
             row.durationSeconds,
+            context.listing.category,
           );
       await guard();
       if (bytes.length > 10 * 1024 * 1024 || bytes.length < 16) throw Error('RUNWAY_OUTPUT_INVALID');

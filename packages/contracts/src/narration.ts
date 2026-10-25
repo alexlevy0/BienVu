@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { EntityId, ObjectKey, Sha256, VideoDuration } from './product';
 import { AvatarAudioSources } from './avatars';
+import { EntityId, ObjectKey, Sha256, VideoDuration } from './product';
 
 export const ScriptFactRef = z.enum([
   'propertyType',
@@ -14,6 +14,7 @@ export const ScriptFactRef = z.enum([
   'agency.contact',
   'narration',
   'description',
+  'vehicle',
 ]);
 export type ScriptFactRef = z.infer<typeof ScriptFactRef>;
 export const SceneKind = z.enum(['intro', 'area', 'rooms', 'price', 'location', 'gallery', 'contact']);
@@ -66,7 +67,7 @@ export const ListingScript = z
     sourceKind: z.enum(['url', 'manual']),
     inputHash: Sha256,
     model: z.string().min(1).max(100),
-    promptVersion: z.enum(['narration-fr/1', 'narration-fr/2', 'narration-fr/3']),
+    promptVersion: z.enum(['narration-fr/1', 'narration-fr/2', 'narration-fr/3', 'narration-auto/1']),
     copyVersion: ScriptCopyVersion,
     disclosure: z.string().min(1).max(150),
     scenes: z.array(ScriptScene).min(4).max(6),

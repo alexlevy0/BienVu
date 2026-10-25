@@ -1,31 +1,32 @@
 import {
   AgencyBrand,
+  CustomNarration,
   GeneratableListing,
   ListingScript,
   NarrationFailure,
+  type NormalizedListing,
+  quantityCompletenessCheck,
+  type SceneKind,
   ScriptCopyVersion,
+  type ScriptFactRef,
   ScriptPlan,
   SYNTHETIC_VOICE_DISCLOSURE,
-  quantityCompletenessCheck,
-  CustomNarration,
-  type NormalizedListing,
-  type SceneKind,
-  type ScriptFactRef,
   type VideoDuration,
 } from '@bienvu/contracts';
 import { displayEuros, displayNumber, frenchDecimal, frenchEuros, frenchInteger } from './french';
 import {
+  COMPLETE_DESCRIPTION_SEGMENTATION_VERSION,
+  DESCRIPTION_SEGMENTATION_VERSION,
+  type DescriptionSegmentationVersion,
   descriptionPassages,
   expandedNarrationLines,
   expandNarrationBookends,
+  LEGACY_DESCRIPTION_SEGMENTATION_VERSION,
   narrationWordLimit,
   narrationWordTarget,
   wordCount,
-  DESCRIPTION_SEGMENTATION_VERSION,
-  COMPLETE_DESCRIPTION_SEGMENTATION_VERSION,
-  LEGACY_DESCRIPTION_SEGMENTATION_VERSION,
-  type DescriptionSegmentationVersion,
 } from './suggestion';
+import { vehicleScriptContext } from './vehicle';
 
 export const PROMPT_VERSION = 'narration-fr/1' as const;
 export const COPY_VERSION = 'factual-copy/2' as const;
@@ -49,12 +50,16 @@ export type ScriptContext = {
   durationSeconds?: VideoDuration;
   descriptionSegmentationVersion?: DescriptionSegmentationVersion;
 };
-export const scriptPromptVersion = (context: Pick<ScriptContext, 'copyVersion'>) =>
-  context.copyVersion === 'description-copy/2'
-    ? ('narration-fr/3' as const)
-    : context.copyVersion === 'description-copy/1'
-      ? ('narration-fr/2' as const)
-      : PROMPT_VERSION;
+export const scriptPromptVersion = (
+  context: Pick<ScriptContext, 'copyVersion'> & Partial<Pick<ScriptContext, 'listing'>>,
+) =>
+  context.listing?.category === 'vehicle'
+    ? ('narration-auto/1' as const)
+    : context.copyVersion === 'description-copy/2'
+      ? ('narration-fr/3' as const)
+      : context.copyVersion === 'description-copy/1'
+        ? ('narration-fr/2' as const)
+        : PROMPT_VERSION;
 export async function hashJson(value: unknown) {
   const bytes = new TextEncoder().encode(JSON.stringify(value)),
     hash = await crypto.subtle.digest('SHA-256', bytes);
@@ -88,6 +93,8 @@ export async function scriptContext(
     brand = parsedBrand.data;
   const channel = contact ?? (brand.neutral ? 'none' : brand.phone ? 'phone' : brand.email ? 'email' : 'website');
   if (channel === 'none' ? !brand.neutral : !brand[channel]) throw new NarrationFailure('SCRIPT_INPUT_INVALID');
+  if (listing.category === 'vehicle')
+    return vehicleScriptContext(listing, brand, channel, durationSeconds ?? 20, hashJson, userNarration);
   const known = <T>(fact: { status: string; value: T }) =>
     fact.status === 'verified' || fact.status === 'user_provided';
   const locality = listing.facts.locality.value!,

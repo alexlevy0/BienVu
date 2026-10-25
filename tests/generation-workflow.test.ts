@@ -1,43 +1,47 @@
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { mkdtemp, rm, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
-import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
-import { migrateNarrationProbe, seedNarrationFixture } from '../scripts/narration-fixtures';
+import { convertV4MiniflareOptions, Miniflare } from 'miniflare';
+import { getJobVideo } from '../apps/pipeline/src/video-manifest';
+import { propertyDescription } from '../fixtures/listing-description';
+import { videoFixture } from '../fixtures/video';
+import {
+  CARTESIA_DEFAULT_VOICE,
+  CartesiaVoiceConfig,
+  DEFAULT_AVATAR_SETTINGS,
+  defaultAvatarCustomization,
+  defaultVideoCustomization,
+  emptyVehicleValues,
+  generationRendererName,
+  userVehicleFacts,
+} from '../packages/contracts/src/index';
 import {
   admitGeneration,
-  setGenerationProgress,
   findGeneration,
   findNarration,
   generationView,
   saveAvatarLook,
   setAvatarSettings,
+  setGenerationProgress,
 } from '../packages/db/src/index';
-import { videoFixture } from '../fixtures/video';
-import { propertyDescription } from '../fixtures/listing-description';
-import { getJobVideo } from '../apps/pipeline/src/video-manifest';
-import {
-  CartesiaVoiceConfig,
-  CARTESIA_DEFAULT_VOICE,
-  DEFAULT_AVATAR_SETTINGS,
-  defaultAvatarCustomization,
-  defaultVideoCustomization,
-  generationRendererName,
-} from '../packages/contracts/src/index';
-import { hashJson, DEFAULT_SCRIPT_MODEL } from '../packages/narration/src/index';
+import { missing as missingFact } from '../packages/importers/src/facts';
+import { DEFAULT_SCRIPT_MODEL, hashJson } from '../packages/narration/src/index';
 import { LOCALITY_SPEECH_VERSION, SURFACE_SPEECH_VERSION } from '../packages/voice/src/index';
+import { migrateNarrationProbe, seedNarrationFixture } from '../scripts/narration-fixtures';
 
-for (const { voiceEnabled, invalidScript, avatarFallback, animationRecovery = false } of [
+for (const { voiceEnabled, invalidScript, avatarFallback, animationRecovery = false, vehicle = false } of [
   { voiceEnabled: true, invalidScript: false, avatarFallback: false },
   { voiceEnabled: false, invalidScript: false, avatarFallback: false },
   { voiceEnabled: true, invalidScript: true, avatarFallback: false },
   { voiceEnabled: true, invalidScript: false, avatarFallback: true },
   { voiceEnabled: true, invalidScript: false, avatarFallback: false, animationRecovery: true },
+  { voiceEnabled: true, invalidScript: false, avatarFallback: false, vehicle: true },
 ])
-  test(`Workflow workerd réel ${animationRecovery ? 'animation lente récupérée' : avatarFallback ? 'avatar indisponible et supplément rendu' : invalidScript ? 'narration invalide et crédit libéré' : voiceEnabled ? 'avec voix' : 'sans voix ni sous-titres'}, fournisseurs simulés : reprise et erreur publique`, async (t) => {
+  test(`Workflow workerd réel ${vehicle ? 'automobile avec voix' : animationRecovery ? 'animation lente récupérée' : avatarFallback ? 'avatar indisponible et supplément rendu' : invalidScript ? 'narration invalide et crédit libéré' : voiceEnabled ? 'avec voix' : 'sans voix ni sous-titres'}, fournisseurs simulés : reprise et erreur publique`, async (t) => {
     const directory = await mkdtemp(path.join(tmpdir(), 'bienvu-generation-'));
     t.after(() => rm(directory, { recursive: true, force: true }));
     const require = createRequire(import.meta.url),
@@ -91,6 +95,33 @@ for (const { voiceEnabled, invalidScript, avatarFallback, animationRecovery = fa
     listing.agencyId = scope.agencyId;
     listing.id = 'listing-workflow';
     listing.description = { text: propertyDescription, sourcePath: 'fixture.description', truncated: false };
+    if (vehicle) {
+      listing.category = 'vehicle';
+      listing.vehicle = userVehicleFacts({
+        ...emptyVehicleValues(),
+        make: 'Peugeot',
+        model: '207',
+        year: 2007,
+        mileageKm: 198500,
+        fuel: 'Diesel',
+        transmission: 'Manuelle',
+      });
+      listing.facts.propertyType = missingFact('category');
+      listing.facts.area = missingFact('m2');
+      listing.facts.rooms = missingFact('rooms');
+      listing.facts.title = {
+        status: 'user_provided',
+        value: 'Peugeot 207',
+        unit: 'text',
+        sourcePath: 'manual.title',
+        rawEvidence: 'Peugeot 207',
+      };
+      listing.description = {
+        text: 'Le vendeur signale un risque de colmatage du FAP.',
+        sourcePath: 'manual.description',
+        truncated: false,
+      };
+    }
     for (const p of listing.photos) {
       p.agencyId = scope.agencyId;
       p.listingId = listing.id;
@@ -255,6 +286,19 @@ for (const { voiceEnabled, invalidScript, avatarFallback, animationRecovery = fa
       }),
     );
     assert.equal(JSON.parse(narration.script!).copyVersion, 'description-copy/2');
+    if (vehicle) {
+      assert.equal(JSON.parse(narration.script!).promptVersion, 'narration-auto/1');
+      assert.match(
+        JSON.parse(narration.script!)
+          .scenes.map((s: { narrationText: string }) => s.narrationText)
+          .join(' '),
+        /risque de colmatage du FAP/,
+      );
+      assert.equal(
+        (await getJobVideo(env.DB, scope.agencyId, job.id))!.manifest.presentation?.vehicle?.mileageKm,
+        198500,
+      );
+    }
     assert.equal(
       (await getJobVideo(env.DB, scope.agencyId, job.id))!.manifest.scenes.reduce((n, s) => n + s.durationFrames, 0),
       1200,

@@ -3,6 +3,21 @@ import { sourceCoverageData } from './source-coverage-data';
 // Public test catalogue only. Recognition here grants no network permission:
 // importer hosts, redirects and photo destinations remain in import-sources.ts.
 export const coverageSources = [
+  { id: 'lacentrale', name: 'La Centrale', kind: 'portal', hosts: ['www.lacentrale.fr', 'lacentrale.fr'], domains: [] },
+  {
+    id: 'autoscout24',
+    name: 'AutoScout24',
+    kind: 'portal',
+    hosts: ['www.autoscout24.fr', 'autoscout24.fr'],
+    domains: [],
+  },
+  {
+    id: 'aramisauto',
+    name: 'Aramisauto',
+    kind: 'portal',
+    hosts: ['www.aramisauto.com', 'aramisauto.com'],
+    domains: [],
+  },
   { id: 'orpi', name: 'Orpi', kind: 'agency', hosts: ['www.orpi.com', 'orpi.com'], domains: [] },
   { id: 'century21', name: 'Century 21', kind: 'agency', hosts: ['www.century21.fr', 'century21.fr'], domains: [] },
   { id: 'laforet', name: 'Laforêt', kind: 'agency', hosts: ['www.laforet.com', 'laforet.com'], domains: [] },

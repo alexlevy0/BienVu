@@ -21,7 +21,8 @@ overrides:
   # Remotion also pins Zod 4.5.4, affected by GHSA-mrhx-c7xc-m3w5.
   "zod@>=4.0.0 <4.6.6": 4.6.6
   # Miniflare still pins the vulnerable Undici/Sharp patch versions.
-  "undici@7.29.0": 7.29.1
+  "undici@>=7.18.0 <7.30.1": 7.30.1
+  "fast-uri@>=3.0.0 <3.1.9": 3.1.9
   "sharp@0.35.4": 0.35.5
   # PostCSS in Next.js and the Remotion bundler still resolves this version.
   "source-map-js@1.2.1": 1.2.2

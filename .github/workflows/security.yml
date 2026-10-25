@@ -38,7 +38,7 @@ jobs:
             docker run --rm --network none "$image" node -e '
               const assert = require("node:assert/strict");
               const v = process.versions.undici.split(".").map(Number);
-              assert.ok(v[0] > 7 || v[0] === 7 && (v[1] > 29 || v[1] === 29 && v[2] >= 1));
+              assert.ok(v[0] > 7 || v[0] === 7 && (v[1] > 30 || v[1] === 30 && v[2] >= 1));
               console.log(JSON.stringify({node:process.versions.node,undici:process.versions.undici}));
             '
           done

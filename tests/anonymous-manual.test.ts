@@ -1,40 +1,45 @@
-import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
+import { type TestContext, test } from 'node:test';
+import { convertV4MiniflareOptions, Miniflare } from 'miniflare';
 import sharp from 'sharp';
-import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
-import { migrateNarrationProbe } from '../scripts/narration-fixtures';
-import { normalizePhoto } from '../scripts/import-transport';
-import { importSources, defaultVideoCustomization, customizedListing } from '../packages/contracts/src/index';
+import { loadGenerationListing } from '../apps/pipeline/src/generation-import';
+import { purgeHostedImports } from '../apps/pipeline/src/import-cleanup';
+import { cleanupAnonymousTrials } from '../apps/pipeline/src/trial-cleanup';
+import {
+  completeAnonymousManual,
+  prepareAnonymousManual,
+  uploadAnonymousManual,
+} from '../apps/web/lib/anonymous-manual';
+import { submitTrialManual, type TrialManualSettings } from '../apps/web/lib/anonymous-manual-client';
+import { generationVideo } from '../apps/web/lib/generations';
+import { RequestFailure, respond } from '../apps/web/lib/http';
+import { importResult } from '../apps/web/lib/imports';
+import { contentHash } from '../apps/web/lib/manual-listings';
+import {
+  startTrial,
+  type TrialEnv,
+  trialResponse,
+  trialSessionResponse,
+  type verifyTrialBot,
+} from '../apps/web/lib/trials';
+import { videoFixture, videoReport } from '../fixtures/video';
+import { customizedListing, defaultVideoCustomization, importSources } from '../packages/contracts/src/index';
 import {
   admitAnonymous,
   anonymousSession,
+  claimTrial,
   createAnonymousSession,
+  creditGrant,
+  ensureAgency,
+  failGeneration,
   findGeneration,
   findImport,
   opaqueHash,
   trialInput,
-  claimTrial,
-  ensureAgency,
-  creditGrant,
-  failGeneration,
 } from '../packages/db/src/index';
 import { selectAdapter } from '../packages/importers/src/index';
-import {
-  prepareAnonymousManual,
-  uploadAnonymousManual,
-  completeAnonymousManual,
-} from '../apps/web/lib/anonymous-manual';
-import { submitTrialManual, type TrialManualSettings } from '../apps/web/lib/anonymous-manual-client';
-import { startTrial, trialSessionResponse, type TrialEnv, type verifyTrialBot } from '../apps/web/lib/trials';
-import { RequestFailure, respond } from '../apps/web/lib/http';
-import { trialResponse } from '../apps/web/lib/trials';
-import { loadGenerationListing } from '../apps/pipeline/src/generation-import';
-import { purgeHostedImports } from '../apps/pipeline/src/import-cleanup';
-import { cleanupAnonymousTrials } from '../apps/pipeline/src/trial-cleanup';
-import { contentHash } from '../apps/web/lib/manual-listings';
-import { videoFixture, videoReport } from '../fixtures/video';
-import { generationVideo } from '../apps/web/lib/generations';
-import { importResult } from '../apps/web/lib/imports';
+import { normalizePhoto } from '../scripts/import-transport';
+import { migrateNarrationProbe } from '../scripts/narration-fixtures';
 
 const base = 'https://bienvu.example',
   at = () => new Date().toISOString();
@@ -133,6 +138,9 @@ async function setup(t: TestContext) {
 }
 test('l’essai accepte toutes les sources du registre connecté et conserve les contrôles de route et HTTPS', () => {
   const urls = [
+    'https://www.lacentrale.fr/auto-occasion-annonce-87103059281.html',
+    'https://www.autoscout24.fr/offres/peugeot-207-6571066c-6882-4f91-a7f8-8bad0771c9d8',
+    'https://www.aramisauto.com/voitures/jaecoo/7/exclusive/v352925?vehicleId=1023164',
     'https://www.espaces-atypiques.com/ventes/21200-beaune-propriete-947eb/',
     'https://www.orpi.com/annonce-vente-maison-12345678-1234-1234-1234-123456789012/',
     'https://www.century21.fr/trouver_logement/detail/123456/',

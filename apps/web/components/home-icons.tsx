@@ -1,6 +1,12 @@
 import type { ReactNode } from 'react';
 
 const shapes = {
+  car: (
+    <>
+      <path d="m5 8 2-5h10l2 5M3 10l2-2h14l2 2v8H3ZM3 14h18M7 11h1m8 0h1M5 18v3m14-3v3" />
+      <path d="M2 8h3m14 0h3" />
+    </>
+  ),
   pin: (
     <>
       <path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z" />

@@ -1,6 +1,7 @@
-import React from 'react';
-import type { CSSProperties, ReactNode, ComponentType } from 'react';
 import { mapFrame, VIDEO_LAYERS, type VideoManifest, type VideoPresentation } from '@bienvu/contracts';
+import type { ComponentType, CSSProperties, ReactNode } from 'react';
+import React from 'react';
+import { cameraMotion } from './camera-motion';
 import {
   contrastInk,
   displayArea,
@@ -9,12 +10,12 @@ import {
   displayRooms,
   fitDisplayFont,
   fitFont,
-  subtitleGroups,
   VIDEO_SAFE as safe,
+  subtitleGroups,
 } from './layout';
-import { cameraMotion } from './camera-motion';
-export * from './layout';
+
 export { cameraMotion } from './camera-motion';
+export * from './layout';
 export const interpolate = (value: number, range: number[], output: number[], _options?: unknown) =>
   output[0] + (output[1] - output[0]) * Math.max(0, Math.min(1, (value - range[0]) / (range[1] - range[0])));
 const dark = '#132a23';
@@ -82,6 +83,14 @@ export type PresentationProps = {
   Image?: ComponentType<{ src: string; style?: CSSProperties }>;
   Layers: ComponentType<SceneLayerProps>;
 };
+const vehicleLabels = (p: VideoPresentation) =>
+  p.vehicle
+    ? [
+        p.vehicle.year === null ? '' : String(p.vehicle.year),
+        p.vehicle.mileageKm === null ? '' : `${new Intl.NumberFormat('fr-FR').format(p.vehicle.mileageKm)} km`,
+        p.vehicle.fuel ?? '',
+      ].filter(Boolean)
+    : [];
 const propertyName = (type: VideoPresentation['propertyType']) =>
   type === 'apartment' ? 'Appartement' : type === 'house' ? 'Maison' : 'Bien immobilier';
 function posterHeadline(kind: VideoManifest['scenes'][number]['kind'], p: VideoPresentation, contact: boolean) {
@@ -98,8 +107,8 @@ function posterLabel(kind: VideoManifest['scenes'][number]['kind'], p: VideoPres
   if (kind === 'area') return 'LA SURFACE';
   if (kind === 'rooms') return 'LES PIÈCES';
   if (kind === 'price') return p.transaction === 'sale' ? 'LE PRIX' : 'LE LOYER';
-  if (kind === 'location') return 'LA LOCALISATION';
-  if (kind === 'gallery') return 'LA VISITE';
+  if (kind === 'location') return p.vehicle ? 'LES CARACTÉRISTIQUES' : 'LA LOCALISATION';
+  if (kind === 'gallery') return p.vehicle ? 'LE VÉHICULE EN IMAGES' : 'LA VISITE';
   return contact ? 'VOTRE CONTACT' : 'POUR EN SAVOIR PLUS';
 }
 
@@ -118,7 +127,8 @@ export function EditorialPhotoScene({
   const p = m.presentation!,
     contact = scene.kind === 'contact',
     intro = scene.kind === 'intro';
-  const shortTitle = p.title.length <= 75 ? p.title : propertyName(p.propertyType);
+  const shortTitle =
+    p.title.length <= 75 ? p.title : p.vehicle ? 'Le véhicule en images' : propertyName(p.propertyType);
   const heading = posterHeadline(scene.kind, p, m.contact !== 'none');
   const audio = m.audio.find((a) => a.id === scene.audioAssetId)!,
     voiceFrames = Math.ceil(((audio?.durationMs ?? (scene.durationFrames * 1000) / 30) * 30) / 1000);
@@ -153,7 +163,8 @@ export function EditorialPhotoScene({
               style={{
                 width: '100%',
                 height: '100%',
-                objectFit: 'cover',
+                objectFit: m.presentation?.vehicle ? 'contain' : 'cover',
+                backgroundColor: m.presentation?.vehicle ? '#14251d' : undefined,
                 objectPosition: 'center',
                 transform: `scale(${zoom})`,
               }}
@@ -256,6 +267,15 @@ export function EditorialPhotoScene({
             {shortTitle}
           </div>
           <div style={{ display: 'flex', gap: 14, marginTop: 28, flexWrap: 'wrap' }}>
+            {p.vehicle &&
+              vehicleLabels(p).map((label) => (
+                <span
+                  key={label}
+                  style={{ background: accent, color: ink, padding: '8px 19px', fontSize: 36, fontWeight: 750 }}
+                >
+                  {label}
+                </span>
+              ))}
             {p.areaM2 !== null && (
               <span style={{ background: accent, color: ink, padding: '8px 19px', fontSize: 42, fontWeight: 750 }}>
                 {displayArea(p.areaM2)}
@@ -284,7 +304,7 @@ export function EditorialPhotoScene({
             {shortTitle}
           </div>
           <div style={{ fontSize: 34, marginTop: 22, opacity: 0.94 }}>
-            {propertyName(p.propertyType)} · {p.locality}
+            {p.vehicle ? vehicleLabels(p).join(' · ') : `${propertyName(p.propertyType)} · ${p.locality}`}
           </div>
         </div>
       )}
@@ -370,7 +390,15 @@ export function StyledPhotoScene({
       background={
         <>
           {!m.photoTimeline && (
-            <Img src={media[scene.photoAssetId]} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <Img
+              src={media[scene.photoAssetId]}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: m.presentation?.vehicle ? 'contain' : 'cover',
+                backgroundColor: m.presentation?.vehicle ? '#14251d' : undefined,
+              }}
+            />
           )}
           <AbsoluteFill
             style={{
@@ -463,7 +491,10 @@ export function StyledPhotoScene({
         ) : (
           <>
             <div style={{ marginTop: 24, fontSize: 34 }}>
-              {[p.areaM2 !== null ? displayArea(p.areaM2) : '', p.rooms !== null ? displayRooms(p.rooms) : '']
+              {(p.vehicle
+                ? vehicleLabels(p)
+                : [p.areaM2 !== null ? displayArea(p.areaM2) : '', p.rooms !== null ? displayRooms(p.rooms) : '']
+              )
                 .filter(Boolean)
                 .join(' · ')}
             </div>
@@ -522,7 +553,8 @@ export function CinematicPhotoScene({
               style={{
                 width: '100%',
                 height: '100%',
-                objectFit: 'cover',
+                objectFit: m.presentation?.vehicle ? 'contain' : 'cover',
+                backgroundColor: m.presentation?.vehicle ? '#14251d' : undefined,
                 scale: fallbackMotion.scale,
                 translate: `${fallbackMotion.x}px ${fallbackMotion.y}px`,
               }}
@@ -577,7 +609,10 @@ export function CinematicPhotoScene({
             {p.title}
           </div>
           <div style={{ marginTop: 22, fontSize: 40 }}>
-            {[p.areaM2 !== null ? displayArea(p.areaM2) : '', p.rooms !== null ? displayRooms(p.rooms) : '']
+            {(p.vehicle
+              ? vehicleLabels(p)
+              : [p.areaM2 !== null ? displayArea(p.areaM2) : '', p.rooms !== null ? displayRooms(p.rooms) : '']
+            )
               .filter(Boolean)
               .join(' · ')}
           </div>
@@ -705,7 +740,15 @@ export function HorizontalPhotoScene({
       background={
         <>
           {!m.photoTimeline && (
-            <Img src={media[scene.photoAssetId]} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <Img
+              src={media[scene.photoAssetId]}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: m.presentation?.vehicle ? 'contain' : 'cover',
+                backgroundColor: m.presentation?.vehicle ? '#14251d' : undefined,
+              }}
+            />
           )}
           {(!cinematic || contact) && (
             <AbsoluteFill
@@ -1074,10 +1117,10 @@ export function VerticalBrand(props: {
 }
 
 export {
-  DesignedPhotoScene,
-  isDesignedStyle,
-  photoStage,
   canvasColor,
+  DesignedPhotoScene,
   galleryMotion,
   galleryPhotoIndex,
+  isDesignedStyle,
+  photoStage,
 } from './new-styles';

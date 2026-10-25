@@ -1,20 +1,20 @@
 import { z } from 'zod';
-import { AgencyBrand, EntityId, ObjectKey, Sha256, VideoDuration, type NormalizedListing } from './product';
-import { ScriptScene } from './narration';
-import { SYNTHETIC_VOICE_DISCLOSURE } from './voice';
-import { VideoStyle } from './customization';
-import { EditorDocument } from './editor';
-import { MUSIC_LIMITS, VideoMusic } from './music-library';
-import { ConfirmedVideoMap, MapZoom, mapRasterLevels } from './maps';
 import {
+  AVATAR_AUDIO_BYTES,
+  AVATAR_VIDEO_BYTES,
+  AvatarAudioSources,
   AvatarCustomization,
   AvatarEngine,
   AvatarId,
   avatarMoments,
-  AvatarAudioSources,
-  AVATAR_AUDIO_BYTES,
-  AVATAR_VIDEO_BYTES,
 } from './avatars';
+import { VideoStyle } from './customization';
+import { EditorDocument } from './editor';
+import { ConfirmedVideoMap, MapZoom, mapRasterLevels } from './maps';
+import { MUSIC_LIMITS, VideoMusic } from './music-library';
+import { ScriptScene } from './narration';
+import { AgencyBrand, EntityId, type NormalizedListing, ObjectKey, Sha256, VideoDuration } from './product';
+import { SYNTHETIC_VOICE_DISCLOSURE } from './voice';
 
 const VideoAssetData = z
   .object({
@@ -76,6 +76,16 @@ export const VideoPresentation = z
     priceCents: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).nullable(),
     areaM2: z.number().positive().max(100_000).nullable(),
     rooms: z.number().int().positive().max(100).nullable(),
+    vehicle: z
+      .object({
+        year: z.number().int().nullable(),
+        mileageKm: z.number().int().nonnegative().nullable(),
+        fuel: z.string().nullable(),
+        transmission: z.string().nullable(),
+        powerHp: z.number().int().positive().nullable(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type VideoPresentation = z.infer<typeof VideoPresentation>;
@@ -85,12 +95,23 @@ export function videoPresentation(listing: NormalizedListing): VideoPresentation
     fact && (fact.status === 'verified' || fact.status === 'user_provided') ? fact.value : null;
   return VideoPresentation.parse({
     transaction: listing.transaction,
-    propertyType: known(facts.propertyType),
-    locality: known(facts.locality),
+    propertyType: listing.category === 'vehicle' ? 'other' : known(facts.propertyType),
+    locality: listing.category === 'vehicle' ? (known(facts.locality) ?? 'Automobile') : known(facts.locality),
     title: known(facts.title),
     priceCents: known(facts.price)?.amountCents ?? null,
     areaM2: known(facts.area),
     rooms: known(facts.rooms),
+    ...(listing.vehicle
+      ? {
+          vehicle: {
+            year: known(listing.vehicle.year),
+            mileageKm: known(listing.vehicle.mileageKm),
+            fuel: known(listing.vehicle.fuel),
+            transmission: known(listing.vehicle.transmission),
+            powerHp: known(listing.vehicle.powerHp),
+          },
+        }
+      : {}),
   });
 }
 export const VideoManifest = z

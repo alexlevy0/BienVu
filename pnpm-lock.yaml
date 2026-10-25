@@ -7,7 +7,8 @@ settings:
 overrides:
   body-parser@>=2.0.0 <2.4.0: 2.4.0
   zod@>=4.0.0 <4.6.6: 4.6.6
-  undici@7.29.0: 7.29.1
+  undici@>=7.18.0 <7.30.1: 7.30.1
+  fast-uri@>=3.0.0 <3.1.9: 3.1.9
   sharp@0.35.4: 0.35.5
   source-map-js@1.2.1: 1.2.2
   js-yaml@4.2.0: 4.3.2
@@ -79,8 +80,8 @@ importers:
         specifier: 10.0.1
         version: 10.0.1
       postal-mime:
-        specifier: 4.0.4
-        version: 4.0.4
+        specifier: 4.0.8
+        version: 4.0.8
       zod:
         specifier: 4.6.6
         version: 4.6.6
@@ -93,10 +94,10 @@ importers:
     dependencies:
       '@remotion/bundler':
         specifier: 4.0.529
-        version: 4.0.529(@swc/helpers@0.5.23)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 4.0.529(@swc/helpers@0.5.23)(postcss@8.5.29)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@remotion/cli':
         specifier: 4.0.529
-        version: 4.0.529(@swc/helpers@0.5.23)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@5.9.3)
+        version: 4.0.529(@swc/helpers@0.5.23)(postcss@8.5.29)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@5.9.3)
       '@remotion/renderer':
         specifier: 4.0.529
         version: 4.0.529(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -165,7 +166,7 @@ importers:
         version: link:../../packages/voice
       '@remotion/bundler':
         specifier: 4.0.529
-        version: 4.0.529(@swc/helpers@0.5.23)(postcss@8.5.29)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 4.0.529(@swc/helpers@0.5.23)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@remotion/renderer':
         specifier: 4.0.529
         version: 4.0.529(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -248,8 +249,8 @@ importers:
         specifier: 16.4.1
         version: 16.4.1(@types/node@24.10.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       postal-mime:
-        specifier: 4.0.4
-        version: 4.0.4
+        specifier: 4.0.8
+        version: 4.0.8
       posthog-js:
         specifier: 1.438.5
         version: 1.438.5(@types/react@19.3.0)(react@19.3.0)
@@ -2797,8 +2798,8 @@ packages:
   fast-png@8.0.0:
     resolution: {integrity: sha512-gCysNasJ8KEMgfdYIKd/wTDo6ENK1PWT0RJO7O+0pgmuHPw2O6tA1WvdxFRJoLf9V8yFYpG0FA1YgI8X97OhJA==}
 
-  fast-uri@3.1.8:
-    resolution: {integrity: sha512-GZMtZUTNRpOVIECoXwLNZS5xUGE+mVNbTB8h/7Rwh2TFWcBQiPzTgyZi05BF9UMZKkLJv8XBRJTlU7zg8+ZfMg==}
+  fast-uri@3.1.9:
+    resolution: {integrity: sha512-hS/0Wt3Ya043oKXs0sIxrMpKQITXhMLIrVAKKXi4gozGC9v7YRWVnXIZzjNPTO02M9BdxLCWqK1yRXgNziVyJQ==}
 
   fflate@0.4.9:
     resolution: {integrity: sha512-zdxgIEddhfsyCaWpJ2SdXEP8ZMrKJ6+5jl4OupODcywU0IhRk6gdXuVGcPICyfx2H97hVK7xmJtRLPjkxAX8Vw==}
@@ -3355,8 +3356,8 @@ packages:
     engines: {node: '>=20'}
     hasBin: true
 
-  postal-mime@4.0.4:
-    resolution: {integrity: sha512-LC9FypbNof/NfF07rHg5ev2zx6KwmqfcaGQPhSSdwJSnp04MImO+7ByCPh+3bkILupgMG5fn2WrThRy4WDqHoA==}
+  postal-mime@4.0.8:
+    resolution: {integrity: sha512-nnAgc4a9hn7zYuQmX4C7LU+fN47kR5S8cE8zvB/vZ2NimNDbaj+ISZJ9qe3CKIfn2uOTwwz4nQeIyljvdFNgOA==}
     engines: {node: '>=20'}
 
   postcss-modules-extract-imports@3.1.0:
@@ -3796,8 +3797,8 @@ packages:
     resolution: {integrity: sha512-EvRlUt/QqAEvXdQeRMYUfwOQsfzpDztykrG2owGEE/rBOBoYv9uF39ZzsNDh4lTFHhTr2XOZjKkYgueD12ZmGA==}
     engines: {node: '>=18.17'}
 
-  undici@7.29.1:
-    resolution: {integrity: sha512-RYONW2MeafgYlkVOKYKkA/Ag7BmXqgIWCa8t1m0JcxrQg9pI9lEqRhAOruOBCbAohOa/gkCF+iPi9hrgvTzu6Q==}
+  undici@7.30.1:
+    resolution: {integrity: sha512-03KrMbjIFDWQR5RNPrSw3bd1r12JpyFQl9/yxjUbJtqkjmllqC5lFjZh6ujeuJCKr8EOQvRW872Oy/az+nLYxg==}
     engines: {node: '>=20.18.1'}
 
   unenv@2.0.0-rc.24:
@@ -5430,15 +5431,15 @@ snapshots:
 
   '@remotion/captions@4.0.529': {}
 
-  '@remotion/cli@4.0.529(@swc/helpers@0.5.23)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@5.9.3)':
+  '@remotion/cli@4.0.529(@swc/helpers@0.5.23)(postcss@8.5.29)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@5.9.3)':
     dependencies:
       '@babel/parser': 7.24.1
-      '@remotion/bundler': 4.0.529(@swc/helpers@0.5.23)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@remotion/bundler': 4.0.529(@swc/helpers@0.5.23)(postcss@8.5.29)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@remotion/media-utils': 4.0.529(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@remotion/player': 4.0.529(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@remotion/renderer': 4.0.529(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@remotion/studio': 4.0.529(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      '@remotion/studio-server': 4.0.529(@swc/helpers@0.5.23)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@5.9.3)
+      '@remotion/studio-server': 4.0.529(@swc/helpers@0.5.23)(postcss@8.5.29)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@5.9.3)
       '@remotion/studio-shared': 4.0.529(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       dotenv: 17.3.1
       minimist: 1.2.6
@@ -5563,11 +5564,11 @@ snapshots:
     dependencies:
       zod: 4.6.6
 
-  '@remotion/studio-server@4.0.529(@swc/helpers@0.5.23)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@5.9.3)':
+  '@remotion/studio-server@4.0.529(@swc/helpers@0.5.23)(postcss@8.5.29)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@5.9.3)':
     dependencies:
       '@babel/parser': 7.24.1
       '@babel/types': 7.24.0
-      '@remotion/bundler': 4.0.529(@swc/helpers@0.5.23)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@remotion/bundler': 4.0.529(@swc/helpers@0.5.23)(postcss@8.5.29)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@remotion/codemods': 4.0.529(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@remotion/renderer': 4.0.529(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@remotion/studio-protocol': 4.0.529
@@ -6190,7 +6191,7 @@ snapshots:
   ajv@8.20.0:
     dependencies:
       fast-deep-equal: 3.1.3
-      fast-uri: 3.1.8
+      fast-uri: 3.1.9
       json-schema-traverse: 1.0.0
       require-from-string: 2.0.2
 
@@ -6696,7 +6697,7 @@ snapshots:
       fflate: 0.8.3
       iobuffer: 6.0.1
 
-  fast-uri@3.1.8: {}
+  fast-uri@3.1.9: {}
 
   fflate@0.4.9: {}
 
@@ -7025,7 +7026,7 @@ snapshots:
     dependencies:
       '@cspotcode/source-map-support': 0.8.1
       sharp: 0.35.5(@types/node@24.10.1)
-      undici: 7.29.1
+      undici: 7.30.1
       workerd: 1.20260926.1
       ws: 8.21.0
       youch: 4.1.0-beta.10
@@ -7038,7 +7039,7 @@ snapshots:
     dependencies:
       '@cspotcode/source-map-support': 0.8.1
       sharp: 0.35.5(@types/node@24.10.1)
-      undici: 7.29.1
+      undici: 7.30.1
       workerd: 1.20261006.1
       ws: 8.21.0
       youch: 4.1.0-beta.10
@@ -7215,7 +7216,7 @@ snapshots:
 
   playwright-core@1.62.1: {}
 
-  postal-mime@4.0.4: {}
+  postal-mime@4.0.8: {}
 
   postcss-modules-extract-imports@3.1.0(postcss@8.5.29):
     dependencies:
@@ -7655,7 +7656,7 @@ snapshots:
 
   undici@6.29.1: {}
 
-  undici@7.29.1: {}
+  undici@7.30.1: {}
 
   unenv@2.0.0-rc.24:
     dependencies:

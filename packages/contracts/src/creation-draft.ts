@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { DESCRIPTION_MAX_CHARACTERS, PhotoAsset } from './product';
 import { VideoCustomization } from './customization';
 import { IMPORT_PHOTO_MAXIMUM } from './photo-limits';
+import { DESCRIPTION_MAX_CHARACTERS, PhotoAsset, VehicleFacts } from './product';
 
 export const creationFieldNames = [
   'title',
@@ -76,6 +76,8 @@ export const CreationDraftData = z
     originalText: z.string().max(DESCRIPTION_MAX_CHARACTERS).nullable(),
     canonicalUrl: z.string().url().nullable(),
     warnings: z.array(z.string().max(300)).max(12),
+    category: z.literal('vehicle').optional(),
+    vehicle: VehicleFacts.optional(),
     videoCustomization: VideoCustomization.optional(),
     manualInput: ManualDraftInput.optional(),
   })
