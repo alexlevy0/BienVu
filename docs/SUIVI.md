@@ -1,8 +1,10 @@
 # BienVu — suivi des sprints
 
-### 25/10/2026 — Nouveau design sur l’accueil principal
+### 25/10/2026 — Auto sur le domaine principal, immobilier d’origine conservé
 
-Alex précise que **seule la partie Auto** doit reprendre le design Beta. La première promotion globale a donc été retirée immédiatement : l’accueil immobilier d’origine est rétabli en production (release `39c1f0025d74`). Correction en préparation : composant immobilier `LandingPage` conservé par défaut, accès Auto dans la barre supérieure vers `/?mode=auto`, retour Immobilier vers l’interface originale, reprises et connexion sur la route principale. Les CI de la première promotion étaient vertes (**922/922 tests**) ; la correction dispose de sa propre vérification à consigner après exécution. Aucune migration ni modification du pipeline, des prix ou des ressources. [Détail](BETA-AUTO.md#promotion-sur-laccueil-principal).
+Alex précise que **seule la partie Auto** doit reprendre le design Beta. La première promotion globale a été retirée immédiatement, puis la correction **`ea7b442`** publiée : `LandingPage` immobilier d’origine par défaut, accès Auto dans la barre supérieure vers `/?mode=auto`, retour Immobilier vers l’interface originale. Le contenu principal, le pied de page et les dialogues immobiliers sont identiques à la version d’origine ; seul le sélecteur est ajouté à l’en-tête.
+
+Release **`ea7b44217fc2`**, Worker **`b043dff3-cf0b-4d91-a4b6-a3286b61db68`** actif à **100 %**, module distant identique au bundle préparé, sourcemaps privées. **CI fonctionnelle et sécurité vertes, 922/922 tests**, 19 tests ciblés locaux, types, build, lint, formatage, frontières et 51 pages SEO de production réussis. Deux modes et aller-retour vérifiés en production sur ordinateur et mobile sans débordement ; ancien brouillon Peugeot repris avec cinq photos et **27 crédits** affichés. Aucun nouvel import ni crédit consommé. Autres Workers, conteneurs, ressources, crons, secrets et migrations conservés. Script d’historique corrigé pour lire les bindings de la version active lors d’un rollback ; rectification ajoutée au journal immuable du retour arrière, publication finale enregistrée. [Versions, commandes, preuves et limites](BETA-AUTO.md#promotion-sur-laccueil-principal).
 
 ### 25/10/2026 — Studio Beta Auto publié et import réel vérifié
 

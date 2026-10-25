@@ -1,19 +1,19 @@
 // Read the active Cloudflare deployment before recording it. Never infer a
 // production release from a successful build or an uploaded, inactive version.
-import { cloudflare, accountId } from './cloudflare-operator.mjs';
+import { accountId, cloudflare } from './cloudflare-operator.mjs';
 
 export async function recordAdminDeployment() {
   const worker = 'bienvu-web-probe-staging',
     base = `/accounts/${accountId}/workers/scripts/${worker}`;
-  const [deployments, settings] = await Promise.all([
-    cloudflare(base + '/deployments'),
-    cloudflare(base + '/settings'),
-  ]);
+  const deployments = await cloudflare(base + '/deployments');
   const active = deployments.deployments[0];
   if (active?.versions.length !== 1 || active.versions[0].percentage !== 100)
     throw Error('SINGLE_ACTIVE_DEPLOYMENT_REQUIRED');
-  const release = settings.bindings.find((b) => b.name === 'BIENVU_RELEASE')?.text;
-  const admin = settings.bindings.find((b) => b.name === 'SUPER_ADMIN_EMAIL')?.text;
+  // Script settings describe the latest upload, which may be inactive after a rollback.
+  const version = await cloudflare(base + '/versions/' + active.versions[0].version_id);
+  const bindings = version.resources?.bindings;
+  const release = bindings?.find((b) => b.name === 'BIENVU_RELEASE')?.text;
+  const admin = bindings?.find((b) => b.name === 'SUPER_ADMIN_EMAIL')?.text;
   if (!/^[a-f0-9]{12,40}$/.test(release ?? '') || !admin || !active.created_on)
     throw Error('DEPLOYMENT_METADATA_MISSING');
   const quote = (s) => "'" + String(s).replaceAll("'", "''") + "'",
