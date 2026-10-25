@@ -60,9 +60,11 @@ async function json(response: Response) {
 export function AutoCreate({
   onLayoutChange,
   voiceChoice,
+  studioPath = '/beta',
 }: {
   onLayoutChange(active: boolean): void;
   voiceChoice?: BetaVoiceChoice | null;
+  studioPath?: '/' | '/beta';
 }) {
   const { me, loading, defaultVoice, resolveDefaultVoice } = useAccount(),
     store = useGenerationStore();
@@ -184,7 +186,7 @@ export function AutoCreate({
         if (!abort.signal.aborted) {
           const next = CreationDraftView.parse(value);
           if (next.data.category !== 'vehicle') {
-            window.location.replace(`/beta?mode=immo&draft=${encodeURIComponent(next.id)}`);
+            window.location.replace(`${studioPath}?mode=immo&draft=${encodeURIComponent(next.id)}`);
             return;
           }
           accept(next);
@@ -434,7 +436,10 @@ export function AutoCreate({
               {!me ? (
                 <div className="auto-signin">
                   <p>Connectez-vous pour importer votre véhicule, retrouver vos photos et créer sa vidéo.</p>
-                  <Link className="auto-primary" href="/connexion?next=%2Fbeta%3Fmode%3Dauto">
+                  <Link
+                    className="auto-primary"
+                    href={`/connexion?next=${encodeURIComponent(studioPath + '?mode=auto')}`}
+                  >
                     Se connecter <HomeIcon name="arrow" size={17} />
                   </Link>
                 </div>

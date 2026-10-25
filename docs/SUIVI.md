@@ -1,5 +1,9 @@
 # BienVu — suivi des sprints
 
+### 25/10/2026 — Nouveau design sur l’accueil principal
+
+À la demande d’Alex, promotion du studio validé sur Beta sur `bienvu.online/`, même interface Immobilier / Auto et mêmes parcours. Suppression du lien « Version actuelle » sur la home, retours de connexion et reprise des brouillons adaptés à la route d’entrée, anciennes créations immobilières conservées, métadonnées automobiles et immobilières, aperçu média administrateur protégé. **19/19 tests ciblés** et typage complet réussis. Aucune migration ni modification du pipeline, des prix ou des ressources. Build, contrôles visuels et publication à consigner après exécution. [Détail](BETA-AUTO.md#promotion-sur-laccueil-principal).
+
 ### 25/10/2026 — Studio Beta Auto publié et import réel vérifié
 
 Code **`31bdf29`** puis **`39c1f00`** poussé sur `main`, release **`39c1f0025d74`** publiée : accueil Beta d’après la référence d’Alex, import automobile, vérification et saisie manuelle, photos privées, paramètres et génération via le pipeline existant. Extension JSON optionnelle sans migration ; anciennes empreintes immobilières conservées. Les quatre Workers web/génération/import/mail sont actifs à **100 %**, modules distants identiques aux bundles préparés, sourcemaps PostHog privées et configuration conservée. Nouvelles images Linux import **v9** et renderer **v38**, renouvellement terminé à 100 %. Schémas existants et **16 tables / 424 lignes critiques** préservés ; migration 0085 conservée. Publication enregistrée dans l’historique du superadmin.

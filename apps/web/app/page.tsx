@@ -1,20 +1,27 @@
-import { LandingPage } from '../components/landing-page';
-import { HomepageMediaProvider } from '../components/homepage-media';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
+import { BetaLandingPage } from '../components/beta-landing-page';
+import { HomepageMediaProvider } from '../components/homepage-media';
+import { StructuredData } from '../components/structured-data';
 import { requireAdmin } from '../lib/admin-access';
-import { readHomepageConfig, readHomepageHeroPoster, homepageEdgeCache } from '../lib/homepage-media';
-import { resolveHomeMedia, imageWidthUrl, homeImageSrcSet, heroPosterSizes } from '../lib/home-media-view';
 import { hasHeroDepth } from '../lib/home-hero-depth';
 import { homeHeroDepth } from '../lib/home-hero-depth-assets';
-import { StructuredData } from '../components/structured-data';
+import { heroPosterSizes, homeImageSrcSet, imageWidthUrl, resolveHomeMedia } from '../lib/home-media-view';
+import { homepageEdgeCache, readHomepageConfig, readHomepageHeroPoster } from '../lib/homepage-media';
 import { seoMetadata, siteSchema } from '../lib/seo';
 import './landing.css';
 import './home-composer.css';
 import './home-noise.css';
 import './home-typography.css';
 import './home-hero-depth.css';
+import './home-avatars.css';
+import './home-render-comparison.css';
+import './home-editor-showcase.css';
+import './home-vitrine.css';
+import './home-footer.css';
+import './beta/beta.css';
+import './beta/auto.css';
 
 export async function generateMetadata({
   searchParams,
@@ -23,17 +30,24 @@ export async function generateMetadata({
 }) {
   const query = await searchParams;
   return seoMetadata({
-    title: 'BienVu — Marketing immobilier IA et création de vidéos',
+    title: 'BienVu — Vos annonces immobilières et auto en vidéo',
     description:
-      'Créez des vidéos immobilières à partir de vos annonces et photos. Personnalisez vos contenus et programmez leur publication sur Instagram et Facebook.',
+      'Le studio marketing IA de vos annonces immobilières et automobiles : import par lien, voix off, avatars et animations.',
     path: '/',
-    noindex: Boolean(query.homePreview || query.draft),
+    noindex: Boolean(query.homePreview || query.draft || query.job),
   });
 }
 export const dynamic = 'force-dynamic';
-export default async function Page({ searchParams }: { searchParams: Promise<{ homePreview?: string }> }) {
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ homePreview?: string; mode?: string; draft?: string }>;
+}) {
+  const query = await searchParams;
   const { env, ctx } = await getCloudflareContext({ async: true }),
-    preview = (await searchParams).homePreview === '1';
+    preview = query.homePreview === '1';
+  const category =
+    query.mode === 'immo' || ((query.draft || preview) && query.mode !== 'auto') ? 'real-estate' : 'vehicle';
   if (preview) {
     try {
       await requireAdmin(new Request(env.BETTER_AUTH_URL, { headers: await headers() }), env);
@@ -49,28 +63,29 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ h
   const depth = hasHeroDepth(resolveHomeMedia(config, 'hero.video'));
   return (
     <HomepageMediaProvider config={config} heroPoster={heroPoster}>
-      {depth ? (
-        <link
-          rel="preload"
-          as="image"
-          href={homeHeroDepth.backgroundPoster}
-          media="(min-width: 761px)"
-          fetchPriority="high"
-        />
-      ) : (
-        heroPoster &&
-        heroImage && (
+      {category === 'real-estate' &&
+        (depth ? (
           <link
             rel="preload"
             as="image"
-            href={imageWidthUrl(heroImage, 640)}
-            imageSrcSet={homeImageSrcSet(heroImage)}
-            imageSizes={heroPosterSizes}
+            href={homeHeroDepth.backgroundPoster}
             media="(min-width: 761px)"
             fetchPriority="high"
           />
-        )
-      )}
+        ) : (
+          heroPoster &&
+          heroImage && (
+            <link
+              rel="preload"
+              as="image"
+              href={imageWidthUrl(heroImage, 640)}
+              imageSrcSet={homeImageSrcSet(heroImage)}
+              imageSizes={heroPosterSizes}
+              media="(min-width: 761px)"
+              fetchPriority="high"
+            />
+          )
+        ))}
       <link rel="preload" href="/fonts/newsreader-ui.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
       <link
         rel="preload"
@@ -86,7 +101,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ h
           <a href="/admin?view=homepage">Retour à l’administration →</a>
         </div>
       )}
-      <LandingPage />
+      <BetaLandingPage betaPreview={false} initialCategory={category} />
     </HomepageMediaProvider>
   );
 }

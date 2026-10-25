@@ -2,13 +2,19 @@
 
 La demande d’Alex du 25/10/2026 porte sur la maquette fournie et un mode **Auto complet avec import par lien et génération**. Le travail utilise l’origine existante : `beta.bienvu.online` redirige vers `bienvu.online/beta`. Aucune nouvelle infrastructure d’environnement n’est créée.
 
+## Promotion sur l’accueil principal
+
+Alex demande ensuite d’appliquer ce design à **`bienvu.online/`**. L’accueil utilise désormais le même composant et les mêmes styles que la page validée sur Beta, sans lien « Version actuelle » vers lui-même. Le mode Auto est affiché par défaut ; `?mode=immo` ouvre directement le parcours immobilier. Les anciens liens `?draft=…` sans catégorie ouvrent d’abord le lecteur immobilier, qui reconnaît et réoriente les brouillons Auto si nécessaire. Les retours de connexion et les changements de lecteur restent sur la route d’origine (`/` ou `/beta`). L’aperçu privé du gestionnaire de médias reste protégé par l’accès administrateur et ouvre l’immobilier par défaut. Métadonnées de la home mises à jour, canonique `/`, annonces privées non indexées. Le lien FAQ du mode Auto ouvre l’aide existante.
+
+Fichiers concernés : `app/page.tsx`, `app/beta/page.tsx`, `components/beta-landing-page.tsx`, `components/auto-create.tsx`, `components/home-create.tsx`, `lib/seo.ts`, sous `apps/web/`. Aucun changement de migration, facturation, fournisseur ou configuration de service. Vérifications initiales : **19/19 tests ciblés** (`beta-homepage`, `seo`, `homepage-media`) et `pnpm typecheck` réussis. Les contrôles visuels, le build final, les CI et la publication du nouvel accueil sont à consigner après exécution. Preuves ignorées dans `evidence/local/homepage-auto/`.
+
 ## Parcours livré
 
 - Accueil Beta inspiré de la référence : sélecteur Immobilier / Auto, grand titre serif, cartes superposées, sources automobiles, sept usages de contenus. Les textes et visuels sociaux ne sont pas présentés comme sept exports automatiques.
 - Auto : connexion, import d’une annonce ou saisie manuelle, vérification des informations, ajout et sélection de 3 à 12 photos réelles, ordre, animations facultatives, durée 20/30/40 s, format vertical/horizontal, style, voix et présentateur existants. Le coût est affiché avant le lancement.
 - Les informations absentes restent absentes. Les photos de catalogue Aramis `betamodels` sont exclues. Les réserves du vendeur sont conservées dans la narration ; GPT sélectionne un catalogue de paragraphes, sans écrire de caractéristiques libres.
 - Le brouillon peut être enregistré et repris. Un retour réseau perdu conserve la même clé d’admission ; la complétion ne se rejoue pas au second clic. Les photos restent privées et leur journal précède R2.
-- L’accueil immobilier principal est conservé. Les anciens brouillons Auto sont dirigés vers Beta ; les anciens brouillons immobiliers restent dans leur parcours.
+- À la première publication Beta, l’accueil immobilier principal était conservé. La promotion demandée ensuite est détaillée ci-dessus ; les anciens brouillons immobiliers restent pris en charge.
 
 ## Sources réellement vérifiées
 

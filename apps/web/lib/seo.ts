@@ -106,7 +106,7 @@ export const siteSchema = {
       operatingSystem: 'Web',
       inLanguage: 'fr',
       description:
-        'Création, personnalisation et publication de vidéos immobilières à partir des annonces et photos de votre agence.',
+        'Création et personnalisation de vidéos immobilières et automobiles à partir de vos annonces et photos.',
       offers: {
         '@type': 'Offer',
         price: '0',

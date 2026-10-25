@@ -122,12 +122,14 @@ function HomeCreateContent({
   onClearRenderChoice,
   voiceChoice,
   variant = 'default',
+  studioPath = '/',
 }: {
   onLayoutChange(active: boolean): void;
   renderChoice?: HomeRenderChoice | null;
   onClearRenderChoice?(): void;
   voiceChoice?: BetaVoiceChoice | null;
   variant?: 'default' | 'beta';
+  studioPath?: '/' | '/beta';
 }) {
   const { me, loading, defaultVoice, resolveDefaultVoice } = useAccount();
   const photoHandoff = useCreationPhotoHandoff(),
@@ -592,7 +594,7 @@ function HomeCreateContent({
         )
           return;
         if (value.draft.data.category === 'vehicle') {
-          window.location.replace(`/beta?mode=auto&draft=${encodeURIComponent(value.draft.id)}`);
+          window.location.replace(`${studioPath}?mode=auto&draft=${encodeURIComponent(value.draft.id)}`);
           return;
         }
         if (!hasCreationDraftContent(value.draft.data, value.draft.photos.length)) {
@@ -1344,7 +1346,9 @@ function HomeCreateContent({
             <>
               Connectez-vous pour ajouter un avatar.{' '}
               <Link
-                href={variant === 'beta' ? '/connexion?next=/beta' : '/connexion'}
+                href={
+                  variant === 'beta' ? `/connexion?next=${encodeURIComponent(studioPath + '?mode=immo')}` : '/connexion'
+                }
                 onClick={() => {
                   const source = ImportUrl.safeParse(url.trim());
                   if (source.success) saveListingDraft({ kind: 'url', url: source.data });

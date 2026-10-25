@@ -203,12 +203,16 @@ function Workspace() {
   );
 }
 
-export function BetaLandingPage() {
+export function BetaLandingPage({
+  betaPreview = true,
+  initialCategory = 'vehicle',
+}: {
+  betaPreview?: boolean;
+  initialCategory?: 'real-estate' | 'vehicle';
+}) {
   const { me } = useAccount();
-  const [category, setCategory] = useState<'real-estate' | 'vehicle'>('vehicle');
-  useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('mode') === 'immo') setCategory('real-estate');
-  }, []);
+  const studioPath = betaPreview ? '/beta' : '/';
+  const [category, setCategory] = useState(initialCategory);
   const [creating, setCreating] = useState(false),
     [example, setExample] = useState(false),
     [heroPlaying, setHeroPlaying] = useState(false),
@@ -279,9 +283,11 @@ export function BetaLandingPage() {
           <span>Le studio marketing IA de vos annonces.</span>
           <div className="beta-topbar-links">
             <Link href="/aide">Aide</Link>
-            <Link href="/">
-              Version actuelle <HomeIcon name="external" size={13} />
-            </Link>
+            {betaPreview && (
+              <Link href="/">
+                Version actuelle <HomeIcon name="external" size={13} />
+              </Link>
+            )}
           </div>
         </header>
         <main
@@ -343,10 +349,16 @@ export function BetaLandingPage() {
                 </div>
               )}
               {category === 'vehicle' ? (
-                <AutoCreate key={me?.agency.id ?? 'guest'} onLayoutChange={setCreating} voiceChoice={voiceChoice} />
+                <AutoCreate
+                  key={me?.agency.id ?? 'guest'}
+                  onLayoutChange={setCreating}
+                  voiceChoice={voiceChoice}
+                  studioPath={studioPath}
+                />
               ) : (
                 <HomeCreate
                   variant="beta"
+                  studioPath={studioPath}
                   onLayoutChange={setCreating}
                   renderChoice={choice}
                   voiceChoice={voiceChoice}
@@ -654,7 +666,7 @@ export function BetaLandingPage() {
             </>
           )}
         </main>
-        <HomeFooter onCreate={focusComposer} faqHref="#beta-faq-title" />
+        <HomeFooter onCreate={focusComposer} faqHref={category === 'vehicle' ? '/aide' : '#beta-faq-title'} />
       </div>
       {example && (
         <Example

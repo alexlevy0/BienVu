@@ -24,7 +24,8 @@ export const metadata = seoMetadata({
   path: '/beta',
   noindex: true,
 });
-export default async function Page() {
+export default async function Page({ searchParams }: { searchParams: Promise<{ mode?: string; draft?: string }> }) {
+  const query = await searchParams;
   const { env, ctx } = await getCloudflareContext({ async: true });
   const config = await readHomepageConfig(
     env.DB,
@@ -34,7 +35,9 @@ export default async function Page() {
   return (
     <HomepageMediaProvider config={config}>
       <link rel="preload" href="/fonts/newsreader-ui.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
-      <BetaLandingPage />
+      <BetaLandingPage
+        initialCategory={query.mode === 'immo' || (query.draft && query.mode !== 'auto') ? 'real-estate' : 'vehicle'}
+      />
     </HomepageMediaProvider>
   );
 }
