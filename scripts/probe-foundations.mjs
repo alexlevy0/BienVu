@@ -8,8 +8,8 @@ if (!['localhost', '127.0.0.1', '[::1]'].includes(origin.hostname))
 const report = { at: new Date().toISOString(), mode: 'local-workerd', externalCalls: 0, checks: [] };
 // The studio controls identify these pages without coupling the probe to marketing copy.
 const pages = new Map([
-  ['/', [/id="home-listing-url"/, /class="auto-composer(?:\s[^"]*)?"/]],
-  ['/?mode=immo', [/id="home-listing-url"/, /class="home-composer(?:\s[^"]*)?"/]],
+  ['/', [/id="home-title"/, /id="home-listing-url"/, /class="home-composer(?:\s[^"]*)?"/]],
+  ['/?mode=auto', [/id="beta-title"/, /id="home-listing-url"/, /class="auto-composer(?:\s[^"]*)?"/]],
   ['/studio', /id="home-listing-url"/],
   ['/sources', /IMPORTER VOTRE ANNONCE/],
   ['/generer', /id="home-listing-url"/],

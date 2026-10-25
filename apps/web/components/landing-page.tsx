@@ -1,32 +1,32 @@
 'use client';
 
+import type { HomepageSlot } from '@bienvu/contracts';
 import Link from 'next/link';
 import { Suspense, startTransition, useCallback, useEffect, useRef, useState } from 'react';
-import { HomeCreate } from './home-create';
-import { AgencySeal, HomeIcon } from './home-icons';
-import { StudioSidebar } from './studio-sidebar';
-import { HomeShowcase } from './home-showcase';
-import { HomeAvatarShowcase } from './home-avatar-showcase';
-import { HomeAnimationComparison } from './home-animation-comparison';
-import { HomeRenderComparison } from './home-render-comparison';
-import { useSiteFeatures } from './site-features';
 import {
-  homeRenderPresetKey,
-  parseHomeRenderPreset,
   type HomeRenderChoice,
   type HomeRenderPreset,
+  homeRenderPresetKey,
+  parseHomeRenderPreset,
 } from '../lib/home-render-presets';
-import { HomeMandateKit } from './home-mandate-kit';
-import { HomeSharing } from './home-sharing';
-import { HomeEditorShowcase } from './home-editor-showcase';
-import { HomeVitrineShowcase } from './home-vitrine-showcase';
-import { HomeHeroVideo } from './home-hero-video';
-import { HomeFooter } from './home-footer';
-import { HomeScrollMotion } from './home-scroll-motion';
-import { HomeMarketingStyles } from './home-marketing-styles';
-import { HomeVisual, useHomepageMedia, useHomepageConfig, homeClock } from './homepage-media';
-import type { HomepageSlot } from '@bienvu/contracts';
 import { publicFeatureLinks as featurePages } from '../lib/marketing-navigation';
+import { HomeAnimationComparison } from './home-animation-comparison';
+import { HomeAvatarShowcase } from './home-avatar-showcase';
+import { HomeCreate } from './home-create';
+import { HomeEditorShowcase } from './home-editor-showcase';
+import { HomeFooter } from './home-footer';
+import { HomeHeroVideo } from './home-hero-video';
+import { AgencySeal, HomeIcon } from './home-icons';
+import { HomeMandateKit } from './home-mandate-kit';
+import { HomeMarketingStyles } from './home-marketing-styles';
+import { HomeRenderComparison } from './home-render-comparison';
+import { HomeScrollMotion } from './home-scroll-motion';
+import { HomeSharing } from './home-sharing';
+import { HomeShowcase } from './home-showcase';
+import { HomeVitrineShowcase } from './home-vitrine-showcase';
+import { HomeVisual, homeClock, useHomepageConfig, useHomepageMedia } from './homepage-media';
+import { useSiteFeatures } from './site-features';
+import { StudioSidebar } from './studio-sidebar';
 
 const examples = [
   {
@@ -210,10 +210,20 @@ export function LandingPage() {
       <StudioSidebar active="create" />
       <div className="home-workspace">
         <header className="home-topbar">
-          <span>Le studio marketing IA de votre agence immobilière.</span>
-          <button type="button" onClick={() => setDialog('help')}>
-            Aide
-          </button>
+          <span className="home-topbar-description">Le studio marketing IA de votre agence immobilière.</span>
+          <div className="home-topbar-actions">
+            <nav className="home-market-switch" aria-label="Type d’annonce">
+              <Link href="/" aria-current="page">
+                <HomeIcon name="house" size={17} /> Immobilier
+              </Link>
+              <Link href="/?mode=auto" prefetch={false}>
+                <HomeIcon name="car" size={19} /> Auto <span>Nouveau</span>
+              </Link>
+            </nav>
+            <button type="button" onClick={() => setDialog('help')}>
+              Aide
+            </button>
+          </div>
         </header>
         <main
           className={`home-content${conversationActive ? ' home-content-conversation' : ''}`}

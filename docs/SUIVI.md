@@ -2,7 +2,7 @@
 
 ### 25/10/2026 — Nouveau design sur l’accueil principal
 
-À la demande d’Alex, promotion du studio validé sur Beta sur `bienvu.online/`, même interface Immobilier / Auto et mêmes parcours. Suppression du lien « Version actuelle » sur la home, retours de connexion et reprise des brouillons adaptés à la route d’entrée, anciennes créations immobilières conservées, métadonnées automobiles et immobilières, aperçu média administrateur protégé. **19/19 tests ciblés** et typage complet réussis. Aucune migration ni modification du pipeline, des prix ou des ressources. Build, contrôles visuels et publication à consigner après exécution. [Détail](BETA-AUTO.md#promotion-sur-laccueil-principal).
+Alex précise que **seule la partie Auto** doit reprendre le design Beta. La première promotion globale a donc été retirée immédiatement : l’accueil immobilier d’origine est rétabli en production (release `39c1f0025d74`). Correction en préparation : composant immobilier `LandingPage` conservé par défaut, accès Auto dans la barre supérieure vers `/?mode=auto`, retour Immobilier vers l’interface originale, reprises et connexion sur la route principale. Les CI de la première promotion étaient vertes (**922/922 tests**) ; la correction dispose de sa propre vérification à consigner après exécution. Aucune migration ni modification du pipeline, des prix ou des ressources. [Détail](BETA-AUTO.md#promotion-sur-laccueil-principal).
 
 ### 25/10/2026 — Studio Beta Auto publié et import réel vérifié
 

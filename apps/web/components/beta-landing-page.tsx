@@ -309,6 +309,10 @@ export function BetaLandingPage({
                       type="button"
                       aria-pressed={category === 'real-estate'}
                       onClick={() => {
+                        if (!betaPreview) {
+                          window.location.assign('/');
+                          return;
+                        }
                         setCategory('real-estate');
                         const u = new URL(window.location.href);
                         u.searchParams.set('mode', 'immo');

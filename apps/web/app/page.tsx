@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { BetaLandingPage } from '../components/beta-landing-page';
 import { HomepageMediaProvider } from '../components/homepage-media';
+import { LandingPage } from '../components/landing-page';
 import { StructuredData } from '../components/structured-data';
 import { requireAdmin } from '../lib/admin-access';
 import { hasHeroDepth } from '../lib/home-hero-depth';
@@ -22,6 +23,7 @@ import './home-vitrine.css';
 import './home-footer.css';
 import './beta/beta.css';
 import './beta/auto.css';
+import './home-market-switch.css';
 
 export async function generateMetadata({
   searchParams,
@@ -29,10 +31,12 @@ export async function generateMetadata({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const query = await searchParams;
+  const auto = query.mode === 'auto';
   return seoMetadata({
-    title: 'BienVu — Vos annonces immobilières et auto en vidéo',
-    description:
-      'Le studio marketing IA de vos annonces immobilières et automobiles : import par lien, voix off, avatars et animations.',
+    title: auto ? 'BienVu — Vos annonces auto en vidéo' : 'BienVu — Marketing immobilier IA et création de vidéos',
+    description: auto
+      ? 'Le studio marketing IA de vos annonces automobiles : import par lien, voix off, avatars et animations.'
+      : 'Créez des vidéos immobilières à partir de vos annonces et photos. Personnalisez vos contenus et programmez leur publication sur Instagram et Facebook.',
     path: '/',
     noindex: Boolean(query.homePreview || query.draft || query.job),
   });
@@ -46,8 +50,7 @@ export default async function Page({
   const query = await searchParams;
   const { env, ctx } = await getCloudflareContext({ async: true }),
     preview = query.homePreview === '1';
-  const category =
-    query.mode === 'immo' || ((query.draft || preview) && query.mode !== 'auto') ? 'real-estate' : 'vehicle';
+  const category = query.mode === 'auto' ? 'vehicle' : 'real-estate';
   if (preview) {
     try {
       await requireAdmin(new Request(env.BETTER_AUTH_URL, { headers: await headers() }), env);
@@ -101,7 +104,7 @@ export default async function Page({
           <a href="/admin?view=homepage">Retour à l’administration →</a>
         </div>
       )}
-      <BetaLandingPage betaPreview={false} initialCategory={category} />
+      {category === 'vehicle' ? <BetaLandingPage betaPreview={false} initialCategory="vehicle" /> : <LandingPage />}
     </HomepageMediaProvider>
   );
 }
