@@ -2,11 +2,11 @@ import type { NormalizedListing, ScriptPlan } from '../packages/contracts/src/in
 import {
   DEFAULT_SCRIPT_MODEL,
   narrationWordLimit,
-  wordCount,
   type ScriptContext,
   type ScriptMetrics,
+  wordCount,
 } from '../packages/narration/src/index';
-import { saleFixture, brandFixture } from './contracts';
+import { brandFixture, saleFixture } from './contracts';
 
 export function narrationListing(manual = false): NormalizedListing {
   const listing = saleFixture();
@@ -55,6 +55,13 @@ export const narrationBrand = {
   email: 'recette@example.com',
 };
 export function fixturePlan(context: ScriptContext): ScriptPlan {
+  if (context.listing.category === 'vehicle')
+    return {
+      scenes: context.copies.map((copy, index) => ({
+        copyId: copy.id,
+        photoAssetId: context.listing.photos[index % context.listing.photos.length].id,
+      })),
+    };
   if (context.copyVersion === 'description-copy/1') {
     const copies = [context.copies.find((c) => c.id === 'intro/short')!],
       ending = context.copies.find((c) => c.id === 'contact/short')!;
