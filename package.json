@@ -63,7 +63,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.6.2",
     "@posthog/cli": "0.18.10",
-    "@types/node": "24.10.1",
+    "@types/node": "26.6.5",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.2.3",
     "miniflare": "5.20260926.0-alpha",
