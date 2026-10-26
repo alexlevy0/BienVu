@@ -13,12 +13,12 @@
     "@bienvu/contracts": "workspace:*",
     "@bienvu/video": "workspace:*",
     "@bienvu/voice": "workspace:*",
-    "@remotion/bundler": "4.0.529",
-    "@remotion/renderer": "4.0.529",
+    "@remotion/bundler": "4.0.538",
+    "@remotion/renderer": "4.0.538",
     "maplibre-gl": "6.12.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "remotion": "4.0.529",
+    "remotion": "4.0.538",
     "sharp": "0.35.5",
     "tsx": "4.23.15"
   }
