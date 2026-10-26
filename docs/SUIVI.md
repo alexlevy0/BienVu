@@ -4,7 +4,7 @@
 
 À la demande d’Alex, le sélecteur **Immobilier / Auto** est retiré de l’en-tête de l’accueil immobilier (`/`) : celui-ci retrouve uniquement son libellé immobilier et l’aide. Le studio Auto n’est pas retiré et reste directement accessible sur `/?mode=auto` ; son parcours et son retour vers l’immobilier ne changent pas. La feuille de style devenue inutilisée est supprimée.
 
-Lint Biome, contrôle de formatage et typage TypeScript de l’application web réussis. Aucun import, brouillon, crédit, génération, migration ni paramètre Cloudflare n’est modifié par cette correction. Publication et contrôle visuel de production à effectuer après construction du Worker.
+Lint Biome, contrôle de formatage et typage TypeScript de l’application web réussis ; le build OpenNext et les sourcemaps PostHog privées ont aussi réussi. Aucun import, brouillon, crédit, génération, migration ni paramètre Cloudflare n’est modifié. Le commit `61bc3e9` est poussé sur `main`, mais **n’est pas publié** : l’OAuth Wrangler en place renvoie `401 Unauthorized` sur l’upload des assets statiques, après les cinq reprises prévues. Aucun nouveau Worker ni déploiement distant n’a donc été créé. L’accueil public conserve logiquement le sélecteur tant que l’authentification Cloudflare n’a pas été renouvelée avec le droit d’écriture des assets Workers.
 
 ### 25/10/2026 — Auto sur le domaine principal, immobilier d’origine conservé
 
