@@ -211,19 +211,9 @@ export function LandingPage() {
       <div className="home-workspace">
         <header className="home-topbar">
           <span className="home-topbar-description">Le studio marketing IA de votre agence immobilière.</span>
-          <div className="home-topbar-actions">
-            <nav className="home-market-switch" aria-label="Type d’annonce">
-              <Link href="/" aria-current="page">
-                <HomeIcon name="house" size={17} /> Immobilier
-              </Link>
-              <Link href="/?mode=auto" prefetch={false}>
-                <HomeIcon name="car" size={19} /> Auto <span>Nouveau</span>
-              </Link>
-            </nav>
-            <button type="button" onClick={() => setDialog('help')}>
-              Aide
-            </button>
-          </div>
+          <button type="button" onClick={() => setDialog('help')}>
+            Aide
+          </button>
         </header>
         <main
           className={`home-content${conversationActive ? ' home-content-conversation' : ''}`}

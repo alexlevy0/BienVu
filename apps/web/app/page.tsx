@@ -23,7 +23,6 @@ import './home-vitrine.css';
 import './home-footer.css';
 import './beta/beta.css';
 import './beta/auto.css';
-import './home-market-switch.css';
 
 export async function generateMetadata({
   searchParams,

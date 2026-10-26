@@ -1,5 +1,11 @@
 # BienVu — suivi des sprints
 
+### 26/10/2026 — Accueil immobilier simplifié
+
+À la demande d’Alex, le sélecteur **Immobilier / Auto** est retiré de l’en-tête de l’accueil immobilier (`/`) : celui-ci retrouve uniquement son libellé immobilier et l’aide. Le studio Auto n’est pas retiré et reste directement accessible sur `/?mode=auto` ; son parcours et son retour vers l’immobilier ne changent pas. La feuille de style devenue inutilisée est supprimée.
+
+Lint Biome, contrôle de formatage et typage TypeScript de l’application web réussis. Aucun import, brouillon, crédit, génération, migration ni paramètre Cloudflare n’est modifié par cette correction. Publication et contrôle visuel de production à effectuer après construction du Worker.
+
 ### 25/10/2026 — Auto sur le domaine principal, immobilier d’origine conservé
 
 Alex précise que **seule la partie Auto** doit reprendre le design Beta. La première promotion globale a été retirée immédiatement, puis la correction **`ea7b442`** publiée : `LandingPage` immobilier d’origine par défaut, accès Auto dans la barre supérieure vers `/?mode=auto`, retour Immobilier vers l’interface originale. Le contenu principal, le pied de page et les dialogues immobiliers sont identiques à la version d’origine ; seul le sélecteur est ajouté à l’en-tête.
