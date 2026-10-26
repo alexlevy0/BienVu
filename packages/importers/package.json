@@ -12,6 +12,6 @@
   "dependencies": {
     "@bienvu/contracts": "workspace:*",
     "ipaddr.js": "2.5.0",
-    "parse5": "8.0.0"
+    "parse5": "8.0.1"
   }
 }
