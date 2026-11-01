@@ -1,5 +1,15 @@
 # BienVu — suivi des sprints
 
+### 01/11/2026 — Création de projet sans corps rétablie
+
+Depuis la publication Auto du 25/10, `POST /api/imports/draft` lisait du JSON dès que `request.body` existait. En production, Next attache un flux vide à tout POST : la démo et le nouveau projet de l’Éditeur, la saisie manuelle et le transfert d’un projet invité, connectés, renvoyaient `VALIDATION_ERROR`. La route ne lit désormais le JSON que si un `Content-Type` l’annonce ; la catégorie `vehicle` reste envoyée en JSON. Test ajouté avec le flux vide reproduit.
+
+Commit **`71d2678`** poussé sur `main`, release **`71d26784c18c`**, Worker web **`037a7942-c30a-4db0-ae19-8bcaa92805cb`** actif à **100 %**, sourcemaps privées PostHog, publication `no_bundle` `--keep-vars --strict` enregistrée dans l’historique du superadmin. CI fonctionnelle verte ; lint, formatage, frontières, types et 925 tests locaux (11 rejoués seuls après épuisement de ports Miniflare). Accueil, Éditeur et connexion **200** avec la nouvelle release, création de brouillon sans session **401**. Aucune migration, aucun autre Worker ni paramètre modifié.
+
+**CI sécurité rouge depuis le 28/10, sans lien avec ce correctif** : `better-auth` 1.7.6 (une alerte critique, une haute, corrigées en 1.7.7), `qs`, `minimatch` et `glob`. Mise à jour à faire séparément.
+
+Le mois **2026-11** a été ouvert le 01/11 par Alex dans le superadmin : imports et générations étaient refusés depuis minuit UTC faute de budget mensuel ouvert.
+
 ### 26/10/2026 — Accueil immobilier simplifié
 
 À la demande d’Alex, le sélecteur **Immobilier / Auto** est retiré de l’en-tête de l’accueil immobilier (`/`) : celui-ci retrouve uniquement son libellé immobilier et l’aide. Le studio Auto n’est pas retiré et reste directement accessible sur `/?mode=auto` ; son parcours et son retour vers l’immobilier ne changent pas. La feuille de style devenue inutilisée est supprimée.
