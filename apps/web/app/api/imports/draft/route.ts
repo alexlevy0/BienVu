@@ -1,5 +1,5 @@
 import { startManualCreationDraft } from '../../../../lib/creation-drafts';
-import { assertSameOrigin, boundedJson, RequestFailure, respond } from '../../../../lib/http';
+import { assertSameOrigin, optionalJson, RequestFailure, respond } from '../../../../lib/http';
 import { requireOwner } from '../../../../lib/owner';
 export const dynamic = 'force-dynamic';
 export async function POST(request: Request) {
@@ -8,7 +8,7 @@ export async function POST(request: Request) {
     assertSameOrigin(request, env);
     const key = request.headers.get('Idempotency-Key') ?? '';
     if (!/^[a-zA-Z0-9_-]{16,128}$/.test(key)) throw new RequestFailure('VALIDATION_ERROR');
-    const input = request.body ? ((await boundedJson(request, 1000)) as { category?: unknown }) : {};
+    const input = (await optionalJson(request, 1000)) as { category?: unknown };
     if (
       !input ||
       typeof input !== 'object' ||

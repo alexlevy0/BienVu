@@ -54,6 +54,10 @@ export async function boundedJson(request: Request, maxBytes = 8192) {
     throw new RequestFailure('VALIDATION_ERROR');
   }
 }
+// Next attache un flux, même vide, à tout POST : seul le Content-Type annonce un corps JSON.
+export async function optionalJson(request: Request, maxBytes = 8192) {
+  return request.headers.has('content-type') ? boundedJson(request, maxBytes) : {};
+}
 export async function respond(action: () => Promise<Response>) {
   const context = requestContext();
   let response: Response;
