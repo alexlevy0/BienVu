@@ -1,5 +1,11 @@
 # BienVu — suivi des sprints
 
+### 01/11/2026 — Correctifs better-auth, qs et glob publiés
+
+La CI sécurité était rouge depuis le 28/10. `better-auth` **1.7.6 → 1.7.7** (GHSA-965c-763c-88jm critique, GHSA-r4xp-prcw-77qf haute, GHSA-44jh-23m7-hpcf faible ; aucune migration). Overrides ajoutés : `qs` **6.16.1** sous Express/OpenNext (GHSA-6pq8-jhm2-2vcw) et `glob` **14.0.3**, qui entraîne `minimatch` **11.0.3**, pour l’outillage de build OpenNext (GHSA-3g3m-2fjr-6pw4, GHSA-g3hv-75wg-m249). API `glob`/`globSync` vérifiée en ESM et CommonJS. Le plugin Magic Link et l’OAuth Proxy ne sont pas activés ; les connexions Google en cours au moment de la publication doivent être relancées.
+
+Commit **`ab77454`**, release **`ab7745401d90`**, Worker web **`2ed5bf5a-73d9-4791-b397-60955d998aaa`** actif à **100 %**, sourcemaps privées PostHog, publication `no_bundle` `--keep-vars --strict` enregistrée dans l’historique du superadmin. **CI fonctionnelle et sécurité vertes**, `pnpm audit` sans vulnérabilité. En local : lint, formatage, frontières, types, build, 925 tests (19 rejoués seuls après épuisement de ports Miniflare) et sonde comptes réussis. La sonde e-mail d’authentification plante localement après l’inscription avec 1.7.6 comme avec 1.7.7 (simulateur local) ; elle passe en CI Linux. Accueil, Éditeur et connexion **200** avec la nouvelle release, Beta **302**, session anonyme `null`, `/api/me` et création de brouillon sans session **401**. Aucune migration, aucun autre Worker ni paramètre modifié.
+
 ### 01/11/2026 — Création de projet sans corps rétablie
 
 Depuis la publication Auto du 25/10, `POST /api/imports/draft` lisait du JSON dès que `request.body` existait. En production, Next attache un flux vide à tout POST : la démo et le nouveau projet de l’Éditeur, la saisie manuelle et le transfert d’un projet invité, connectés, renvoyaient `VALIDATION_ERROR`. La route ne lit désormais le JSON que si un `Content-Type` l’annonce ; la catégorie `vehicle` reste envoyée en JSON. Test ajouté avec le flux vide reproduit.
