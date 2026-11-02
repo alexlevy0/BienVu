@@ -13,6 +13,6 @@
   "dependencies": {
     "@bienvu/contracts": "workspace:*",
     "@bienvu/db": "workspace:*",
-    "image-size": "2.0.3"
+    "image-size": "2.0.4"
   }
 }
