@@ -13,7 +13,7 @@ import {
 import {
   voiceSettings,
   setDefaultVoice,
-  cartesiaFreeUsage,
+  cartesiaUsage,
   reserveCartesiaVoice,
   finishCartesiaVoice,
   type Database,
@@ -111,7 +111,7 @@ export async function adminVoiceCatalog(env: Env, q = '') {
   });
   return AdminVoices.parse({
     catalog: await publicVoiceCatalog(env),
-    usage: await cartesiaFreeUsage(env.DB),
+    usage: await cartesiaUsage(env.DB),
     listings,
   });
 }

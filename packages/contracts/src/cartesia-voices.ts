@@ -306,5 +306,5 @@ export const cartesiaParisianVoices = [
   },
 ] as const;
 export const CARTESIA_DEFAULT_VOICE = 'cartesia-7c58f4a4-a72c-42fa-a503-41b9408820f3' as const;
-export const CARTESIA_FREE_CHARACTERS = 20_000;
+export const CARTESIA_CHARACTER_LIMIT = 100_000;
 export const CARTESIA_API_VERSION = '2026-08-14';

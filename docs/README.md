@@ -26,7 +26,7 @@ Ce dossier rassemble le cahier de construction, les sprints et leurs preuves. Un
 | [SOURCES.md](SOURCES.md)                   | Sources officielles et points à revérifier                                              |
 | [BILAN-SPRINTS.md](BILAN-SPRINTS.md)       | Revue des critères, preuves locales/réelles et priorités restantes                      |
 | [SUIVI.md](SUIVI.md)                       | État actuel et journal daté du développement                                            |
-| [VOIX-CARTESIA.md](VOIX-CARTESIA.md)       | Sonic 3.6, voix parisiennes, comparaisons superadmin et plafond Free                    |
+| [VOIX-CARTESIA.md](VOIX-CARTESIA.md)       | Sonic 3.6, voix parisiennes, comparaisons superadmin et plafond BienVu                  |
 | [SIMULATEUR-PRIX.md](SIMULATEUR-PRIX.md)   | Scénarios de packs/abonnements, coûts observés, prix cible et prévisions de rentabilité |
 
 ## Ordre des sprints

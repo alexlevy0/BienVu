@@ -10,7 +10,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { CartesiaVoiceConfig, cartesiaParisianVoices } from '../packages/contracts/src/index';
 import { cartesiaTts, measureVoiceWav, voiceCacheKey } from '../packages/voice/src/index';
-import { reserveCartesiaVoice, finishCartesiaVoice, cartesiaFreeUsage, type Database } from '../packages/db/src/index';
+import { reserveCartesiaVoice, finishCartesiaVoice, cartesiaUsage, type Database } from '../packages/db/src/index';
 import { cloudflare, accountId } from './cloudflare-operator.mjs';
 const exec = promisify(execFile),
   directory = 'evidence/remote/cartesia-20261006/previews',
@@ -119,5 +119,5 @@ if (mode === '--check') {
       );
     console.log(JSON.stringify({ voice: voice.name, durationMs: state.durationMs, ready: true }));
   }
-  console.log(await cartesiaFreeUsage(db));
+  console.log(await cartesiaUsage(db));
 }

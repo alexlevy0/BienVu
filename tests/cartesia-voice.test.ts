@@ -5,6 +5,7 @@ import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 import {
   CartesiaVoiceConfig,
   CARTESIA_DEFAULT_VOICE,
+  CARTESIA_CHARACTER_LIMIT,
   cartesiaParisianVoices,
   VoiceFailure,
   VideoVoice,
@@ -15,7 +16,7 @@ import { cartesiaTts, voiceCacheKey, measureVoiceWav } from '../packages/voice/s
 import {
   reserveCartesiaVoice,
   finishCartesiaVoice,
-  cartesiaFreeUsage,
+  cartesiaUsage,
   voiceSettings,
   setDefaultVoice,
   admitGeneration,
@@ -120,7 +121,7 @@ test('Cartesia : HTTP, flux trop long, silence et délai sont refusés sans retr
   const preview = await cartesiaTts(config, key, { fetch: longAudio, maximumDurationMs: 300000 }).synthesize('Bonjour');
   assert.equal(measureVoiceWav(preview.bytes, 300000).durationMs, 45000);
 });
-test('Voix : Free partagé, courses, audit, vrais textes, cache et accès superadmin', async (t) => {
+test('Voix : plafond partagé, courses, audit, vrais textes, cache et accès superadmin', async (t) => {
   const mf = new Miniflare(
     convertV4MiniflareOptions({
       modules: true,
@@ -249,7 +250,7 @@ test('Voix : Free partagé, courses, audit, vrais textes, cache et accès supera
   assert.equal(storedBytes.byteLength, JSON.parse(stored!.metrics_json).sizeBytes);
   assert.equal((await adminVoicesRequest(req(cookies[0]), env, sample.id)).status, 200);
   assert.equal((await adminVoicesRequest(req(''), env, sample.id)).status, 401);
-  const used = (await cartesiaFreeUsage(db)).used;
+  const used = (await cartesiaUsage(db)).used;
   assert.equal(used, input.text.length);
   const slots = await Promise.allSettled([
     reserveCartesiaVoice(db, 'slot-one', 'Bonjour'),
@@ -257,21 +258,28 @@ test('Voix : Free partagé, courses, audit, vrais textes, cache et accès supera
     reserveCartesiaVoice(db, 'slot-three', 'Bonjour'),
   ]);
   assert.equal(slots.filter((s) => s.status === 'fulfilled').length, 2);
-  assert.equal((await cartesiaFreeUsage(db)).active, 2);
+  assert.equal((await cartesiaUsage(db)).active, 2);
   for (const [i, s] of slots.entries())
     if (s.status === 'fulfilled') await finishCartesiaVoice(db, ['slot-one', 'slot-two', 'slot-three'][i], false);
-  assert.equal((await cartesiaFreeUsage(db)).used, used + 14);
+  assert.equal((await cartesiaUsage(db)).used, used + 14);
   await assert.rejects(db.prepare('DELETE FROM cartesia_usage').run(), /VOICE_USAGE_IMMUTABLE/);
-  for (let i = 0; i < 20; i++) {
-    try {
-      await reserveCartesiaVoice(db, 'budget-' + i, 'x'.repeat(1000));
-      await finishCartesiaVoice(db, 'budget-' + i, true);
-    } catch (error) {
-      assert.ok(rejected('VOICE_FREE_LIMIT')(error));
-    }
+  const beforeBudget = await cartesiaUsage(db),
+    fullCalls = Math.floor(beforeBudget.remaining / 1000),
+    remainder = beforeBudget.remaining % 1000;
+  for (let i = 0; i < fullCalls; i++) {
+    await reserveCartesiaVoice(db, 'budget-' + i, 'x'.repeat(1000));
+    await finishCartesiaVoice(db, 'budget-' + i, true);
   }
-  await assert.rejects(reserveCartesiaVoice(db, 'over-budget', 'x'.repeat(1000)), rejected('VOICE_FREE_LIMIT'));
-  assert.equal((await cartesiaFreeUsage(db, Date.now() + 32 * 86400_000)).used, 0);
+  if (remainder) {
+    await reserveCartesiaVoice(db, 'budget-remainder', 'x'.repeat(remainder));
+    await finishCartesiaVoice(db, 'budget-remainder', true);
+  }
+  const exhausted = await cartesiaUsage(db);
+  assert.equal(exhausted.limit, CARTESIA_CHARACTER_LIMIT);
+  assert.equal(exhausted.used, CARTESIA_CHARACTER_LIMIT);
+  assert.equal(exhausted.remaining, 0);
+  await assert.rejects(reserveCartesiaVoice(db, 'over-budget', 'x'), rejected('VOICE_FREE_LIMIT'));
+  assert.equal((await cartesiaUsage(db, Date.now() + 32 * 86400_000)).used, 0);
   await db
     .prepare('INSERT INTO hosted_import_budget VALUES(?,0,9500,0)')
     .bind(new Date().toISOString().slice(0, 7))

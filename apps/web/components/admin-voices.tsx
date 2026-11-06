@@ -140,8 +140,10 @@ export function AdminVoiceLibrary() {
         </div>
         {data && (
           <div className="admin-voices-quota">
-            <strong>{data.usage.remaining.toLocaleString('fr-FR')} / 20 000</strong>
-            <span>caractères disponibles · Cartesia Free</span>
+            <strong>
+              {data.usage.remaining.toLocaleString('fr-FR')} / {data.usage.limit.toLocaleString('fr-FR')}
+            </strong>
+            <span>caractères disponibles · plafond BienVu</span>
             <small>
               Plafond interne sur 31 jours glissants, partagé avec les vidéos et les extraits. Le solde du compte
               Cartesia peut différer.

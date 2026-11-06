@@ -1257,7 +1257,7 @@ function NarrationCosts({ calls }: { calls: AdminNarrationCall[] }) {
         {[
           { name: 'OpenAI · rédaction', total: openai, note: 'Avant remise sur les tokens en cache.' },
           { name: 'Google · voix', total: google, note: 'Avant gratuité mensuelle Google.' },
-          { name: 'Cartesia · voix', total: cartesia, note: 'Sonic 3.6 · quota Free, facture à rapprocher.' },
+          { name: 'Cartesia · voix', total: cartesia, note: 'Sonic 3.6 · plafond BienVu, facture à rapprocher.' },
           { name: 'Fish Audio · voix', total: fish, note: 'Modèle gratuit S2.1 Pro ; usage mesuré en octets UTF-8.' },
         ].map(({ name, total, note }) => (
           <div className="admin-cost-card" key={name}>

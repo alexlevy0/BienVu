@@ -1,4 +1,4 @@
-import { VideoVoice, DEFAULT_VIDEO_VOICE, VoiceFailure, VoiceText, CARTESIA_FREE_CHARACTERS } from '@bienvu/contracts';
+import { VideoVoice, DEFAULT_VIDEO_VOICE, VoiceFailure, VoiceText, CARTESIA_CHARACTER_LIMIT } from '@bienvu/contracts';
 import type { Database } from './index';
 
 export async function voiceSettings(db: Database) {
@@ -28,7 +28,7 @@ export async function setDefaultVoice(
     .run();
   return voiceSettings(db);
 }
-export async function cartesiaFreeUsage(db: Database, now = Date.now()) {
+export async function cartesiaUsage(db: Database, now = Date.now()) {
   const since = new Date(now - 31 * 86400_000).toISOString(),
     at = new Date(now).toISOString();
   const row = await db
@@ -37,9 +37,9 @@ export async function cartesiaFreeUsage(db: Database, now = Date.now()) {
     .bind(at, since)
     .first<{ used: number; calls: number; active: number }>();
   return {
-    limit: CARTESIA_FREE_CHARACTERS,
+    limit: CARTESIA_CHARACTER_LIMIT,
     used: row?.used ?? 0,
-    remaining: Math.max(0, CARTESIA_FREE_CHARACTERS - (row?.used ?? 0)),
+    remaining: Math.max(0, CARTESIA_CHARACTER_LIMIT - (row?.used ?? 0)),
     active: row?.active ?? 0,
     windowDays: 31,
   };

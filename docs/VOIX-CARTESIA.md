@@ -16,13 +16,13 @@ Le bouton « Choisir par défaut » enregistre un réglage global audité, avec 
 
 Les API du panneau et chaque fichier d’extrait exigent la session du superadmin avec adresse vérifiée. Les écritures contrôlent l’origine et la taille du JSON. Un catalogue public distinct expose uniquement noms, fournisseurs et défaut, sans texte d’annonce ni clé privée.
 
-## Limite Free et coût
+## Plafond BienVu et coût
 
-Un registre D1 atomique, commun aux générations et aux comparaisons, provisionne le nombre de caractères **avant** chaque appel Cartesia. Il bloque au-delà de 20 000 caractères sur 31 jours glissants et limite à deux appels simultanés. Cette fenêtre est conservatrice : le solde affiché est un plafond interne, pas une interrogation du solde fournisseur. Un usage extérieur à BienVu ou des règles de comptage fournisseur différentes peuvent réduire le solde réel ; les refus de l’API restent traités.
+Un registre D1 atomique, commun aux générations et aux comparaisons, provisionne le nombre de caractères **avant** chaque appel Cartesia. Il bloque au-delà de **100 000 caractères sur 31 jours glissants** et limite à deux appels simultanés. Cette fenêtre est un plafond opérationnel BienVu, pas une interrogation du solde fournisseur. Un usage extérieur à BienVu, le forfait Cartesia ou des règles de comptage fournisseur différentes peuvent réduire le solde réel ; les refus de l’API restent traités.
 
 Les appels échoués ou incertains restent provisionnés. Aucun retry automatique n’est lancé après un résultat incertain. Les extraits ont aussi un plafond de 60 créations par administrateur et jour. Un refus de quota avant tout appel permet une tentative ultérieure ; une réponse ambiguë demande une vérification.
 
-La gratuité n’est pas une facture : les métriques Cartesia conservent `actualBilledMicros=null`. Le rapprochement financier accepte Cartesia comme fournisseur pour affecter d’éventuelles factures réelles. Le quota de caractères fournisseur reste distinct des crédits BienVu.
+Le plafond BienVu n’est pas une facture : les métriques Cartesia conservent `actualBilledMicros=null`. Le rapprochement financier accepte Cartesia comme fournisseur pour affecter d’éventuelles factures réelles. Le quota de caractères fournisseur reste distinct des crédits BienVu.
 
 ## Audio et vérification
 

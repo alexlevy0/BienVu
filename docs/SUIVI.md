@@ -1,5 +1,13 @@
 # BienVu — suivi des sprints
 
+### 06/11/2026 — Plafond Cartesia BienVu porté à 100 000 caractères (local)
+
+À la demande d’Alex, la migration additive **0086** remplace le trigger D1 historique par `cartesia_usage_limit` : le plafond opérationnel BienVu passe de **20 000 à 100 000 caractères sur 31 jours glissants**, sans modifier le registre immuable `cartesia_usage`. La réservation atomique avant appel et la limite de deux synthèses Cartesia simultanées sont conservées. Le contrat et le tableau Super admin portent désormais un libellé neutre de « plafond BienVu », affichent la valeur transmise par l’API et ne présentent plus ce garde-fou comme le solde Free du fournisseur. Le script de préparation d’aperçus, la documentation et le test de saturation suivent la nouvelle limite.
+
+Le test Cartesia ciblé réussit (**3/3**), le typage complet et le build OpenNext réussissent. `pnpm check` a d’abord rencontré une indisponibilité locale de port Miniflare (`EADDRNOTAVAIL`) dans `tests/trial-api.test.ts`, sans lien avec la migration ; la suite rejouée séquentiellement réussit ensuite intégralement (**925/925**). Le build a envoyé les sourcemaps privées associées à ce build vers PostHog. À l’issue de cette validation locale, aucune génération, aucun appel Cartesia payant ni migration distante n’avait été effectué.
+
+Ce plafond ne modifie pas le forfait ni le solde Cartesia. Alex confirme disposer d’un abonnement Cartesia Pro ; aucune souscription ni achat de crédits n’est réalisé par ce changement.
+
 ### 01/11/2026 — Correctifs better-auth, qs et glob publiés
 
 La CI sécurité était rouge depuis le 28/10. `better-auth` **1.7.6 → 1.7.7** (GHSA-965c-763c-88jm critique, GHSA-r4xp-prcw-77qf haute, GHSA-44jh-23m7-hpcf faible ; aucune migration). Overrides ajoutés : `qs` **6.16.1** sous Express/OpenNext (GHSA-6pq8-jhm2-2vcw) et `glob` **14.0.3**, qui entraîne `minimatch` **11.0.3**, pour l’outillage de build OpenNext (GHSA-3g3m-2fjr-6pw4, GHSA-g3hv-75wg-m249). API `glob`/`globSync` vérifiée en ESM et CommonJS. Le plugin Magic Link et l’OAuth Proxy ne sont pas activés ; les connexions Google en cours au moment de la publication doivent être relancées.
